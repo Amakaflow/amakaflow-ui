@@ -396,4 +396,341 @@ class ParserService:
             blocks.append(current)
 
         return Workout(title=(wk_title or "Imported Workout"), source=source, blocks=blocks)
+    
+    @staticmethod
+    def parse_ai_workout(text: str, source: Optional[str] = None) -> Workout:
+        """
+        Parse AI/ChatGPT-generated workout text into a structured Workout object.
+        
+        Handles formatted workouts with:
+        - Numbered sections (1. Section Title)
+        - Narrative exercise descriptions
+        - Equipment notes in parentheses
+        - Superset clusters with rest times
+        - Special formatting characters
+        
+        Args:
+            text: Raw AI-generated workout text
+            source: Optional source identifier
+            
+        Returns:
+            Parsed Workout object
+        """
+        # Extract title if present (look for title-like lines at the start)
+        title_match = re.search(r'^([A-Z][^.\n]{5,60}Workout[^\n]*)', text, re.MULTILINE | re.IGNORECASE)
+        workout_title = title_match.group(1).strip() if title_match else "AI Generated Workout"
+        
+        blocks: List[Block] = []
+        lines = text.split('\n')
+        
+        current_block: Optional[Block] = None
+        pending_exercises: List[Exercise] = []  # Exercises collected before superset marker
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Skip empty lines and separator lines (⸻)
+            if not line or line == '⸻':
+                i += 1
+                continue
+            
+            # Check for numbered section header (e.g., "1. Big Lifts (Single Sets)")
+            section_match = re.match(r'^\d+\.\s+(.+?)(?:\s*\([^)]+\))?$', line)
+            if section_match:
+                # Save previous block if exists
+                if current_block:
+                    # Add any pending exercises as individual exercises
+                    if pending_exercises:
+                        current_block.exercises.extend(pending_exercises)
+                        pending_exercises.clear()
+                    if current_block.exercises or current_block.supersets:
+                        blocks.append(current_block)
+                
+                section_title = section_match.group(1).strip()
+                # Extract category from parentheses if present
+                category_match = re.search(r'\(([^)]+)\)', section_match.group(0))
+                category = category_match.group(1) if category_match else None
+                
+                block_label = section_title
+                if category:
+                    block_label = f"{section_title} ({category})"
+                
+                current_block = Block(label=block_label)
+                pending_exercises.clear()
+                i += 1
+                continue
+            
+            # Check for superset cluster marker on its own line (comes AFTER exercises)
+            # Handle rest time ranges like "60–75s" by extracting the first number
+            superset_match = re.search(r'\(superset\s*x\s*(?P<sets>\d+)(?:,\s*(?P<rest>\d+)[\s–\-]?\d*\s*s?\s*rest)?\)', line, re.I)
+            if superset_match:
+                if current_block and pending_exercises:
+                    sets_count = to_int(superset_match.group("sets"))
+                    rest_str = superset_match.group("rest")
+                    # Extract first number from rest (handles "60–75s" -> 60)
+                    rest_sec = to_int(rest_str.split('–')[0].split('-')[0].strip() if rest_str else None)
+                    # Apply sets to all exercises in superset (superset sets override individual)
+                    for ex in pending_exercises:
+                        ex.sets = sets_count
+                    # Create superset from pending exercises
+                    current_block.supersets.append(Superset(
+                        exercises=pending_exercises.copy(),
+                        rest_between_sec=rest_sec
+                    ))
+                    current_block.default_sets = sets_count
+                    current_block.structure = f"{sets_count} sets"
+                    pending_exercises.clear()
+                i += 1
+                continue
+            
+            # Skip standalone description lines that are clearly not exercises
+            # But we'll collect them as part of the previous exercise below
+            
+            # Look for exercise lines (usually start with • or are indented)
+            if line.startswith('•') or (line and len(line) > 10 and not line.startswith('(')):
+                # Remove bullet point and leading whitespace
+                exercise_line = re.sub(r'^[•\s]+', '', line)
+                
+                # Skip if line is too short after cleaning
+                if len(exercise_line) < 3:
+                    i += 1
+                    continue
+                
+                # Collect multi-line exercise description
+                # Check if next lines are part of this exercise (descriptions, not new exercises)
+                full_exercise_text = exercise_line
+                j = i + 1
+                blank_lines_seen = 0
+                while j < len(lines):
+                    next_line = lines[j].strip()
+                    # Stop if we hit a new exercise bullet, section, superset marker, or separator
+                    if (next_line == '⸻' or
+                        next_line.startswith('•') or
+                        (next_line.startswith('(') and 'superset' in next_line.lower()) or
+                        re.match(r'^\d+\.', next_line)):
+                        break
+                    # Continue collecting description lines
+                    if next_line:
+                        blank_lines_seen = 0
+                        # Check if it's likely a description vs new exercise
+                        is_description = (
+                            re.match(r'^\d+\s+(heavy|working|set)', next_line, re.I) or  # "1 heavy working set"
+                            (re.match(r'^\d+', next_line) and any(word in next_line.lower() for word in ['set', 'reps', 'heavy', 'working'])) or
+                            next_line[0].islower() or  # Starts with lowercase
+                            (len(next_line) < 50 and not next_line[0].isupper())  # Short lowercase lines are descriptions
+                        )
+                        if is_description and not next_line.startswith('('):
+                            full_exercise_text += ' ' + next_line
+                            j += 1
+                        else:
+                            # If it looks like a new exercise (starts with capital and is long), stop
+                            if next_line[0].isupper() and len(next_line) > 20:
+                                break
+                            # Otherwise, might still be part of description
+                            j += 1
+                    else:
+                        # Blank line - allow one blank line between exercise and description
+                        blank_lines_seen += 1
+                        if blank_lines_seen > 1:
+                            break
+                        j += 1
+                
+                # Extract exercise name and details
+                exercise = ParserService._parse_ai_exercise_line(full_exercise_text)
+                if exercise and current_block:
+                    pending_exercises.append(exercise)
+                
+                # Skip the lines we already processed
+                i = j
+                continue
+            
+            i += 1
+        
+        # Finish last block
+        if current_block:
+            # Check if there's a superset marker after the last exercise (might be at end of text)
+            # Look ahead for any remaining superset markers
+            if pending_exercises:
+                # Check if there's a superset marker in remaining lines
+                for k in range(i, len(lines)):
+                    remaining_line = lines[k].strip()
+                    superset_match = re.search(r'\(superset\s*x\s*(?P<sets>\d+)(?:,\s*(?P<rest>\d+)[\s–\-]?\d*\s*s?\s*rest)?\)', remaining_line, re.I)
+                    if superset_match:
+                        sets_count = to_int(superset_match.group("sets"))
+                        rest_str = superset_match.group("rest")
+                        # Extract first number from rest (handles "60–75s" -> 60)
+                        rest_sec = to_int(rest_str.split('–')[0].split('-')[0].strip() if rest_str else None)
+                        # Apply sets to all exercises in superset
+                        for ex in pending_exercises:
+                            ex.sets = sets_count
+                        # Create superset from pending exercises
+                        current_block.supersets.append(Superset(
+                            exercises=pending_exercises.copy(),
+                            rest_between_sec=rest_sec
+                        ))
+                        current_block.default_sets = sets_count
+                        current_block.structure = f"{sets_count} sets"
+                        pending_exercises.clear()
+                        break
+                
+                # If no superset marker found, add as individual exercises
+                if pending_exercises:
+                    current_block.exercises.extend(pending_exercises)
+            
+            if current_block.exercises or current_block.supersets:
+                blocks.append(current_block)
+        
+        return Workout(title=workout_title, source=source or "ai_generated", blocks=blocks)
+    
+    @staticmethod
+    def _parse_ai_exercise_line(line: str) -> Optional[Exercise]:
+        """
+        Parse a single exercise line from AI-generated workout.
+        
+        Examples:
+        - "Marrs Bar Squat (SquatMax-MD + Voltras)\n1 heavy working set (6–8 reps, ~80–85% effort)."
+        - "Dumbbell RDLs – 8–10 reps"
+        - "Band-Resisted Push-Ups – AMRAP (8–12 target)"
+        
+        Args:
+            line: Exercise description line
+            
+        Returns:
+            Exercise object or None if parsing fails
+        """
+        # Clean up the line
+        line = line.strip()
+        if not line or len(line) < 3:
+            return None
+        
+        # Split by newline if present (sometimes equipment is on separate line)
+        parts = [p.strip() for p in line.split('\n') if p.strip()]
+        if not parts:
+            return None
+        
+        # Combine all parts for full text analysis
+        full_text = ' '.join(parts)
+        
+        # Extract exercise name - look for the actual exercise name
+        # Exercise name is usually before descriptions like "1 heavy working set" or rep ranges
+        # Try to find the base exercise name (before set/rep descriptions)
+        if 'heavy working set' in full_text.lower():
+            # Pattern: "Exercise Name 1 heavy working set..."
+            # Split on "1 heavy" or "heavy working set"
+            exercise_name_match = re.search(r'^(.+?)\s+(?:\d+\s+)?heavy\s+working\s+set', full_text, re.I)
+            if exercise_name_match:
+                exercise_part = exercise_name_match.group(1).strip()
+            else:
+                # Fallback: take first part before any description starting with number
+                exercise_part = parts[0].strip()
+                # Remove trailing dashes
+                exercise_part = re.sub(r'[\s–\-]+$', '', exercise_part)
+        else:
+            # For exercises with inline reps like "Exercise – 8–10 reps"
+            # Take everything up to the dash followed by numbers or rep indicators
+            exercise_name_match = re.match(r'^(.+?)(?:[\s–\-]\s*(?:\d+|/side|AMRAP|reps?)|$)', full_text, re.I)
+            if exercise_name_match:
+                exercise_part = exercise_name_match.group(1).strip()
+                # Remove trailing dashes
+                exercise_part = re.sub(r'[\s–\-]+$', '', exercise_part)
+            else:
+                exercise_part = parts[0].strip()
+        
+        # Extract equipment notes - look for parentheses that contain equipment keywords
+        equipment_keywords = ['using', 'or', 'dumbbell', 'barbell', 'bar', 'bench', 'band', 'jammer', 'arms', 'slot']
+        equipment = None
+        equipment_matches = list(re.finditer(r'\(([^)]+)\)', exercise_part))
+        for match in equipment_matches:
+            content = match.group(1).lower()
+            # If parentheses contain equipment keywords, treat as equipment
+            if any(keyword in content for keyword in equipment_keywords):
+                equipment = match.group(1)
+                # Remove equipment from exercise name
+                exercise_part = exercise_part[:match.start()].strip() + ' ' + exercise_part[match.end():].strip()
+                break
+        
+        # Clean up exercise name
+        exercise_name = re.sub(r'\s+', ' ', exercise_part).strip()
+        # Remove trailing dashes
+        exercise_name = re.sub(r'[\s–\-]+$', '', exercise_name).strip()
+        
+        # Add equipment back if we found it
+        if equipment:
+            exercise_name = f"{exercise_name} ({equipment})"
+        
+        # Look for sets and reps in remaining parts or in the line
+        full_text = ' '.join(parts)
+        
+        sets = None
+        reps = None
+        reps_range = None
+        
+        # Pattern: "1 heavy working set (6–8 reps, ~80–85% effort)"
+        heavy_set_match = re.search(r'(\d+)\s+heavy\s+working\s+set\s*\(([^)]+)\)', full_text, re.I)
+        if heavy_set_match:
+            sets = to_int(heavy_set_match.group(1))
+            details = heavy_set_match.group(2)
+            # Extract reps from details
+            reps_match = re.search(r'(\d+)[\s–\-](\d+)\s*reps?', details)
+            if reps_match:
+                reps_range = f"{reps_match.group(1)}-{reps_match.group(2)}"
+            else:
+                reps_match = re.search(r'(\d+)\s*reps?', details)
+                if reps_match:
+                    reps = to_int(reps_match.group(1))
+        
+        # Pattern: "X sets" or "x3"
+        if not sets:
+            sets_match = re.search(r'(\d+)\s*sets?', full_text, re.I) or re.search(r'[x×]\s*(\d+)', full_text, re.I)
+            if sets_match:
+                sets = to_int(sets_match.group(1))
+        
+        # Pattern: "6–8 reps" or "8-10 reps"
+        if not reps and not reps_range:
+            reps_match = re.search(r'(\d+)[\s–\-]+(\d+)\s*reps?', full_text, re.I)
+            if reps_match:
+                reps_range = f"{reps_match.group(1)}-{reps_match.group(2)}"
+            else:
+                reps_match = re.search(r'(\d+)\s*reps?', full_text, re.I)
+                if reps_match:
+                    reps = to_int(reps_match.group(1))
+        
+        # Pattern: "AMRAP (8–12 target)" - use target as rep range
+        amrap_match = re.search(r'AMRAP\s*\((\d+)[\s–\-](\d+)\s*target\)', full_text, re.I)
+        if amrap_match:
+            reps_range = f"{amrap_match.group(1)}-{amrap_match.group(2)}"
+        
+        # Pattern: "/side" or "/side" - indicates unilateral exercise
+        if '/side' in full_text.lower() or 'per side' in full_text.lower():
+            # Keep reps as is, but note it's per side in the name
+            if not '/side' in exercise_name.lower():
+                exercise_name += " (per side)"
+        
+        # Pattern: "20–30s hold" - time-based exercise
+        duration_sec = None
+        time_match = re.search(r'(\d+)[\s–\-]?(\d+)?\s*s\s*hold', full_text, re.I)
+        if time_match:
+            duration_sec = to_int(time_match.group(1))
+            if time_match.group(2):
+                # Use upper bound if range provided
+                duration_sec = to_int(time_match.group(2))
+        
+        # Default to 1 set if no sets specified but reps found
+        if not sets and (reps or reps_range):
+            sets = 1
+        
+        # Determine exercise type
+        ex_type = "strength"
+        if duration_sec or 'hold' in full_text.lower():
+            ex_type = "interval"
+        
+        return Exercise(
+            name=exercise_name,
+            sets=sets,
+            reps=reps,
+            reps_range=reps_range,
+            duration_sec=duration_sec,
+            type=ex_type
+        )
 

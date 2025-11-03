@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.models import Workout
@@ -27,6 +27,17 @@ async def ingest_text(text: str = Form(...), source: Optional[str] = Form(None))
     """Ingest workout from plain text."""
     wk = ParserService.parse_free_text_to_workout(text, source)
     return JSONResponse(wk.model_dump())
+
+
+@router.post("/ingest/ai_workout")
+async def ingest_ai_workout(text: str = Body(..., media_type="text/plain")):
+    """Ingest AI/ChatGPT-generated workout with formatted structure.
+    
+    Accepts plain text workout in request body.
+    Returns structured workout JSON matching the same format as /ingest/text.
+    """
+    wk = ParserService.parse_ai_workout(text, "ai_generated")
+    return JSONResponse(content=wk.model_dump(), media_type="application/json")
 
 
 @router.post("/ingest/image")
