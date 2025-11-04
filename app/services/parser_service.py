@@ -408,6 +408,7 @@ class ParserService:
         - Equipment notes in parentheses
         - Superset clusters with rest times
         - Special formatting characters
+        - Cycling/Zwift workouts (FTP-based, time intervals)
         
         Args:
             text: Raw AI-generated workout text
@@ -416,6 +417,18 @@ class ParserService:
         Returns:
             Parsed Workout object
         """
+        # Check if this is a cycling/Zwift workout (has FTP, cadence, time intervals)
+        is_cycling_workout = (
+            re.search(r'\bFTP\b', text, re.I) or
+            re.search(r'\bcadence\b', text, re.I) or
+            re.search(r'\d+:\d+[–\-]\d+:\d+', text) or  # Time intervals like "0:00–3:00"
+            re.search(r'% FTP', text, re.I) or
+            re.search(r'zwift', text, re.I)
+        )
+        
+        if is_cycling_workout:
+            return ParserService._parse_cycling_workout(text, source)
+        
         # Extract title if present (look for title-like lines at the start)
         title_match = re.search(r'^([A-Z][^.\n]{5,60}Workout[^\n]*)', text, re.MULTILINE | re.IGNORECASE)
         workout_title = title_match.group(1).strip() if title_match else "AI Generated Workout"
@@ -733,4 +746,264 @@ class ParserService:
             duration_sec=duration_sec,
             type=ex_type
         )
+    
+    @staticmethod
+    def _parse_cycling_workout(text: str, source: Optional[str] = None) -> Workout:
+        """
+        Parse cycling/Zwift workout text into a structured Workout object.
+        
+        Handles:
+        - Time-based intervals (0:00–3:00 → 50% FTP)
+        - Repeat instructions (Repeat 3×)
+        - FTP percentages
+        - Cadence notes
+        - Recovery periods
+        
+        Args:
+            text: Raw cycling workout text
+            source: Optional source identifier
+            
+        Returns:
+            Parsed Workout object
+        """
+        # Extract title
+        title_match = re.search(r'^([^\n]+Workout[^\n]*)', text, re.MULTILINE | re.IGNORECASE)
+        workout_title = title_match.group(1).strip() if title_match else "Cycling Workout"
+        
+        # Extract goal if present
+        goal_match = re.search(r'Goal:\s*(.+?)(?:\n|⸻)', text, re.I | re.DOTALL)
+        goal = goal_match.group(1).strip() if goal_match else None
+        
+        blocks: List[Block] = []
+        lines = text.split('\n')
+        
+        current_block: Optional[Block] = None
+        current_exercises: List[Exercise] = []
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Skip empty lines and separators
+            if not line or line == '⸻':
+                i += 1
+                continue
+            
+            # Skip goal line (already extracted)
+            if line.startswith('Goal:'):
+                i += 1
+                continue
+            
+            # Skip cadence notes section (can add as block metadata later)
+            if 'Cadence' in line and 'Notes' in line:
+                i += 1
+                continue
+            
+            # Check for section headers (e.g., "Warm-Up – 10:00", "Set 1 — Threshold + Tempo (15:00)")
+            # Handle both en dash (–) and em dash (—) and regular dash
+            # Section header formats:
+            # 1. "Warm-Up – 10:00" (name - duration)
+            # 2. "Set 1 — Threshold + Tempo (15:00)" (name — description (duration))
+            # Don't match if it looks like a time interval (starts with time range like "0:00–3:00")
+            if not re.match(r'^\s*[\s•\t]*\d+:\d+[–\-]', line):
+                # Pattern 1: Simple format "Name - Duration" or "Name — Duration"
+                section_match = re.match(r'^([A-Za-z0-9][A-Za-z0-9\s\-]+?)\s*[–—\-]\s*([\d:]+)(?:\s*\(([^)]+)\))?$', line)
+                
+                # Pattern 2: Format with description "Set 1 — Description (Duration)"
+                if not section_match:
+                    section_match = re.match(r'^([A-Za-z0-9][A-Za-z0-9\s]+?)\s*[—]\s*(.+?)\s*\(([\d:]+)\)$', line)
+                    if section_match:
+                        # Reorder groups: name, duration, description
+                        section_name = section_match.group(1).strip()
+                        section_desc = section_match.group(2).strip()
+                        section_duration = section_match.group(3).strip()
+                        # Reconstruct as if it matched pattern 1: (name + desc, duration, None)
+                        from types import SimpleNamespace
+                        section_match = SimpleNamespace()
+                        section_match.group = lambda n: (f"{section_name} — {section_desc}", section_duration, None)[n-1] if n <= 3 else None
+                
+                # Pattern 3: Simpler em/en dash pattern
+                if not section_match:
+                    section_match = re.match(r'^([A-Za-z0-9][^–—]*?)\s*[–—]\s*([\d:]+)(?:\s*\(([^)]+)\))?$', line)
+            else:
+                section_match = None
+            
+            if section_match:
+                # Save previous block
+                if current_block:
+                    if current_exercises:
+                        current_block.exercises.extend(current_exercises)
+                    if current_block.exercises:
+                        blocks.append(current_block)
+                
+                section_name = section_match.group(1).strip()
+                section_duration = section_match.group(2).strip()
+                section_note = section_match.group(3) if section_match.group(3) else None
+                
+                # Parse duration (e.g., "10:00" -> 600 seconds)
+                duration_sec = ParserService._parse_duration_to_seconds(section_duration)
+                
+                block_label = section_name
+                if section_note:
+                    block_label = f"{section_name} ({section_note})"
+                
+                current_block = Block(label=block_label)
+                if duration_sec:
+                    current_block.time_work_sec = duration_sec
+                
+                # Clear exercises and reset defaults for new section
+                current_exercises.clear()
+                current_block.default_sets = None
+                current_block.structure = None
+                i += 1
+                continue
+            
+            # Check for "Repeat N×" instruction
+            # This applies to the NEXT exercises in the current block
+            repeat_match = re.search(r'Repeat\s+(\d+)\s*[x×]', line, re.I)
+            if repeat_match:
+                if current_block:
+                    repeat_count = to_int(repeat_match.group(1))
+                    # Store the repeat count for the current block - applies to exercises added after this
+                    current_block.default_sets = repeat_count
+                    current_block.structure = f"{repeat_count} rounds"
+                i += 1
+                continue
+            
+            # Check for time intervals (e.g., "0:00–3:00 → 50% FTP" or "•	0:00–3:00 → 50% FTP")
+            # Handle tabs, bullets, and different arrow formats
+            time_interval_match = re.match(r'^[\s•\t]*(\d+:\d+)[–\-](\d+:\d+)\s*[→-]\s*(.+?)$', line)
+            if time_interval_match:
+                start_time = time_interval_match.group(1)
+                end_time = time_interval_match.group(2)
+                instruction = time_interval_match.group(3).strip()
+                
+                # Calculate duration
+                start_sec = ParserService._parse_duration_to_seconds(start_time)
+                end_sec = ParserService._parse_duration_to_seconds(end_time)
+                if start_sec is not None and end_sec is not None:
+                    duration = end_sec - start_sec
+                else:
+                    duration = None
+                
+                # Extract FTP percentage if present
+                ftp_match = re.search(r'(\d+)%\s*FTP', instruction, re.I)
+                ftp_percent = ftp_match.group(1) if ftp_match else None
+                
+                # Extract additional instructions
+                additional = re.sub(r'\d+%\s*FTP', '', instruction, flags=re.I).strip()
+                additional = re.sub(r'\s+', ' ', additional).strip()  # Clean up whitespace
+                
+                exercise_name = f"{start_time}–{end_time}"
+                if ftp_percent:
+                    exercise_name += f" @ {ftp_percent}% FTP"
+                if additional:
+                    exercise_name += f" ({additional})"
+                
+                exercise = Exercise(
+                    name=exercise_name,
+                    duration_sec=duration,
+                    type="interval"
+                )
+                # Apply repeat count if set for current block
+                if current_block and current_block.default_sets:
+                    exercise.sets = current_block.default_sets
+                current_exercises.append(exercise)
+                i += 1
+                continue
+            
+            # Check for simple interval lines with @ notation (e.g., "3:00 @ 103% FTP")
+            time_at_ftp_match = re.match(r'^\s*[•\t]*\s*(\d+:\d+)\s*@\s*(\d+)%\s*FTP\s*(?:\((.+?)\))?', line, re.I)
+            if time_at_ftp_match:
+                duration_str = time_at_ftp_match.group(1)
+                ftp_percent = time_at_ftp_match.group(2)
+                note = time_at_ftp_match.group(3) if time_at_ftp_match.group(3) else None
+                
+                duration_sec = ParserService._parse_duration_to_seconds(duration_str)
+                
+                exercise_name = f"{duration_str} @ {ftp_percent}% FTP"
+                if note:
+                    exercise_name += f" ({note})"
+                
+                exercise = Exercise(
+                    name=exercise_name,
+                    duration_sec=duration_sec,
+                    type="interval"
+                )
+                # Apply repeat count if set for current block
+                if current_block and current_block.default_sets:
+                    exercise.sets = current_block.default_sets
+                current_exercises.append(exercise)
+                i += 1
+                continue
+            
+            # Check for simple interval lines (e.g., "60% FTP easy spin")
+            if ('FTP' in line.upper() or 'tempo' in line.lower() or 'threshold' in line.lower()) and '•' in line:
+                # Extract percentage and instruction
+                ftp_match = re.search(r'(\d+)%\s*FTP', line, re.I)
+                ftp_percent = ftp_match.group(1) if ftp_match else None
+                
+                # Clean up the line
+                exercise_name = line.replace('•', '').replace('\t', ' ').strip()
+                exercise_name = re.sub(r'\s+', ' ', exercise_name)  # Normalize whitespace
+                
+                if not ftp_percent:
+                    # If no FTP found, use the whole line as name
+                    pass
+                
+                exercise = Exercise(
+                    name=exercise_name,
+                    type="interval"
+                )
+                # Apply repeat count if set for current block
+                if current_block and current_block.default_sets:
+                    exercise.sets = current_block.default_sets
+                current_exercises.append(exercise)
+                i += 1
+                continue
+            
+            i += 1
+        
+        # Finish last block
+        if current_block:
+            if current_exercises:
+                current_block.exercises.extend(current_exercises)
+            if current_block.exercises:
+                blocks.append(current_block)
+        
+        # Add goal as block if provided
+        if goal and blocks:
+            goal_block = Block(label="Goal")
+            goal_block.exercises.append(Exercise(name=goal, type="interval"))
+            blocks.insert(0, goal_block)
+        
+        return Workout(title=workout_title, source=source or "ai_generated", blocks=blocks)
+    
+    @staticmethod
+    def _parse_duration_to_seconds(duration_str: str) -> Optional[int]:
+        """
+        Parse duration string to seconds.
+        
+        Examples:
+        - "10:00" -> 600
+        - "3:00" -> 180
+        - "15" -> 15 (assumes seconds)
+        
+        Args:
+            duration_str: Duration string (MM:SS or seconds)
+            
+        Returns:
+            Duration in seconds or None
+        """
+        if ':' in duration_str:
+            parts = duration_str.split(':')
+            if len(parts) == 2:
+                minutes = to_int(parts[0])
+                seconds = to_int(parts[1])
+                if minutes is not None and seconds is not None:
+                    return minutes * 60 + seconds
+        else:
+            # Try to parse as seconds
+            return to_int(duration_str)
+        return None
 
