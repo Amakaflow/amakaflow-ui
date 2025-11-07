@@ -16,6 +16,7 @@ from app.services.ocr_service import OCRService
 from app.services.parser_service import ParserService
 from app.services.video_service import VideoService
 from app.services.export_service import ExportService
+from app.services.instagram_service import InstagramService, InstagramServiceError
 
 router = APIRouter()
 
@@ -187,6 +188,12 @@ class YouTubeTranscriptRequest(BaseModel):
     url: str
 
 
+class InstagramIngestRequest(BaseModel):
+    username: str
+    password: str
+    url: str
+
+
 @router.get("/health")
 def health():
     """Health check endpoint."""
@@ -254,6 +261,54 @@ async def ingest_url(url: str = Body(..., embed=True)):
     if title:
         wk.title = title[:80]
     return JSONResponse(wk.model_dump())
+
+
+@router.post("/ingest/instagram")
+async def ingest_instagram(payload: InstagramIngestRequest):
+    """Ingest workout images from Instagram using Instaloader."""
+
+    tmpdir = tempfile.mkdtemp(prefix="instagram_ingest_")
+
+    try:
+        try:
+            image_paths = InstagramService.download_post_images(
+                username=payload.username,
+                password=payload.password,
+                url=payload.url,
+                target_dir=tmpdir,
+            )
+        except InstagramServiceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:  # pragma: no cover - unexpected runtime errors
+            raise HTTPException(status_code=500, detail=f"Instagram ingestion failed: {exc}") from exc
+
+        extracted_segments = []
+        for image_path in image_paths:
+            try:
+                with open(image_path, "rb") as file_obj:
+                    text = OCRService.ocr_image_bytes(file_obj.read()).strip()
+                if text:
+                    extracted_segments.append(text)
+            except Exception:
+                continue
+
+        if not extracted_segments:
+            raise HTTPException(status_code=422, detail="OCR could not extract text from Instagram images.")
+
+        merged_text = "\n".join(extracted_segments)
+        workout = ParserService.parse_free_text_to_workout(merged_text, source=payload.url)
+
+        response_payload = workout.model_dump()
+        response_payload.setdefault("_provenance", {})
+        response_payload["_provenance"].update({
+            "mode": "instagram_image",
+            "source_url": payload.url,
+            "image_count": len(image_paths),
+        })
+
+        return JSONResponse(response_payload)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @router.post("/export/tp_text")
