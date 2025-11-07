@@ -201,8 +201,8 @@ class TestParserService:
 
         block = workout.blocks[0]
         assert block.label == "Engine Builder"
-        assert block.structure == "Repeat sequence for 35 min"
-        assert block.time_work_sec == 35 * 60
+        assert block.structure == "Complete sequence in order"
+        assert block.time_work_sec is None
         assert not block.exercises
         assert len(block.supersets) == 1
 
@@ -230,4 +230,82 @@ class TestParserService:
 
         assert superset_exercises[5].name == "Row"
         assert superset_exercises[5].distance_m == 1500
+
+    def test_parse_hyrox_engine_builder_phases(self):
+        """Hyrox Engine Builder variants with multiple run/lunge/sled phases parse correctly."""
+        text = """
+        HY ROX CF
+        S ENGINE BUILDER
+        ENGINEBUILDER
+        1200M RUN
+        60M LUNGES Kao’
+        1200M RUN
+        30M SLED PUSH NS
+        1200M RUN
+        50 WALL BALLS
+        1200M RUN
+        50M LUNGES
+        600M RUN
+        20M SLED PUSH
+        600M RUN
+        40 WALL BALLS
+        600M RUN
+        200M FARMERS CARRY A
+        600M RUN oo
+        """
+
+        workout = ParserService.parse_free_text_to_workout(text, source="https://www.instagram.com/p/DOgZYdKgphG/")
+
+        assert workout.title == "Hyrox Engine Builder"
+        assert len(workout.blocks) == 1
+
+        block = workout.blocks[0]
+        assert block.label == "Engine Builder"
+        assert block.structure == "Complete sequence in order"
+        assert block.time_work_sec is None
+        assert not block.exercises
+        assert len(block.supersets) == 1
+
+        names = [ex.name for ex in block.supersets[0].exercises]
+        distances = [ex.distance_m for ex in block.supersets[0].exercises]
+
+        expected_names = [
+            "Run",
+            "Walking Lunges",
+            "Run",
+            "Sled Push",
+            "Run",
+            "Wall Balls",
+            "Run",
+            "Walking Lunges",
+            "Run",
+            "Sled Push",
+            "Run",
+            "Wall Balls",
+            "Run",
+            "Farmers Carry",
+            "Run",
+        ]
+
+        assert names == expected_names
+
+        expected_distances = [
+            1200,
+            60,
+            1200,
+            30,
+            1200,
+            None,
+            1200,
+            50,
+            600,
+            20,
+            600,
+            None,
+            600,
+            200,
+            600,
+        ]
+
+        assert distances == expected_distances
 

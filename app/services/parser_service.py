@@ -201,21 +201,28 @@ class ParserService:
             return None
 
         joined_upper = " ".join(normalized_lines).upper()
-        if "HY ROX" not in joined_upper.replace("HYROX", "HY ROX"):
+        compact = re.sub(r"\s+", "", joined_upper)
+        if "HYROX" not in compact:
             return None
-        if "ENGINE BUILDER" not in joined_upper:
+        if "ENGINEBUILDER" not in compact:
             return None
 
         exercises: List[Exercise] = []
 
+        skip_tokens = {
+            "HY ROX CPEC",
+            "HYROX CPEC",
+            "HYROX CF",
+            "FITNESS",
+            "S ENGINE BUILDER",
+            "ENGINE BUILDER",
+            "ENGINEBUILDER",
+        }
+
         for raw in normalized_lines:
             up = re.sub(r"[^A-Z0-9 ]", " ", raw.upper())
             up = re.sub(r"\s+", " ", up).strip()
-            if not up:
-                continue
-
-            # Skip obvious non-exercise captions
-            if up in {"HY ROX CPEC", "HYROX CPEC", "FITNESS", "S ENGINE BUILDER", "ENGINE BUILDER"}:
+            if not up or up in skip_tokens:
                 continue
 
             number = ParserService._extract_relevant_number(up)
@@ -223,28 +230,31 @@ class ParserService:
                 continue
 
             if "RUN" in up:
-                exercises.append(
-                    Exercise(name="Run", distance_m=number, type="HIIT")
-                )
+                exercises.append(Exercise(name="Run", distance_m=number, type="HIIT"))
                 continue
 
             if "ROW" in up:
-                # Normalize label to Row even if OCR captured ROWER or ROW REMOT
-                exercises.append(
-                    Exercise(name="Row", distance_m=number, type="HIIT")
-                )
+                exercises.append(Exercise(name="Row", distance_m=number, type="HIIT"))
                 continue
 
             if "WALL" in up and "BALL" in up:
-                exercises.append(
-                    Exercise(name="Wall Balls", reps=number, type="strength")
-                )
+                exercises.append(Exercise(name="Wall Balls", reps=number, type="strength"))
                 continue
 
             if "BURPEE" in up:
-                exercises.append(
-                    Exercise(name="Burpee Broad Jump", reps=number, type="HIIT")
-                )
+                exercises.append(Exercise(name="Burpee Broad Jump", reps=number, type="HIIT"))
+                continue
+
+            if "LUNGE" in up:
+                exercises.append(Exercise(name="Walking Lunges", distance_m=number, type="strength"))
+                continue
+
+            if "SLED" in up and "PUSH" in up:
+                exercises.append(Exercise(name="Sled Push", distance_m=number, type="strength"))
+                continue
+
+            if "FARMERS" in up and "CARRY" in up:
+                exercises.append(Exercise(name="Farmers Carry", distance_m=number, type="strength"))
                 continue
 
         if not exercises:
@@ -252,8 +262,8 @@ class ParserService:
 
         block = Block(
             label="Engine Builder",
-            structure="Repeat sequence for 35 min",
-            time_work_sec=35 * 60,
+            structure="Complete sequence in order",
+            time_work_sec=None,
             supersets=[Superset(exercises=exercises)],
         )
 
