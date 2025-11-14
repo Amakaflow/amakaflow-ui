@@ -1,0 +1,189 @@
+{
+  "health": {
+    "ok": true
+  },
+  "ingest_text": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ]
+  },
+  "ingest_ai_workout": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ]
+  },
+  "ingest_image": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ]
+  },
+  "ingest_url": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ]
+  },
+  "ingest_instagram_test": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ],
+    "_provenance": {
+      "mode": "instagram_image_test",
+      "source_url": "https://www.instagram.com/p/example/",
+      "image_count": 3
+    }
+  },
+  "ingest_youtube": {
+    "title": "Sample Chest & Triceps Workout",
+    "source": "example",
+    "blocks": [
+      {
+        "label": "Main Workout",
+        "structure": "4 sets",
+        "rest_between_sec": 90,
+        "exercises": [
+          {
+            "name": "Incline Barbell Bench Press",
+            "sets": 4,
+            "reps": 8,
+            "type": "strength",
+            "notes": "Last set to failure; 45\u00b0 incline; narrow grip; pause on chest."
+          },
+          {
+            "name": "Seated Cable Fly",
+            "sets": 3,
+            "reps_range": "10-12",
+            "type": "strength",
+            "notes": "Slow negatives; elbows high; deep stretch."
+          }
+        ],
+        "supersets": []
+      }
+    ],
+    "_provenance": {
+      "mode": "transcript_only",
+      "source_url": "https://www.youtube.com/watch?v=example",
+      "has_captions": true,
+      "has_asr": false,
+      "has_ocr": false,
+      "transcript_provider": "youtube-transcript.io",
+      "transcript_summarized": false
+    }
+  },
+  "export_tp_text": "WORKOUT: Sample Chest & Triceps Workout\n\nMain Workout\n4 sets; 90 sec rest\n  - Incline Barbell Bench Press: 4 x 8\n  - Seated Cable Fly: 3 x 10-12",
+  "export_tcx": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<TrainingCenterDatabase>\n  <Workouts>\n    <Workout>\n      <Name>Sample Chest & Triceps Workout</Name>\n    </Workout>\n  </Workouts>\n</TrainingCenterDatabase>"
+}
