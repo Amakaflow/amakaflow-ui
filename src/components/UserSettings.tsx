@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -22,7 +22,7 @@ import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLef
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner@2.0.3';
 import { LinkedAccounts } from './LinkedAccounts';
-import { deleteAccount } from '../lib/auth';
+import { deleteAccount, getUserIdentityProviders } from '../lib/auth';
 
 type Props = {
   user: {
@@ -46,6 +46,16 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted 
   const [pushNotifications, setPushNotifications] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Load linked OAuth providers
+    const loadProviders = async () => {
+      const { providers } = await getUserIdentityProviders();
+      setLinkedProviders(providers);
+    };
+    loadProviders();
+  }, []);
 
   const handleSave = () => {
     toast.success('Settings saved successfully');
@@ -337,9 +347,28 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted 
           <Button variant="outline" className="w-full justify-start">
             Two-Factor Authentication
           </Button>
-          <Button variant="outline" className="w-full justify-start">
-            Connected Apps
-          </Button>
+          <div className="space-y-2">
+            <Button variant="outline" className="w-full justify-start">
+              Connected Apps
+            </Button>
+            {linkedProviders.length > 0 && (
+              <div className="pt-2 space-y-2">
+                <Label className="text-xs text-muted-foreground">Linked Sign-In Methods:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {linkedProviders.map((provider) => (
+                    <Badge key={provider} variant="secondary" className="capitalize">
+                      {provider === 'google' ? 'Google' : provider === 'apple' ? 'Apple' : provider}
+                    </Badge>
+                  ))}
+                </div>
+                {linkedProviders.length > 1 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    You can sign in with any of these methods
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           
           <Separator />
           

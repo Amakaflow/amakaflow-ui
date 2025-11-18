@@ -145,6 +145,26 @@ export async function getCurrentUser() {
 }
 
 /**
+ * Get the user's linked identity providers (OAuth providers)
+ */
+export async function getUserIdentityProviders() {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      return { providers: [], error };
+    }
+
+    // Get user identities from the user object
+    const identities = user.identities || [];
+    const providers = identities.map((identity: any) => identity.provider);
+
+    return { providers, error: null };
+  } catch (error: any) {
+    return { providers: [], error };
+  }
+}
+
+/**
  * Fetch user profile from database
  */
 export async function getUserProfile(userId: string): Promise<User | null> {
@@ -229,6 +249,10 @@ export async function updateUserProfile(userId: string, updates: Partial<User>) 
  */
 export async function signInWithOAuth(provider: 'google' | 'apple') {
   try {
+    // Check if user already has a session - if so, allow automatic sign-in
+    const { data: { session } } = await supabase.auth.getSession();
+    const hasExistingSession = !!session;
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -238,7 +262,13 @@ export async function signInWithOAuth(provider: 'google' | 'apple') {
           // Don't set prompt - let Google handle it automatically
           // This allows automatic sign-in for returning users who are already logged in to Google
           // Google will only show account picker if needed (multiple accounts or not logged in)
+        } : provider === 'apple' ? {
+          // For Apple, we can't control the prompt directly, but we can skip showing the UI
+          // if the user is already authenticated with Apple
+          // Apple will handle automatic sign-in if the user is already logged in to iCloud
         } : undefined,
+        // Skip browser redirect for Apple if user already has session (though Apple may still show UI)
+        skipBrowserRedirect: false,
       },
     });
 
