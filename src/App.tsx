@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'sonner@2.0.3';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity } from 'lucide-react';
@@ -12,13 +13,12 @@ import { Analytics } from './components/Analytics';
 import { TeamSharing } from './components/TeamSharing';
 import { UserSettings } from './components/UserSettings';
 import { StravaEnhance } from './components/StravaEnhance';
-import { LoginPage } from './components/LoginPage';
 import { ProfileCompletion } from './components/ProfileCompletion';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
 import { generateWorkoutStructure, validateWorkout, processWorkflow } from './lib/mock-api';
 import { DeviceId } from './lib/devices';
 import { saveWorkoutToHistory, getWorkoutHistory } from './lib/workout-history';
-import { getSession, getCurrentUser, getUserProfile, signOut, onAuthStateChange } from './lib/auth';
+import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
 import { User } from './types/auth';
 import { isAccountConnected } from './lib/linked-accounts';
 
@@ -31,6 +31,8 @@ type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
 type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance';
 
 export default function App() {
+  // Clerk authentication
+  const { user: clerkUser, isLoaded: clerkLoaded } = useClerkUser();
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -55,68 +57,62 @@ export default function App() {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
-  // Check for existing session on mount and handle OAuth callback
+  // Sync Clerk user with Supabase profile
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Check for OAuth callback in URL hash
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const error = hashParams.get('error');
-        const errorDescription = hashParams.get('error_description');
-        
-        if (error) {
-          toast.error(`Authentication failed: ${errorDescription || error}. Please try again.`);
-          window.history.replaceState({}, '', '/');
-          setAuthLoading(false);
-          return;
-        }
+    const syncUser = async () => {
+      if (!clerkLoaded) {
+        // Clerk is still loading
+        return;
+      }
 
-        // Get session (Supabase handles the OAuth callback automatically)
-        const { session, error: sessionError } = await getSession();
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          toast.error(`Session error: ${sessionError.message || 'Failed to get session'}`);
-          setAuthLoading(false);
-          return;
-        }
-        
-        if (session?.user) {
-          console.log('Session found, loading profile for user:', session.user.id);
-          await loadUserProfile(session.user.id);
-          // Clean up the URL hash if present
-          if (accessToken) {
-            window.history.replaceState({}, '', '/');
+      setAuthLoading(true);
+      try {
+        if (clerkUser) {
+          console.log('Clerk user found, syncing with profile:', clerkUser.id);
+          // Sync Clerk user to Supabase profile
+          const profile = await syncClerkUserToProfile(clerkUser);
+          if (profile) {
+            setUser({
+              ...profile,
+              avatar: clerkUser.imageUrl,
+              mode: 'individual' as const,
+            });
+          } else {
+            // Profile creation failed, but we still have Clerk user
+            // Create a temporary user object
+            const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '';
+            const name = clerkUser.firstName && clerkUser.lastName
+              ? `${clerkUser.firstName} ${clerkUser.lastName}`
+              : clerkUser.firstName || clerkUser.username || email.split('@')[0];
+            
+            const tempUser: AppUser = {
+              id: clerkUser.id,
+              email: email,
+              name: name,
+              subscription: 'free',
+              workoutsThisWeek: 0,
+              selectedDevices: [],
+              mode: 'individual',
+              avatar: clerkUser.imageUrl,
+            };
+            setUser(tempUser);
           }
+          setStravaConnected(isAccountConnected('strava'));
         } else {
-          console.log('No session found');
+          // No Clerk user, clear app user
+          setUser(null);
+          setStravaConnected(false);
         }
       } catch (error: any) {
-        console.error('Error checking session:', error);
-        toast.error(`Error: ${error.message || 'Failed to check session'}`);
+        console.error('Error syncing Clerk user:', error);
+        toast.error(`Error: ${error.message || 'Failed to sync user'}`);
       } finally {
         setAuthLoading(false);
       }
     };
 
-    checkSession();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = onAuthStateChange(async (authUser) => {
-      if (authUser) {
-        console.log('Auth state changed - user logged in:', authUser.id);
-        await loadUserProfile(authUser.id);
-      } else {
-        console.log('Auth state changed - user logged out');
-        setUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+    syncUser();
+  }, [clerkUser, clerkLoaded]);
 
   // Check if profile needs completion
   const needsProfileCompletion = (user: AppUser | null): boolean => {
@@ -129,57 +125,43 @@ export default function App() {
     return !hasDevices && !hasStrava;
   };
 
-  // Load user profile from Supabase
-  const loadUserProfile = async (userId: string, retryCount = 0) => {
+  // Load user profile from Supabase (for Clerk user)
+  const loadUserProfile = async (clerkUserId: string, retryCount = 0) => {
     try {
-      console.log(`Loading profile for user ${userId} (attempt ${retryCount + 1})`);
-      const profile = await getUserProfile(userId);
+      console.log(`Loading profile for Clerk user ${clerkUserId} (attempt ${retryCount + 1})`);
+      const profile = await getUserProfileFromClerk(clerkUserId);
       
       if (profile) {
         console.log('Profile found:', profile);
         console.log('Selected devices:', profile.selectedDevices, 'Length:', profile.selectedDevices.length);
         setUser({
           ...profile,
-          avatar: undefined,
+          avatar: clerkUser?.imageUrl,
           mode: 'individual' as const,
         });
       } else {
         console.log('No profile found, retry count:', retryCount);
-        // Profile might not be created yet by the database trigger (especially for OAuth users)
+        // Profile might not be created yet
         // Retry up to 3 times with increasing delays
         if (retryCount < 3) {
           console.log(`Retrying in ${500 * (retryCount + 1)}ms...`);
           setTimeout(() => {
-            loadUserProfile(userId, retryCount + 1);
+            loadUserProfile(clerkUserId, retryCount + 1);
           }, 500 * (retryCount + 1)); // 500ms, 1000ms, 1500ms
           return;
         }
         
-        // If profile still doesn't exist after retries, create a default one (no devices pre-selected)
-        console.log('Profile still not found after retries, creating default user');
-        const { user: authUser, error: userError } = await getCurrentUser();
-        
-        if (userError) {
-          console.error('Error getting current user:', userError);
-          toast.error('Failed to get user information. Please try logging in again.');
-          return;
-        }
-        
-        if (authUser) {
-          console.log('Creating default user object for:', authUser.id);
-          const defaultUser: AppUser = {
-            id: authUser.id,
-            email: authUser.email || '',
-            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
-            subscription: 'free',
-            workoutsThisWeek: 0,
-            selectedDevices: [], // Empty - user must choose
-            mode: 'individual',
-          };
-          setUser(defaultUser);
-        } else {
-          console.error('No auth user found');
-          toast.error('User authentication failed. Please try again.');
+        // If profile still doesn't exist after retries, sync it
+        console.log('Profile still not found after retries, syncing Clerk user');
+        if (clerkUser) {
+          const syncedProfile = await syncClerkUserToProfile(clerkUser);
+          if (syncedProfile) {
+            setUser({
+              ...syncedProfile,
+              avatar: clerkUser.imageUrl,
+              mode: 'individual' as const,
+            });
+          }
         }
       }
       // Check Strava connection status
@@ -204,29 +186,11 @@ export default function App() {
     setStravaConnected(isAccountConnected('strava'));
   };
 
-  // Handle login
-  const handleLogin = async (authUser: any) => {
-    if (authUser?.id) {
-      await loadUserProfile(authUser.id);
-    }
-  };
-
-  // Handle signup
-  const handleSignUp = async (authUser: any) => {
-    if (authUser?.id) {
-      await loadUserProfile(authUser.id);
-    }
-  };
-
-  // Handle logout
+  // Handle logout (Clerk handles this automatically via UserButton)
+  // This is kept for compatibility but Clerk's UserButton handles sign out
   const handleLogout = async () => {
-    try {
-      await signOut();
-      setUser(null);
-      toast.success('Logged out successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to logout');
-    }
+    setUser(null);
+    setStravaConnected(false);
   };
 
   // Load workout history on mount (only when user is logged in)
@@ -381,8 +345,8 @@ export default function App() {
     }
   };
 
-  // Show login page if not authenticated
-  if (authLoading) {
+  // Show loading while Clerk initializes
+  if (!clerkLoaded || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -393,12 +357,47 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  // Show sign-in UI if not authenticated (Clerk handles this)
+  if (!clerkUser) {
     return (
       <>
         <Toaster position="top-center" />
-        <LoginPage onLogin={handleLogin} onSignUp={handleSignUp} />
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+          <div className="w-full max-w-md space-y-4 text-center">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
+                <Dumbbell className="w-8 h-8 text-primary-foreground" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">MyAmaka/AmakaFlow</h1>
+              <p className="mt-2 text-muted-foreground">
+                Transform workout content into structured training for your devices
+              </p>
+            </div>
+            <div className="space-y-2">
+              <SignInButton mode="modal">
+                <Button className="w-full">Sign In</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button variant="outline" className="w-full">Sign Up</Button>
+              </SignUpButton>
+            </div>
+          </div>
+        </div>
       </>
+    );
+  }
+
+  // If Clerk user exists but profile not loaded yet, show loading
+  if (!user && clerkUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your profile...</p>
+        </div>
+      </div>
     );
   }
 
@@ -495,14 +494,7 @@ export default function App() {
                 <Settings className="w-4 h-4" />
                 Settings
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="gap-2"
-              >
-                Sign Out
-              </Button>
+              <UserButton afterSignOutUrl="/" />
             </div>
           </div>
         </div>

@@ -35,4 +35,33 @@ The test suite includes:
   - `AddSources.test.tsx` - Source input component
 
 All tests are passing with 84 test cases covering core functionality.
+
+## Documentation
+
+All project documentation has been organized into the `/docs` folder:
+
+- **`/docs/auth`** - Authentication setup (Clerk, Supabase Auth, user management)
+- **`/docs/oauth`** - OAuth provider setup (Google, Apple)
+- **`/docs/database`** - Database setup and migrations (Supabase)
+- **`/docs/getting-started`** - Quick start guides
+
+See [`/docs/README.md`](./docs/README.md) for a complete documentation index.
+
+## Quick Links
+
+- [Quick Start Guide](./docs/getting-started/QUICK_START.md)
+- [Clerk Setup](./docs/auth/CLERK_SETUP.md)
+- [Supabase Setup](./docs/database/SUPABASE_SETUP.md)
+- [Google OAuth](./docs/oauth/GOOGLE_OAUTH_SETUP.md)
+- [Apple OAuth](./docs/oauth/APPLE_OAUTH_SETUP.md)
+
+## Utility Scripts
+
+Utility scripts are organized in the `/scripts` folder:
+
+- **`/scripts/auth`** - User deletion scripts (Clerk, Supabase)
+- **`/scripts/oauth`** - OAuth helper scripts (Apple JWT generator)
+- **`/scripts/database`** - Database setup scripts
+
+See [`/scripts/README.md`](./scripts/README.md) for usage instructions.
   
