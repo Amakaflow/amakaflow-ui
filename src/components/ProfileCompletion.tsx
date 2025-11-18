@@ -16,7 +16,8 @@ import {
 import { toast } from 'sonner@2.0.3';
 import { AVAILABLE_DEVICES, DeviceId, Device } from '../lib/devices';
 import { User } from '../types/auth';
-import { updateUserProfile } from '../lib/auth';
+import { updateUserProfileFromClerk } from '../lib/clerk-auth';
+import { useClerkUser } from '../lib/clerk-auth';
 import { connectAccount, getOAuthUrl, PLATFORM_INFO, LinkedAccountProvider } from '../lib/linked-accounts';
 
 interface ProfileCompletionProps {
@@ -25,6 +26,7 @@ interface ProfileCompletionProps {
 }
 
 export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) {
+  const { user: clerkUser } = useClerkUser();
   const [selectedDevices, setSelectedDevices] = useState<DeviceId[]>(user.selectedDevices || []);
   const [connectStrava, setConnectStrava] = useState(false);
   const [connectOtherAccounts, setConnectOtherAccounts] = useState<'now' | 'later'>('later');
@@ -74,7 +76,11 @@ export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) 
       // If user selected devices, use those
       const devicesToSave = selectedDevices.length > 0 ? selectedDevices : [];
 
-      const { data, error } = await updateUserProfile(user.id, {
+      if (!clerkUser?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await updateUserProfileFromClerk(clerkUser.id, {
         selectedDevices: devicesToSave,
       });
 

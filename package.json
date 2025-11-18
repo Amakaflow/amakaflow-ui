@@ -16,6 +16,7 @@
     "db:setup": "npm run db:link && npm run db:push"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.56.0",
     "@dnd-kit/core": "*",
     "@dnd-kit/sortable": "*",
     "@dnd-kit/utilities": "*",
