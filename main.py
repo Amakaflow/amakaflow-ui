@@ -438,23 +438,29 @@ async def update_activity(
         name = None
         description = None
         
-        if payload.overwriteTitle and payload.newTitle:
-            name = payload.newTitle
+        if payload.overwriteTitle:
+            # If overwriteTitle is True, newTitle must be provided and non-empty
+            if not payload.newTitle or not payload.newTitle.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="newTitle is required when overwriteTitle is true"
+                )
+            name = payload.newTitle.strip()
         
         if payload.overwriteDescription and payload.description:
             description = payload.description
         
-        if not name and not description:
+        if name is None and not description:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one of overwriteTitle+newTitle or overwriteDescription+description must be provided"
             )
         
-        # Update activity
+        # Update activity - only send name if it's a non-empty string
         result = await strava_client.update_activity(
             activity_id=activity_id,
             access_token=access_token,
-            name=name,
+            name=name if name and name.strip() else None,
             description=description,
         )
         
@@ -472,12 +478,20 @@ async def update_activity(
             try:
                 await token_manager.refresh_token(user_id)
                 access_token = await token_manager.get_valid_token(user_id)
-                name = payload.newTitle if payload.overwriteTitle else None
+                # Re-prepare update data for retry
+                name = None
+                if payload.overwriteTitle:
+                    if not payload.newTitle or not payload.newTitle.strip():
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="newTitle is required when overwriteTitle is true"
+                        )
+                    name = payload.newTitle.strip()
                 description = payload.description if payload.overwriteDescription else None
                 result = await strava_client.update_activity(
                     activity_id=activity_id,
                     access_token=access_token,
-                    name=name,
+                    name=name if name and name.strip() else None,
                     description=description,
                 )
                 return UpdateActivityResponse(**result)
