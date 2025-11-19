@@ -100,6 +100,8 @@ export function ValidateMap({
       updatedValidation.unmapped_exercises = updatedValidation.unmapped_exercises.filter(
         ex => ex.original_name !== exerciseName
       );
+      // Update can_proceed: true only if no unmapped exercises remain
+      // Note: We still need to check for unconfirmed mappings separately in canExport
       updatedValidation.can_proceed = updatedValidation.unmapped_exercises.length === 0;
     }
 
@@ -138,10 +140,17 @@ export function ValidateMap({
     // Move confirmed exercise from needs_review to validated_exercises
     const updatedValidation = { ...localValidation };
     
-    // Find the exercise in needs_review
-    const confirmedExercise = updatedValidation.needs_review.find(
+    // Find the exercise in needs_review (prioritize this)
+    let confirmedExercise = updatedValidation.needs_review.find(
       ex => ex.original_name === exerciseName
     );
+    
+    // If not in needs_review, check unmapped_exercises
+    if (!confirmedExercise) {
+      confirmedExercise = updatedValidation.unmapped_exercises.find(
+        ex => ex.original_name === exerciseName
+      );
+    }
     
     if (confirmedExercise) {
       // Remove from needs_review
@@ -149,14 +158,21 @@ export function ValidateMap({
         ex => ex.original_name !== exerciseName
       );
       
+      // Also remove from unmapped_exercises to prevent it appearing there
+      updatedValidation.unmapped_exercises = updatedValidation.unmapped_exercises.filter(
+        ex => ex.original_name !== exerciseName
+      );
+      
       // Add to validated_exercises with confirmed status
       updatedValidation.validated_exercises.push({
         ...confirmedExercise,
+        mapped_to: confirmedExercise.mapped_to || confirmedExercise.original_name, // Ensure mapped_to is set
         status: 'valid' as const,
         confidence: Math.max(confirmedExercise.confidence, 0.95)
       });
       
-      // Update can_proceed: true if no unmapped exercises remain
+      // Update can_proceed: true only if no unmapped exercises remain
+      // Note: Unconfirmed mappings are checked separately in canExport logic
       updatedValidation.can_proceed = updatedValidation.unmapped_exercises.length === 0;
       
       setLocalValidation(updatedValidation);
@@ -170,7 +186,7 @@ export function ValidateMap({
   const handleConfirmAll = () => {
     const allMappedExercises = new Set<string>();
     
-    // Get all exercises that have mappings
+    // Get all exercises that have mappings (from both validated_exercises and needs_review)
     [...localValidation.validated_exercises, ...localValidation.needs_review].forEach(ex => {
       if (ex.mapped_to && ex.mapped_to !== ex.original_name) {
         allMappedExercises.add(ex.original_name);
@@ -188,33 +204,10 @@ export function ValidateMap({
     const updatedConfirmed = new Set([...confirmedMappings, ...allMappedExercises]);
     setConfirmedMappings(updatedConfirmed);
     
-    // Move all confirmed exercises from needs_review to validated_exercises
-    const updatedValidation = { ...localValidation };
-    
-    unconfirmed.forEach(exerciseName => {
-      const confirmedExercise = updatedValidation.needs_review.find(
-        ex => ex.original_name === exerciseName
-      );
-      
-      if (confirmedExercise) {
-        // Remove from needs_review
-        updatedValidation.needs_review = updatedValidation.needs_review.filter(
-          ex => ex.original_name !== exerciseName
-        );
-        
-        // Add to validated_exercises with confirmed status
-        updatedValidation.validated_exercises.push({
-          ...confirmedExercise,
-          status: 'valid' as const,
-          confidence: Math.max(confirmedExercise.confidence, 0.95)
-        });
-      }
-    });
-    
-    // Update can_proceed: true if no unmapped exercises remain
-    updatedValidation.can_proceed = updatedValidation.unmapped_exercises.length === 0;
-    
-    setLocalValidation(updatedValidation);
+    // Note: We don't need to move exercises between arrays here because:
+    // - Exercises in validated_exercises stay there (they're already validated, just need confirmation)
+    // - Exercises in needs_review will be moved when they're individually confirmed
+    // The important thing is that they're now in the confirmedMappings set
     
     toast.success(`Confirmed ${unconfirmed.length} mapping(s)`, {
       duration: 3000,
@@ -232,19 +225,48 @@ export function ValidateMap({
   };
 
   // Filter out exercises that appear in both needs_review and unmapped (show them only in needs_review)
-  const uniqueUnmappedExercises = localValidation.unmapped_exercises.filter(
-    result => !localValidation.needs_review.some(ex => ex.original_name === result.original_name)
-  );
+  // Also filter out exercises that are already confirmed (in validated_exercises)
+  // Ensure unmapped exercises don't have a mapped_to value (clear any pre-set mappings)
+  const uniqueUnmappedExercises = localValidation.unmapped_exercises
+    .filter(result => 
+      !localValidation.needs_review.some(ex => ex.original_name === result.original_name) &&
+      !localValidation.validated_exercises.some(ex => ex.original_name === result.original_name) &&
+      !confirmedMappings.has(result.original_name)
+    )
+    .map(result => ({
+      ...result,
+      mapped_to: undefined, // Ensure unmapped exercises don't have pre-set mappings
+      status: 'unmapped' as const
+    }));
 
   // Get exercises that need review but haven't been confirmed
   const unconfirmedNeedsReview = localValidation.needs_review.filter(
     result => result.mapped_to && !confirmedMappings.has(result.original_name)
   );
 
+  // Get exercises in validated_exercises that have mappings but haven't been confirmed
+  // These are exercises that were auto-validated but still need user confirmation
+  const unconfirmedValidated = localValidation.validated_exercises.filter(
+    result => result.mapped_to && 
+              result.mapped_to !== result.original_name && 
+              !confirmedMappings.has(result.original_name)
+  );
+
   // Check if export should be disabled
   const hasUnmapped = uniqueUnmappedExercises.length > 0;
-  const hasUnconfirmedMappings = unconfirmedNeedsReview.length > 0;
-  const canExport = !hasUnmapped && !hasUnconfirmedMappings && localValidation.can_proceed;
+  const hasUnconfirmedMappings = unconfirmedNeedsReview.length > 0 || unconfirmedValidated.length > 0;
+  
+  // Export should be disabled if:
+  // 1. There are unmapped exercises, OR
+  // 2. There are unconfirmed mappings (in either needs_review OR validated_exercises), OR
+  // 3. Validation says we can't proceed
+  // IMPORTANT: We check our own state, not just localValidation.can_proceed,
+  // because can_proceed from API doesn't account for confirmation status
+  const canExport = !hasUnmapped && !hasUnconfirmedMappings;
+  
+  // Also ensure validation says we can proceed (but don't rely on it alone)
+  // This is a safety check, but the main checks are hasUnmapped and hasUnconfirmedMappings
+  const finalCanExport = canExport && localValidation.can_proceed;
 
   // Get reason why export is disabled
   const getExportDisabledReason = () => {
@@ -252,7 +274,8 @@ export function ValidateMap({
       return `Cannot export: ${uniqueUnmappedExercises.length} exercise(s) need to be mapped`;
     }
     if (hasUnconfirmedMappings) {
-      return `Cannot export: ${unconfirmedNeedsReview.length} mapping(s) need to be confirmed`;
+      const totalUnconfirmed = unconfirmedNeedsReview.length + unconfirmedValidated.length;
+      return `Cannot export: ${totalUnconfirmed} mapping(s) need to be confirmed`;
     }
     return '';
   };
@@ -325,10 +348,8 @@ export function ValidateMap({
         </Card>
       )}
 
-      {/* Confirm All Button */}
-      {([...localValidation.validated_exercises, ...localValidation.needs_review].some(ex => 
-        ex.mapped_to && ex.mapped_to !== ex.original_name && !confirmedMappings.has(ex.original_name)
-      )) && (
+      {/* Confirm All Button - Show if there are any unconfirmed mappings */}
+      {(unconfirmedNeedsReview.length > 0 || unconfirmedValidated.length > 0) && (
         <Card className="border-primary/50 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -503,8 +524,8 @@ export function ValidateMap({
         <div className="flex flex-col items-end gap-1">
           <Button
             onClick={() => onProcess(workout)}
-            disabled={loading || !canExport}
-            variant={canExport ? 'default' : 'secondary'}
+            disabled={loading || !finalCanExport}
+            variant={finalCanExport ? 'default' : 'secondary'}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -513,7 +534,7 @@ export function ValidateMap({
             )}
             Export to {selectedDevice === 'garmin' ? 'Garmin' : selectedDevice === 'apple' ? 'Apple Watch' : 'Zwift'}
           </Button>
-          {!canExport && !loading && (
+          {!finalCanExport && !loading && (
             <p className="text-xs text-muted-foreground text-right">
               {getExportDisabledReason()}
             </p>

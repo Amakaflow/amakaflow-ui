@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface EnhancedMappingProps {
   result: ValidationResult;
@@ -179,7 +179,9 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
                   Action Required
                 </div>
                 <div className="text-xs text-orange-700 dark:text-orange-300 mt-1">
-                  This exercise needs to be mapped. Select an AI suggestion below or use "Change Mapping" to search for alternatives.
+                  {topSuggestions.length > 0 
+                    ? "Select one of the AI suggestions below, or click 'Find & Select Mapping' to see more options."
+                    : "Click 'Find & Select Mapping' to see AI suggestions and search for alternatives."}
                 </div>
               </div>
             </div>
@@ -203,41 +205,50 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
           </div>
         )}
 
-        {/* Quick Suggestions */}
+        {/* Quick Suggestions - Show for unmapped exercises with suggestions */}
         {topSuggestions.length > 0 && !result.mapped_to && (
           <div className="space-y-2">
-            <Label className="text-xs">AI Suggestions</Label>
+            <Label className="text-xs">AI Suggestions - Click to Select</Label>
             {topSuggestions.map((suggestion, idx) => (
               <div
                 key={idx}
-                className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
+                className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
                   selectedSuggestionIndex === idx 
                     ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
-                    : 'bg-muted/50 hover:bg-muted'
+                    : 'bg-muted/50 hover:bg-muted hover:border-primary/50'
                 }`}
+                onClick={() => {
+                  setSelectedSuggestionIndex(idx);
+                  // Apply immediately when clicking the suggestion
+                  onApplyMapping(result.original_name, suggestion.name);
+                  setSelectedSuggestionIndex(null);
+                }}
               >
                 <div className="flex-1">
                   <div className="text-sm font-medium">{suggestion.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {(suggestion.score * 100).toFixed(0)}% match
+                    {(suggestion.score * 100).toFixed(0)}% match - Click to select
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  variant={selectedSuggestionIndex === idx ? "default" : "ghost"}
-                  onClick={() => {
+                  variant={selectedSuggestionIndex === idx ? "default" : "outline"}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setSelectedSuggestionIndex(idx);
-                    // Apply after a brief delay to show selection
-                    setTimeout(() => {
-                      onApplyMapping(result.original_name, suggestion.name);
-                      setSelectedSuggestionIndex(null);
-                    }, 300);
+                    onApplyMapping(result.original_name, suggestion.name);
+                    setSelectedSuggestionIndex(null);
                   }}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                 </Button>
               </div>
             ))}
+            {originalSuggestions.length > 2 && (
+              <p className="text-xs text-muted-foreground text-center">
+                + {originalSuggestions.length - 2} more suggestions available in "Find & Select Mapping"
+              </p>
+            )}
           </div>
         )}
 

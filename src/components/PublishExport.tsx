@@ -18,12 +18,15 @@ import {
   CalendarPlus,
   X,
   Trash2,
-  Activity
+  Activity,
+  Save,
+  Loader2,
+  FolderOpen
 } from 'lucide-react';
 import { ExportFormats, ValidationResponse } from '../types/workout';
 import { DeviceId } from '../lib/devices';
 import { ScrollArea } from './ui/scroll-area';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Calendar as CalendarComponent } from './ui/calendar';
 import {
   Popover,
@@ -39,6 +42,11 @@ import {
   SelectValue,
 } from './ui/select';
 import { isAccountConnectedSync } from '../lib/linked-accounts';
+import { saveWorkoutToAPI, SaveWorkoutRequest, SavedWorkout, getWorkoutFromAPI } from '../lib/workout-api';
+import { useClerkUser } from '../lib/clerk-auth';
+import { WorkoutStructure } from '../types/workout';
+import { WorkoutSelector } from './WorkoutSelector';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface PublishExportProps {
   exports: ExportFormats;
@@ -47,15 +55,22 @@ interface PublishExportProps {
   onStartNew?: () => void;
   selectedDevice?: DeviceId;
   userMode?: 'individual' | 'trainer';
+  workout?: WorkoutStructure; // Add workout data for saving
 }
 
-export function PublishExport({ exports, validation, sources, onStartNew, selectedDevice = 'garmin', userMode = 'individual' }: PublishExportProps) {
+export function PublishExport({ exports, validation, sources, onStartNew, selectedDevice = 'garmin', userMode = 'individual', workout }: PublishExportProps) {
+  const { user: clerkUser } = useClerkUser();
+  const profileId = clerkUser?.id || '';
+  
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [scheduledDates, setScheduledDates] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [recurringType, setRecurringType] = useState<'none' | 'daily' | 'weekly' | 'custom'>('none');
   const [recurringCount, setRecurringCount] = useState<number>(1);
   const [autoEnhanceStrava, setAutoEnhanceStrava] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedWorkoutId, setSavedWorkoutId] = useState<string | null>(null);
+  const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
   const stravaConnected = isAccountConnectedSync('strava');
 
   const copyToClipboard = async (text: string, format: string) => {
@@ -82,10 +97,79 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
     toast.success(`Downloaded ${filename}`);
   };
 
-  const sendToDevice = (platform: string) => {
+  const handleSaveWorkout = async () => {
+    if (!workout || !profileId) {
+      toast.error('Workout data or user profile missing');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const request: SaveWorkoutRequest = {
+        profile_id: profileId,
+        workout_data: workout,
+        sources: sources,
+        device: selectedDevice,
+        exports: exports,
+        validation: validation,
+        title: workout.title || `Workout ${new Date().toLocaleDateString()}`,
+      };
+
+      const savedWorkout = await saveWorkoutToAPI(request);
+      setSavedWorkoutId(savedWorkout.id);
+      toast.success('Workout saved successfully!', {
+        description: 'You can sync it to your device later from History'
+      });
+    } catch (error: any) {
+      console.error('Failed to save workout:', error);
+      toast.error(`Failed to save workout: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSelectSavedWorkout = async (savedWorkout: SavedWorkout) => {
+    setShowWorkoutSelector(false);
+    
+    // Load the selected workout data
+    try {
+      const fullWorkout = await getWorkoutFromAPI(savedWorkout.id, profileId);
+      if (fullWorkout) {
+        // Update the current workout with selected workout data
+        // This would need to be passed up to parent component
+        toast.success('Workout loaded!', {
+          description: 'You can now sync this workout to your device'
+        });
+        // TODO: Emit event or callback to parent to load this workout
+        // For now, just show success message
+      }
+    } catch (error: any) {
+      console.error('Failed to load selected workout:', error);
+      toast.error(`Failed to load workout: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const sendToDevice = async (platform: string) => {
+    // If workout hasn't been saved yet, save it first
+    if (!savedWorkoutId && workout && profileId) {
+      try {
+        await handleSaveWorkout();
+        // Wait a moment for save to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Failed to save workout before sync:', error);
+        // Continue with sync even if save fails
+      }
+    }
+
     toast.success(`Syncing to ${platform}...`, {
       description: 'This would connect to your device in production'
     });
+    
+    // TODO: Update export status after successful sync
+    // if (savedWorkoutId) {
+    //   await updateWorkoutExportStatus(savedWorkoutId, profileId, true, selectedDevice);
+    // }
   };
 
   // Add scheduled date
@@ -237,6 +321,31 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         </Card>
       )}
 
+      {/* Load from Saved Workouts */}
+      {profileId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Load Saved Workout
+            </CardTitle>
+            <CardDescription>
+              Select a previously saved workout to sync to your device
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => setShowWorkoutSelector(true)}
+              className="w-full"
+            >
+              <FolderOpen className="w-4 h-4 mr-2" />
+              Browse Saved Workouts
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Export Formats */}
       <Card>
         <CardHeader>
@@ -272,6 +381,46 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
                   }
                 }}
               />
+            </div>
+          )}
+
+          {/* Save Workout Option */}
+          {workout && profileId && (
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Save className="w-4 h-4 text-primary" />
+                  <Label className="cursor-pointer font-medium">Save Workout</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {savedWorkoutId 
+                    ? 'Workout saved! You can sync it later from History.'
+                    : 'Save this workout before syncing to access it later'}
+                </p>
+              </div>
+              <Button
+                variant={savedWorkoutId ? "outline" : "default"}
+                size="sm"
+                onClick={handleSaveWorkout}
+                disabled={isSaving || !!savedWorkoutId}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : savedWorkoutId ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
             </div>
           )}
 
@@ -484,6 +633,23 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
           </Button>
         </div>
       )}
+
+      {/* Workout Selector Dialog */}
+      <Dialog open={showWorkoutSelector} onOpenChange={setShowWorkoutSelector}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Select Saved Workout</DialogTitle>
+            <DialogDescription>
+              Choose a saved workout to sync to your {deviceExport.deviceName} device
+            </DialogDescription>
+          </DialogHeader>
+          <WorkoutSelector
+            selectedDevice={selectedDevice}
+            onSelectWorkout={handleSelectSavedWorkout}
+            onClose={() => setShowWorkoutSelector(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

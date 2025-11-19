@@ -24,9 +24,13 @@ async function mapperApiCall<T>(
     ...options.headers,
   };
   
+  // Extract signal from options to ensure it's passed correctly
+  const { signal, ...restOptions } = options;
+  
   const response = await fetch(url, {
-    ...options,
+    ...restOptions,
     headers,
+    signal, // Explicitly pass signal for timeout support
   });
   
   if (!response.ok) {
@@ -44,10 +48,24 @@ async function mapperApiCall<T>(
 export async function validateWorkoutMapping(
   workout: WorkoutStructure
 ): Promise<ValidationResponse> {
-  return mapperApiCall<ValidationResponse>('/workflow/validate', {
-    method: 'POST',
-    body: JSON.stringify({ blocks_json: workout }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for validation
+  
+  try {
+    const result = await mapperApiCall<ValidationResponse>('/workflow/validate', {
+      method: 'POST',
+      body: JSON.stringify({ blocks_json: workout }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Validation request timed out. Please try again.');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -171,9 +189,25 @@ export async function saveUserMapping(
  */
 export async function checkMapperApiHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${MAPPER_API_BASE_URL}/docs`);
-    return response.ok;
+    // Use a simple GET endpoint with timeout instead of /docs
+    // Try /mappings endpoint as a lightweight health check
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    const response = await fetch(`${MAPPER_API_BASE_URL}/mappings`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    return response.ok || response.status === 401 || response.status === 403; // 401/403 means API is up but auth required
   } catch (error) {
+    // If it's an abort error, the request timed out
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('Mapper API health check timed out');
+      return false;
+    }
+    console.warn('Mapper API health check failed:', error);
     return false;
   }
 }

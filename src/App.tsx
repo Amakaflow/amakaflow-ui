@@ -25,7 +25,7 @@ import {
   checkMapperApiHealth 
 } from './lib/mapper-api';
 import { DeviceId } from './lib/devices';
-import { saveWorkoutToHistory, getWorkoutHistory } from './lib/workout-history';
+import { saveWorkoutToHistory, getWorkoutHistory, getWorkoutHistoryFromLocalStorage } from './lib/workout-history';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
 import { User } from './types/auth';
 import { isAccountConnectedSync, isAccountConnected } from './lib/linked-accounts';
@@ -275,10 +275,25 @@ export default function App() {
 
   // Load workout history on mount (only when user is logged in)
   useEffect(() => {
-    if (user) {
-      const history = getWorkoutHistory();
-      setWorkoutHistoryList(history);
-    }
+    const loadHistory = async () => {
+      if (user?.id) {
+        try {
+          const history = await getWorkoutHistory(user.id);
+          setWorkoutHistoryList(history);
+        } catch (error) {
+          console.error('Failed to load workout history:', error);
+          // Fallback to localStorage
+          try {
+            const localHistory = getWorkoutHistoryFromLocalStorage();
+            setWorkoutHistoryList(localHistory);
+          } catch (error) {
+            console.error('Failed to load from localStorage:', error);
+            setWorkoutHistoryList([]);
+          }
+        }
+      }
+    };
+    loadHistory();
   }, [user]);
 
   const handleStartNew = () => {
@@ -371,7 +386,7 @@ export default function App() {
       
       // Save to history
       if (user) {
-        await saveWorkoutToHistory(user.id, workout, selectedDevice);
+        await saveWorkoutToHistory(user.id, workout, selectedDevice, exports, sources.map(s => `${s.type}:${s.content}`));
       }
       
       setCurrentStep('export');
@@ -390,18 +405,26 @@ export default function App() {
   };
 
   const handleValidate = async () => {
-    if (!workout) return;
+    if (!workout) {
+      toast.error('No workout to validate');
+      return;
+    }
     setLoading(true);
     try {
+      console.log('Starting validation...');
       // Check if mapper API is available
       const isMapperApiAvailable = await checkMapperApiHealth();
+      console.log('Mapper API available:', isMapperApiAvailable);
       
       let validationResult: ValidationResponse;
       if (isMapperApiAvailable) {
         // Use real mapper API
+        console.log('Calling mapper API for validation...');
         validationResult = await validateWorkoutMapping(workout);
+        console.log('Validation result:', validationResult);
       } else {
         // Fallback to mock if API unavailable
+        console.log('Mapper API unavailable, using mock validation');
         const { validateWorkout } = await import('./lib/mock-api');
         validationResult = await validateWorkout(workout);
       }
@@ -414,7 +437,9 @@ export default function App() {
         toast.warning('Some exercises need review');
       }
     } catch (error: any) {
-      toast.error(`Failed to validate workout: ${error.message || 'Unknown error'}`);
+      console.error('Validation error:', error);
+      const errorMessage = error?.message || 'Unknown error';
+      toast.error(`Failed to validate workout: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -491,9 +516,15 @@ export default function App() {
       
       // Save to history
       if (user) {
-        await saveWorkoutToHistory(user.id, updatedWorkout, selectedDevice);
-        const history = await getWorkoutHistory(user.id);
-        setWorkoutHistoryList(history);
+        // Convert sources from Source[] to string[]
+        const sourcesAsStrings = sources.map(s => `${s.type}:${s.content}`);
+        await saveWorkoutToHistory(user.id, updatedWorkout, selectedDevice, exportFormats, sourcesAsStrings, validationResult);
+        try {
+          const history = await getWorkoutHistory(user.id);
+          setWorkoutHistoryList(history);
+        } catch (error) {
+          console.error('Failed to refresh workout history:', error);
+        }
       }
     } catch (error: any) {
       toast.error(`Failed to process workout: ${error.message || 'Unknown error'}`);
@@ -512,6 +543,20 @@ export default function App() {
     setCurrentStep('structure');
     setCurrentView('workflow');
     toast.success('Workout loaded from history');
+  };
+
+  const handleEditFromHistory = (historyItem: any) => {
+    setWorkout(historyItem.workout);
+    setSources(historyItem.sources.map((s: string) => {
+      const [type, ...content] = s.split(':');
+      return { id: Math.random().toString(), type, content: content.join(':') };
+    }));
+    setSelectedDevice(historyItem.device);
+    setValidation(historyItem.validation || null); // Restore validation if available
+    setExports(historyItem.exports || null); // Restore exports if available
+    setCurrentStep('structure'); // Start at structure step for editing
+    setCurrentView('workflow');
+    toast.success('Workout opened for editing');
   };
 
   const goBack = () => {
@@ -843,6 +888,7 @@ export default function App() {
             onStartNew={handleStartNew}
             selectedDevice={selectedDevice}
             userMode={user.mode}
+            workout={workout}
           />
         )}
 
@@ -856,9 +902,29 @@ export default function App() {
           <WorkoutHistory
             history={workoutHistoryList}
             onLoadWorkout={handleLoadFromHistory}
-            onDeleteWorkout={(id) => {
-              // TODO: implement delete
-              toast.success('Delete functionality coming soon');
+            onEditWorkout={handleEditFromHistory}
+            onDeleteWorkout={async (id) => {
+              try {
+                const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
+                const deleted = await deleteWorkoutFromHistory(id, user?.id);
+                if (deleted) {
+                  toast.success('Workout deleted');
+                  // Refresh history
+                  if (user) {
+                    try {
+                      const history = await getWorkoutHistory(user.id);
+                      setWorkoutHistoryList(history);
+                    } catch (error) {
+                      console.error('Failed to refresh workout history:', error);
+                    }
+                  }
+                } else {
+                  toast.error('Failed to delete workout');
+                }
+              } catch (error) {
+                console.error('Error deleting workout:', error);
+                toast.error('Failed to delete workout');
+              }
             }}
             onEnhanceStrava={(item) => {
               // Navigate to Strava enhance view
