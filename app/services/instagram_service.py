@@ -247,7 +247,13 @@ class InstagramService:
                                     # Get the highest quality (first) resource
                                     best_resource = resources[0]
                                     if 'src' in best_resource:
-                                        image_urls.append(best_resource['src'])
+                                        # Remove size parameters to potentially get higher resolution
+                                        url = best_resource['src']
+                                        url = re.sub(r'[?&]w=\d+[&]?', '', url)
+                                        url = re.sub(r'[?&]h=\d+[&]?', '', url)
+                                        url = re.sub(r'[?&]s=\d+[&]?', '', url)
+                                        url = re.sub(r'[?&]c=\d+[&]?', '', url)
+                                        image_urls.append(url)
                             elif 'display_url' in shortcode_media:
                                 image_urls.append(shortcode_media['display_url'])
                             # Carousel post
@@ -259,7 +265,13 @@ class InstagramService:
                                     if 'display_resources' in node:
                                         resources = node.get('display_resources', [])
                                         if resources and 'src' in resources[0]:
-                                            image_urls.append(resources[0]['src'])
+                                            # Remove size parameters for higher resolution
+                                            url = resources[0]['src']
+                                            url = re.sub(r'[?&]w=\d+[&]?', '', url)
+                                            url = re.sub(r'[?&]h=\d+[&]?', '', url)
+                                            url = re.sub(r'[?&]s=\d+[&]?', '', url)
+                                            url = re.sub(r'[?&]c=\d+[&]?', '', url)
+                                            image_urls.append(url)
                                     elif 'display_url' in node:
                                         image_urls.append(node['display_url'])
             except (json.JSONDecodeError, KeyError, TypeError):

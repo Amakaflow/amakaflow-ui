@@ -25,27 +25,25 @@ except ImportError:
 class VisionService:
     """Service for using vision models to extract workout data from images."""
     
-    WORKOUT_EXTRACTION_PROMPT = """Extract workout information from these Instagram workout images.
+    WORKOUT_EXTRACTION_PROMPT = """CRITICAL: Extract workout information ONLY from what you can ACTUALLY SEE in these images. Do NOT make up or guess exercises that are not visible.
 
-The images contain a workout with exercises, sets, reps, weights, and structure information.
-Extract ALL visible text accurately, especially:
-- Exercise names
-- Sets (e.g., "3 sets", "5x")
-- Reps (e.g., "10 reps", "8-10")
-- Weights (e.g., "32kg", "100lb")
-- Time intervals (e.g., "30 seconds", "2 minutes")
-- Rest periods
-- Structure information (e.g., "for time", "EMOM", "3 rounds")
+Look carefully at each image and extract:
+- Exercise names (EXACTLY as written/spelled in the images)
+- Sets and reps numbers (if visible)
+- Weights/loads (if visible)
+- Time intervals (if visible)
+- Rest periods (if visible)
+- Structure information (e.g., "for time", "EMOM", "3 rounds", "AMRAP" - if visible)
+- Any text, labels, or numbers visible in the images
 
-Return the extracted text in a clean, structured format that preserves:
-- Exercise names exactly as written
-- All numbers for sets/reps/weights
-- Structure and timing information
-- Groupings (supersets, circuits, etc.)
+IMPORTANT:
+- Only extract text that is clearly visible in the images
+- Preserve exact spelling and capitalization from the images
+- If something is unclear or not visible, use null or omit it
+- Do NOT invent generic workout data like "Squats" or "Bench Press" if you cannot see them
+- Pay attention to all text in the images, including handwritten notes, captions, and labels"""
 
-Format the output as plain text, one exercise per line when possible."""
-
-    WORKOUT_STRUCTURE_PROMPT = """You are a fitness workout parser. Convert the following workout text into structured JSON format.
+    WORKOUT_STRUCTURE_PROMPT = """You are a fitness workout parser. Convert the EXTRACTED workout text (from the images) into structured JSON format.
 
 The workout text may contain:
 - Exercise names
@@ -87,13 +85,16 @@ Extract and structure this into a JSON format matching:
   ]
 }
 
-Focus on accuracy:
-- Preserve exact exercise names from the images
-- Extract all numbers accurately
-- Group exercises into supersets if they're performed together
-- Preserve time caps, intervals, and structure information
+CRITICAL INSTRUCTIONS:
+- Use ONLY the text that was extracted from the images - do NOT invent or add exercises
+- If no exercises were visible in the images, return an empty workout structure
+- Preserve exact exercise names as extracted (including any spelling errors or abbreviations)
+- Extract all numbers exactly as shown in the images
+- If information is missing from the images, use null - do NOT guess or invent values
+- Group exercises into supersets only if they were clearly grouped in the images
+- Preserve time caps, intervals, and structure information exactly as extracted
 
-Return ONLY valid JSON, no additional text."""
+Return ONLY valid JSON matching the format above, no additional text or explanations."""
 
     @staticmethod
     def image_to_base64(image_path: str) -> str:
@@ -227,7 +228,12 @@ Return ONLY valid JSON, no additional text."""
                 }
             })
         
-        combined_prompt = f"{VisionService.WORKOUT_EXTRACTION_PROMPT}\n\n{VisionService.WORKOUT_STRUCTURE_PROMPT}"
+        # Combine prompts with clear separation
+        combined_prompt = f"""{VisionService.WORKOUT_EXTRACTION_PROMPT}
+
+{VisionService.WORKOUT_STRUCTURE_PROMPT}
+
+Remember: Only use information that is ACTUALLY visible in the images. Do not invent exercises."""
         
         try:
             response = client.chat.completions.create(
@@ -241,7 +247,7 @@ Return ONLY valid JSON, no additional text."""
                         ]
                     }
                 ],
-                temperature=0.1,
+                temperature=0.1,  # Low temperature for accuracy
                 response_format={"type": "json_object"},
                 max_tokens=4000
             )

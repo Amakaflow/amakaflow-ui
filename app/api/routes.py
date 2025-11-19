@@ -224,20 +224,34 @@ async def ingest_ai_workout(text: str = Body(..., media_type="text/plain")):
 
 
 @router.post("/ingest/image")
-async def ingest_image(
+async def ingest_image(file: UploadFile = File(...)):
+    """Ingest workout from image using OCR."""
+    b = await file.read()
+    text = OCRService.ocr_image_bytes(b)
+    workout = ParserService.parse_free_text_to_workout(text, source=f"image:{file.filename}")
+    return JSONResponse(workout.model_dump())
+
+
+@router.post("/ingest/image_vision")
+async def ingest_image_vision(
     file: UploadFile = File(...),
-    use_vision: bool = Form(False),  # Use vision model instead of OCR
-    vision_provider: Optional[str] = Form("openai"),  # "openai" or "anthropic"
-    vision_model: Optional[str] = Form(None),  # Optional model name
-    openai_api_key: Optional[str] = Form(None)  # Optional: Use your own OpenAI API key
+    vision_provider: str = Form("openai"),  # "openai" or "anthropic"
+    vision_model: Optional[str] = Form(None),  # Optional model name (default: gpt-4o-mini for openai, claude-3-5-sonnet-20241022 for anthropic)
+    openai_api_key: Optional[str] = Form(None)  # Optional: Use your own OpenAI API key (or use OPENAI_API_KEY env var)
 ):
     """
-    Ingest workout from image using OCR or Vision model.
+    Ingest workout from image using Vision model (OpenAI GPT-4o-mini/GPT-4o or Claude Vision).
     
-    Use use_vision=true to try vision models (requires API key).
-    Falls back to OCR if vision model fails or is not enabled.
+    This endpoint uses AI vision models for better accuracy than OCR, especially for:
+    - Handwritten text
+    - Stylized fonts
+    - Complex layouts
+    - Instagram/social media images
+    
+    Requires OpenAI API key (set OPENAI_API_KEY env var or pass openai_api_key parameter).
+    ChatGPT Plus ($20/month) includes API access.
     """
-    tmpdir = tempfile.mkdtemp(prefix="ingest_image_")
+    tmpdir = tempfile.mkdtemp(prefix="ingest_image_vision_")
     
     try:
         # Save uploaded file temporarily
@@ -246,44 +260,100 @@ async def ingest_image(
         with open(image_path, "wb") as f:
             f.write(b)
         
-        if use_vision:
-            # Use vision model for better accuracy
-            try:
-                provider = vision_provider or "openai"
-                model = vision_model or ("gpt-4o-mini" if provider == "openai" else "claude-3-5-sonnet-20241022")
-                api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+        try:
+            provider = vision_provider.lower() if vision_provider else "openai"
+            
+            # Handle vision_model - ignore placeholder values from Swagger UI
+            if vision_model and vision_model.strip() and vision_model.strip().lower() not in ["string", "none", ""]:
+                model = vision_model.strip()
+            else:
+                # Use default model based on provider
+                model = "gpt-4o-mini" if provider == "openai" else "claude-3-5-sonnet-20241022"
+            
+            # Get API key - ignore placeholder values from Swagger UI
+            if openai_api_key and openai_api_key.strip() and openai_api_key.strip().lower() not in ["string", "none", ""]:
+                api_key = openai_api_key.strip()
+            else:
+                api_key = os.getenv("OPENAI_API_KEY")
+            
+            if provider == "openai":
+                if not api_key:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="OpenAI API key required. Set OPENAI_API_KEY environment variable or pass openai_api_key parameter."
+                    )
+                workout_dict = VisionService.extract_and_structure_workout_openai(
+                    [image_path],
+                    model=model,
+                    api_key=api_key,
+                )
+                # Post-process: ensure exercise types have valid defaults
+                for block in workout_dict.get("blocks", []):
+                    for exercise in block.get("exercises", []):
+                        if not exercise.get("type") or exercise.get("type") is None:
+                            # Default to "strength" if type is missing/None
+                            exercise["type"] = "strength"
+                    for superset in block.get("supersets", []):
+                        for exercise in superset.get("exercises", []):
+                            if not exercise.get("type") or exercise.get("type") is None:
+                                exercise["type"] = "strength"
                 
-                if provider == "openai":
-                    workout_dict = VisionService.extract_and_structure_workout_openai(
-                        [image_path],
-                        model=model,
-                        api_key=api_key,
+                workout = Workout(**workout_dict)
+                workout.source = f"image:{file.filename}"
+            elif provider == "anthropic":
+                anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+                if not anthropic_api_key:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Anthropic API key required. Set ANTHROPIC_API_KEY environment variable."
                     )
-                    workout = Workout(**workout_dict)
-                    workout.source = f"image:{file.filename}"
-                else:
-                    # Anthropic: extract text then structure
-                    text = VisionService.extract_text_from_images_anthropic(
-                        [image_path],
-                        model=model,
-                    )
-                    from app.services.llm_service import LLMService
-                    workout_dict = LLMService.structure_with_anthropic(text, model=model)
-                    workout = Workout(**workout_dict)
-                    workout.source = f"image:{file.filename}"
-                    
-                return JSONResponse(workout.model_dump())
-            except Exception as exc:
-                # Fallback to OCR if vision model fails
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Vision model failed, falling back to OCR: {exc}")
-                # Continue to OCR below
-        
-        # Use OCR (default or fallback)
-        text = OCRService.ocr_image_bytes(b)
-        workout = ParserService.parse_free_text_to_workout(text, source=f"image:{file.filename}")
-        return JSONResponse(workout.model_dump())
+                # Anthropic: extract text then structure
+                text = VisionService.extract_text_from_images_anthropic(
+                    [image_path],
+                    model=model,
+                    api_key=anthropic_api_key,
+                )
+                from app.services.llm_service import LLMService
+                workout_dict = LLMService.structure_with_anthropic(text, model=model)
+                # Post-process: ensure exercise types have valid defaults
+                for block in workout_dict.get("blocks", []):
+                    for exercise in block.get("exercises", []):
+                        if not exercise.get("type") or exercise.get("type") is None:
+                            exercise["type"] = "strength"
+                    for superset in block.get("supersets", []):
+                        for exercise in superset.get("exercises", []):
+                            if not exercise.get("type") or exercise.get("type") is None:
+                                exercise["type"] = "strength"
+                
+                workout = Workout(**workout_dict)
+                workout.source = f"image:{file.filename}"
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unknown vision provider: {provider}. Use 'openai' or 'anthropic'."
+                )
+                
+            # Add provenance info
+            response_dict = workout.model_dump()
+            response_dict.setdefault("_provenance", {})
+            response_dict["_provenance"].update({
+                "mode": "image_vision",
+                "provider": provider,
+                "model": model,
+                "source_file": file.filename,
+            })
+            
+            return JSONResponse(response_dict)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Vision model extraction failed: {exc}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Vision model extraction failed: {str(exc)}"
+            ) from exc
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -374,6 +444,15 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
                     url=payload.url,
                     target_dir=tmpdir,
                 )
+                
+            # Log image info for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Downloaded {len(image_paths)} images for Instagram post")
+            for i, img_path in enumerate(image_paths):
+                import os
+                size = os.path.getsize(img_path) if os.path.exists(img_path) else 0
+                logger.info(f"Image {i+1}: {img_path} ({size} bytes)")
         except InstagramServiceError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # pragma: no cover - unexpected runtime errors
