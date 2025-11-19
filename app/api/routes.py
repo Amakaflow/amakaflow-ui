@@ -294,13 +294,23 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
 
     try:
         try:
-            # If username/password provided, use login method; otherwise use no-login
-            image_paths = InstagramService.download_post_images(
-                username=payload.username,
-                password=payload.password,
-                url=payload.url,
-                target_dir=tmpdir,
-            )
+            # Only use login method if both username and password are provided and not empty
+            use_login = payload.username and payload.password and payload.username.strip() and payload.password.strip()
+            
+            if use_login:
+                # Use login method with Instaloader
+                image_paths = InstagramService.download_post_images(
+                    username=payload.username,
+                    password=payload.password,
+                    url=payload.url,
+                    target_dir=tmpdir,
+                )
+            else:
+                # Use no-login method (web scraping)
+                image_paths = InstagramService.download_post_images_no_login(
+                    url=payload.url,
+                    target_dir=tmpdir,
+                )
         except InstagramServiceError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # pragma: no cover - unexpected runtime errors

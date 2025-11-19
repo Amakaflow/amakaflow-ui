@@ -272,8 +272,8 @@ class InstagramService:
         Returns:
             List of paths to downloaded image files
         """
-        # If no credentials provided, use no-login method
-        if not username or not password:
+        # If no credentials provided (None or empty string), use no-login method
+        if not username or not password or username.strip() == "" or password.strip() == "":
             return InstagramService.download_post_images_no_login(url, target_dir)
         
         # Otherwise, use Instaloader (requires login)
