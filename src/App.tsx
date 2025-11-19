@@ -14,9 +14,16 @@ import { TeamSharing } from './components/TeamSharing';
 import { UserSettings } from './components/UserSettings';
 import { StravaEnhance } from './components/StravaEnhance';
 import { ProfileCompletion } from './components/ProfileCompletion';
+import { WelcomeGuide } from './components/WelcomeGuide';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
 import { generateWorkoutStructure as generateWorkoutStructureReal, checkApiHealth } from './lib/api';
-import { generateWorkoutStructure as generateWorkoutStructureMock, validateWorkout, processWorkflow } from './lib/mock-api';
+import { generateWorkoutStructure as generateWorkoutStructureMock } from './lib/mock-api';
+import { 
+  validateWorkoutMapping, 
+  processWorkoutWithValidation, 
+  exportWorkoutToDevice,
+  checkMapperApiHealth 
+} from './lib/mapper-api';
 import { DeviceId } from './lib/devices';
 import { saveWorkoutToHistory, getWorkoutHistory } from './lib/workout-history';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
@@ -313,27 +320,39 @@ export default function App() {
     if (!workout) return;
     setLoading(true);
     try {
-      console.log('Auto-mapping workout:', workout);
-      const exportFormats = await processWorkflow(workout, true);
-      console.log('Export formats:', exportFormats);
-      setExports(exportFormats);
+      // Check if mapper API is available
+      const isMapperApiAvailable = await checkMapperApiHealth();
+      
+      if (isMapperApiAvailable) {
+        // Use real mapper API - process workout and export to selected device
+        const exportFormats = await exportWorkoutToDevice(workout, selectedDevice);
+        setExports(exportFormats);
+        
+        // Also validate to show in export view
+        const validationResult = await validateWorkoutMapping(workout);
+        setValidation(validationResult);
+      } else {
+        // Fallback to mock if API unavailable
+        const { processWorkflow } = await import('./lib/mock-api');
+        const exportFormats = await processWorkflow(workout, true);
+        setExports(exportFormats);
+      }
       
       // Save to history
-      saveWorkoutToHistory({
-        workout,
-        sources: sources.map(s => `${s.type}:${s.content}`),
-        device: selectedDevice,
-        exports: exportFormats
-      });
+      if (user) {
+        await saveWorkoutToHistory(user.id, workout, selectedDevice);
+      }
       
       setCurrentStep('export');
       toast.success('Workout auto-mapped and ready to export!');
       
       // Refresh history
-      setWorkoutHistoryList(getWorkoutHistory());
-    } catch (error) {
-      console.error('Auto-map error:', error);
-      toast.error('Failed to auto-map workout');
+      if (user) {
+        const history = await getWorkoutHistory(user.id);
+        setWorkoutHistoryList(history);
+      }
+    } catch (error: any) {
+      toast.error(`Failed to auto-map workout: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -343,9 +362,19 @@ export default function App() {
     if (!workout) return;
     setLoading(true);
     try {
-      console.log('Validating workout:', workout);
-      const validationResult = await validateWorkout(workout);
-      console.log('Validation result:', validationResult);
+      // Check if mapper API is available
+      const isMapperApiAvailable = await checkMapperApiHealth();
+      
+      let validationResult: ValidationResponse;
+      if (isMapperApiAvailable) {
+        // Use real mapper API
+        validationResult = await validateWorkoutMapping(workout);
+      } else {
+        // Fallback to mock if API unavailable
+        const { validateWorkout } = await import('./lib/mock-api');
+        validationResult = await validateWorkout(workout);
+      }
+      
       setValidation(validationResult);
       setCurrentStep('validate');
       if (validationResult.can_proceed) {
@@ -353,51 +382,90 @@ export default function App() {
       } else {
         toast.warning('Some exercises need review');
       }
-    } catch (error) {
-      console.error('Validation error:', error);
-      toast.error('Failed to validate workout');
+    } catch (error: any) {
+      toast.error(`Failed to validate workout: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReValidate = async () => {
-    if (!workout) return;
+  const handleReValidate = async (updatedWorkout: WorkoutStructure) => {
     setLoading(true);
     try {
-      const validationResult = await validateWorkout(workout);
+      // Check if mapper API is available
+      const isMapperApiAvailable = await checkMapperApiHealth();
+      
+      let validationResult: ValidationResponse;
+      if (isMapperApiAvailable) {
+        // Use real mapper API with updated workout
+        validationResult = await validateWorkoutMapping(updatedWorkout);
+      } else {
+        // Fallback to mock if API unavailable
+        const { validateWorkout } = await import('./lib/mock-api');
+        validationResult = await validateWorkout(updatedWorkout);
+      }
+      
       setValidation(validationResult);
+      setWorkout(updatedWorkout); // Update the workout state as well
       toast.success('Re-validation complete');
-    } catch (error) {
-      toast.error('Failed to re-validate workout');
+    } catch (error: any) {
+      toast.error(`Failed to re-validate workout: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleProcess = async (device: DeviceId) => {
-    if (!workout) return;
+  const handleProcess = async (updatedWorkout: WorkoutStructure) => {
     setLoading(true);
-    setSelectedDevice(device);
     try {
-      const exportFormats = await processWorkflow(workout, true);
+      // Check if mapper API is available
+      const isMapperApiAvailable = await checkMapperApiHealth();
+      
+      let exportFormats: ExportFormats;
+      let validationResult: ValidationResponse | null = null;
+      
+      if (isMapperApiAvailable) {
+        // Use real mapper API - process workout with validation and export to selected device
+        const processResult = await processWorkoutWithValidation(updatedWorkout, false);
+        validationResult = processResult.validation;
+        
+        // If validation passes, export to selected device
+        if (processResult.validation.can_proceed || processResult.yaml) {
+          // Try to export to device-specific format
+          try {
+            exportFormats = await exportWorkoutToDevice(updatedWorkout, selectedDevice);
+            // If device export has yaml, prefer it over process result yaml
+            if (!exportFormats.yaml && processResult.yaml) {
+              exportFormats.yaml = processResult.yaml;
+            }
+          } catch (deviceError) {
+            // If device export fails, use the yaml from process result
+            exportFormats = { yaml: processResult.yaml || '' };
+          }
+        } else {
+          // Validation didn't pass, but we still have the validation result
+          exportFormats = { yaml: processResult.yaml || '' };
+        }
+      } else {
+        // Fallback to mock if API unavailable
+        const { processWorkflow } = await import('./lib/mock-api');
+        exportFormats = await processWorkflow(updatedWorkout, false);
+      }
+      
       setExports(exportFormats);
+      setValidation(validationResult);
+      setWorkout(updatedWorkout); // Update the workout state as well
+      setCurrentStep('export');
+      toast.success(`Workout processed for ${selectedDevice === 'garmin' ? 'Garmin' : selectedDevice === 'apple' ? 'Apple Watch' : 'Zwift'}!`);
       
       // Save to history
-      saveWorkoutToHistory({
-        workout,
-        sources: sources.map(s => `${s.type}:${s.content}`),
-        device,
-        exports: exportFormats
-      });
-      
-      setCurrentStep('export');
-      toast.success(`Workout processed for ${device === 'garmin' ? 'Garmin' : device === 'apple' ? 'Apple Watch' : 'Zwift'}!`);
-      
-      // Refresh history
-      setWorkoutHistoryList(getWorkoutHistory());
-    } catch (error) {
-      toast.error('Failed to process workout');
+      if (user) {
+        await saveWorkoutToHistory(user.id, updatedWorkout, selectedDevice);
+        const history = await getWorkoutHistory(user.id);
+        setWorkoutHistoryList(history);
+      }
+    } catch (error: any) {
+      toast.error(`Failed to process workout: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -685,8 +753,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
+           {/* Main Content */}
+           <div className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
+        {/* Welcome Guide (shown on home view) */}
+        {currentView === 'home' && (
+          <WelcomeGuide 
+            onGetStarted={() => {
+              setCurrentView('workflow');
+              setCurrentStep('add-sources');
+            }}
+          />
+        )}
+
         {currentView === 'workflow' && currentStepIndex > 0 && (
           <Button variant="ghost" onClick={goBack} className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -715,9 +793,10 @@ export default function App() {
           />
         )}
 
-        {currentView === 'workflow' && currentStep === 'validate' && validation && (
+        {currentView === 'workflow' && currentStep === 'validate' && validation && workout && (
           <ValidateMap
             validation={validation}
+            workout={workout}
             onReValidate={handleReValidate}
             onProcess={handleProcess}
             loading={loading}

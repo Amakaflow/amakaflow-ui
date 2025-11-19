@@ -11,9 +11,10 @@ import {
   ArrowRight,
   ThumbsUp,
   ThumbsDown,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
-import { ValidationResult } from '../types/workout';
+import { ValidationResult, ExerciseSuggestion } from '../types/workout';
 import {
   Dialog,
   DialogContent,
@@ -35,40 +36,74 @@ interface EnhancedMappingProps {
   result: ValidationResult;
   onApplyMapping: (exerciseName: string, newMapping: string) => void;
   onAcceptMapping: (exerciseName: string) => void;
+  isRecentlyUpdated?: boolean;
+  isConfirmed?: boolean;
 }
 
-export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: EnhancedMappingProps) {
+export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRecentlyUpdated = false, isConfirmed = false }: EnhancedMappingProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string>('');
   const [customMapping, setCustomMapping] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<ExerciseSuggestion[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
 
   const handleApplySuggestion = () => {
     if (selectedSuggestion) {
       onApplyMapping(result.original_name, selectedSuggestion);
-      toast.success('Mapping applied successfully');
       setIsDialogOpen(false);
       setSelectedSuggestion('');
+      // Note: Toast notification is handled in ValidateMap's handleApplyMapping
     }
   };
 
   const handleApplyCustom = () => {
     if (customMapping.trim()) {
       onApplyMapping(result.original_name, customMapping.trim());
-      toast.success('Custom mapping applied');
       setIsDialogOpen(false);
       setCustomMapping('');
+      // Note: Toast notification is handled in ValidateMap's handleApplyMapping
     }
   };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    // Simulate search API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSearching(false);
-    toast.success(`Found ${Math.floor(Math.random() * 10) + 3} similar exercises`);
+    try {
+      // Call real mapper API for exercise suggestions
+      const { getExerciseSuggestions } = await import('../lib/mapper-api');
+      const suggestions = await getExerciseSuggestions(searchQuery.trim(), true);
+      
+      // Combine similar exercises and exercises by type
+      const allSearchResults: ExerciseSuggestion[] = [
+        ...(suggestions.similar_exercises || []),
+        ...(suggestions.exercises_by_type || [])
+      ];
+      
+      // Remove duplicates by name
+      const uniqueResults = allSearchResults.filter((item, index, self) =>
+        index === self.findIndex((t) => t.name === item.name)
+      );
+      
+      // Sort by score descending
+      uniqueResults.sort((a, b) => b.score - a.score);
+      
+      setSearchResults(uniqueResults);
+      
+      const count = uniqueResults.length;
+      if (count > 0) {
+        toast.success(`Found ${count} similar exercises`);
+      } else {
+        toast.info('No similar exercises found');
+        setSearchResults([]);
+      }
+    } catch (error: any) {
+      toast.error(`Failed to search exercises: ${error.message || 'Unknown error'}`);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -77,25 +112,53 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: Enh
     return 'text-red-600';
   };
 
-  const allSuggestions = [
+  // Combine original suggestions with search results
+  const originalSuggestions = [
     ...(result.suggestions?.similar || []),
     ...(result.suggestions?.by_type || [])
   ];
   
-  const topSuggestions = allSuggestions.slice(0, 2);
+  // If we have search results, use them, otherwise use original suggestions
+  const allSuggestions = searchResults.length > 0 ? searchResults : originalSuggestions;
+  
+  const topSuggestions = originalSuggestions.slice(0, 2);
 
   return (
-    <Card>
+    <Card className={`transition-all duration-300 ${
+      isRecentlyUpdated 
+        ? 'ring-2 ring-green-500 ring-offset-2 bg-green-50/50 dark:bg-green-950/20 animate-pulse-once' 
+        : ''
+    }`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <CardTitle className="text-base">{result.original_name}</CardTitle>
-            {result.mapped_to && result.mapped_to !== result.original_name && (
-              <CardDescription className="mt-1 flex items-center gap-2">
-                <ArrowRight className="w-3 h-3" />
-                {result.mapped_to}
-              </CardDescription>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Show only the mapped name if it exists and is different, otherwise show original */}
+              <CardTitle className="text-base">
+                {result.mapped_to && result.mapped_to !== result.original_name 
+                  ? result.mapped_to 
+                  : result.original_name}
+              </CardTitle>
+              {isRecentlyUpdated && (
+                <Badge variant="default" className="bg-green-500 text-white animate-fade-in">
+                  ✓ Updated
+                </Badge>
+              )}
+              {isConfirmed && (
+                <Badge variant="default" className="bg-blue-500 text-white">
+                  ✓ Confirmed
+                </Badge>
+              )}
+              {result.mapped_to && result.mapped_to !== result.original_name && !isConfirmed && (
+                <Badge variant="outline" className="border-green-500 text-green-600">
+                  Mapped
+                </Badge>
+              )}
+            </div>
+            {/* Show original name - always show for context */}
+            <CardDescription className="mt-1 text-xs text-muted-foreground">
+              Original: {result.original_name}
+            </CardDescription>
           </div>
           <Badge 
             variant={result.confidence >= 0.9 ? 'default' : result.confidence >= 0.7 ? 'secondary' : 'destructive'}
@@ -106,27 +169,69 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: Enh
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Action Required Alert for Unmapped */}
+        {!result.mapped_to && (
+          <div className="rounded-lg border border-orange-500/50 bg-orange-50 dark:bg-orange-950/20 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                  Action Required
+                </div>
+                <div className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                  This exercise needs to be mapped. Select an AI suggestion below or use "Change Mapping" to search for alternatives.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Needs Review Alert */}
+        {result.status === 'needs_review' && result.mapped_to && !isConfirmed && (
+          <div className="rounded-lg border border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                  Review Required
+                </div>
+                <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                  A mapping has been suggested: <strong>{result.mapped_to}</strong>. Click "Confirm" to accept or "Change Mapping" to select a different exercise.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Suggestions */}
-        {topSuggestions.length > 0 && (
+        {topSuggestions.length > 0 && !result.mapped_to && (
           <div className="space-y-2">
             <Label className="text-xs">AI Suggestions</Label>
             {topSuggestions.map((suggestion, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-2 rounded-lg border bg-muted/50 hover:bg-muted transition-colors"
+                className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
+                  selectedSuggestionIndex === idx 
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
+                    : 'bg-muted/50 hover:bg-muted'
+                }`}
               >
                 <div className="flex-1">
-                  <div className="text-sm">{suggestion.name}</div>
+                  <div className="text-sm font-medium">{suggestion.name}</div>
                   <div className="text-xs text-muted-foreground">
                     {(suggestion.score * 100).toFixed(0)}% match
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant={selectedSuggestionIndex === idx ? "default" : "ghost"}
                   onClick={() => {
-                    onApplyMapping(result.original_name, suggestion.name);
-                    toast.success('Quick mapping applied');
+                    setSelectedSuggestionIndex(idx);
+                    // Apply after a brief delay to show selection
+                    setTimeout(() => {
+                      onApplyMapping(result.original_name, suggestion.name);
+                      setSelectedSuggestionIndex(null);
+                    }, 300);
                   }}
                 >
                   <CheckCircle2 className="w-4 h-4" />
@@ -138,30 +243,50 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: Enh
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          {result.status === 'valid' && (
+          {/* Show Confirm button if exercise has a mapping (even if same as original) OR if status is needs_review */}
+          {(result.mapped_to || result.status === 'needs_review') && (
             <Button
               size="sm"
-              variant="outline"
-              className="flex-1"
+              variant={isConfirmed ? "default" : "outline"}
+              className={`flex-1 ${isConfirmed ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
               onClick={() => {
                 onAcceptMapping(result.original_name);
-                toast.success('Mapping confirmed');
               }}
+              disabled={isConfirmed}
             >
-              <ThumbsUp className="w-3 h-3 mr-2" />
-              Confirm
+              {isConfirmed ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3 mr-2" />
+                  Confirmed
+                </>
+              ) : (
+                <>
+                  <ThumbsUp className="w-3 h-3 mr-2" />
+                  Confirm
+                </>
+              )}
             </Button>
           )}
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            // Reset search when dialog closes
+            if (!open) {
+              setSearchQuery('');
+              setSearchResults([]);
+              setSelectedSuggestion('');
+              setCustomMapping('');
+              setSelectedSuggestionIndex(null);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button
                 size="sm"
-                variant="outline"
-                className="flex-1"
+                variant={!result.mapped_to ? "default" : "outline"}
+                className={`flex-1 ${!result.mapped_to ? 'bg-primary hover:bg-primary/90' : ''}`}
               >
                 <Sparkles className="w-3 h-3 mr-2" />
-                {result.status === 'needs_review' && !result.mapped_to ? 'Find Mapping' : 'Change Mapping'}
+                {!result.mapped_to ? 'Find & Select Mapping' : 'Change Mapping'}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -193,17 +318,21 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: Enh
                   </div>
                 </div>
 
-                {/* All Suggestions */}
-                {allSuggestions.length > 0 && (
+                {/* Search Results */}
+                {searchResults.length > 0 && (
                   <div className="space-y-2">
-                    <Label>AI Suggestions ({allSuggestions.length})</Label>
+                    <Label>Search Results ({searchResults.length})</Label>
                     <Select value={selectedSuggestion} onValueChange={setSelectedSuggestion}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a suggested mapping..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {allSuggestions.map((suggestion, idx) => (
-                          <SelectItem key={idx} value={suggestion.name}>
+                        {searchResults.map((suggestion, idx) => (
+                          <SelectItem 
+                            key={idx} 
+                            value={suggestion.name}
+                            onSelect={() => setSelectedSuggestionIndex(-1 - idx)} // Negative to differentiate from top suggestions
+                          >
                             <div className="flex items-center gap-3">
                               <span>{suggestion.name}</span>
                               <span className="text-xs text-muted-foreground">
@@ -215,7 +344,49 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping }: Enh
                       </SelectContent>
                     </Select>
                     <Button
-                      onClick={handleApplySuggestion}
+                      onClick={() => {
+                        handleApplySuggestion();
+                        setSelectedSuggestionIndex(null);
+                      }}
+                      disabled={!selectedSuggestion}
+                      className="w-full"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Apply Selected Suggestion
+                    </Button>
+                  </div>
+                )}
+
+                {/* Original AI Suggestions (show if no search results) */}
+                {searchResults.length === 0 && originalSuggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>AI Suggestions ({originalSuggestions.length})</Label>
+                    <Select value={selectedSuggestion} onValueChange={setSelectedSuggestion}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a suggested mapping..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {originalSuggestions.map((suggestion, idx) => (
+                          <SelectItem 
+                            key={idx} 
+                            value={suggestion.name}
+                            onSelect={() => setSelectedSuggestionIndex(-1 - idx)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span>{suggestion.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {(suggestion.score * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => {
+                        handleApplySuggestion();
+                        setSelectedSuggestionIndex(null);
+                      }}
                       disabled={!selectedSuggestion}
                       className="w-full"
                     >
