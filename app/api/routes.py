@@ -17,6 +17,7 @@ from app.services.parser_service import ParserService
 from app.services.video_service import VideoService
 from app.services.export_service import ExportService
 from app.services.instagram_service import InstagramService, InstagramServiceError
+from app.services.vision_service import VisionService
 
 router = APIRouter()
 
@@ -192,6 +193,10 @@ class InstagramTestRequest(BaseModel):
     url: str
     username: Optional[str] = None
     password: Optional[str] = None
+    use_vision: bool = False  # Use vision model instead of OCR (requires API key)
+    vision_provider: Optional[str] = "openai"  # "openai" or "anthropic"
+    vision_model: Optional[str] = None  # Optional: specific model name (e.g., "gpt-4o-mini")
+    openai_api_key: Optional[str] = None  # Optional: Use your own OpenAI API key (from $20/month plan)
 
 
 @router.get("/health")
@@ -219,12 +224,68 @@ async def ingest_ai_workout(text: str = Body(..., media_type="text/plain")):
 
 
 @router.post("/ingest/image")
-async def ingest_image(file: UploadFile = File(...)):
-    """Ingest workout from image using OCR."""
-    b = await file.read()
-    text = OCRService.ocr_image_bytes(b)
-    wk = ParserService.parse_free_text_to_workout(text, source=f"image:{file.filename}")
-    return JSONResponse(wk.model_dump())
+async def ingest_image(
+    file: UploadFile = File(...),
+    use_vision: bool = Form(False),  # Use vision model instead of OCR
+    vision_provider: Optional[str] = Form("openai"),  # "openai" or "anthropic"
+    vision_model: Optional[str] = Form(None),  # Optional model name
+    openai_api_key: Optional[str] = Form(None)  # Optional: Use your own OpenAI API key
+):
+    """
+    Ingest workout from image using OCR or Vision model.
+    
+    Use use_vision=true to try vision models (requires API key).
+    Falls back to OCR if vision model fails or is not enabled.
+    """
+    tmpdir = tempfile.mkdtemp(prefix="ingest_image_")
+    
+    try:
+        # Save uploaded file temporarily
+        image_path = os.path.join(tmpdir, file.filename or "image.jpg")
+        b = await file.read()
+        with open(image_path, "wb") as f:
+            f.write(b)
+        
+        if use_vision:
+            # Use vision model for better accuracy
+            try:
+                provider = vision_provider or "openai"
+                model = vision_model or ("gpt-4o-mini" if provider == "openai" else "claude-3-5-sonnet-20241022")
+                api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+                
+                if provider == "openai":
+                    workout_dict = VisionService.extract_and_structure_workout_openai(
+                        [image_path],
+                        model=model,
+                        api_key=api_key,
+                    )
+                    workout = Workout(**workout_dict)
+                    workout.source = f"image:{file.filename}"
+                else:
+                    # Anthropic: extract text then structure
+                    text = VisionService.extract_text_from_images_anthropic(
+                        [image_path],
+                        model=model,
+                    )
+                    from app.services.llm_service import LLMService
+                    workout_dict = LLMService.structure_with_anthropic(text, model=model)
+                    workout = Workout(**workout_dict)
+                    workout.source = f"image:{file.filename}"
+                    
+                return JSONResponse(workout.model_dump())
+            except Exception as exc:
+                # Fallback to OCR if vision model fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Vision model failed, falling back to OCR: {exc}")
+                # Continue to OCR below
+        
+        # Use OCR (default or fallback)
+        text = OCRService.ocr_image_bytes(b)
+        workout = ParserService.parse_free_text_to_workout(text, source=f"image:{file.filename}")
+        return JSONResponse(workout.model_dump())
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @router.post("/ingest/url")
@@ -318,21 +379,72 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
         except Exception as exc:  # pragma: no cover - unexpected runtime errors
             raise HTTPException(status_code=500, detail=f"Instagram ingestion failed: {exc}") from exc
 
-        text_segments = []
-        for image_path in image_paths:
+        # Extract text from images using OCR or Vision model
+        if payload.use_vision:
+            # Use vision model for better accuracy
             try:
-                with open(image_path, "rb") as file_obj:
-                    extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
-                if extracted:
-                    text_segments.append(extracted)
-            except Exception:
-                continue
+                provider = payload.vision_provider or "openai"
+                model = payload.vision_model or ("gpt-4o-mini" if provider == "openai" else "claude-3-5-sonnet-20241022")
+                
+                if provider == "openai":
+                    # Use provided API key or fall back to environment variable
+                    api_key = payload.openai_api_key or os.getenv("OPENAI_API_KEY")
+                    workout_dict = VisionService.extract_and_structure_workout_openai(
+                        image_paths,
+                        model=model,
+                        api_key=api_key,
+                    )
+                else:
+                    # For Anthropic, extract text first then structure with existing LLM service
+                    text = VisionService.extract_text_from_images_anthropic(
+                        image_paths,
+                        model=model,
+                    )
+                    # Use existing LLM service to structure the text
+                    from app.services.llm_service import LLMService
+                    workout_dict = LLMService.structure_with_anthropic(text, model=model)
+                
+                # Convert dict to Workout model
+                workout = Workout(**workout_dict)
+                workout.source = payload.url
+            except Exception as exc:
+                # Fallback to OCR if vision model fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Vision model failed, falling back to OCR: {exc}")
+                
+                text_segments = []
+                for image_path in image_paths:
+                    try:
+                        with open(image_path, "rb") as file_obj:
+                            extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
+                        if extracted:
+                            text_segments.append(extracted)
+                    except Exception:
+                        continue
+                
+                if not text_segments:
+                    raise HTTPException(status_code=422, detail=f"Could not extract text from Instagram images (vision model failed: {exc}).")
+                
+                merged = "\n".join(text_segments)
+                workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
+        else:
+            # Use OCR (default)
+            text_segments = []
+            for image_path in image_paths:
+                try:
+                    with open(image_path, "rb") as file_obj:
+                        extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
+                    if extracted:
+                        text_segments.append(extracted)
+                except Exception:
+                    continue
 
-        if not text_segments:
-            raise HTTPException(status_code=422, detail="OCR could not extract text from Instagram images.")
+            if not text_segments:
+                raise HTTPException(status_code=422, detail="OCR could not extract text from Instagram images.")
 
-        merged = "\n".join(text_segments)
-        workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
+            merged = "\n".join(text_segments)
+            workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
 
         response_payload = workout.model_dump()
         response_payload.setdefault("_provenance", {})
@@ -340,6 +452,7 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
             "mode": "instagram_image_test",
             "source_url": payload.url,
             "image_count": len(image_paths),
+            "extraction_method": "vision" if payload.use_vision else "ocr",
         })
 
         return JSONResponse(response_payload)
