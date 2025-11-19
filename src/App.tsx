@@ -28,7 +28,7 @@ import { DeviceId } from './lib/devices';
 import { saveWorkoutToHistory, getWorkoutHistory } from './lib/workout-history';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
 import { User } from './types/auth';
-import { isAccountConnected } from './lib/linked-accounts';
+import { isAccountConnectedSync, isAccountConnected } from './lib/linked-accounts';
 
 type AppUser = User & {
   avatar?: string;
@@ -140,7 +140,18 @@ export default function App() {
             };
             setUser(tempUser);
           }
-          setStravaConnected(isAccountConnected('strava'));
+          // Check Strava connection status from Supabase
+          if (clerkUser?.id) {
+            try {
+              const connected = await isAccountConnected(clerkUser.id, 'strava');
+              setStravaConnected(connected);
+            } catch (error) {
+              console.error('Error checking Strava connection:', error);
+              setStravaConnected(false);
+            }
+          } else {
+            setStravaConnected(false);
+          }
         } else {
           // No Clerk user, clear app user
           setUser(null);
@@ -170,7 +181,7 @@ export default function App() {
     // 1. No devices selected AND
     // 2. Strava is not connected
     const hasDevices = user.selectedDevices && user.selectedDevices.length > 0;
-    const hasStrava = isAccountConnected('strava');
+    const hasStrava = isAccountConnectedSync('strava');
     return !hasDevices && !hasStrava;
   };
 
@@ -213,8 +224,18 @@ export default function App() {
           }
         }
       }
-      // Check Strava connection status
-      setStravaConnected(isAccountConnected('strava'));
+      // Check Strava connection status from Supabase
+      if (clerkUserId) {
+        try {
+          const connected = await isAccountConnected(clerkUserId, 'strava');
+          setStravaConnected(connected);
+        } catch (error) {
+          console.error('Error checking Strava connection:', error);
+          setStravaConnected(false);
+        }
+      } else {
+        setStravaConnected(false);
+      }
     } catch (error: any) {
       console.error('Error loading user profile:', error);
       // Only show toast for non-404 errors (profile not found is expected for new users)
@@ -225,14 +246,24 @@ export default function App() {
   };
 
   // Handle profile completion
-  const handleProfileComplete = (updatedUser: User) => {
+  const handleProfileComplete = async (updatedUser: User) => {
     setUser({
       ...updatedUser,
       avatar: undefined,
       mode: 'individual' as const,
     });
-    // Refresh Strava connection status
-    setStravaConnected(isAccountConnected('strava'));
+    // Refresh Strava connection status from Supabase
+    if (updatedUser.id) {
+      try {
+        const connected = await isAccountConnected(updatedUser.id, 'strava');
+        setStravaConnected(connected);
+      } catch (error) {
+        console.error('Error checking Strava connection:', error);
+        setStravaConnected(false);
+      }
+    } else {
+      setStravaConnected(false);
+    }
   };
 
   // Handle logout (Clerk handles this automatically via UserButton)
@@ -854,9 +885,19 @@ export default function App() {
           <UserSettings
             user={user}
             onBack={() => setCurrentView('workflow')}
-            onAccountsChange={() => {
-              // Refresh Strava connection status
-              setStravaConnected(isAccountConnected('strava'));
+            onAccountsChange={async () => {
+              // Refresh Strava connection status from Supabase
+              if (user?.id) {
+                try {
+                  const connected = await isAccountConnected(user.id, 'strava');
+                  setStravaConnected(connected);
+                } catch (error) {
+                  console.error('Error checking Strava connection:', error);
+                  setStravaConnected(false);
+                }
+              } else {
+                setStravaConnected(false);
+              }
             }}
             onAccountDeleted={() => {
               // Account was deleted, sign out and reset state

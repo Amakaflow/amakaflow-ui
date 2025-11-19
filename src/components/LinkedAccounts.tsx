@@ -13,7 +13,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import {
@@ -25,56 +26,149 @@ import {
   PLATFORM_INFO,
   LinkedAccountProvider,
   LinkedAccountStatus,
+  LinkedAccounts,
 } from '../lib/linked-accounts';
+import { useClerkUser } from '../lib/clerk-auth';
+import { initiateStravaOAuth, getStravaAthlete } from '../lib/strava-api';
 
 type Props = {
   onAccountsChange?: () => void;
 };
 
 export function LinkedAccounts({ onAccountsChange }: Props) {
-  const [accounts, setAccounts] = useState(getLinkedAccounts());
+  const { user: clerkUser } = useClerkUser();
+  const profileId = clerkUser?.id || '';
+  
+  const [accounts, setAccounts] = useState<LinkedAccounts>({
+    strava: { connected: false },
+    relive: { connected: false },
+    trainingPeaks: { connected: false },
+    appleHealth: { connected: false },
+    garmin: { connected: false },
+    amazfit: { connected: false },
+  });
+  const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<LinkedAccountProvider | null>(null);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
+  // Load linked accounts from Supabase
   useEffect(() => {
-    setAccounts(getLinkedAccounts());
-  }, []);
-
-  const handleConnect = (provider: LinkedAccountProvider) => {
-    // In production, this would redirect to OAuth URL
-    const oauthUrl = getOAuthUrl(provider);
-    console.log('Redirecting to OAuth URL:', oauthUrl);
+    const loadAccounts = async () => {
+      if (!profileId) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const linkedAccounts = await getLinkedAccounts(profileId);
+        setAccounts(linkedAccounts);
+      } catch (error: any) {
+        console.error('Failed to load linked accounts:', error);
+        toast.error('Failed to load linked accounts');
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // Simulate OAuth success with promise
-    const connectPromise = new Promise((resolve) => {
-      setTimeout(() => {
-        connectAccount(provider, ['read_activities', 'write_activities']);
-        setAccounts(getLinkedAccounts());
-        onAccountsChange?.();
-        resolve(true);
-      }, 1500);
-    });
+    loadAccounts();
+  }, [profileId]);
 
-    toast.promise(connectPromise, {
-      loading: 'Connecting to ' + PLATFORM_INFO[provider].name + '...',
-      success: PLATFORM_INFO[provider].name + ' connected successfully!',
-      error: 'Failed to connect to ' + PLATFORM_INFO[provider].name,
-    });
+  // Handle OAuth callback redirect
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const provider = params.get('provider');
+      const status = params.get('status');
+      const error = params.get('error');
+
+      if (provider === 'strava' && status === 'success' && profileId) {
+        try {
+          // Get athlete info from strava-sync-api (this verifies tokens are stored)
+          const athlete = await getStravaAthlete(profileId);
+          
+          // Update linked_accounts in Supabase with athlete ID
+          await connectAccount(
+            profileId,
+            'strava',
+            athlete.id.toString(),
+            athlete.username || `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim() || undefined,
+            ['read_activities', 'write_activities']
+          );
+
+          // Reload accounts
+          const linkedAccounts = await getLinkedAccounts(profileId);
+          setAccounts(linkedAccounts);
+
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+
+          toast.success('Strava account connected successfully!');
+          onAccountsChange?.();
+        } catch (error: any) {
+          console.error('Failed to sync Strava account after OAuth:', error);
+          toast.error(`Connected to Strava but failed to sync: ${error.message || 'Unknown error'}`);
+        }
+      } else if (provider === 'strava' && status === 'error') {
+        toast.error(`Failed to connect Strava: ${error || 'Unknown error'}`);
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    handleOAuthCallback();
+  }, [profileId, onAccountsChange]);
+
+  const handleConnect = async (provider: LinkedAccountProvider) => {
+    if (provider === 'strava') {
+      // For Strava, initiate OAuth flow
+      if (!profileId) {
+        toast.error('Please sign in to connect your Strava account');
+        return;
+      }
+
+      try {
+        setConnecting(true);
+        // Initiate OAuth flow - this will return a Strava OAuth URL
+        const oauthUrl = await initiateStravaOAuth(profileId);
+        // Redirect user to Strava to authorize
+        window.location.href = oauthUrl;
+      } catch (error: any) {
+        console.error('Failed to initiate Strava OAuth:', error);
+        toast.error(`Failed to connect Strava: ${error.message || 'Unknown error'}`);
+        setConnecting(false);
+      }
+    } else {
+      // For other providers, use OAuth flow (future implementation)
+      const oauthUrl = getOAuthUrl(provider);
+      console.log('Redirecting to OAuth URL:', oauthUrl);
+      toast.info(`${PLATFORM_INFO[provider].name} OAuth flow not yet implemented`);
+    }
   };
+
 
   const handleManage = (provider: LinkedAccountProvider) => {
     setSelectedProvider(provider);
     setShowManageModal(true);
   };
 
-  const handleDisconnect = () => {
-    if (!selectedProvider) return;
+  const handleDisconnect = async () => {
+    if (!selectedProvider || !profileId) return;
     
-    disconnectAccount(selectedProvider);
-    setAccounts(getLinkedAccounts());
-    setShowManageModal(false);
-    toast.success(PLATFORM_INFO[selectedProvider].name + ' disconnected.');
-    onAccountsChange?.();
+    try {
+      await disconnectAccount(profileId, selectedProvider);
+      
+      // Reload accounts
+      const linkedAccounts = await getLinkedAccounts(profileId);
+      setAccounts(linkedAccounts);
+      
+      setShowManageModal(false);
+      toast.success(PLATFORM_INFO[selectedProvider].name + ' disconnected.');
+      onAccountsChange?.();
+    } catch (error: any) {
+      console.error('Failed to disconnect account:', error);
+      toast.error(error.message || 'Failed to disconnect account');
+    }
   };
 
   const handleReconnect = (provider: LinkedAccountProvider) => {
@@ -108,7 +202,8 @@ export function LinkedAccounts({ onAccountsChange }: Props) {
 
   const renderAccountCard = (provider: LinkedAccountProvider, status: LinkedAccountStatus) => {
     const info = PLATFORM_INFO[provider];
-    const isExpired = isAccountExpired(provider);
+    // Check if expired based on expiresAt timestamp
+    const isExpired = status.connected && status.expiresAt && status.expiresAt < Date.now();
     
     return (
       <Card key={provider} className={!info.available ? 'opacity-60' : ''}>
@@ -218,6 +313,22 @@ export function LinkedAccounts({ onAccountsChange }: Props) {
       </Card>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl mb-2">Linked Accounts</h2>
+          <p className="text-muted-foreground">
+            Manage your connected apps and authorize MyAmaka to enhance your workouts.
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

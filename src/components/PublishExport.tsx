@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { isAccountConnected } from '../lib/linked-accounts';
+import { isAccountConnectedSync } from '../lib/linked-accounts';
 
 interface PublishExportProps {
   exports: ExportFormats;
@@ -56,7 +56,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
   const [recurringType, setRecurringType] = useState<'none' | 'daily' | 'weekly' | 'custom'>('none');
   const [recurringCount, setRecurringCount] = useState<number>(1);
   const [autoEnhanceStrava, setAutoEnhanceStrava] = useState(false);
-  const stravaConnected = isAccountConnected('strava');
+  const stravaConnected = isAccountConnectedSync('strava');
 
   const copyToClipboard = async (text: string, format: string) => {
     try {

@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { Clock, Dumbbell, Watch, Bike, Download, Activity, CheckCircle2, ExternalLink } from 'lucide-react';
 import { WorkoutHistoryItem } from '../lib/workout-history';
-import { isAccountConnected } from '../lib/linked-accounts';
+import { isAccountConnectedSync } from '../lib/linked-accounts';
 
 type Props = {
   history: WorkoutHistoryItem[];
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function WorkoutHistory({ history, onLoadWorkout, onDeleteWorkout, onEnhanceStrava }: Props) {
-  const stravaConnected = isAccountConnected('strava');
+  const stravaConnected = isAccountConnectedSync('strava');
   
   // Ensure history is an array
   const safeHistory = Array.isArray(history) ? history : [];

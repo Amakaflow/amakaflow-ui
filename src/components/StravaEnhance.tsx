@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -25,54 +25,15 @@ import {
   AlertCircle,
   Activity,
   Eye,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-
-// Mock Strava Activities (to be enhanced)
-const MOCK_STRAVA_ACTIVITIES = [
-  {
-    id: '123456',
-    name: 'Morning Run',
-    type: 'Run',
-    date: '2025-11-16T06:30:00Z',
-    distance: 8500,
-    moving_time: 2580,
-    has_description: false,
-  },
-  {
-    id: '123457',
-    name: 'Evening CrossFit',
-    type: 'Workout',
-    date: '2025-11-10T18:00:00Z',
-    distance: 0,
-    moving_time: 3600,
-    has_description: true,
-    description: '5 Rounds for Time:\n10 Thrusters (95 lbs)\n15 Pull-ups\n20 Box Jumps (24")',
-    has_images: true
-  },
-  {
-    id: '123458',
-    name: 'Hyrox Training',
-    type: 'Workout',
-    date: '2025-11-14T18:30:00Z',
-    distance: 1200,
-    moving_time: 2100,
-    has_description: false,
-  },
-  {
-    id: '123459',
-    name: 'Strength Training',
-    type: 'WeightTraining',
-    date: '2025-11-08T17:00:00Z',
-    distance: 0,
-    moving_time: 2700,
-    has_description: true,
-    description: 'Back Squat 5x5 @ 225 lbs\nDeadlift 3x8 @ 275 lbs',
-  },
-];
+import { getStravaActivities, updateStravaActivity, getStravaAthlete, StravaActivity } from '../lib/strava-api';
+import { useClerkUser } from '../lib/clerk-auth';
+import { getLinkedAccounts } from '../lib/linked-accounts';
 
 type Step = 'select-activity' | 'add-details' | 'success';
 
@@ -81,8 +42,13 @@ interface StravaEnhanceProps {
 }
 
 export function StravaEnhance({ onClose }: StravaEnhanceProps) {
+  const { user: clerkUser } = useClerkUser();
+  const profileId = clerkUser?.id || '';
+  
   const [currentStep, setCurrentStep] = useState<Step>('select-activity');
-  const [selectedActivity, setSelectedActivity] = useState<typeof MOCK_STRAVA_ACTIVITIES[0] | null>(null);
+  const [activities, setActivities] = useState<StravaActivity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   
   // Enhancement fields
   const [overwriteTitle, setOverwriteTitle] = useState(false);
@@ -97,6 +63,61 @@ export function StravaEnhance({ onClose }: StravaEnhanceProps) {
   
   const [showPreview, setShowPreview] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+
+  // Fetch Strava activities when component mounts
+  useEffect(() => {
+    const loadActivities = async () => {
+      if (!profileId) {
+        setLoadingActivities(false);
+        return;
+      }
+
+      try {
+        // Get linked accounts to check if Strava is connected
+        const linkedAccounts = await getLinkedAccounts(profileId);
+        const stravaAccount = linkedAccounts.strava;
+        
+        if (!stravaAccount.connected) {
+          toast.error('Please connect your Strava account first via OAuth in Settings');
+          setLoadingActivities(false);
+          return;
+        }
+
+        // Verify tokens exist by trying to get athlete info first
+        // This will fail with "No tokens found" if OAuth wasn't completed
+        try {
+          await getStravaAthlete(profileId);
+        } catch (verifyError: any) {
+          if (verifyError.message?.includes('No tokens found')) {
+            toast.error('Please complete Strava OAuth connection in Settings. Click "Connect Strava" to authorize.');
+            setLoadingActivities(false);
+            return;
+          }
+          // If it's a different error, continue to try fetching activities
+          console.warn('Could not verify tokens, but will try to fetch activities:', verifyError);
+        }
+
+        // Use profileId as userId for API calls (strava-sync-api stores tokens by userId)
+        // The API will handle token lookup and refresh automatically
+        // Fetch last 5 activities from Strava using profileId as userId
+        const fetchedActivities = await getStravaActivities(profileId, 5);
+        setActivities(fetchedActivities);
+      } catch (error: any) {
+        console.error('Failed to load Strava activities:', error);
+        
+        // Provide helpful error message for token-related errors
+        if (error.message?.includes('No tokens found')) {
+          toast.error('Please complete Strava OAuth connection. Go to Settings → Linked Accounts → Connect Strava');
+        } else {
+          toast.error(`Failed to load activities: ${error.message || 'Unknown error'}`);
+        }
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    loadActivities();
+  }, [profileId]);
 
   // Format distance
   const formatDistance = (meters: number) => {
@@ -192,17 +213,37 @@ export function StravaEnhance({ onClose }: StravaEnhanceProps) {
 
   // Handle enhance activity
   const handleEnhance = async () => {
-    if (!selectedActivity) return;
+    if (!selectedActivity || !profileId) {
+      toast.error('Missing activity or user profile');
+      return;
+    }
 
     setIsEnhancing(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Generate the enhanced description
+      const description = generateDescription();
 
-    // In production: POST /api/strava/activities/enhance-manual
-    toast.success('Strava activity enhanced!');
-    setIsEnhancing(false);
-    setCurrentStep('success');
+      // Update the activity on Strava using profileId as userId
+      await updateStravaActivity(
+        profileId,
+        selectedActivity.id,
+        {
+          overwriteTitle: overwriteTitle,
+          newTitle: overwriteTitle ? newTitle : undefined,
+          overwriteDescription: true,
+          description: description,
+        }
+      );
+
+      toast.success('Strava activity enhanced!');
+      setCurrentStep('success');
+    } catch (error: any) {
+      console.error('Failed to enhance activity:', error);
+      toast.error(`Failed to enhance activity: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsEnhancing(false);
+    }
   };
 
   // Navigation
@@ -255,73 +296,97 @@ export function StravaEnhance({ onClose }: StravaEnhanceProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-96">
-              <div className="space-y-3">
-                {MOCK_STRAVA_ACTIVITIES.map(activity => (
-                  <div
-                    key={activity.id}
-                    onClick={() => setSelectedActivity(activity)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                      selectedActivity?.id === activity.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">{activity.name}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {activity.type}
-                          </Badge>
-                          {activity.has_images && (
-                            <Badge variant="outline" className="text-xs">
-                              Has images
-                            </Badge>
+            {loadingActivities ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="text-center py-12">
+                <Activity className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-20" />
+                <p className="text-muted-foreground mb-2">No Strava activities found</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Make sure your Strava account is connected via OAuth in Settings
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" onClick={onClose}>
+                    Go Back
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <ScrollArea className="h-96">
+                <div className="space-y-3">
+                  {activities.map(activity => {
+                    const hasDescription = !!activity.description && activity.description.trim().length > 0;
+                    const hasImages = activity.photos && activity.photos.count > 0;
+
+                    return (
+                      <div
+                        key={activity.id}
+                        onClick={() => setSelectedActivity(activity)}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                          selectedActivity?.id === activity.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{activity.name}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {activity.type}
+                              </Badge>
+                              {hasImages && (
+                                <Badge variant="outline" className="text-xs">
+                                  Has images
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatDate(activity.start_date)}
+                            </div>
+                          </div>
+                          {selectedActivity?.id === activity.id && (
+                            <Check className="w-5 h-5 text-primary" />
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDate(activity.date)}
+
+                        {/* Stats */}
+                        <div className="flex items-center gap-4 mt-3 text-sm">
+                          {activity.distance > 0 && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4 text-muted-foreground" />
+                              <span>{formatDistance(activity.distance)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Timer className="w-4 h-4 text-muted-foreground" />
+                            <span>{formatTime(activity.moving_time || activity.elapsed_time)}</span>
+                          </div>
                         </div>
-                      </div>
-                      {selectedActivity?.id === activity.id && (
-                        <Check className="w-5 h-5 text-primary" />
-                      )}
-                    </div>
 
-                    {/* Stats */}
-                    <div className="flex items-center gap-4 mt-3 text-sm">
-                      {activity.distance > 0 && (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                          <span>{formatDistance(activity.distance)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Timer className="w-4 h-4 text-muted-foreground" />
-                        <span>{formatTime(activity.moving_time)}</span>
-                      </div>
-                    </div>
+                        {/* Existing description preview */}
+                        {hasDescription && activity.description && (
+                          <div className="mt-2 p-2 bg-muted rounded text-xs">
+                            {activity.description.slice(0, 100)}...
+                          </div>
+                        )}
 
-                    {/* Existing description preview */}
-                    {activity.has_description && activity.description && (
-                      <div className="mt-2 p-2 bg-muted rounded text-xs">
-                        {activity.description.slice(0, 100)}...
+                        {hasDescription && (
+                          <Alert className="mt-3">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription className="text-xs">
+                              This activity already has a description. It will be replaced with MyAmaka formatting.
+                            </AlertDescription>
+                          </Alert>
+                        )}
                       </div>
-                    )}
-
-                    {activity.has_description && (
-                      <Alert className="mt-3">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs">
-                          This activity already has a description. It will be replaced with MyAmaka formatting.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
       )}
