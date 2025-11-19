@@ -189,9 +189,9 @@ class YouTubeTranscriptRequest(BaseModel):
 
 
 class InstagramTestRequest(BaseModel):
-    username: str
-    password: str
     url: str
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 
 @router.get("/health")
@@ -247,7 +247,7 @@ async def ingest_url(url: str = Body(..., embed=True)):
             raise HTTPException(
                 status_code=400,
                 detail=f"Instagram image posts are not supported by this endpoint. "
-                       f"Please use /ingest/instagram_test endpoint with Instagram credentials to extract images from the post: {url}"
+                       f"Please use /ingest/instagram_test endpoint to extract images from the post (login optional): {url}"
             )
         raise HTTPException(status_code=400, detail=f"Could not read URL: {e}")
 
@@ -281,12 +281,20 @@ async def ingest_url(url: str = Body(..., embed=True)):
 
 @router.post("/ingest/instagram_test")
 async def ingest_instagram_test(payload: InstagramTestRequest):
-    """Temporary Instagram ingestion endpoint requiring explicit credentials."""
+    """
+    Instagram ingestion endpoint.
+    
+    If username and password are provided, uses Instaloader (requires login).
+    Otherwise, extracts images without login using web scraping.
+    
+    Note: Login may be required for private posts or to avoid rate limits.
+    """
 
     tmpdir = tempfile.mkdtemp(prefix="instagram_ingest_")
 
     try:
         try:
+            # If username/password provided, use login method; otherwise use no-login
             image_paths = InstagramService.download_post_images(
                 username=payload.username,
                 password=payload.password,
