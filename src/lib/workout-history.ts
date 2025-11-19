@@ -304,11 +304,22 @@ export function updateStravaSyncStatus(workoutId: string, stravaActivityId: stri
 }
 
 export function getWorkoutStats(historyParam?: WorkoutHistoryItem[]) {
-  const history = historyParam || getWorkoutHistory();
+  // Only use localStorage sync version if no history provided
+  const history = historyParam || getWorkoutHistoryFromLocalStorage();
+  
+  // Safety check: ensure history is an array
+  if (!Array.isArray(history)) {
+    return {
+      totalWorkouts: 0,
+      thisWeek: 0,
+      deviceCounts: {},
+      avgExercisesPerWorkout: 0
+    };
+  }
   
   const totalWorkouts = history.length;
   const thisWeek = history.filter(item => {
-    if (!item.createdAt) return false;
+    if (!item || !item.createdAt) return false;
     try {
       const date = new Date(item.createdAt);
       if (isNaN(date.getTime())) return false;
@@ -321,17 +332,27 @@ export function getWorkoutStats(historyParam?: WorkoutHistoryItem[]) {
   }).length;
   
   const deviceCounts = history.reduce((acc, item) => {
+    if (!item || !item.device) return acc;
     acc[item.device] = (acc[item.device] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
   
   const avgExercisesPerWorkout = history.length > 0
     ? history.reduce((sum, item) => {
+        // Safety check: ensure workout and blocks exist
+        if (!item || !item.workout || !Array.isArray(item.workout.blocks)) {
+          return sum;
+        }
+        
         const count = item.workout.blocks.reduce((blockSum, block) => {
+          if (!block) return blockSum;
           // Handle both old format (exercises directly on block) and new format (exercises in supersets)
-          if (block.supersets && block.supersets.length > 0) {
-            return blockSum + block.supersets.reduce((ssSum, ss) => ssSum + (ss.exercises?.length || 0), 0);
-          } else if (block.exercises) {
+          if (block.supersets && Array.isArray(block.supersets) && block.supersets.length > 0) {
+            return blockSum + block.supersets.reduce((ssSum, ss) => {
+              if (!ss || !Array.isArray(ss.exercises)) return ssSum;
+              return ssSum + (ss.exercises.length || 0);
+            }, 0);
+          } else if (Array.isArray(block.exercises)) {
             return blockSum + (block.exercises.length || 0);
           }
           return blockSum;
@@ -343,7 +364,11 @@ export function getWorkoutStats(historyParam?: WorkoutHistoryItem[]) {
   return {
     totalWorkouts,
     thisWeek,
-    deviceCounts,
+    deviceCounts: {
+      garmin: deviceCounts.garmin || 0,
+      apple: deviceCounts.apple || 0,
+      zwift: deviceCounts.zwift || 0,
+    },
     avgExercisesPerWorkout: Math.round(avgExercisesPerWorkout)
   };
 }
