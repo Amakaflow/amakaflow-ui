@@ -53,6 +53,10 @@ class TokenManager:
             
         Returns:
             Updated token information
+            
+        Raises:
+            ValueError: If no tokens found
+            StravaAPIError: If refresh fails (may indicate refresh token expired)
         """
         tokens = await db.get_tokens(user_id)
         
@@ -93,7 +97,15 @@ class TokenManager:
                 "expires_at": new_tokens["expires_at"],
             }
         except StravaAPIError as e:
+            error_message = str(e)
             logger.error(f"Failed to refresh token for user {user_id}: {e}")
+            
+            # Check if refresh token is expired (common error patterns)
+            if "invalid" in error_message.lower() or "expired" in error_message.lower() or "401" in error_message:
+                # Create a more specific error message for refresh token expiration
+                raise StravaAPIError(
+                    f"Refresh token expired or invalid for user {user_id}. Reauthorization required."
+                )
             raise
     
     async def store_initial_tokens(

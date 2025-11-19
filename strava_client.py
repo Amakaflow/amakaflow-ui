@@ -100,8 +100,16 @@ class StravaClient:
                 "expires_at": token_data["expires_at"],
             }
         except httpx.HTTPStatusError as e:
-            logger.error(f"Failed to refresh token: {e.response.text}")
-            raise StravaAPIError(f"Token refresh failed: {e.response.text}")
+            error_text = e.response.text
+            logger.error(f"Failed to refresh token: {error_text}")
+            
+            # Check if it's a refresh token expiration (401 or invalid_grant)
+            if e.response.status_code == 401:
+                raise StravaAPIError("Refresh token expired or invalid. Reauthorization required.")
+            elif "invalid_grant" in error_text.lower() or "invalid" in error_text.lower():
+                raise StravaAPIError("Refresh token expired or invalid. Reauthorization required.")
+            
+            raise StravaAPIError(f"Token refresh failed: {error_text}")
         except Exception as e:
             logger.error(f"Unexpected error during token refresh: {e}")
             raise StravaAPIError(f"Token refresh error: {str(e)}")
