@@ -230,9 +230,25 @@ async def ingest_image(file: UploadFile = File(...)):
 @router.post("/ingest/url")
 async def ingest_url(url: str = Body(..., embed=True)):
     """Ingest workout from video URL."""
+    # Check if URL is an Instagram post (image post, not video)
+    instagram_post_pattern = re.compile(r"instagram\.com/p/([A-Za-z0-9_-]+)")
+    instagram_reel_pattern = re.compile(r"instagram\.com/reel/([A-Za-z0-9_-]+)")
+    instagram_tv_pattern = re.compile(r"instagram\.com/tv/([A-Za-z0-9_-]+)")
+    
+    is_instagram_post = bool(instagram_post_pattern.search(url))
+    is_instagram_video = bool(instagram_reel_pattern.search(url) or instagram_tv_pattern.search(url))
+    
     try:
         title, desc, dl_url = VideoService.extract_video_info(url)
     except Exception as e:
+        error_str = str(e)
+        # Check if it's an Instagram image post error
+        if is_instagram_post and not is_instagram_video and ("no video" in error_str.lower() or "instagram" in error_str.lower()):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Instagram image posts are not supported by this endpoint. "
+                       f"Please use /ingest/instagram_test endpoint with Instagram credentials to extract images from the post: {url}"
+            )
         raise HTTPException(status_code=400, detail=f"Could not read URL: {e}")
 
     collected_text = f"{title}\n{desc}".strip()
