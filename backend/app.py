@@ -32,6 +32,13 @@ from backend.core.global_mappings import (
 )
 
 from backend.adapters.blocks_to_hyrox_yaml import load_user_defaults
+from backend.database import (
+    save_workout,
+    get_workouts,
+    get_workout,
+    update_workout_export_status,
+    delete_workout
+)
 
 
 
@@ -386,4 +393,136 @@ def update_defaults(p: UserDefaultsRequest):
         "message": "Settings updated successfully",
         "settings": data["defaults"]
     }
+
+
+# ============================================================================
+# Workout Storage Endpoints
+# ============================================================================
+
+class SaveWorkoutRequest(BaseModel):
+    profile_id: str
+    workout_data: dict
+    sources: list[str] = []
+    device: str
+    exports: dict = None
+    validation: dict = None
+    title: str = None
+    description: str = None
+
+
+class UpdateWorkoutExportRequest(BaseModel):
+    profile_id: str
+    is_exported: bool = True
+    exported_to_device: str = None
+
+
+@app.post("/workouts/save")
+def save_workout_endpoint(request: SaveWorkoutRequest):
+    """Save a workout to Supabase before syncing to device."""
+    result = save_workout(
+        profile_id=request.profile_id,
+        workout_data=request.workout_data,
+        sources=request.sources,
+        device=request.device,
+        exports=request.exports,
+        validation=request.validation,
+        title=request.title,
+        description=request.description
+    )
+    
+    if result:
+        return {
+            "success": True,
+            "workout_id": result.get("id"),
+            "message": "Workout saved successfully"
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Failed to save workout. Check server logs."
+        }
+
+
+@app.get("/workouts")
+def get_workouts_endpoint(
+    profile_id: str = Query(..., description="User profile ID"),
+    device: str = Query(None, description="Filter by device"),
+    is_exported: bool = Query(None, description="Filter by export status"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of workouts")
+):
+    """Get workouts for a user, optionally filtered by device and export status."""
+    workouts = get_workouts(
+        profile_id=profile_id,
+        device=device,
+        is_exported=is_exported,
+        limit=limit
+    )
+    
+    return {
+        "success": True,
+        "workouts": workouts,
+        "count": len(workouts)
+    }
+
+
+@app.get("/workouts/{workout_id}")
+def get_workout_endpoint(
+    workout_id: str,
+    profile_id: str = Query(..., description="User profile ID")
+):
+    """Get a single workout by ID."""
+    workout = get_workout(workout_id, profile_id)
+    
+    if workout:
+        return {
+            "success": True,
+            "workout": workout
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Workout not found"
+        }
+
+
+@app.put("/workouts/{workout_id}/export-status")
+def update_workout_export_endpoint(workout_id: str, request: UpdateWorkoutExportRequest):
+    """Update workout export status after syncing to device."""
+    success = update_workout_export_status(
+        workout_id=workout_id,
+        profile_id=request.profile_id,
+        is_exported=request.is_exported,
+        exported_to_device=request.exported_to_device
+    )
+    
+    if success:
+        return {
+            "success": True,
+            "message": "Export status updated successfully"
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Failed to update export status"
+        }
+
+
+@app.delete("/workouts/{workout_id}")
+def delete_workout_endpoint(
+    workout_id: str,
+    profile_id: str = Query(..., description="User profile ID")
+):
+    """Delete a workout."""
+    success = delete_workout(workout_id, profile_id)
+    
+    if success:
+        return {
+            "success": True,
+            "message": "Workout deleted successfully"
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Failed to delete workout"
+        }
 

@@ -16,7 +16,8 @@ from backend.adapters.blocks_to_hyrox_yaml import (
 def is_hiit_workout(blocks_json: dict) -> bool:
     """Detect if a workout is a HIIT workout."""
     for block in blocks_json.get("blocks", []):
-        structure = block.get("structure", "").lower()
+        structure = block.get("structure") or ""
+        structure = structure.lower() if structure else ""
         if "for time" in structure or "amrap" in structure or "emom" in structure:
             return True
         
@@ -64,13 +65,13 @@ def to_hiit_garmin_yaml(blocks_json: dict) -> str:
     # Process all blocks
     for block in blocks_json.get("blocks", []):
         # Check for time cap in structure (e.g., "for time (cap: 35 min)")
-        structure = block.get("structure", "")
+        structure = block.get("structure") or ""
         time_work_sec = block.get("time_work_sec")
         
         # Extract time cap if present
         if time_work_sec:
             time_cap_sec = time_work_sec
-        elif "cap:" in structure.lower():
+        elif structure and "cap:" in structure.lower():
             # Try to parse time cap from structure string
             cap_match = re.search(r'cap:\s*(\d+)\s*(min|minute|m)', structure, re.IGNORECASE)
             if cap_match:
