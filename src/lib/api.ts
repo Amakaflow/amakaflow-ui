@@ -100,9 +100,35 @@ async function apiCall<T>(
   const url = `${API_BASE_URL}${endpoint}`;
   
   // Don't set Content-Type for FormData (browser will set it with boundary)
-  const headers: HeadersInit = { ...options.headers };
+  // Preserve existing headers (e.g., 'text/plain' for AI text)
+  const headers: Record<string, string> = {};
+  
+  // Copy existing headers if provided
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      options.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (Array.isArray(options.headers)) {
+      // Array of [key, value] pairs
+      options.headers.forEach(([key, value]) => {
+        headers[key] = value;
+      });
+    } else {
+      // Plain object
+      Object.assign(headers, options.headers);
+    }
+  }
+  
+  // Only set default Content-Type if not already specified and not FormData
   if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
+    const hasContentType = Object.keys(headers).some(
+      k => k.toLowerCase() === 'content-type'
+    );
+    
+    if (!hasContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
   }
   
   const response = await fetch(url, {
@@ -115,7 +141,19 @@ async function apiCall<T>(
     throw new Error(error.detail || `API error: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  // Parse JSON response
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  }
+  
+  // If response is not JSON, try to parse as text and then JSON
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Failed to parse response as JSON: ${text.substring(0, 100)}`);
+  }
 }
 
 /**
