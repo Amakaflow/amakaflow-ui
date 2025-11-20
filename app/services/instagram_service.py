@@ -144,14 +144,174 @@ class InstagramService:
             raise InstagramServiceError(f"instagrapi download failed: {error_msg}") from e
 
     @staticmethod
+    def _get_images_from_node_scraper(url: str) -> Optional[List[str]]:
+        """
+        Get image URLs using Node.js instagram-media-scraper script.
+        
+        Falls back to GraphQL Python implementation if Node.js unavailable.
+        
+        Args:
+            url: Instagram post URL
+            
+        Returns:
+            List of image URLs or None if Node.js not available
+        """
+        import subprocess
+        import os
+        
+        script_path = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "instagram_scraper.js")
+        
+        try:
+            # Try to run Node.js script
+            result = subprocess.run(
+                ["node", script_path, url],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False
+            )
+            
+            if result.returncode == 0 and result.stdout:
+                try:
+                    # Parse JSON array of URLs
+                    image_urls = json.loads(result.stdout.strip())
+                    if isinstance(image_urls, list) and len(image_urls) > 0:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.info(f"Node.js scraper: Found {len(image_urls)} images")
+                        return image_urls
+                except json.JSONDecodeError:
+                    # Output might be error JSON
+                    pass
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            # Node.js not available or script failed - fall back to Python implementation
+            pass
+        
+        return None
+    
+    @staticmethod
+    def _get_images_from_graphql(shortcode: str) -> List[str]:
+        """
+        Get high-quality image URLs from Instagram using GraphQL API (no login required).
+        
+        Based on: https://github.com/ahmedrangel/instagram-media-scraper
+        
+        Args:
+            shortcode: Instagram post shortcode (e.g., "DRHiuniDM1K")
+            
+        Returns:
+            List of high-quality image URLs
+        """
+        image_urls = []
+        
+        try:
+            # Instagram GraphQL endpoint
+            graphql_url = "https://www.instagram.com/api/graphql"
+            
+            # GraphQL query parameters
+            variables = json.dumps({"shortcode": shortcode})
+            doc_id = "10015901848480474"  # Instagram's internal doc ID for media queries
+            lsd = "AVqbxe3J_YA"  # Instagram's LSD token
+            
+            # Build request URL
+            from urllib.parse import urlencode
+            params = {
+                "variables": variables,
+                "doc_id": doc_id,
+                "lsd": lsd
+            }
+            request_url = f"{graphql_url}?{urlencode(params)}"
+            
+            # Headers to mimic browser request
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-IG-App-ID': '936619743392459',  # Instagram's web app ID
+                'X-FB-LSD': lsd,
+                'X-ASBD-ID': '129477',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Dest': 'empty',
+                'Referer': 'https://www.instagram.com/',
+                'Origin': 'https://www.instagram.com',
+            }
+            
+            # Make GraphQL request
+            response = requests.post(
+                request_url,
+                headers=headers,
+                timeout=15
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract media data from GraphQL response
+            media = data.get("data", {}).get("xdt_shortcode_media")
+            if not media:
+                return image_urls
+            
+            # Single image post - get display_resources (sorted by quality, highest first)
+            display_resources = media.get("display_resources", [])
+            if display_resources:
+                # display_resources is sorted by quality (lowest to highest)
+                # Get the highest quality resource (last in list, usually largest)
+                best_resource = display_resources[-1]  # Last one is highest quality
+                if "src" in best_resource:
+                    image_urls.append(best_resource["src"])
+                    # Also log the quality for debugging
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"GraphQL: Found image {best_resource.get('config_width', '?')}x{best_resource.get('config_height', '?')}")
+            elif media.get("display_url"):
+                # Fallback to display_url
+                image_urls.append(media["display_url"])
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("GraphQL: Using display_url fallback")
+            
+            # Carousel post (sidecar)
+            sidecar = media.get("edge_sidecar_to_children", {}).get("edges", [])
+            if sidecar:
+                for edge in sidecar:
+                    node = edge.get("node", {})
+                    # Get highest quality from display_resources
+                    node_resources = node.get("display_resources", [])
+                    if node_resources:
+                        best_node_resource = node_resources[-1]  # Last one is highest quality
+                        if "src" in best_node_resource:
+                            img_url = best_node_resource["src"]
+                            if img_url not in image_urls:
+                                image_urls.append(img_url)
+                    elif node.get("display_url"):
+                        img_url = node["display_url"]
+                        if img_url not in image_urls:
+                            image_urls.append(img_url)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_urls = []
+            for url in image_urls:
+                if url and url not in seen:
+                    seen.add(url)
+                    unique_urls.append(url)
+            
+            return unique_urls
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"GraphQL method failed for shortcode {shortcode}: {e}")
+            return []
+    
+    @staticmethod
     def download_post_images_no_login(url: str, target_dir: str) -> List[str]:
         """
-        Download images from Instagram post without login by extracting URLs from page HTML.
+        Download images from Instagram post without login.
         
-        This method fetches the Instagram post page and extracts image URLs from:
-        - Open Graph meta tags (og:image)
-        - JSON-LD structured data
-        - Page metadata
+        First tries GraphQL method (higher quality), then falls back to HTML scraping.
         
         Args:
             url: Instagram post URL
@@ -166,6 +326,56 @@ class InstagramService:
         os.makedirs(target_dir, exist_ok=True)
         shortcode = InstagramService._extract_shortcode(url)
         
+        # Try Node.js scraper first (if available)
+        image_urls = InstagramService._get_images_from_node_scraper(url)
+        
+        # Fall back to Python GraphQL implementation
+        if not image_urls:
+            image_urls = InstagramService._get_images_from_graphql(shortcode)
+        
+        # Use the image URLs we found
+        if image_urls:
+            graphql_urls = image_urls
+        if graphql_urls:
+            # Download images from GraphQL URLs (already high quality)
+            image_paths = []
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://www.instagram.com/',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            }
+            
+            for idx, img_url in enumerate(graphql_urls[:10]):  # Limit to 10 images
+                try:
+                    parsed_url = urlparse(img_url)
+                    ext = os.path.splitext(parsed_url.path)[1] or '.jpg'
+                    if '?' in ext:
+                        ext = ext.split('?')[0]
+                    
+                    filepath = os.path.join(target_dir, f"{shortcode}_{idx}{ext}")
+                    
+                    img_response = requests.get(img_url, headers=headers, timeout=15, stream=True)
+                    img_response.raise_for_status()
+                    
+                    with open(filepath, 'wb') as f:
+                        for chunk in img_response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        image_paths.append(filepath)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to download image {idx} from GraphQL: {e}")
+                    continue
+            
+            if image_paths:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Successfully downloaded {len(image_paths)} images using GraphQL method")
+                return image_paths
+        
+        # Fallback to HTML scraping method
         # Fetch the Instagram post page
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -190,11 +400,14 @@ class InstagramService:
         og_image_pattern = r'<meta\s+property="og:image"\s+content="([^"]+)"'
         og_image_matches = re.findall(og_image_pattern, html)
         for url in og_image_matches:
-            # Try to get higher resolution version by removing size parameters
-            # Instagram URLs often have ?width=XXX&height=XXX - remove those for full size
-            high_res_url = re.sub(r'[?&](width|height|quality|fit)=[^&]*', '', url)
-            if high_res_url not in image_urls:
-                image_urls.append(high_res_url)
+            # Remove ALL query parameters to get potentially higher resolution
+            # Instagram OG images often have size parameters like s640x640, s1080x1080
+            # Removing params may get us the original size
+            base_url = url.split('?')[0] if '?' in url else url
+            # Try to remove size suffixes from path (e.g., /s640x640/)
+            base_url = re.sub(r'/s\d+x\d+/', '/', base_url)
+            if base_url not in image_urls:
+                image_urls.append(base_url)
         
         # Method 2: Extract from JSON-LD structured data
         json_ld_pattern = r'<script type="application/ld\+json">(.*?)</script>'
@@ -330,56 +543,183 @@ class InstagramService:
                 unique_image_urls.extend(img_tag_matches)
         
         # Remove duplicates again after adding img tags and filter valid URLs
+        # Prioritize higher resolution versions by removing size parameters
         final_seen = set()
         final_image_urls = []
-        for url in unique_image_urls:
-            if url and url.startswith('http') and url not in final_seen:
+        
+        # Sort URLs to prefer display_resources (from window._sharedData) which are usually higher quality
+        # These typically come before CDN URLs in our extraction
+        prioritized_urls = unique_image_urls
+        
+        for url in prioritized_urls:
+            if not url or not url.startswith('http'):
+                continue
+            
+            # Try multiple URL variations to get higher resolution
+            url_variants = [url]
+            
+            # Variant 1: Remove size parameters from query string
+            # Instagram CDN URLs often have: ?stp=...s640x640... or s1080x1080
+            cleaned = re.sub(r'[?&]stp=[^&]*s\d+x\d+[^&]*', '', url)
+            cleaned = re.sub(r'[?&]s=\d+x\d+', '', cleaned)
+            cleaned = re.sub(r'[?&](w|h|width|height|fit|quality)=[^&]*', '', cleaned)
+            if cleaned != url:
+                url_variants.append(cleaned)
+            
+            # Variant 2: Remove size suffixes from path (e.g., /s640x640/)
+            path_cleaned = re.sub(r'/s\d+x\d+/', '/', url)
+            if path_cleaned != url and path_cleaned not in url_variants:
+                url_variants.append(path_cleaned)
+            
+            # Variant 3: Try to extract base CDN URL without size params
+            # Instagram format: https://scontent-xxx.cdninstagram.com/v/t51.xxx/.../image.jpg?stp=...
+            if 'cdninstagram.com' in url:
+                # Try removing all query params to get base URL
+                base_url = url.split('?')[0]
+                if base_url not in url_variants and base_url != url:
+                    url_variants.append(base_url)
+            
+            # Add all variants (they'll be tried in order during download)
+            for variant in url_variants:
+                if variant and variant.startswith('http') and variant not in final_seen:
+                    final_seen.add(variant)
+                    # Prefer cleaned variants (higher resolution) over original
+                    if variant != url:
+                        # Insert cleaned version first
+                        final_image_urls.insert(0, variant) if variant not in final_image_urls else None
+                    elif url not in final_image_urls:
+                        final_image_urls.append(url)
+            
+            # Add original if not already added
+            if url not in final_seen:
                 final_seen.add(url)
-                final_image_urls.append(url)
+                if url not in final_image_urls:
+                    final_image_urls.append(url)
+        
+        # Remove duplicates while preserving order (prefer cleaned URLs first)
+        final_image_urls = list(dict.fromkeys(final_image_urls))
         
         if not final_image_urls:
+            # Check if this might be a private post (login required)
+            private_indicators = [
+                'Log In' in html[:1000],
+                'Sign Up' in html[:1000],
+                'This page isn\'t available' in html,
+                'Sorry, this page' in html,
+            ]
+            
+            if any(private_indicators):
+                raise InstagramServiceError(
+                    f"Instagram post appears to be private or requires login. "
+                    f"Please provide username and password to access this post, or the post may not be publicly accessible."
+                )
+            
             # Log some debug info before failing
             debug_info = {
                 'has_og_image': bool(og_image_matches),
                 'has_json_ld': len(json_ld_matches) > 0,
                 'has_shared_data': bool(shared_data_match),
                 'html_length': len(html),
-                'html_preview': html[:500] if len(html) > 0 else 'Empty HTML'
+                'html_preview': html[:500] if len(html) > 0 else 'Empty HTML',
+                'might_be_private': any(private_indicators)
             }
             raise InstagramServiceError(
                 f"Could not extract image URLs from Instagram post. "
                 f"The post might be private, deleted, or Instagram's page structure has changed. "
-                f"Debug info: {debug_info}"
+                f"Try: 1) Providing username/password for private posts, 2) Using a direct image URL instead, "
+                f"or 3) Manually uploading screenshots. Debug info: {debug_info}"
             )
         
-        # Download images
+        # Download images with retry logic for expired/blocked URLs
         image_paths = []
-        for idx, img_url in enumerate(final_image_urls):
-            try:
-                # Get image extension from URL or default to jpg
-                parsed_url = urlparse(img_url)
-                ext = os.path.splitext(parsed_url.path)[1] or '.jpg'
-                if '?' in ext:
-                    ext = ext.split('?')[0]
+        for idx, img_url in enumerate(final_image_urls[:10]):  # Limit to first 10 images (carousel posts)
+            max_retries = 2
+            downloaded = False
+            original_url = img_url  # Keep original for retry
+            
+            for attempt in range(max_retries):
+                try:
+                    # Get image extension from URL or default to jpg
+                    parsed_url = urlparse(img_url)
+                    ext = os.path.splitext(parsed_url.path)[1] or '.jpg'
+                    if '?' in ext:
+                        ext = ext.split('?')[0]
+                    
+                    filepath = os.path.join(target_dir, f"{shortcode}_{idx}{ext}")
+                    
+                    # Use same headers as page fetch for consistency
+                    img_headers = headers.copy()
+                    img_headers['Referer'] = 'https://www.instagram.com/'
+                    img_headers['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8'
+                    
+                    # Download the image with timeout
+                    img_response = requests.get(img_url, headers=img_headers, timeout=15, stream=True, allow_redirects=True)
+                    
+                    # Handle 403/404 - might be expired or blocked
+                    if img_response.status_code == 403:
+                        if attempt < max_retries - 1:
+                            # Try original URL without cleaning on retry
+                            img_url = original_url
+                            continue
+                        continue
+                    elif img_response.status_code == 404:
+                        # URL expired, skip this one
+                        break
+                    
+                    img_response.raise_for_status()
+                    
+                    # Download in chunks
+                    with open(filepath, 'wb') as f:
+                        for chunk in img_response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    
+                    # Verify the file was downloaded and has reasonable size (>1KB)
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        image_paths.append(filepath)
+                        downloaded = True
+                        break  # Success, move to next image
+                    else:
+                        # File too small or missing
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                        continue
+                        
+                except requests.RequestException as e:
+                    # If it's a 403/404 on last attempt, skip this image
+                    if attempt == max_retries - 1:
+                        continue
+                    # Otherwise retry with original URL
+                    img_url = original_url
                 
-                filepath = os.path.join(target_dir, f"{shortcode}_{idx}{ext}")
-                
-                # Download the image
-                img_response = requests.get(img_url, headers=headers, timeout=15, stream=True)
-                img_response.raise_for_status()
-                
-                with open(filepath, 'wb') as f:
-                    for chunk in img_response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                    image_paths.append(filepath)
-            except requests.RequestException as e:
-                # Log error but continue with other images
-                continue
+                except Exception as e:
+                    # Unexpected error, log and continue
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Error downloading image {idx} from {img_url}: {e}")
+                    continue
+            
+            if not downloaded:
+                # Could not download this image after retries
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to download image {idx} after {max_retries} attempts: {img_url}")
         
         if not image_paths:
-            raise InstagramServiceError("Failed to download any images from the extracted URLs.")
+            # Provide helpful error message
+            error_msg = (
+                f"Failed to download images from Instagram post. "
+                f"Possible reasons: "
+                f"1) Images URLs expired or blocked by Instagram CDN, "
+                f"2) Post is private (requires login), "
+                f"3) Rate limiting or geo-restrictions. "
+                f"Suggestion: Try providing username/password, or manually upload screenshots."
+            )
+            raise InstagramServiceError(error_msg)
+        
+        # Log success
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Successfully downloaded {len(image_paths)} images from Instagram post {shortcode}")
         
         return image_paths
 

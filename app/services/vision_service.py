@@ -25,23 +25,31 @@ except ImportError:
 class VisionService:
     """Service for using vision models to extract workout data from images."""
     
-    WORKOUT_EXTRACTION_PROMPT = """CRITICAL: Extract workout information ONLY from what you can ACTUALLY SEE in these images. Do NOT make up or guess exercises that are not visible.
+    WORKOUT_EXTRACTION_PROMPT = """CRITICAL: Extract ONLY the workout information that is ACTUALLY VISIBLE in these images. 
 
-Look carefully at each image and extract:
-- Exercise names (EXACTLY as written/spelled in the images)
-- Sets and reps numbers (if visible)
-- Weights/loads (if visible)
-- Time intervals (if visible)
-- Rest periods (if visible)
-- Structure information (e.g., "for time", "EMOM", "3 rounds", "AMRAP" - if visible)
-- Any text, labels, or numbers visible in the images
+DO NOT invent, guess, or make up exercises that are not clearly visible in the images.
 
-IMPORTANT:
-- Only extract text that is clearly visible in the images
-- Preserve exact spelling and capitalization from the images
-- If something is unclear or not visible, use null or omit it
-- Do NOT invent generic workout data like "Squats" or "Bench Press" if you cannot see them
-- Pay attention to all text in the images, including handwritten notes, captions, and labels"""
+Look carefully at each image and extract ONLY what you can actually see:
+- Exercise names (EXACTLY as written/spelled in the images - do NOT interpret abbreviations as full names)
+- Sets and reps numbers (ONLY if clearly visible)
+- Weights/loads (ONLY if clearly visible)
+- Time intervals (ONLY if clearly visible)
+- Rest periods (ONLY if clearly visible)
+- Structure information (ONLY if clearly visible in the images)
+
+CRITICAL RULES:
+1. Extract text EXACTLY as written in the images - preserve spelling, capitalization, abbreviations
+2. If an exercise name is abbreviated (e.g., "BS"), write it as "BS" - do NOT expand to "Back Squat" unless that's literally what the image says
+3. If text is unclear or partially visible, write what you can see (e.g., "Jumpi..." not "Jumping Jacks")
+4. If you cannot clearly see workout information in an image, do NOT make up generic exercises
+5. If an image appears to be blank, has no text, or is too blurry to read, say so
+6. Do NOT use common workout terminology unless it's literally written in the image
+
+Return a detailed description of what you can ACTUALLY SEE in each image, including:
+- Any text that is visible (even if unclear)
+- Exercise names as written (even if abbreviated or stylized)
+- Numbers that are visible
+- Any workout structure that is clearly written"""
 
     WORKOUT_STRUCTURE_PROMPT = """You are a fitness workout parser. Convert the EXTRACTED workout text (from the images) into structured JSON format.
 
@@ -86,13 +94,21 @@ Extract and structure this into a JSON format matching:
 }
 
 CRITICAL INSTRUCTIONS:
-- Use ONLY the text that was extracted from the images - do NOT invent or add exercises
-- If no exercises were visible in the images, return an empty workout structure
-- Preserve exact exercise names as extracted (including any spelling errors or abbreviations)
-- Extract all numbers exactly as shown in the images
-- If information is missing from the images, use null - do NOT guess or invent values
-- Group exercises into supersets only if they were clearly grouped in the images
-- Preserve time caps, intervals, and structure information exactly as extracted
+- Use ONLY the text that was extracted from the images - do NOT invent, guess, or make up exercises
+- Use exercise names EXACTLY as extracted (if "BS" was extracted, use "BS" not "Back Squat")
+- Only interpret abbreviations if the image clearly shows the full name elsewhere
+- If no clear workout information was extracted, return an empty workout structure (empty blocks array)
+- Extract numbers ONLY if they were visible in the images
+- If information is missing from images, use null - do NOT guess or use default values
+- Group exercises into supersets ONLY if they were clearly grouped in the images
+- Preserve workout structure (rounds, AMRAP, EMOM, etc.) ONLY if it was clearly written in the images
+- Create blocks ONLY if the images show distinct workout sections
+
+If the images contain no readable workout text, return:
+{
+  "title": null,
+  "blocks": []
+}
 
 Return ONLY valid JSON matching the format above, no additional text or explanations."""
 
@@ -233,7 +249,12 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
 
 {VisionService.WORKOUT_STRUCTURE_PROMPT}
 
-Remember: Only use information that is ACTUALLY visible in the images. Do not invent exercises."""
+FINAL REMINDER: 
+- Extract ONLY what you can ACTUALLY SEE in the images
+- Do NOT invent or make up exercises
+- If images are blank, blurry, or contain no readable workout text, return empty workout structure
+- Use exercise names EXACTLY as written in images (preserve abbreviations, don't expand them)
+- If you cannot clearly see workout data, return empty blocks array rather than guessing"""
         
         try:
             response = client.chat.completions.create(
@@ -253,7 +274,59 @@ Remember: Only use information that is ACTUALLY visible in the images. Do not in
             )
             
             result_text = response.choices[0].message.content
-            return json.loads(result_text)
+            workout_dict = json.loads(result_text)
+            
+            # Post-process: Filter out obviously garbled/invalid exercise names
+            # If exercise names look like OCR garbage (random chars, symbols), remove them
+            for block in workout_dict.get("blocks", []):
+                exercises = block.get("exercises", [])
+                filtered_exercises = []
+                for ex in exercises:
+                    name = ex.get("name", "").strip()
+                    if not name:
+                        continue
+                    
+                    # Skip if name is clearly garbled/invalid:
+                    # 1. Too short (1-2 chars) with no meaningful content
+                    # 2. Mostly symbols/special characters
+                    # 3. Pattern matching OCR garbage (random combinations)
+                    
+                    # Count meaningful characters
+                    letters = sum(c.isalpha() for c in name)
+                    digits = sum(c.isdigit() for c in name)
+                    spaces = sum(c.isspace() for c in name)
+                    symbols = len(name) - letters - digits - spaces
+                    
+                    # Valid exercise name criteria:
+                    # - Has at least 2 letters, OR
+                    # - Has at least 4 characters total with more letters/digits than symbols
+                    if len(name) <= 2 and letters == 0:
+                        continue  # Too short, no letters
+                    
+                    if len(name) >= 3:
+                        # For longer names, require meaningful content
+                        meaningful = letters + digits
+                        if meaningful == 0:
+                            continue  # Only symbols
+                        
+                        # If mostly symbols, skip (likely OCR garbage)
+                        if symbols > meaningful * 2:
+                            continue
+                        
+                        # If it's just random characters/symbols with no pattern, skip
+                        # Check for patterns that suggest OCR garbage
+                        if all(c in "®°©™'\"()[]{}.,;:!?-_=+|\\/@#$%^&*~`" for c in name.replace(" ", "")):
+                            continue
+                    
+                    # Keep this exercise
+                    filtered_exercises.append(ex)
+                
+                block["exercises"] = filtered_exercises
+            
+            # If all exercises were filtered out, keep at least empty structure
+            # (don't delete blocks, just empty their exercises)
+            
+            return workout_dict
         except Exception as e:
             raise ValueError(f"OpenAI Vision API call failed: {e}") from e
 

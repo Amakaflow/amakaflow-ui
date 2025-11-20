@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from app.services.video_service import VideoService
 from app.services.export_service import ExportService
 from app.services.instagram_service import InstagramService, InstagramServiceError
 from app.services.vision_service import VisionService
+from app.services.llm_service import LLMService
 
 router = APIRouter()
 
@@ -159,6 +160,102 @@ def _summarize_transcript_to_workout(text: str) -> Optional[str]:
     return "\n".join(lines)
 
 
+def _structure_workout_from_transcript_with_llm(transcript_text: str, provider: str = "openai") -> Optional[Dict]:
+    """
+    Use LLM to directly structure a workout from a YouTube transcript.
+    Returns a structured workout dictionary.
+    """
+    try:
+        # Use LLMService to structure the workout directly
+        structured = LLMService.structure_workout(
+            transcript_text[:12000],  # Limit transcript length
+            provider=provider
+        )
+        return structured
+    except Exception as e:
+        print(f"LLM structuring failed: {e}")
+        return None
+
+
+def _extract_workout_from_transcript_with_llm(transcript_text: str) -> Optional[str]:
+    """
+    Use LLM to extract a concise workout summary from a YouTube transcript.
+    Returns a structured text format that can be parsed by ParserService.
+    """
+    extraction_prompt = """You are extracting workout exercises from a YouTube fitness video transcript.
+
+The transcript contains conversational text mixed with actual workout information. Your task is to extract ONLY the exercises mentioned with their sets, reps, and any relevant details.
+
+Extract exercises in this format (one per line):
+Exercise Name: sets x reps
+Exercise Name: sets x reps, notes
+
+Examples:
+Overhead Press: 2 sets x 4 reps
+Wide Grip Pull-Up: 3 sets x 6 reps, with 30lb dumbbell
+Close Grip Bench Press: 2 sets x 10-12 reps
+Seated Cable Row: 3 sets x 12 reps
+Incline Dumbbell Lateral Raise: 3 sets x 15 reps
+Face Pulls: 3 sets x 20 reps
+Supinated Dumbbell Curl: 3 sets x 12 reps
+
+CRITICAL RULES:
+1. Only extract actual EXERCISES (movements like presses, pulls, rows, curls, raises, squats, deadlifts, etc.)
+2. IGNORE all conversational text, explanations, technique tips, greetings, sign-offs, and non-exercise content
+3. Extract sets and reps when mentioned (e.g., "3 sets of 6 reps", "2 sets x 10 reps", "three sets of four")
+4. If an exercise is mentioned multiple times, only include it once with the most complete information
+5. Group exercises that are supersetted together on the same line separated by " / "
+6. If sets/reps aren't mentioned, just list the exercise name
+7. Do NOT include warm-up activities, stretching, or non-exercise movements unless they're part of the workout
+
+Common exercise patterns to look for:
+- "X sets of Y reps on [exercise]"
+- "doing [exercise] for X sets"
+- "next we're doing [exercise]"
+- "[exercise]: X sets x Y reps"
+
+Return ONLY the exercise list, one exercise per line, no additional text or explanations."""
+
+    try:
+        # Try OpenAI first if available
+        if os.getenv("OPENAI_API_KEY"):
+            client = __import__("openai").OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": extraction_prompt},
+                    {"role": "user", "content": f"Transcript:\n\n{transcript_text[:8000]}"}  # Limit to avoid token limits
+                ],
+                temperature=0.1,
+                max_tokens=1000,
+            )
+            extracted = response.choices[0].message.content.strip()
+            if extracted and len(extracted) > 20:  # Basic validation
+                return extracted
+    except Exception as e:
+        print(f"OpenAI extraction failed: {e}")
+    
+    # Fallback: try Anthropic if available
+    try:
+        if os.getenv("ANTHROPIC_API_KEY"):
+            anthropic = __import__("anthropic").Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            message = anthropic.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1000,
+                messages=[
+                    {"role": "user", "content": f"{extraction_prompt}\n\nTranscript:\n\n{transcript_text[:8000]}"}
+                ],
+                temperature=0.1,
+            )
+            extracted = message.content[0].text.strip()
+            if extracted and len(extracted) > 20:  # Basic validation
+                return extracted
+    except Exception as e:
+        print(f"Anthropic extraction failed: {e}")
+    
+    return None
+
+
 def _build_workout_from_rules(text: str, source: Optional[str], title: Optional[str]) -> Optional[Workout]:
     normalized = re.sub(r"\s+", " ", text.lower())
     exercises = []
@@ -193,10 +290,6 @@ class InstagramTestRequest(BaseModel):
     url: str
     username: Optional[str] = None
     password: Optional[str] = None
-    use_vision: bool = False  # Use vision model instead of OCR (requires API key)
-    vision_provider: Optional[str] = "openai"  # "openai" or "anthropic"
-    vision_model: Optional[str] = None  # Optional: specific model name (e.g., "gpt-4o-mini")
-    openai_api_key: Optional[str] = None  # Optional: Use your own OpenAI API key (from $20/month plan)
 
 
 @router.get("/health")
@@ -418,6 +511,8 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
     If username and password are provided, uses Instaloader (requires login).
     Otherwise, extracts images without login using web scraping.
     
+    Uses OCR for text extraction from images.
+    
     Note: Login may be required for private posts or to avoid rate limits.
     """
 
@@ -458,72 +553,23 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
         except Exception as exc:  # pragma: no cover - unexpected runtime errors
             raise HTTPException(status_code=500, detail=f"Instagram ingestion failed: {exc}") from exc
 
-        # Extract text from images using OCR or Vision model
-        if payload.use_vision:
-            # Use vision model for better accuracy
+        # Extract text from images using OCR only
+        # Note: Vision models don't work well with Instagram's low-quality images
+        text_segments = []
+        for image_path in image_paths:
             try:
-                provider = payload.vision_provider or "openai"
-                model = payload.vision_model or ("gpt-4o-mini" if provider == "openai" else "claude-3-5-sonnet-20241022")
-                
-                if provider == "openai":
-                    # Use provided API key or fall back to environment variable
-                    api_key = payload.openai_api_key or os.getenv("OPENAI_API_KEY")
-                    workout_dict = VisionService.extract_and_structure_workout_openai(
-                        image_paths,
-                        model=model,
-                        api_key=api_key,
-                    )
-                else:
-                    # For Anthropic, extract text first then structure with existing LLM service
-                    text = VisionService.extract_text_from_images_anthropic(
-                        image_paths,
-                        model=model,
-                    )
-                    # Use existing LLM service to structure the text
-                    from app.services.llm_service import LLMService
-                    workout_dict = LLMService.structure_with_anthropic(text, model=model)
-                
-                # Convert dict to Workout model
-                workout = Workout(**workout_dict)
-                workout.source = payload.url
-            except Exception as exc:
-                # Fallback to OCR if vision model fails
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Vision model failed, falling back to OCR: {exc}")
-                
-                text_segments = []
-                for image_path in image_paths:
-                    try:
-                        with open(image_path, "rb") as file_obj:
-                            extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
-                        if extracted:
-                            text_segments.append(extracted)
-                    except Exception:
-                        continue
-                
-                if not text_segments:
-                    raise HTTPException(status_code=422, detail=f"Could not extract text from Instagram images (vision model failed: {exc}).")
-                
-                merged = "\n".join(text_segments)
-                workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
-        else:
-            # Use OCR (default)
-            text_segments = []
-            for image_path in image_paths:
-                try:
-                    with open(image_path, "rb") as file_obj:
-                        extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
-                    if extracted:
-                        text_segments.append(extracted)
-                except Exception:
-                    continue
+                with open(image_path, "rb") as file_obj:
+                    extracted = OCRService.ocr_image_bytes(file_obj.read()).strip()
+                if extracted:
+                    text_segments.append(extracted)
+            except Exception:
+                continue
 
-            if not text_segments:
-                raise HTTPException(status_code=422, detail="OCR could not extract text from Instagram images.")
+        if not text_segments:
+            raise HTTPException(status_code=422, detail="OCR could not extract text from Instagram images. The images may be too low quality or contain no readable text.")
 
-            merged = "\n".join(text_segments)
-            workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
+        merged = "\n".join(text_segments)
+        workout = ParserService.parse_free_text_to_workout(merged, source=payload.url)
 
         response_payload = workout.model_dump()
         response_payload.setdefault("_provenance", {})
@@ -531,7 +577,7 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
             "mode": "instagram_image_test",
             "source_url": payload.url,
             "image_count": len(image_paths),
-            "extraction_method": "vision" if payload.use_vision else "ocr",
+            "extraction_method": "ocr",
         })
 
         return JSONResponse(response_payload)
@@ -579,9 +625,12 @@ async def export_fit(workout: Workout):
 async def ingest_youtube(payload: YouTubeTranscriptRequest):
     """Ingest a YouTube workout using a provided URL.
 
-    The service fetches the transcript from youtube-transcript.io (requires
-    `YT_TRANSCRIPT_API_TOKEN`), converts it into structured workout JSON, and
-    returns your canonical format.
+    The service fetches the transcript from youtube-transcript.io (https://www.youtube-transcript.io/).
+    
+    Free subscription: 25 transcripts per month
+    Token is configured via YT_TRANSCRIPT_API_TOKEN environment variable.
+    
+    The transcript is converted into structured workout JSON and returned in your canonical format.
     """
 
     video_url = payload.url.strip()
@@ -668,18 +717,69 @@ async def ingest_youtube(payload: YouTubeTranscriptRequest):
 
     source = video_url
     summary_text: Optional[str] = None
+    wk: Optional[Workout] = None
+    
+    # Try rule-based extraction first (only works for known exercises)
     structured_workout = _build_workout_from_rules(transcript_text, source, title)
 
     if structured_workout:
         wk = structured_workout
     else:
-        summary_text = _summarize_transcript_to_workout(transcript_text)
-        text_for_parser = summary_text or transcript_text
+        # Try LLM to structure workout directly (best approach for YouTube transcripts)
+        try:
+            if os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+                provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
+                llm_structured = _structure_workout_from_transcript_with_llm(transcript_text, provider)
+                if llm_structured and llm_structured.get("blocks"):
+                    # Convert LLM structured output to Workout object
+                    blocks = []
+                    for block_data in llm_structured.get("blocks", []):
+                        exercises = []
+                        for ex_data in block_data.get("exercises", []):
+                            ex_data.setdefault("type", "strength")  # Default to strength if not specified
+                            exercises.append(Exercise(**ex_data))
+                        block = Block(
+                            label=block_data.get("label", "Block 1"),
+                            structure=block_data.get("structure"),
+                            exercises=exercises
+                        )
+                        blocks.append(block)
+                    
+                    if blocks:
+                        wk = Workout(
+                            title=llm_structured.get("title") or title or "Imported Workout",
+                            source=source,
+                            blocks=blocks
+                        )
+                        summary_text = "LLM structured"  # Mark as summarized
+        except Exception as e:
+            print(f"LLM structuring failed: {e}")
+            # Fall through to text extraction
+        
+        # If LLM structuring didn't work, try text extraction and parsing
+        if not wk or not wk.blocks:
+            # Try rule-based summarization first (only works for known exercises)
+            rule_based_summary = _summarize_transcript_to_workout(transcript_text)
+            
+            # Try LLM text extraction for YouTube transcripts
+            llm_summary = None
+            try:
+                llm_summary = _extract_workout_from_transcript_with_llm(transcript_text)
+            except Exception as e:
+                print(f"LLM text extraction failed: {e}")
+            
+            # Prefer LLM summary if available, otherwise use rule-based, otherwise full transcript
+            summary_text = llm_summary or rule_based_summary
+            text_for_parser = summary_text or transcript_text
 
-        wk = ParserService.parse_free_text_to_workout(text_for_parser, source=source)
+            wk = ParserService.parse_free_text_to_workout(text_for_parser, source=source)
 
-        if title:
-            wk.title = title[:80]
+    if wk and title:
+        wk.title = title[:80]
+    
+    # Ensure we have a workout object
+    if not wk:
+        wk = Workout(title=title or "Imported Workout", source=source, blocks=[])
 
     response_payload = wk.model_dump()
     response_payload.setdefault("_provenance", {})
