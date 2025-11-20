@@ -13,6 +13,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './ui/alert-dialog';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -38,6 +49,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onDelete
   const stravaConnected = isAccountConnectedSync('strava');
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'compact'>('cards');
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,15 +59,24 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onDelete
   // Ensure history is an array
   const safeHistory = Array.isArray(history) ? history : [];
   
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this workout?')) {
-      setDeletingId(id);
-      try {
-        await onDeleteWorkout(id);
-      } finally {
-        setDeletingId(null);
-      }
+  const handleDeleteClick = (id: string) => {
+    setConfirmDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDeleteId) return;
+    
+    setDeletingId(confirmDeleteId);
+    try {
+      await onDeleteWorkout(confirmDeleteId);
+      setConfirmDeleteId(null);
+    } finally {
+      setDeletingId(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setConfirmDeleteId(null);
   };
 
   // Helper to get mapped exercise name from validation
@@ -392,7 +413,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onDelete
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => handleDeleteClick(item.id)}
                       disabled={deletingId === item.id}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                       title="Delete"
@@ -496,7 +517,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onDelete
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => handleDeleteClick(item.id)}
                       disabled={deletingId === item.id}
                       className="h-9 gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 font-medium"
                     >
@@ -670,6 +691,30 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onDelete
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && handleDeleteCancel()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Workout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this workout? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel} disabled={!!deletingId}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={!!deletingId}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingId ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* View Workout Dialog - Shows selected cards */}
       <Dialog open={!!viewingWorkout && !showCardSelector} onOpenChange={(open) => !open && setViewingWorkout(null)}>
