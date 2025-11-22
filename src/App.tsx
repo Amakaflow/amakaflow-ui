@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity, Play } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity } from 'lucide-react';
 import { AddSources, Source } from './components/AddSources';
 import { StructureWorkout } from './components/StructureWorkout';
 import { ValidateMap } from './components/ValidateMap';
@@ -15,7 +15,6 @@ import { UserSettings } from './components/UserSettings';
 import { StravaEnhance } from './components/StravaEnhance';
 import { ProfileCompletion } from './components/ProfileCompletion';
 import { WelcomeGuide } from './components/WelcomeGuide';
-import { FollowAlongWorkouts } from './components/FollowAlongWorkouts';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
 import { generateWorkoutStructure as generateWorkoutStructureReal, checkApiHealth } from './lib/api';
@@ -38,7 +37,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'follow-along';
+type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance';
 
 export default function App() {
   // Clerk authentication
@@ -47,7 +46,7 @@ export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [currentView, setCurrentView] = useState<'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'follow-along'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance'>('home');
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('add-sources');
   const [showStravaEnhance, setShowStravaEnhance] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
@@ -819,20 +818,6 @@ export default function App() {
                   History
                 </Button>
                 <Button
-                  variant={currentView === 'follow-along' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    checkUnsavedChanges(() => {
-                      clearWorkflowState();
-                      setCurrentView('follow-along');
-                    });
-                  }}
-                  className="gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Follow-Along
-                </Button>
-                <Button
                   variant={currentView === 'analytics' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1138,12 +1123,6 @@ export default function App() {
               });
             }}
           />
-        )}
-
-        {currentView === 'follow-along' && (
-          <div className="container mx-auto px-4 py-8">
-            <FollowAlongWorkouts />
-          </div>
         )}
 
         {currentView === 'analytics' && (
