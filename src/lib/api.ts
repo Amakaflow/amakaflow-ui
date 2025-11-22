@@ -3,6 +3,9 @@ import { WorkoutStructure, SourceType, Block, Superset } from '../types/workout'
 // API base URL - defaults to localhost:8004 (workout-ingestor-api)
 const API_BASE_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
 
+// API timeout in milliseconds (2 minutes for structure generation)
+const API_TIMEOUT = 120000;
+
 /**
  * Normalize workout structure to ensure all blocks have supersets
  * If a block has exercises directly but no supersets, convert them to a superset
@@ -95,7 +98,8 @@ function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStructure 
 
 async function apiCall<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  signal?: AbortSignal
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -131,28 +135,60 @@ async function apiCall<T>(
     }
   }
   
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `API error: ${response.status} ${response.statusText}`);
-  }
-
-  // Parse JSON response
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    return response.json();
+  // Create an AbortController for timeout
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), API_TIMEOUT);
+  
+  // Combine signals: if both are provided, create a combined signal
+  let finalSignal: AbortSignal;
+  if (signal) {
+    // If user signal aborts, abort timeout controller too
+    signal.addEventListener('abort', () => {
+      timeoutController.abort();
+    });
+    // Use user signal as primary
+    finalSignal = signal;
+  } else {
+    // Use timeout signal only
+    finalSignal = timeoutController.signal;
   }
   
-  // If response is not JSON, try to parse as text and then JSON
-  const text = await response.text();
   try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Failed to parse response as JSON: ${text.substring(0, 100)}`);
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: finalSignal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || `API error: ${response.status} ${response.statusText}`);
+    }
+
+    // Parse JSON response
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+    
+    // If response is not JSON, try to parse as text and then JSON
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error(`Failed to parse response as JSON: ${text.substring(0, 100)}`);
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError' || error.name === 'AbortSignal') {
+      // Check if it was user cancellation or timeout
+      if (signal?.aborted) {
+        throw new Error('Generation cancelled');
+      }
+      throw new Error(`Request timeout: Structure generation took longer than ${API_TIMEOUT / 1000} seconds. The image may be complex or the server is slow. Please try again.`);
+    }
+    throw error;
   }
 }
 
@@ -160,7 +196,8 @@ async function apiCall<T>(
  * Generate workout structure from sources
  */
 export async function generateWorkoutStructure(
-  sources: Array<{ type: SourceType; content: string }>
+  sources: Array<{ type: SourceType; content: string }>,
+  signal?: AbortSignal
 ): Promise<WorkoutStructure> {
   let workout: WorkoutStructure;
   
@@ -172,7 +209,7 @@ export async function generateWorkoutStructure(
         body: JSON.stringify({
           url: source.content,
         }),
-      });
+      }, signal);
       break;
     }
 
@@ -231,7 +268,7 @@ export async function generateWorkoutStructure(
           method: 'POST',
           body: formData,
           headers: {}, // Let browser set Content-Type with boundary
-        });
+        }, signal);
         break;
       } catch (error: any) {
         if (error.message.includes('Failed to fetch image')) {
@@ -248,7 +285,7 @@ export async function generateWorkoutStructure(
         headers: {
           'Content-Type': 'text/plain',
         },
-      });
+      }, signal);
       break;
     }
   }
@@ -261,14 +298,42 @@ export async function generateWorkoutStructure(
   return normalizeWorkoutStructure(workout);
 }
 
+// Cache for health check to avoid repeated calls
+let healthCheckCache: { result: boolean; timestamp: number } | null = null;
+const HEALTH_CHECK_CACHE_DURATION = 5000; // Cache for 5 seconds
+
 /**
  * Check if the API is available
  */
 export async function checkApiHealth(): Promise<boolean> {
+  // Return cached result if still valid
+  if (healthCheckCache && Date.now() - healthCheckCache.timestamp < HEALTH_CHECK_CACHE_DURATION) {
+    return healthCheckCache.result;
+  }
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    return response.ok;
+    // Add timeout to health check
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    
+    const isHealthy = response.ok;
+    // Cache the result
+    healthCheckCache = {
+      result: isHealthy,
+      timestamp: Date.now(),
+    };
+    return isHealthy;
   } catch (error) {
+    // Cache negative result to avoid repeated failures
+    healthCheckCache = {
+      result: false,
+      timestamp: Date.now(),
+    };
     return false;
   }
 }

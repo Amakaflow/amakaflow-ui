@@ -54,6 +54,8 @@ export default function App() {
   const [validation, setValidation] = useState<ValidationResponse | null>(null);
   const [exports, setExports] = useState<ExportFormats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<string | null>(null);
+  const [generationAbortController, setGenerationAbortController] = useState<AbortController | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<DeviceId>('garmin');
   const [workoutHistoryList, setWorkoutHistoryList] = useState<any[]>([]);
   const [stravaConnected, setStravaConnected] = useState(false);
@@ -71,6 +73,9 @@ export default function App() {
     description: '',
     onConfirm: () => {},
   });
+  
+  // Build timestamp - shows when app was loaded/updated
+  const [buildTimestamp] = useState(() => new Date().toISOString());
 
   const steps: Array<{ id: WorkflowStep; label: string; number: number }> = [
     { id: 'add-sources', label: 'Add Sources', number: 1 },
@@ -81,13 +86,29 @@ export default function App() {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
-  // Check API availability on mount
+  // Check API availability on mount (only once, with debounce)
   useEffect(() => {
-    checkApiHealth().then((available) => {
-      setApiAvailable(available);
-    }).catch(() => {
-      setApiAvailable(false);
-    });
+    let mounted = true;
+    const checkHealth = async () => {
+      try {
+        const available = await checkApiHealth();
+        if (mounted) {
+          setApiAvailable(available);
+        }
+      } catch {
+        if (mounted) {
+          setApiAvailable(false);
+        }
+      }
+    };
+    
+    // Delay initial check slightly to avoid race conditions
+    const timeoutId = setTimeout(checkHealth, 500);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
 
@@ -339,38 +360,117 @@ export default function App() {
   };
 
   const handleGenerateStructure = async (newSources: Source[]) => {
+    // Create abort controller for cancellation
+    const abortController = new AbortController();
+    setGenerationAbortController(abortController);
     setLoading(true);
+    setGenerationProgress('Initializing...');
+    
+    const loadingToast = toast.loading('Generating workout structure... This may take a minute for complex images.', {
+      id: 'generate-structure',
+    });
+    
+    // Progress update interval
+    const progressInterval = setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (!prev) return 'Processing...';
+        // Cycle through progress messages
+        const messages = [
+          'Extracting text from image...',
+          'Processing OCR data...',
+          'Parsing workout structure...',
+          'Validating exercises...',
+          'Finalizing structure...',
+        ];
+        const currentIndex = messages.findIndex(m => prev.includes(m.split('...')[0]));
+        const nextIndex = currentIndex >= 0 && currentIndex < messages.length - 1 ? currentIndex + 1 : 0;
+        return messages[nextIndex];
+      });
+    }, 10000); // Update every 10 seconds
+    
     try {
-      // Check if API is available
-      const isApiAvailable = apiAvailable !== false ? await checkApiHealth() : false;
+      setGenerationProgress('Checking API availability...');
+      // Check if API is available (use cached value if available, otherwise check)
+      let isApiAvailable = apiAvailable;
+      if (isApiAvailable === null || isApiAvailable === false) {
+        try {
+          isApiAvailable = await checkApiHealth();
+        } catch {
+          isApiAvailable = false;
+        }
+      }
       
       // Update API availability state
       setApiAvailable(isApiAvailable);
       
+      if (abortController.signal.aborted) {
+        throw new Error('Generation cancelled');
+      }
+      
+      setGenerationProgress('Preparing sources...');
       const sourcesData = newSources.map(s => ({ type: s.type, content: s.content }));
       
       // Use real API if available, otherwise fall back to mock
       let structure: WorkoutStructure;
       if (isApiAvailable) {
         try {
-          structure = await generateWorkoutStructureReal(sourcesData);
+          setGenerationProgress('Sending request to API...');
+          structure = await generateWorkoutStructureReal(sourcesData, abortController.signal);
         } catch (apiError: any) {
+          if (apiError.name === 'AbortError' || abortController.signal.aborted) {
+            throw new Error('Generation cancelled');
+          }
           // If API call fails, throw the error (don't silently fall back to mock)
           throw new Error(`API error: ${apiError.message || 'Failed to generate workout'}`);
         }
       } else {
         structure = await generateWorkoutStructureMock(sourcesData);
       }
+      
+      if (abortController.signal.aborted) {
+        throw new Error('Generation cancelled');
+      }
         
+      setGenerationProgress('Complete!');
       setWorkout(structure);
       setSources(newSources);
       setCurrentStep('structure');
+      clearInterval(progressInterval);
+      toast.dismiss('generate-structure');
       toast.success('Workout structure generated!');
     } catch (error: any) {
+      clearInterval(progressInterval);
+      toast.dismiss('generate-structure');
       const errorMessage = error?.message || 'Failed to generate workout';
-      toast.error(errorMessage);
+      
+      if (errorMessage.includes('cancelled')) {
+        toast.info('Generation cancelled');
+      } else if (errorMessage.includes('timeout')) {
+        toast.error(errorMessage, {
+          action: {
+            label: 'Retry',
+            onClick: () => handleGenerateStructure(newSources),
+          },
+        });
+      } else {
+        toast.error(errorMessage, {
+          action: {
+            label: 'Retry',
+            onClick: () => handleGenerateStructure(newSources),
+          },
+        });
+      }
     } finally {
       setLoading(false);
+      setGenerationProgress(null);
+      setGenerationAbortController(null);
+    }
+  };
+  
+  const handleCancelGeneration = () => {
+    if (generationAbortController) {
+      generationAbortController.abort();
+      setGenerationAbortController(null);
     }
   };
 
@@ -944,12 +1044,20 @@ export default function App() {
            <div className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
         {/* Welcome Guide (shown on home view) */}
         {currentView === 'home' && (
-          <WelcomeGuide 
-            onGetStarted={() => {
-              setCurrentView('workflow');
-              setCurrentStep('add-sources');
-            }}
-          />
+          <>
+            <WelcomeGuide 
+              onGetStarted={() => {
+                setCurrentView('workflow');
+                setCurrentStep('add-sources');
+              }}
+            />
+            {/* Version timestamp */}
+            <div className="mt-8 text-center">
+              <p className="text-xs text-muted-foreground">
+                Build: {new Date(buildTimestamp).toLocaleString()}
+              </p>
+            </div>
+          </>
         )}
 
         {currentView === 'workflow' && currentStepIndex > 0 && !isEditingFromHistory && (
@@ -989,7 +1097,9 @@ export default function App() {
 
         {currentView === 'workflow' && currentStep === 'add-sources' && (
           <AddSources 
-            onGenerate={handleGenerateStructure} 
+            onGenerate={handleGenerateStructure}
+            progress={generationProgress}
+            onCancel={handleCancelGeneration} 
             onLoadTemplate={handleLoadTemplate}
             loading={loading} 
           />

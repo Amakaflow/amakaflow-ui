@@ -161,6 +161,7 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
+
   const updateExercise = (blockIdx: number, supersetIdx: number, exerciseIdx: number, updates: Partial<Exercise>) => {
     const newWorkout = JSON.parse(JSON.stringify(workout));
     const exercise = newWorkout.blocks[blockIdx].supersets[supersetIdx].exercises[exerciseIdx];
