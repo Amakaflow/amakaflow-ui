@@ -37,7 +37,7 @@ export function WorkoutBuilder({
         <div className="p-4">
           <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
-              {workout.blocks.length === 0 ? (
+              {!workout.blocks || workout.blocks.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Drag blocks from the library to build your workout
                 </p>

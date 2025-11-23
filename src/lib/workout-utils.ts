@@ -11,12 +11,21 @@ export function generateId(): string {
  * Add IDs to all blocks and exercises in a workout
  */
 export function addIdsToWorkout(workout: WorkoutStructure): WorkoutStructure {
+  // Guard against undefined/null workout or blocks
+  if (!workout || !workout.blocks || !Array.isArray(workout.blocks)) {
+    return {
+      title: workout?.title || '',
+      source: workout?.source || '',
+      blocks: []
+    };
+  }
+  
   return {
     ...workout,
     blocks: workout.blocks.map(block => ({
       ...block,
       id: block.id || generateId(),
-      exercises: block.exercises.map(exercise => ({
+      exercises: (block.exercises || []).map(exercise => ({
         ...exercise,
         id: exercise.id || generateId(),
       })),
@@ -31,7 +40,7 @@ export function cloneBlock(block: Block): Block {
   return {
     ...block,
     id: generateId(),
-    exercises: block.exercises.map(exercise => ({
+    exercises: (block.exercises || []).map(exercise => ({
       ...exercise,
       id: generateId(),
     })),
@@ -85,7 +94,8 @@ export function getBlockSummary(block: Block): string {
     if (block.rest_between_sets_sec) parts.push(`${block.rest_between_sets_sec}s rest`);
   }
   
-  return parts.length > 0 ? parts.join(' • ') : `${block.exercises.length} exercise${block.exercises.length !== 1 ? 's' : ''}`;
+  const exerciseCount = (block.exercises || []).length;
+  return parts.length > 0 ? parts.join(' • ') : `${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}`;
 }
 
 /**

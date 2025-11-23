@@ -45,8 +45,17 @@ export function StructureWorkout({
 }: Props) {
   // Ensure workout has IDs - use a stable check to avoid infinite loops
   const workoutWithIds = useMemo(() => {
+    // Guard against undefined/null workout or blocks
+    if (!workout || !workout.blocks || !Array.isArray(workout.blocks)) {
+      return {
+        title: workout?.title || '',
+        source: workout?.source || '',
+        blocks: []
+      };
+    }
+    
     const hasAllIds = workout.blocks.every(b => 
-      b.id && b.exercises.every(ex => ex.id)
+      b && b.id && b.exercises && Array.isArray(b.exercises) && b.exercises.every(ex => ex && ex.id)
     );
     if (hasAllIds) {
       return workout;
@@ -54,12 +63,12 @@ export function StructureWorkout({
     return addIdsToWorkout(workout);
   }, [
     // Use stable dependencies - only re-compute if structure actually changes
-    workout.blocks.length,
-    workout.title,
-    workout.source,
-    // Stringify block IDs to detect actual changes
-    workout.blocks.map(b => b.id).join(','),
-    workout.blocks.map(b => b.exercises.map(e => e.id).join(',')).join('|')
+    workout?.blocks?.length || 0,
+    workout?.title || '',
+    workout?.source || '',
+    // Stringify block IDs to detect actual changes (with null checks)
+    workout?.blocks?.map(b => b?.id || '').join(',') || '',
+    workout?.blocks?.map(b => b?.exercises?.map(e => e?.id || '').join(',') || '').join('|') || ''
   ]);
 
   // Blocks Library (left panel) - separate from workout blocks
@@ -67,7 +76,7 @@ export function StructureWorkout({
 
   // Selected block for editing
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const selectedBlock = workoutWithIds.blocks.find(b => b.id === selectedBlockId) || null;
+  const selectedBlock = (workoutWithIds.blocks || []).find(b => b.id === selectedBlockId) || null;
 
   // Create block dialog
   const [showCreateBlockDialog, setShowCreateBlockDialog] = useState(false);
@@ -87,7 +96,7 @@ export function StructureWorkout({
 
   // Initialize blocks library only once on mount if workout is empty
   useEffect(() => {
-    if (blocksLibrary.length === 0 && workout.blocks.length === 0) {
+    if (blocksLibrary.length === 0 && (!workout?.blocks || workout.blocks.length === 0)) {
       const sample = getInitializedSampleWorkout();
       setBlocksLibrary(sample.blocks);
     }
@@ -113,13 +122,13 @@ export function StructureWorkout({
       // Find drop position in workout
       let overIndex = -1;
       if (overId.startsWith('workout-')) {
-        overIndex = workoutWithIds.blocks.findIndex(b => b.id === overId.replace('workout-', ''));
+        overIndex = (workoutWithIds.blocks || []).findIndex(b => b.id === overId.replace('workout-', ''));
       } else if (overId === 'workout-builder') {
         // Dropped on the builder container itself
-        overIndex = workoutWithIds.blocks.length;
+        overIndex = (workoutWithIds.blocks || []).length;
       }
       
-      const newBlocks = [...workoutWithIds.blocks];
+      const newBlocks = [...(workoutWithIds.blocks || [])];
       if (overIndex >= 0) {
         newBlocks.splice(overIndex, 0, clonedBlock);
       } else {
@@ -132,11 +141,12 @@ export function StructureWorkout({
 
     // Reordering blocks within workout
     if (activeId.startsWith('workout-') && overId.startsWith('workout-')) {
-      const activeIndex = workoutWithIds.blocks.findIndex(b => b.id === activeId.replace('workout-', ''));
-      const overIndex = workoutWithIds.blocks.findIndex(b => b.id === overId.replace('workout-', ''));
+      const blocks = workoutWithIds.blocks || [];
+      const activeIndex = blocks.findIndex(b => b.id === activeId.replace('workout-', ''));
+      const overIndex = blocks.findIndex(b => b.id === overId.replace('workout-', ''));
       
       if (activeIndex >= 0 && overIndex >= 0) {
-        const newBlocks = arrayMove(workoutWithIds.blocks, activeIndex, overIndex);
+        const newBlocks = arrayMove(blocks, activeIndex, overIndex);
         onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
       }
       return;
@@ -169,14 +179,14 @@ export function StructureWorkout({
 
   // Workout block operations
   const handleBlockUpdate = (updatedBlock: Block) => {
-    const newBlocks = workoutWithIds.blocks.map(b => 
+    const newBlocks = (workoutWithIds.blocks || []).map(b => 
       b.id === updatedBlock.id ? updatedBlock : b
     );
     onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
   };
 
   const handleBlockDelete = (blockId: string) => {
-    const newBlocks = workoutWithIds.blocks.filter(b => b.id !== blockId);
+    const newBlocks = (workoutWithIds.blocks || []).filter(b => b.id !== blockId);
     onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
     if (selectedBlockId === blockId) {
       setSelectedBlockId(null);
@@ -185,9 +195,9 @@ export function StructureWorkout({
 
   // Exercise operations
   const handleExerciseAdd = (blockId: string, exercise: Exercise) => {
-    const newBlocks = workoutWithIds.blocks.map(block => {
+    const newBlocks = (workoutWithIds.blocks || []).map(block => {
       if (block.id === blockId) {
-        return { ...block, exercises: [...block.exercises, exercise] };
+        return { ...block, exercises: [...(block.exercises || []), exercise] };
       }
       return block;
     });
@@ -195,11 +205,11 @@ export function StructureWorkout({
   };
 
   const handleExerciseUpdate = (blockId: string, exerciseId: string, updatedExercise: Exercise) => {
-    const newBlocks = workoutWithIds.blocks.map(block => {
+    const newBlocks = (workoutWithIds.blocks || []).map(block => {
       if (block.id === blockId) {
         return {
           ...block,
-          exercises: block.exercises.map(ex => ex.id === exerciseId ? updatedExercise : ex)
+          exercises: (block.exercises || []).map(ex => ex.id === exerciseId ? updatedExercise : ex)
         };
       }
       return block;
@@ -208,11 +218,11 @@ export function StructureWorkout({
   };
 
   const handleExerciseDelete = (blockId: string, exerciseId: string) => {
-    const newBlocks = workoutWithIds.blocks.map(block => {
+    const newBlocks = (workoutWithIds.blocks || []).map(block => {
       if (block.id === blockId) {
         return {
           ...block,
-          exercises: block.exercises.filter(ex => ex.id !== exerciseId)
+          exercises: (block.exercises || []).filter(ex => ex.id !== exerciseId)
         };
       }
       return block;
@@ -221,14 +231,14 @@ export function StructureWorkout({
   };
 
   const handleExerciseReorder = (blockId: string, exerciseIds: string[]) => {
-    const block = workoutWithIds.blocks.find(b => b.id === blockId);
-    if (!block) return;
+    const block = (workoutWithIds.blocks || []).find(b => b.id === blockId);
+    if (!block || !block.exercises) return;
 
     const reorderedExercises = exerciseIds
       .map(id => block.exercises.find(ex => ex.id === id))
       .filter((ex): ex is Exercise => ex !== undefined);
 
-    const newBlocks = workoutWithIds.blocks.map(b => 
+    const newBlocks = (workoutWithIds.blocks || []).map(b => 
       b.id === blockId ? { ...b, exercises: reorderedExercises } : b
     );
     onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
