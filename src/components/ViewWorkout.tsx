@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { X, Clock, Watch, Bike, Dumbbell } from 'lucide-react';
 import { WorkoutHistoryItem } from '../lib/workout-history';
 import { Block, Exercise } from '../types/workout';
-// Removed unused import: getDeviceById, DeviceId
 import { getStructureDisplayName } from '../lib/workout-utils';
 
 type Props = {
@@ -52,8 +51,6 @@ function formatDate(dateString: string): string {
   });
 }
 
-// Removed unused helper functions: getExerciseMeasurement, getBlockStructureInfo
-
 // Helper function to count total exercises in a block
 function countBlockExercises(block: Block): number {
   const blockExercises = (block.exercises || []).length;
@@ -65,14 +62,6 @@ function countBlockExercises(block: Block): number {
 }
 
 export function ViewWorkout({ workout, onClose }: Props) {
-  // Debug logging
-  console.log('=== ViewWorkout Debug ===');
-  console.log('1. Full workout prop:', workout);
-  console.log('2. workout.workout:', workout.workout);
-  console.log('3. workout.workout.title:', workout.workout?.title);
-  console.log('4. workout.workout.blocks:', workout.workout?.blocks);
-  console.log('========================');
-
   const workoutData = workout.workout || workout.data || workout;
   const blocks = workoutData?.blocks || [];
   const hasExports = !!(workout.exports);
@@ -105,37 +94,46 @@ export function ViewWorkout({ workout, onClose }: Props) {
 
   // Handle escape key to close
   useEffect(() => {
-    console.log('Escape key handler registered');
     const handleEscape = (e: KeyboardEvent) => {
-      console.log('Key pressed:', e.key);
       if (e.key === 'Escape') {
-        console.log('Escape pressed, closing...');
         onClose();
       }
     };
     document.addEventListener('keydown', handleEscape);
-    return () => {
-      console.log('Escape key handler removed');
-      document.removeEventListener('keydown', handleEscape);
-    };
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   return (
     <div
-      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onMouseDown={(e) => {
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+      }}
+      onClick={(e) => {
         if (e.target === e.currentTarget) {
-          console.log('Backdrop clicked!');
           onClose();
         }
       }}
     >
-      <Card
-        className="w-full max-w-4xl h-[85vh] flex flex-col"
+      <div
+        className="bg-background rounded-lg shadow-lg w-full max-w-4xl flex flex-col"
+        style={{
+          maxHeight: '90vh',
+          height: '90vh',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Section (Fixed) */}
-        <CardHeader className="border-b shrink-0">
+        {/* Fixed Header */}
+        <div className="border-b px-6 py-4 flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2">
@@ -170,19 +168,23 @@ export function ViewWorkout({ workout, onClose }: Props) {
               size="icon"
               onClick={(e) => {
                 e.stopPropagation();
-                console.log('Close button clicked!');
                 onClose();
               }}
-              className="h-9 w-9 shrink-0 relative z-10"
+              className="h-9 w-9 flex-shrink-0"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
             </Button>
           </div>
-        </CardHeader>
+        </div>
 
-        {/* Content Area (Scrollable) */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-6">
+        {/* Scrollable Content */}
+        <div
+          className="flex-1 overflow-y-auto px-6 py-4"
+          style={{
+            minHeight: 0,
+          }}
+        >
           {blocks.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
               <Dumbbell className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -200,7 +202,7 @@ export function ViewWorkout({ workout, onClose }: Props) {
                     key={block.id || blockIdx}
                     className="border rounded-lg overflow-hidden"
                   >
-                    {/* Block Header - Colored background */}
+                    {/* Block Header */}
                     <div className="bg-muted px-4 py-3 border-b">
                       <div className="flex items-center justify-between">
                         <div>
@@ -216,8 +218,8 @@ export function ViewWorkout({ workout, onClose }: Props) {
                       </div>
                     </div>
 
-                    {/* Block Content - White background */}
-                    <div className="p-4 space-y-4">
+                    {/* Block Content */}
+                    <div className="p-4 space-y-4 bg-background">
                       {/* Block-level exercises */}
                       {blockExercises.length > 0 && (
                         <div className="space-y-2">
@@ -357,7 +359,7 @@ export function ViewWorkout({ workout, onClose }: Props) {
             </div>
           )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
