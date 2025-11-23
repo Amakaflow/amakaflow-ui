@@ -127,6 +127,29 @@ export function ViewWorkout({ workout, onClose }: Props) {
 
   // Count total exercises across all blocks
   const totalExercises = blocks.reduce((sum, block) => sum + countBlockExercises(block), 0);
+  
+  // Helper to format block metadata
+  const getBlockMetadata = (block: Block): string => {
+    const parts: string[] = [];
+    const blockExerciseCount = countBlockExercises(block);
+    
+    if (block.structure) {
+      parts.push(`Structure: ${getStructureDisplayName(block.structure)}`);
+    }
+    if (blockExerciseCount > 0) {
+      parts.push(`${blockExerciseCount} exercise${blockExerciseCount !== 1 ? 's' : ''}`);
+    }
+    if (block.sets) {
+      parts.push(`${block.sets} sets`);
+    }
+    if (block.rest_between_rounds_sec) {
+      parts.push(`${block.rest_between_rounds_sec}s rest`);
+    } else if (block.rest_between_sets_sec) {
+      parts.push(`${block.rest_between_sets_sec}s rest`);
+    }
+    
+    return parts.join(' • ');
+  };
 
   // Handle escape key to close
   useEffect(() => {
@@ -197,131 +220,166 @@ export function ViewWorkout({ workout, onClose }: Props) {
               <p>No blocks found in this workout</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {blocks.map((block, blockIdx) => {
                 const blockExercises = block.exercises || [];
                 const blockSupersets = block.supersets || [];
-                const totalBlockExercises = countBlockExercises(block);
-                const structureInfo = getBlockStructureInfo(block);
+                const blockMetadata = getBlockMetadata(block);
 
                 return (
                   <div
                     key={block.id || blockIdx}
-                    className="bg-muted/30 rounded-lg border border-border p-4 space-y-3"
+                    className="border rounded-lg overflow-hidden"
                   >
-                    {/* Block Header */}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-base">{block.label || `Block ${blockIdx + 1}`}</h3>
-                        {block.structure && (
-                          <Badge variant="outline" className="text-xs">
-                            {getStructureDisplayName(block.structure)}
-                          </Badge>
-                        )}
+                    {/* Block Header - Colored background */}
+                    <div className="bg-muted px-4 py-3 border-b">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold">{block.label || `Block ${blockIdx + 1}`}</h3>
+                          {blockMetadata && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {blockMetadata}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {structureInfo && (
-                        <p className="text-sm text-muted-foreground">
-                          Structure: {structureInfo}
-                        </p>
-                      )}
                     </div>
 
-                    {/* Block-level exercises */}
-                    {blockExercises.length > 0 && (
-                      <div className="space-y-2">
-                        {blockExercises.map((exercise, exerciseIdx) => {
-                          const measurement = getExerciseMeasurement(exercise);
-                          const exerciseType = exercise.type || '';
+                    {/* Block Content - White background */}
+                    <div className="p-4 space-y-4">
+                      {/* Block-level exercises */}
+                      {blockExercises.length > 0 && (
+                        <div className="space-y-2">
+                          {blockExercises.map((exercise, exerciseIdx) => {
+                            const exerciseType = exercise.type || '';
 
-                          return (
-                            <div
-                              key={exercise.id || exerciseIdx}
-                              className="bg-background rounded-md border border-border/50 p-3 hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm">{exercise.name}</div>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {measurement && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {measurement}
-                                    </Badge>
-                                  )}
-                                  {exerciseType && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {exerciseType}
-                                    </Badge>
+                            return (
+                              <div
+                                key={exercise.id || exerciseIdx}
+                                className="flex items-start justify-between p-3 bg-background border rounded-md"
+                              >
+                                <div className="flex-1">
+                                  <h4 className="font-medium">{exercise.name}</h4>
+                                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                                    {exercise.sets && (
+                                      <Badge variant="outline">{exercise.sets} sets</Badge>
+                                    )}
+                                    {exercise.reps && (
+                                      <Badge variant="outline">{exercise.reps} reps</Badge>
+                                    )}
+                                    {exercise.reps_range && (
+                                      <Badge variant="outline">{exercise.reps_range} reps</Badge>
+                                    )}
+                                    {exercise.duration_sec && (
+                                      <Badge variant="outline">{exercise.duration_sec}s</Badge>
+                                    )}
+                                    {exercise.distance_m && (
+                                      <Badge variant="outline">{exercise.distance_m}m</Badge>
+                                    )}
+                                    {exercise.distance_range && (
+                                      <Badge variant="outline">{exercise.distance_range}</Badge>
+                                    )}
+                                    {exercise.rest_sec && (
+                                      <Badge variant="outline">{exercise.rest_sec}s rest</Badge>
+                                    )}
+                                    {exerciseType && (
+                                      <Badge variant="secondary">{exerciseType}</Badge>
+                                    )}
+                                  </div>
+                                  {exercise.notes && (
+                                    <p className="text-xs text-muted-foreground mt-2 italic">{exercise.notes}</p>
                                   )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      )}
 
-                    {/* Superset exercises */}
-                    {blockSupersets.length > 0 && (
-                      <div className="space-y-3">
-                        {blockSupersets.map((superset, supersetIdx) => {
-                          const supersetExercises = superset.exercises || [];
-                          
-                          return (
-                            <div key={superset.id || supersetIdx} className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  Superset {supersetIdx + 1}
-                                </Badge>
-                                {superset.rest_between_sec && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {superset.rest_between_sec}s rest
-                                  </span>
-                                )}
-                              </div>
-                              <div className="space-y-2 pl-4 border-l-2 border-primary/20">
-                                {supersetExercises.map((exercise, exerciseIdx) => {
-                                  const measurement = getExerciseMeasurement(exercise);
-                                  const exerciseType = exercise.type || '';
+                      {/* Superset exercises */}
+                      {blockSupersets.length > 0 && (
+                        <div className="space-y-3">
+                          {blockSupersets.map((superset, supersetIdx) => {
+                            const supersetExercises = superset.exercises || [];
+                            
+                            return (
+                              <div key={superset.id || supersetIdx} className="border-l-4 border-primary pl-3">
+                                {/* Superset header */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge variant="default" className="text-xs">
+                                    Superset {supersetIdx + 1}
+                                  </Badge>
+                                  {superset.rest_between_sec && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {superset.rest_between_sec}s rest between exercises
+                                    </span>
+                                  )}
+                                </div>
 
-                                  return (
-                                    <div
-                                      key={exercise.id || exerciseIdx}
-                                      className="bg-background rounded-md border border-border/50 p-3 hover:bg-muted/50 transition-colors"
-                                    >
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                          <div className="font-medium text-sm">{exercise.name}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                          {measurement && (
-                                            <Badge variant="outline" className="text-xs">
-                                              {measurement}
-                                            </Badge>
-                                          )}
-                                          {exerciseType && (
-                                            <Badge variant="secondary" className="text-xs">
-                                              {exerciseType}
-                                            </Badge>
+                                {/* Superset exercises */}
+                                <div className="space-y-2">
+                                  {supersetExercises.map((exercise, exerciseIdx) => {
+                                    const exerciseType = exercise.type || '';
+
+                                    return (
+                                      <div
+                                        key={exercise.id || exerciseIdx}
+                                        className="flex items-start justify-between p-3 bg-background border rounded-md"
+                                      >
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-mono text-muted-foreground">
+                                              {String.fromCharCode(65 + exerciseIdx)}
+                                            </span>
+                                            <h4 className="font-medium">{exercise.name}</h4>
+                                          </div>
+                                          <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground ml-5">
+                                            {exercise.sets && (
+                                              <Badge variant="outline">{exercise.sets} sets</Badge>
+                                            )}
+                                            {exercise.reps && (
+                                              <Badge variant="outline">{exercise.reps} reps</Badge>
+                                            )}
+                                            {exercise.reps_range && (
+                                              <Badge variant="outline">{exercise.reps_range} reps</Badge>
+                                            )}
+                                            {exercise.duration_sec && (
+                                              <Badge variant="outline">{exercise.duration_sec}s</Badge>
+                                            )}
+                                            {exercise.distance_m && (
+                                              <Badge variant="outline">{exercise.distance_m}m</Badge>
+                                            )}
+                                            {exercise.distance_range && (
+                                              <Badge variant="outline">{exercise.distance_range}</Badge>
+                                            )}
+                                            {exercise.rest_sec && (
+                                              <Badge variant="outline">{exercise.rest_sec}s rest</Badge>
+                                            )}
+                                            {exerciseType && (
+                                              <Badge variant="secondary">{exerciseType}</Badge>
+                                            )}
+                                          </div>
+                                          {exercise.notes && (
+                                            <p className="text-xs text-muted-foreground mt-2 italic ml-5">{exercise.notes}</p>
                                           )}
                                         </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      )}
 
-                    {/* Empty state for block */}
-                    {totalBlockExercises === 0 && (
-                      <div className="text-center text-sm text-muted-foreground py-4">
-                        No exercises in this block
-                      </div>
-                    )}
+                      {/* Empty state for block */}
+                      {blockExercises.length === 0 && blockSupersets.length === 0 && (
+                        <div className="text-center text-sm text-muted-foreground py-4">
+                          No exercises in this block
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
