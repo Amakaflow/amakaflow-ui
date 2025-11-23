@@ -310,7 +310,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
       </div>
 
       <ScrollArea className="h-[calc(100vh-200px)]">
-        <div className={viewMode === 'cards' ? 'space-y-2 pr-4' : 'space-y-1 pr-4'}>
+        <div className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
           {safeHistory.map((item) => {
             // Safety check: ensure workout exists
             if (!item.workout) {
@@ -721,8 +721,8 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
 
       {/* View Workout Dialog - Shows selected cards */}
       <Dialog open={!!viewingWorkout && !showCardSelector} onOpenChange={(open) => !open && setViewingWorkout(null)}>
-        <DialogContent className="!max-w-[98vw] !w-[98vw] max-h-[90vh] overflow-y-auto p-0" style={{ maxWidth: '98vw', width: '98vw' }}>
-          <div className="px-6 pt-4 pb-3 border-b flex items-center justify-between">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 [&>button]:hidden">
+          <div className="px-6 pt-4 pb-3 border-b flex items-center justify-between flex-shrink-0">
             <DialogHeader className="flex-1">
               <DialogTitle className="text-xl">{viewingWorkout?.workout?.title || 'Untitled Workout'}</DialogTitle>
               <DialogDescription>
@@ -739,7 +739,8 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
               <X className="w-5 h-5" />
             </Button>
           </div>
-          <div className="px-6 py-4 overflow-y-auto flex-1">
+          <ScrollArea className="flex-1">
+            <div className="px-6 py-4">
           {viewingWorkout && (() => {
             const availableCards = getAvailableCards(viewingWorkout);
             const showSummary = selectedCards.has('summary') || selectedCards.size === 0;
@@ -1118,7 +1119,8 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
               </div>
             );
           })()}
-          </div>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
