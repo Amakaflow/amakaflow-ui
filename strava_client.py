@@ -366,6 +366,84 @@ class StravaClient:
                 "activity_id": activity_id,
             }
     
+    async def create_activity(
+        self,
+        access_token: str,
+        name: str,
+        activity_type: str = "Workout",
+        start_date: Optional[str] = None,
+        elapsed_time: Optional[int] = None,
+        description: Optional[str] = None,
+        distance: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a manual activity on Strava.
+        
+        Args:
+            access_token: Valid access token
+            name: Activity name
+            activity_type: Activity type (e.g., "Workout", "Crossfit", "WeightTraining")
+            start_date: Start date in ISO 8601 format (defaults to now)
+            elapsed_time: Duration in seconds
+            description: Activity description
+            distance: Distance in meters (optional)
+            
+        Returns:
+            Created activity data
+        """
+        url = f"{self.base_url}/activities"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        
+        # Default to current time if not provided
+        if not start_date:
+            from datetime import datetime, timezone
+            start_date = datetime.now(timezone.utc).isoformat()
+        
+        data = {
+            "name": name,
+            "type": activity_type,
+            "start_date_local": start_date,
+        }
+        
+        if elapsed_time:
+            data["elapsed_time"] = elapsed_time
+        if description:
+            # Strava has a 2000 character limit for description
+            if len(description) > 2000:
+                logger.warning(f"Description truncated from {len(description)} to 2000 chars")
+                description = description[:2000]
+            data["description"] = description
+        if distance:
+            data["distance"] = distance
+        
+        try:
+            response = await self.client.post(url, headers=headers, json=data)
+            
+            if response.status_code == 401:
+                raise StravaAPIError("Unauthorized - token expired or invalid")
+            
+            response.raise_for_status()
+            activity = response.json()
+            
+            logger.info(f"Successfully created activity: {activity.get('id')}")
+            return {
+                "id": activity["id"],
+                "name": activity["name"],
+                "type": activity.get("type", activity_type),
+                "start_date": activity.get("start_date_local", start_date),
+                "elapsed_time": activity.get("elapsed_time", elapsed_time or 0),
+                "distance": activity.get("distance", distance or 0),
+                "description": activity.get("description", description or ""),
+            }
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to create activity: {e.response.text}")
+            if e.response.status_code == 401:
+                raise StravaAPIError("Unauthorized")
+            raise StravaAPIError(f"Failed to create activity: {e.response.text}")
+        except Exception as e:
+            logger.error(f"Unexpected error creating activity: {e}")
+            raise StravaAPIError(f"Error creating activity: {str(e)}")
+    
     async def close(self):
         """Close the HTTP client."""
         await self.client.aclose()

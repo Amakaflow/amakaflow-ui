@@ -80,6 +80,25 @@ class UpdateActivityResponse(BaseModel):
     updated_at: str
 
 
+class CreateActivityRequest(BaseModel):
+    name: str
+    activity_type: Optional[str] = "Workout"
+    start_date: Optional[str] = None
+    elapsed_time: Optional[int] = None
+    description: Optional[str] = None
+    distance: Optional[float] = None
+
+
+class CreateActivityResponse(BaseModel):
+    id: int
+    name: str
+    type: str
+    start_date: str
+    elapsed_time: int
+    distance: float
+    description: str
+
+
 class TokenRefreshResponse(BaseModel):
     success: bool
     expires_at: int
@@ -515,7 +534,82 @@ async def update_activity(
 
 
 # ============================================================================
-# 5.6 Upload Image (Stub)
+# 5.6 Create Activity
+# ============================================================================
+
+@app.post("/strava/activities", response_model=CreateActivityResponse)
+@limiter.limit("30/minute")  # Lower limit for write operations
+async def create_activity(
+    request: Request,
+    payload: CreateActivityRequest = ...,
+    user_id: str = Depends(get_user_id),
+):
+    """
+    Create a manual activity on Strava.
+    
+    This endpoint allows you to create a manual workout activity on Strava
+    with a title, description, duration, and optional distance.
+    """
+    try:
+        # Get valid token
+        access_token = await token_manager.get_valid_token(user_id)
+        
+        # Create activity
+        result = await strava_client.create_activity(
+            access_token=access_token,
+            name=payload.name,
+            activity_type=payload.activity_type or "Workout",
+            start_date=payload.start_date,
+            elapsed_time=payload.elapsed_time,
+            description=payload.description,
+            distance=payload.distance,
+        )
+        
+        return CreateActivityResponse(**result)
+    
+    except ValueError as e:
+        logger.error(f"Create activity error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except StravaAPIError as e:
+        if "Unauthorized" in str(e):
+            # Try to refresh and retry once
+            try:
+                await token_manager.refresh_token(user_id)
+                access_token = await token_manager.get_valid_token(user_id)
+                result = await strava_client.create_activity(
+                    access_token=access_token,
+                    name=payload.name,
+                    activity_type=payload.activity_type or "Workout",
+                    start_date=payload.start_date,
+                    elapsed_time=payload.elapsed_time,
+                    description=payload.description,
+                    distance=payload.distance,
+                )
+                return CreateActivityResponse(**result)
+            except Exception as retry_error:
+                logger.error(f"Retry after refresh failed: {retry_error}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication failed"
+                )
+        logger.error(f"Strava API error creating activity: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create activity on Strava"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error creating activity: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create activity"
+        )
+
+
+# ============================================================================
+# 5.7 Upload Image (Stub)
 # ============================================================================
 
 @app.post("/strava/activities/{activity_id}/image")
