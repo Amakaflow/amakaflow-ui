@@ -4,12 +4,41 @@ import shutil
 import subprocess
 import tempfile
 from typing import Optional, Dict
+from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 import requests
 from urllib.parse import urlparse, parse_qs
 import re
+
+# Build timestamp - set when module is imported
+BUILD_TIMESTAMP = datetime.now().isoformat()
+
+# Try to get git commit info if available
+def get_git_info():
+    """Get git commit hash and timestamp if available."""
+    try:
+        result = subprocess.run(
+            ['git', 'log', '-1', '--format=%H|%ci', '--date=iso'],
+            cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split('|')
+            if len(parts) == 2:
+                return {
+                    'commit': parts[0],
+                    'commit_short': parts[0][:7],
+                    'commit_date': parts[1]
+                }
+    except:
+        pass
+    return None
+
+GIT_INFO = get_git_info()
 
 from app.models import Workout, Block, Exercise
 from app.services.ocr_service import OCRService
@@ -303,6 +332,24 @@ class InstagramTestRequest(BaseModel):
     password: Optional[str] = None
 
 
+@router.get("/version")
+async def get_version():
+    """Get API version and build information."""
+    version_info = {
+        "service": "workout-ingestor-api",
+        "build_timestamp": BUILD_TIMESTAMP,
+        "build_date": datetime.now().isoformat(),
+    }
+    
+    if GIT_INFO:
+        version_info.update({
+            "git_commit": GIT_INFO['commit'],
+            "git_commit_short": GIT_INFO['commit_short'],
+            "git_commit_date": GIT_INFO['commit_date'],
+        })
+    
+    return JSONResponse(version_info)
+
 @router.get("/health")
 def health():
     """Health check endpoint."""
@@ -325,11 +372,15 @@ async def ingest_text(
     result = ParserService.parse_free_text_to_workout(text, source, return_filtered=return_filtered)
     if return_filtered:
         workout, filtered_items = result
+        # Convert to new structure format (flatten supersets into exercises)
+        workout = workout.convert_to_new_structure()
         response = workout.model_dump()
         response["_filtered_items"] = filtered_items
         return JSONResponse(response)
     else:
-        return JSONResponse(result.model_dump())
+        # Convert to new structure format
+        workout = result.convert_to_new_structure()
+        return JSONResponse(workout.model_dump())
 
 
 @router.post("/ingest/ai_workout")
@@ -340,6 +391,8 @@ async def ingest_ai_workout(text: str = Body(..., media_type="text/plain")):
     Returns structured workout JSON matching the same format as /ingest/text.
     """
     wk = ParserService.parse_ai_workout(text, "ai_generated")
+    # Convert to new structure format
+    wk = wk.convert_to_new_structure()
     return JSONResponse(content=wk.model_dump(), media_type="application/json")
 
 
@@ -366,11 +419,15 @@ async def ingest_image(
     result = ParserService.parse_free_text_to_workout(text, source=f"image:{file.filename}", return_filtered=return_filtered)
     if return_filtered:
         workout, filtered_items = result
+        # Convert to new structure format
+        workout = workout.convert_to_new_structure()
         response = workout.model_dump()
         response["_filtered_items"] = filtered_items
         return JSONResponse(response)
     else:
-        return JSONResponse(result.model_dump())
+        # Convert to new structure format
+        workout = result.convert_to_new_structure()
+        return JSONResponse(workout.model_dump())
 
 
 @router.post("/ingest/image_vision")
@@ -428,18 +485,67 @@ async def ingest_image_vision(
                     model=model,
                     api_key=api_key,
                 )
-                # Post-process: ensure exercise types have valid defaults
+                # Normalize structure values (e.g., "for time" -> "for-time")
                 for block in workout_dict.get("blocks", []):
+                    structure = block.get("structure")
+                    if structure:
+                        # Normalize common variations
+                        structure_lower = str(structure).lower().strip()
+                        structure_map = {
+                            "for time": "for-time",
+                            "for-time": "for-time",
+                            "for_time": "for-time",
+                            "fortime": "for-time",
+                            "superset": "superset",
+                            "circuit": "circuit",
+                            "tabata": "tabata",
+                            "emom": "emom",
+                            "amrap": "amrap",
+                            "rounds": "rounds",
+                            "sets": "sets",
+                            "regular": "regular",
+                        }
+                        block["structure"] = structure_map.get(structure_lower, structure)
+                    
+                    # Post-process: ensure exercise names include rep counts/distance for easier scanning
                     for exercise in block.get("exercises", []):
+                        name = exercise.get("name", "")
+                        reps = exercise.get("reps")
+                        distance_m = exercise.get("distance_m")
+                        duration_sec = exercise.get("duration_sec")
+                        
+                        # If name doesn't already include the count, add it
+                        if reps and str(reps) not in name:
+                            exercise["name"] = f"{reps} {name}"
+                        elif distance_m and str(distance_m) not in name and "m" not in name.lower():
+                            exercise["name"] = f"{distance_m}m {name}"
+                        elif duration_sec and str(duration_sec) not in name and "s" not in name.lower():
+                            exercise["name"] = f"{duration_sec}s {name}"
+                        
+                        # Ensure exercise types have valid defaults
                         if not exercise.get("type") or exercise.get("type") is None:
-                            # Default to "strength" if type is missing/None
                             exercise["type"] = "strength"
                     for superset in block.get("supersets", []):
                         for exercise in superset.get("exercises", []):
+                            name = exercise.get("name", "")
+                            reps = exercise.get("reps")
+                            distance_m = exercise.get("distance_m")
+                            duration_sec = exercise.get("duration_sec")
+                            
+                            # If name doesn't already include the count, add it
+                            if reps and str(reps) not in name:
+                                exercise["name"] = f"{reps} {exercise.get('name', '')}"
+                            elif distance_m and str(distance_m) not in name and "m" not in name.lower():
+                                exercise["name"] = f"{distance_m}m {exercise.get('name', '')}"
+                            elif duration_sec and str(duration_sec) not in name and "s" not in name.lower():
+                                exercise["name"] = f"{duration_sec}s {exercise.get('name', '')}"
+                            
                             if not exercise.get("type") or exercise.get("type") is None:
                                 exercise["type"] = "strength"
                 
                 workout = Workout(**workout_dict)
+                # Convert to new structure format
+                workout = workout.convert_to_new_structure()
                 workout.source = f"image:{file.filename}"
             elif provider == "anthropic":
                 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -456,17 +562,67 @@ async def ingest_image_vision(
                 )
                 from app.services.llm_service import LLMService
                 workout_dict = LLMService.structure_with_anthropic(text, model=model)
-                # Post-process: ensure exercise types have valid defaults
+                # Normalize structure values (e.g., "for time" -> "for-time")
                 for block in workout_dict.get("blocks", []):
+                    structure = block.get("structure")
+                    if structure:
+                        # Normalize common variations
+                        structure_lower = str(structure).lower().strip()
+                        structure_map = {
+                            "for time": "for-time",
+                            "for-time": "for-time",
+                            "for_time": "for-time",
+                            "fortime": "for-time",
+                            "superset": "superset",
+                            "circuit": "circuit",
+                            "tabata": "tabata",
+                            "emom": "emom",
+                            "amrap": "amrap",
+                            "rounds": "rounds",
+                            "sets": "sets",
+                            "regular": "regular",
+                        }
+                        block["structure"] = structure_map.get(structure_lower, structure)
+                    
+                    # Post-process: ensure exercise names include rep counts/distance for easier scanning
                     for exercise in block.get("exercises", []):
+                        name = exercise.get("name", "")
+                        reps = exercise.get("reps")
+                        distance_m = exercise.get("distance_m")
+                        duration_sec = exercise.get("duration_sec")
+                        
+                        # If name doesn't already include the count, add it
+                        if reps and str(reps) not in name:
+                            exercise["name"] = f"{reps} {name}"
+                        elif distance_m and str(distance_m) not in name and "m" not in name.lower():
+                            exercise["name"] = f"{distance_m}m {name}"
+                        elif duration_sec and str(duration_sec) not in name and "s" not in name.lower():
+                            exercise["name"] = f"{duration_sec}s {name}"
+                        
+                        # Ensure exercise types have valid defaults
                         if not exercise.get("type") or exercise.get("type") is None:
                             exercise["type"] = "strength"
                     for superset in block.get("supersets", []):
                         for exercise in superset.get("exercises", []):
+                            name = exercise.get("name", "")
+                            reps = exercise.get("reps")
+                            distance_m = exercise.get("distance_m")
+                            duration_sec = exercise.get("duration_sec")
+                            
+                            # If name doesn't already include the count, add it
+                            if reps and str(reps) not in name:
+                                exercise["name"] = f"{reps} {exercise.get('name', '')}"
+                            elif distance_m and str(distance_m) not in name and "m" not in name.lower():
+                                exercise["name"] = f"{distance_m}m {exercise.get('name', '')}"
+                            elif duration_sec and str(duration_sec) not in name and "s" not in name.lower():
+                                exercise["name"] = f"{duration_sec}s {exercise.get('name', '')}"
+                            
                             if not exercise.get("type") or exercise.get("type") is None:
                                 exercise["type"] = "strength"
                 
                 workout = Workout(**workout_dict)
+                # Convert to new structure format
+                workout = workout.convert_to_new_structure()
                 workout.source = f"image:{file.filename}"
             else:
                 raise HTTPException(
@@ -482,7 +638,10 @@ async def ingest_image_vision(
                 "provider": provider,
                 "model": model,
                 "source_file": file.filename,
+                "api_build_timestamp": BUILD_TIMESTAMP,
             })
+            if GIT_INFO:
+                response_dict["_provenance"]["api_git_commit"] = GIT_INFO['commit_short']
             
             return JSONResponse(response_dict)
         except HTTPException:

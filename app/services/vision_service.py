@@ -55,12 +55,19 @@ Return a detailed description of what you can ACTUALLY SEE in each image, includ
 
 The workout text may contain:
 - Exercise names
-- Sets and reps (e.g., "3 sets of 10 reps", "5x5")
+- Sets and reps (e.g., "3 sets of 10 reps", "5x5", "15 WALL BALLS" where 15 is the reps)
 - Weights/loads (e.g., "32kg", "100lb")
 - Time intervals (e.g., "30 seconds", "2 minutes")
 - Rest periods
 - Equipment notes
 - Exercise cues/instructions
+
+CRITICAL: Extract reps from exercise names when they appear at the start:
+- "15 WALL BALLS" → reps: 15, name: "WALL BALLS"
+- "25 WALL BALLS" → reps: 25, name: "WALL BALLS"
+- "1000M RUN" → distance_m: 1000, name: "RUN" (M = meters)
+- "60 LUNGES" → reps: 60, name: "LUNGES"
+- If a number appears before the exercise name and it's not a distance (no M/meter/km), extract it as reps
 
 Extract and structure this into a JSON format matching:
 {
@@ -68,10 +75,10 @@ Extract and structure this into a JSON format matching:
   "blocks": [
     {
       "label": "block name (e.g., 'Warm-up', 'Strength', 'Conditioning')",
-      "structure": "structure description (e.g., '3 sets', 'for time')",
+      "structure": "one of: 'superset', 'circuit', 'tabata', 'emom', 'amrap', 'for-time', 'rounds', 'sets', 'regular', or null",
       "exercises": [
         {
-          "name": "exercise name",
+          "name": "exercise name (include rep count or distance in name, e.g., '15 WALL BALLS', '1000m RUN')",
           "sets": number or null,
           "reps": number or null,
           "reps_range": "range like '8-10' or null",
@@ -103,6 +110,16 @@ CRITICAL INSTRUCTIONS:
 - Group exercises into supersets ONLY if they were clearly grouped in the images
 - Preserve workout structure (rounds, AMRAP, EMOM, etc.) ONLY if it was clearly written in the images
 - Create blocks ONLY if the images show distinct workout sections
+
+REPS EXTRACTION RULES:
+- If an exercise name starts with a number followed by a space (e.g., "15 WALL BALLS"), extract the number as "reps" BUT KEEP IT IN THE NAME
+- If the number is followed by "M", "meter", "meters", "km", "mi", "mile", "miles", extract it as "distance_m" BUT KEEP IT IN THE NAME
+- Examples:
+  * "15 WALL BALLS" → {"reps": 15, "name": "15 WALL BALLS"}
+  * "25 WALL BALLS" → {"reps": 25, "name": "25 WALL BALLS"}
+  * "1000M RUN" → {"distance_m": 1000, "name": "1000m RUN"}
+  * "1 MIN REST" → {"rest_sec": 60, "name": "1 MIN REST"} (convert "1 MIN" to 60 seconds)
+- IMPORTANT: Always include the count (reps, distance, or duration) in the exercise name for easier scanning
 
 If the images contain no readable workout text, return:
 {

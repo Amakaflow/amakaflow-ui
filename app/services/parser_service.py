@@ -595,11 +595,15 @@ class ParserService:
                     if m_rx:
                         reps = to_int(m_rx.group("reps"))
                     else:
-                        # Check for number at start of line (e.g., "80 Walking Lunges")
+                        # Check for number at start of line (e.g., "80 Walking Lunges", "15 WALL BALLS")
                         # This handles Hyrox-style workouts where reps come before exercise name
-                        reps_at_start = re.match(r'^(?P<reps>\d+)\s+(?![km]g\b)', ln)
-                        if reps_at_start and not RE_RUN.search(ln):
-                            reps = to_int(reps_at_start.group("reps"))
+                        # First check if it's a distance pattern (e.g., "1000M RUN" should be distance, not reps)
+                        is_distance_pattern = bool(re.search(r'\d+\s*(m|meter|meters|km|mi|mile|miles)\b', ln, re.I))
+                        if not is_distance_pattern:
+                            # Simple pattern: number at start, followed by space, NOT followed by kg/mg
+                            reps_at_start = re.match(r'^(?P<reps>\d+)\s+(?![km]g\b)', ln)
+                            if reps_at_start and not RE_RUN.search(ln):
+                                reps = to_int(reps_at_start.group("reps"))
 
             # Inherit reps_range from header if none on line
             if not reps and not reps_range and not distance_m and not distance_range and current.default_reps_range:
@@ -619,6 +623,29 @@ class ParserService:
 
             # Clean and validate exercise name
             exercise_name = full_line_for_name.strip(" .")
+            
+            # If we haven't extracted reps yet, try extracting from exercise name
+            # This handles cases like "15 WALL BALLS" where the number is at the start
+            if not reps and not m_interval and not m_dist and not distance_m and not distance_range:
+                # Check if exercise name starts with a number (e.g., "15 WALL BALLS")
+                # First verify it's NOT a distance pattern
+                is_distance_in_name = bool(re.search(r'\d+\s*(m|meter|meters|km|mi|mile|miles)\b', exercise_name, re.I))
+                if not is_distance_in_name:
+                    # Simple pattern: number at start, followed by space, NOT followed by kg/mg
+                    reps_at_start = re.match(r'^(?P<reps>\d+)\s+(?![km]g\b)', exercise_name)
+                    if reps_at_start and not RE_RUN.search(exercise_name):
+                        reps = to_int(reps_at_start.group("reps"))
+                        # Remove the number from exercise name for cleaner display
+                        exercise_name = re.sub(r'^\d+\s+', '', exercise_name)
+            
+            # If we already extracted reps, make sure to remove the number from exercise name if it's still there
+            elif reps and not m_interval and not m_dist:
+                # Check if exercise name starts with the same number we extracted as reps
+                reps_at_start_match = re.match(r'^(?P<reps_num>\d+)\s+', exercise_name)
+                if reps_at_start_match and int(reps_at_start_match.group('reps_num')) == reps:
+                    # Remove the number and following space from exercise name for cleaner display
+                    exercise_name = re.sub(r'^\d+\s+', '', exercise_name)
+            
             exercise_name = re.sub(r'\s+(Dislike|Share|Like|Comment|Follow|Followers|Following)$', '', exercise_name, flags=re.I)
             exercise_name = re.sub(r'\s+([a-z])$', '', exercise_name)
             exercise_name = exercise_name.strip()
