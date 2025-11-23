@@ -62,6 +62,7 @@ export default function App() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   const [isEditingFromHistory, setIsEditingFromHistory] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [workoutSaved, setWorkoutSaved] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     title: string;
@@ -431,11 +432,131 @@ export default function App() {
         throw new Error('Generation cancelled');
       }
         
+      setGenerationProgress('Analyzing quality...');
+      
+      // Analyze OCR quality BEFORE proceeding to structure page
+      const usedVisionAPI = (structure as any)?._usedVisionAPI === true;
+      const sourceIsImage = newSources.some(s => s.type === 'image');
+      
+      // Get current processing method to double-check
+      const { getImageProcessingMethod } = await import('./lib/preferences');
+      const currentMethod = getImageProcessingMethod();
+      const actuallyUsedVision = usedVisionAPI || currentMethod === 'vision';
+      
+      console.log('OCR Quality Check:', { 
+        usedVisionAPI, 
+        currentMethod,
+        actuallyUsedVision,
+        hasStructure: !!structure, 
+        structureSource: structure?.source,
+        sourceIsImage,
+        blocks: structure?.blocks?.length,
+        totalExercises: structure?.blocks?.reduce((sum, b) => sum + (b.exercises?.length || 0) + (b.supersets?.reduce((s, ss) => s + (ss.exercises?.length || 0), 0) || 0), 0)
+      });
+      
+      // Check if OCR was used (not Vision API) AND source is an image
+      if (!actuallyUsedVision && structure && sourceIsImage) {
+        const { analyzeOCRQuality } = await import('./lib/ocr-quality');
+        const quality = analyzeOCRQuality(structure, actuallyUsedVision);
+        console.log('OCR Quality Result:', quality);
+        console.log('OCR Quality Details:', {
+          score: quality?.score,
+          recommendation: quality?.recommendation,
+          totalExercises: quality ? (structure.blocks || []).reduce((sum: number, b: any) => 
+            sum + (b.exercises?.length || 0) + (b.supersets?.reduce((s: number, ss: any) => 
+              s + (ss.exercises?.length || 0), 0) || 0), 0) : 0,
+          issues: quality?.issues,
+          issuesCount: quality?.issues?.length
+        });
+        
+        // Block if quality is poor (score < 40 or recommendation is 'poor')
+        const shouldBlock = quality && (quality.recommendation === 'poor' || quality.score < 40);
+        console.log('Should block progression?', shouldBlock, { 
+          score: quality?.score, 
+          recommendation: quality?.recommendation,
+          scoreCheck: quality?.score < 40,
+          recommendationCheck: quality?.recommendation === 'poor',
+          issues: quality?.issues?.length,
+          qualityExists: !!quality
+        });
+        
+        if (shouldBlock) {
+          console.log('🚫 BLOCKING progression due to poor OCR quality:', quality.score, quality.recommendation);
+          
+          // Block progression - don't go to structure page
+          clearInterval(progressInterval);
+          setLoading(false);
+          setGenerationProgress(null);
+          setGenerationAbortController(null);
+          
+          // Explicitly ensure we stay on add-sources step and don't set workout
+          setCurrentStep('add-sources');
+          // Do NOT set workout or sources - leave them as they were
+          
+          toast.dismiss('generate-structure');
+          
+          // Show error toast with OCR score and action buttons
+          toast.error(
+            <div className="space-y-3">
+              <div className="font-semibold">OCR Quality Too Low: {quality.score}%</div>
+              <div className="text-sm">
+                This image is too complex for OCR. Please switch to the <strong>AI Vision Model</strong> for better accuracy.
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    const { setImageProcessingMethod } = await import('./lib/preferences');
+                    setImageProcessingMethod('vision');
+                    toast.success('Switched to Vision API. Please try again.');
+                    // Reload to apply changes
+                    setTimeout(() => window.location.reload(), 500);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Switch to Vision API
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setCurrentView('settings');
+                    });
+                  }}
+                >
+                  Go to Settings
+                </Button>
+              </div>
+            </div>,
+            {
+              duration: 20000,
+              id: 'ocr-quality-block',
+            }
+          );
+          // CRITICAL: Don't proceed - stay on add-sources step
+          // Do NOT set workout, sources, or change step
+          console.log('✅ RETURNING EARLY - NOT setting workout or changing step');
+          // Return early to prevent any further execution
+          return; // This should prevent all code below from executing
+        }
+      }
+      
+      // Only proceed if we haven't returned above
+      console.log('✅ OCR quality acceptable or Vision API used, proceeding to structure page');
+      
+      // Quality is acceptable OR Vision API was used - proceed to structure page
+      // IMPORTANT: This code should NOT execute if quality was poor (we returned above)
       setGenerationProgress('Complete!');
       setWorkout(structure);
       setSources(newSources);
       setCurrentStep('structure');
+      setWorkoutSaved(false); // New workout, not saved yet
       clearInterval(progressInterval);
+      setLoading(false);
+      setGenerationProgress(null);
+      setGenerationAbortController(null);
       toast.dismiss('generate-structure');
       toast.success('Workout structure generated!');
     } catch (error: any) {
@@ -478,6 +599,7 @@ export default function App() {
     setWorkout(template);
     setSources([]);
     setCurrentStep('structure');
+    setWorkoutSaved(false); // Template loaded, not saved yet
     toast.success(`Loaded template: ${template.title}`);
   };
 
@@ -506,6 +628,7 @@ export default function App() {
       // Save to history
       if (user) {
         await saveWorkoutToHistory(user.id, workout, selectedDevice, exports, sources.map(s => `${s.type}:${s.content}`));
+        setWorkoutSaved(true); // Mark as saved
       }
       
       setCurrentStep('export');
@@ -639,6 +762,7 @@ export default function App() {
         // Convert sources from Source[] to string[]
         const sourcesAsStrings = sources.map(s => `${s.type}:${s.content}`);
         await saveWorkoutToHistory(user.id, updatedWorkout, selectedDevice, exportFormats, sourcesAsStrings, validationResult);
+        setWorkoutSaved(true); // Mark as saved
         try {
           const history = await getWorkoutHistory(user.id);
           setWorkoutHistoryList(history);
@@ -662,6 +786,7 @@ export default function App() {
     setSelectedDevice(historyItem.device);
     setCurrentStep('structure');
     setCurrentView('workflow');
+    setWorkoutSaved(true); // Loaded from history, already saved
     toast.success('Workout loaded from history');
   };
 
@@ -678,12 +803,14 @@ export default function App() {
     setCurrentView('workflow');
     setIsEditingFromHistory(true); // Mark as editing from history
     setEditingWorkoutId(historyItem.id); // Store the workout ID for saving
+    setWorkoutSaved(true); // Initially saved (from history), will be marked unsaved when modified
     toast.success('Workout opened for editing - you can edit directly or re-validate if needed');
   };
 
   // Helper function to check for unsaved changes and show confirmation
   const checkUnsavedChanges = (onConfirm: () => void): void => {
-    if (currentView === 'workflow' && (workout || sources.length > 0)) {
+    // Only show dialog if there are unsaved changes (workout exists but hasn't been saved)
+    if (currentView === 'workflow' && (workout || sources.length > 0) && !workoutSaved) {
       setConfirmDialog({
         open: true,
         title: 'Unsaved Changes',
@@ -704,6 +831,7 @@ export default function App() {
     setCurrentStep('add-sources');
     setIsEditingFromHistory(false);
     setEditingWorkoutId(null);
+    setWorkoutSaved(false);
   };
 
   const goBack = () => {
@@ -1108,7 +1236,10 @@ export default function App() {
         {currentView === 'workflow' && currentStep === 'structure' && workout && (
           <StructureWorkout
             workout={workout}
-            onWorkoutChange={setWorkout}
+            onWorkoutChange={(updatedWorkout) => {
+              setWorkout(updatedWorkout);
+              setWorkoutSaved(false); // Mark as unsaved when workout is modified
+            }}
             onAutoMap={handleAutoMap}
             onValidate={handleValidate}
             onSave={isEditingFromHistory ? async () => {
@@ -1125,6 +1256,7 @@ export default function App() {
                   validation || undefined
                 );
                 toast.success('Workout saved!');
+                setWorkoutSaved(true); // Mark as saved
                 // Refresh history
                 const { getWorkoutHistory } = await import('./lib/workout-history');
                 const history = await getWorkoutHistory(user.id);
@@ -1144,6 +1276,12 @@ export default function App() {
             selectedDevice={selectedDevice}
             onDeviceChange={setSelectedDevice}
             userSelectedDevices={user.selectedDevices}
+            onNavigateToSettings={() => {
+              checkUnsavedChanges(() => {
+                clearWorkflowState();
+                setCurrentView('settings');
+              });
+            }}
           />
         )}
 

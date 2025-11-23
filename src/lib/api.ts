@@ -21,67 +21,64 @@ function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStructure 
         {
           label: 'Workout',
           structure: null,
-          rest_between_sec: null,
-          time_work_sec: null,
-          default_reps_range: null,
-          default_sets: null,
           exercises: [],
-          supersets: [
-            {
-              exercises: [],
-              rest_between_sec: null,
-            } as Superset,
-          ],
         } as Block,
       ],
     };
   }
   
   const normalizedBlocks = workout.blocks.map((block: Block, index: number) => {
-    // Ensure block has a label (use label, structure, or default)
+    // Ensure block has a label
     const blockLabel = block.label || block.structure || `Block ${index + 1}`;
     
-    // If block has exercises but no supersets, create a superset with those exercises
-    if (block.exercises && block.exercises.length > 0 && (!block.supersets || block.supersets.length === 0)) {
-      return {
-        ...block,
-        label: blockLabel,
-        supersets: [
-          {
-            exercises: block.exercises,
-            rest_between_sec: block.rest_between_sec || null,
-          } as Superset,
-        ],
-        exercises: [], // Clear exercises since they're now in supersets
-      };
+    // Convert old format (supersets) to new format (exercises with structure)
+    let exercises: Exercise[] = block.exercises || [];
+    let structure = block.structure;
+    let restBetweenRoundsSec = block.rest_between_rounds_sec || block.rest_between_sec;
+    
+    // If block has supersets (old format), convert to new format
+    if (block.supersets && block.supersets.length > 0) {
+      // Flatten supersets into exercises array
+      exercises = [];
+      block.supersets.forEach((superset) => {
+        exercises.push(...superset.exercises);
+      });
+      
+      // If not already set, determine structure based on exercise count
+      if (!structure) {
+        if (exercises.length === 2) {
+          structure = 'superset'; // 2 exercises = superset
+        } else if (exercises.length > 2) {
+          structure = 'circuit'; // Multiple exercises = circuit
+        }
+      }
+      
+      // Use rest from first superset if available
+      if (block.supersets[0]?.rest_between_sec && !restBetweenRoundsSec) {
+        restBetweenRoundsSec = block.supersets[0].rest_between_sec;
+      }
     }
     
-    // If block has no supersets and no exercises, create an empty superset
-    if (!block.supersets || block.supersets.length === 0) {
-      return {
-        ...block,
-        label: blockLabel,
-        supersets: [
-          {
-            exercises: [],
-            rest_between_sec: null,
-          } as Superset,
-        ],
-        exercises: [],
-      };
-    }
-    
-    // Block already has supersets, ensure label is set and all fields are properly initialized
-    return {
+    // Build normalized block
+    const normalizedBlock: Block = {
       label: blockLabel,
-      structure: block.structure || null,
-      rest_between_sec: block.rest_between_sec || null,
+      structure: structure || null,
+      exercises: exercises,
+      rest_between_rounds_sec: restBetweenRoundsSec,
+      rest_between_sets_sec: block.rest_between_sets_sec || null,
       time_work_sec: block.time_work_sec || null,
-      default_reps_range: block.default_reps_range || null,
-      default_sets: block.default_sets || null,
-      exercises: block.exercises || [],
-      supersets: block.supersets || [],
+      time_rest_sec: block.time_rest_sec || null,
+      time_cap_sec: block.time_cap_sec || null,
+      rounds: block.rounds || null,
+      sets: block.sets || null,
     };
+    
+    // Legacy fields for backward compatibility
+    if (block.rest_between_sec !== undefined) {
+      normalizedBlock.rest_between_sec = block.rest_between_sec;
+    }
+    
+    return normalizedBlock;
   });
   
   return {
@@ -257,7 +254,8 @@ export async function generateWorkoutStructure(
         const method = getImageProcessingMethod();
         
         let endpoint = '/ingest/image';
-        if (method === 'vision') {
+        const usedVisionAPI = method === 'vision';
+        if (usedVisionAPI) {
           endpoint = '/ingest/image_vision';
           formData.append('vision_provider', 'openai');
           formData.append('vision_model', 'gpt-4o-mini');
@@ -269,6 +267,9 @@ export async function generateWorkoutStructure(
           body: formData,
           headers: {}, // Let browser set Content-Type with boundary
         }, signal);
+        
+        // Store whether Vision API was used (for quality analysis)
+        (workout as any)._usedVisionAPI = usedVisionAPI;
         break;
       } catch (error: any) {
         if (error.message.includes('Failed to fetch image')) {
