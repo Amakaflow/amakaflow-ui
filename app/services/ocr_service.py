@@ -76,6 +76,25 @@ class OCRService:
                 new_height = int(height * scale_factor)
                 img = img.resize((new_width, new_height), Image.LANCZOS)
         
+        # For high-contrast images (like yellow/black text on backgrounds), try inverting
+        # Check if image has high contrast (many very dark and very light pixels)
+        img_array = np.array(img)
+        dark_pixels = np.sum(img_array < 50)
+        light_pixels = np.sum(img_array > 200)
+        total_pixels = img_array.size
+        high_contrast_ratio = (dark_pixels + light_pixels) / total_pixels if total_pixels > 0 else 0
+        
+        # If high contrast detected, try inverting (sometimes yellow text on dark becomes clearer)
+        if high_contrast_ratio > 0.3:
+            # Try inverted version - sometimes works better for colored text on backgrounds
+            img_inverted = Image.fromarray(255 - img_array)
+            # Use whichever has better contrast
+            img_contrast = np.std(img_array)
+            img_inv_contrast = np.std(255 - img_array)
+            if img_inv_contrast > img_contrast * 1.1:
+                img = img_inverted
+                img_array = np.array(img)
+        
         # Enhance contrast to improve binarization (try multiple levels)
         enhancer = ImageEnhance.Contrast(img)
         # Try multiple contrast levels - higher contrast often helps Instagram images

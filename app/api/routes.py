@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import json
 from typing import Optional, Dict
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Request
@@ -338,7 +339,7 @@ async def get_version():
     version_info = {
         "service": "workout-ingestor-api",
         "build_timestamp": BUILD_TIMESTAMP,
-        "build_date": datetime.now().isoformat(),
+        "build_date": BUILD_TIMESTAMP,  # Use BUILD_TIMESTAMP instead of datetime.now() so it doesn't change on every request
     }
     
     if GIT_INFO:
@@ -381,6 +382,71 @@ async def ingest_text(
         # Convert to new structure format
         workout = result.convert_to_new_structure()
         return JSONResponse(workout.model_dump())
+
+
+@router.post("/ingest/json")
+async def ingest_json(
+    workout_data: Dict = Body(...)
+):
+    """
+    Ingest workout directly from JSON format (bypasses text parsing).
+    
+    Accepts a WorkoutStructure JSON object directly. This is useful for:
+    - Internal tools and scripts
+    - API integrations
+    - Power users who want to bypass text parsing
+    - Testing and development
+    
+    The JSON must match the WorkoutStructure schema:
+    {
+        "title": "Workout Title",
+        "blocks": [
+            {
+                "label": "Block Label",
+                "exercises": [
+                    {
+                        "name": "Exercise Name",
+                        "sets": 3,
+                        "reps": 8,
+                        ...
+                    }
+                ]
+            }
+        ]
+    }
+    
+    Args:
+        workout_data: WorkoutStructure JSON object
+        
+    Returns:
+        Validated and normalized workout JSON
+    """
+    try:
+        # Validate and clean JSON structure (removes UI-specific fields like 'id', 'supersets')
+        parsed = ParserService.parse_json_workout(json.dumps(workout_data))
+        
+        # Convert to Workout object for validation
+        # Use model_validate with extra='ignore' to handle any remaining extra fields gracefully
+        workout = Workout.model_validate(parsed, strict=False)
+        
+        # Convert to new structure format
+        workout = workout.convert_to_new_structure()
+        
+        # Add provenance info
+        response_dict = workout.model_dump()
+        response_dict.setdefault("_provenance", {})
+        response_dict["_provenance"].update({
+            "mode": "json_direct",
+            "api_build_timestamp": BUILD_TIMESTAMP,
+        })
+        if GIT_INFO:
+            response_dict["_provenance"]["api_git_commit"] = GIT_INFO['commit_short']
+        
+        return JSONResponse(response_dict)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing JSON workout: {str(e)}")
 
 
 @router.post("/ingest/ai_workout")

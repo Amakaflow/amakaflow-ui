@@ -1,8 +1,10 @@
 """Parser service for converting free text into structured workout data."""
 import re
-from typing import List, Optional, Union, Tuple
+import json
+from typing import List, Optional, Union, Tuple, Any, Dict
 from app.models import Workout, Block, Exercise, Superset
 from app.utils import to_int
+from app.config import settings
 
 # Try to import feedback service (optional - won't fail if not available)
 try:
@@ -358,6 +360,25 @@ class ParserService:
         
         # Track filtered junk items for review
         filtered_items = []
+        
+        # Detect AI-generated workout format (has bullet points, section headers like "Warm-up:", "Optional Finisher:")
+        # AI workouts typically have:
+        # - Bullet points (•)
+        # - Section headers with colons (Warm-up:, Optional Finisher:)
+        # - Compact format exercises (Exercise – 4×6–8, Exercise – 3×AMRAP)
+        # - Title format like "Day – Description (Category)"
+        has_ai_format = (
+            any('•' in ln for ln in cleaned_lines) and  # Has bullet points
+            any(re.search(r'(warm-up|warmup|finisher|optional|primer):', ln, re.I) for ln in cleaned_lines) and  # Has section headers
+            any(re.search(r'\d+[x×]\s*(\d+[\s–\-]\d+|\d+|AMRAP)', ln, re.I) for ln in cleaned_lines)  # Has compact format
+        )
+        
+        # If it looks like an AI-generated workout, use the AI parser
+        if has_ai_format:
+            ai_workout = ParserService.parse_ai_workout(text, source)
+            if return_filtered:
+                return ai_workout, filtered_items
+            return ai_workout
         
         # Special-case HYROX Engine Builder style cards
         # BUT: Skip if it looks like a structured workout program (has section headers)
@@ -785,7 +806,449 @@ class ParserService:
         return workout
     
     @staticmethod
-    def parse_ai_workout(text: str, source: Optional[str] = None) -> Workout:
+    def maybe_normalize_with_llm(text: str) -> str:
+        """
+        No-op normalizer function. LLM normalizer is disabled via config.
+        
+        Args:
+            text: Text to normalize
+            
+        Returns:
+            Original text unchanged
+        """
+        if not settings.USE_LLM_NORMALIZER:
+            return text
+        return text
+    
+    @staticmethod
+    def looks_like_json(text: str) -> bool:
+        """
+        Check if text looks like JSON.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if text appears to be valid JSON
+        """
+        stripped = text.strip()
+        if not stripped:
+            return False
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            return False
+        try:
+            json.loads(stripped)
+            return True
+        except json.JSONDecodeError:
+            return False
+    
+    @staticmethod
+    def parse_json_workout(text: str) -> Dict[str, Any]:
+        """
+        Parse a workout from JSON format.
+        
+        Args:
+            text: JSON string containing workout data
+            
+        Returns:
+            Dictionary with workout structure (cleaned of UI-specific fields)
+            
+        Raises:
+            ValueError: If JSON is invalid or missing required fields
+        """
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("Workout JSON must be a JSON object")
+        if "title" not in data or "blocks" not in data:
+            raise ValueError("Workout JSON must contain 'title' and 'blocks'")
+        if not isinstance(data["blocks"], list):
+            raise ValueError("'blocks' must be a list")
+        
+        # Clean and validate blocks
+        cleaned_blocks = []
+        for i, block in enumerate(data["blocks"]):
+            if not isinstance(block, dict):
+                raise ValueError(f"Block {i} must be an object")
+            if "label" not in block:
+                raise ValueError(f"Block {i} missing label")
+            if "exercises" not in block or not isinstance(block["exercises"], list):
+                raise ValueError(f"Block {i} exercises invalid")
+            
+            # Clean block: remove UI-specific fields (id, supersets) and keep only model fields
+            cleaned_block = {
+                "label": block.get("label") or "Workout",
+                "exercises": [],
+                "structure": block.get("structure"),
+                "rounds": block.get("rounds"),
+                "sets": block.get("sets"),
+                "time_cap_sec": block.get("time_cap_sec"),
+                "time_work_sec": block.get("time_work_sec"),
+                "time_rest_sec": block.get("time_rest_sec"),
+                "rest_between_rounds_sec": block.get("rest_between_rounds_sec") or block.get("rest_between_sec"),
+                "rest_between_sets_sec": block.get("rest_between_sets_sec"),
+            }
+            
+            # Remove None values to keep JSON clean
+            cleaned_block = {k: v for k, v in cleaned_block.items() if v is not None}
+            
+            # Clean exercises: remove UI-specific fields (id) and filter out invalid exercises
+            for j, exercise in enumerate(block.get("exercises", [])):
+                if not isinstance(exercise, dict):
+                    continue
+                
+                # Skip exercises with obviously invalid names (just numbers, "sets", etc.)
+                exercise_name = exercise.get("name", "").strip()
+                if not exercise_name or len(exercise_name) < 2:
+                    continue
+                
+                # Skip exercises that are just numbers or common metadata
+                if exercise_name.lower() in ["3", "sets", "set", "reps", "rep"]:
+                    continue
+                
+                # Skip exercises that are just numbers followed by "sets"
+                if re.match(r'^\d+\s*sets?$', exercise_name, re.I):
+                    continue
+                
+                # Clean exercise: keep only model fields
+                cleaned_exercise = {
+                    "name": exercise_name,
+                    "sets": exercise.get("sets"),
+                    "reps": exercise.get("reps"),
+                    "reps_range": exercise.get("reps_range"),
+                    "duration_sec": exercise.get("duration_sec"),
+                    "rest_sec": exercise.get("rest_sec"),
+                    "distance_m": exercise.get("distance_m"),
+                    "distance_range": exercise.get("distance_range"),
+                    "type": exercise.get("type", "strength"),
+                    "notes": exercise.get("notes"),
+                }
+                
+                # Remove None values
+                cleaned_exercise = {k: v for k, v in cleaned_exercise.items() if v is not None}
+                
+                # Ensure name is always present
+                if cleaned_exercise.get("name"):
+                    cleaned_block.setdefault("exercises", []).append(cleaned_exercise)
+            
+            # Only add block if it has exercises or is explicitly structured
+            if cleaned_block.get("exercises") or cleaned_block.get("structure"):
+                cleaned_blocks.append(cleaned_block)
+        
+        # Build cleaned workout data
+        cleaned_data = {
+            "title": data.get("title", "Imported Workout"),
+            "source": data.get("source", "json"),
+            "blocks": cleaned_blocks
+        }
+        
+        return cleaned_data
+    
+    @staticmethod
+    def looks_like_canonical_ai_format(text: str) -> bool:
+        """
+        Check if text looks like canonical AI format.
+        
+        Canonical format starts with "Title:" and has "Block:" markers.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if text appears to be in canonical format
+        """
+        lines = [ln.rstrip() for ln in text.splitlines()]
+        non_blank = [ln for ln in lines if ln.strip()]
+        if not non_blank:
+            return False
+        if not non_blank[0].strip().lower().startswith("title:"):
+            return False
+        has_block = any(ln.strip().lower().startswith("block:") for ln in lines)
+        # Check for exercise markers: dash (-), bullet point (•), or lines with exercise patterns
+        # Handle tabs and indentation by stripping first
+        has_exercise = False
+        for ln in lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            # Skip title and block lines
+            if stripped.lower().startswith("title:") or stripped.lower().startswith("block:"):
+                continue
+            # Check for dash or bullet prefix
+            if stripped.startswith("- ") or stripped.startswith("•") or '•' in stripped:
+                has_exercise = True
+                break
+            # Check for exercise patterns (contains |, type:, or sets×reps pattern)
+            # This handles exercises without prefixes
+            if '|' in stripped or 'type:' in stripped.lower() or re.search(r'\d+[x×]\d+', stripped) or re.search(r'\d+[x×]AMRAP', stripped, re.I):
+                has_exercise = True
+                break
+        return has_block and has_exercise
+    
+    @staticmethod
+    def _parse_sets_reps_field(field: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+        """
+        Parse sets/reps field from canonical format.
+        
+        Handles formats like:
+        - "3×AMRAP" -> (3, None, "AMRAP")
+        - "4×6–8" -> (4, None, "6-8")
+        - "3×8" -> (3, 8, None)
+        - "8" -> (None, 8, None)
+        
+        Args:
+            field: Field string to parse
+            
+        Returns:
+            Tuple of (sets, reps, reps_range)
+        """
+        field = field.strip()
+        if not field:
+            return None, None, None
+        
+        # Pattern: "3×AMRAP"
+        m = re.match(r"(\d+)\s*[x×]\s*AMRAP", field, re.I)
+        if m:
+            return int(m.group(1)), None, "AMRAP"
+        
+        # Pattern: "4×6–8" or "4×6-8"
+        m = re.match(r"(\d+)\s*[x×]\s*(\d+)\s*[-–]\s*(\d+)", field)
+        if m:
+            return int(m.group(1)), None, f"{m.group(2)}-{m.group(3)}"
+        
+        # Pattern: "3×8"
+        m = re.match(r"(\d+)\s*[x×]\s*(\d+)", field)
+        if m:
+            return int(m.group(1)), int(m.group(2)), None
+        
+        # Pattern: "8" (just a number)
+        m = re.match(r"^\d+$", field)
+        if m:
+            return None, int(field), None
+        
+        return None, None, None
+    
+    @staticmethod
+    def parse_canonical_ai_workout(text: str) -> Dict[str, Any]:
+        """
+        Parse a workout from canonical AI format.
+        
+        Format:
+        Title: Workout Title
+        Block: Block Label
+        - Exercise Name | 3×8 | type:strength | note:Some note
+        - Exercise Name | 4×6–8
+        
+        Args:
+            text: Text in canonical format
+            
+        Returns:
+            Dictionary with workout structure
+        """
+        # Normalize the text first - handle various whitespace issues from pasting
+        # Replace multiple spaces with single space, normalize tabs, etc.
+        # BUT preserve line structure - only normalize within lines, not across lines
+        normalized_text = text
+        # Normalize line endings first
+        normalized_text = re.sub(r'\r\n', '\n', normalized_text)  # Normalize Windows line endings
+        normalized_text = re.sub(r'\r', '\n', normalized_text)  # Handle old Mac line endings
+        
+        # Normalize spaces/tabs within each line (but preserve blank lines)
+        lines = []
+        for ln in normalized_text.splitlines():
+            # Preserve blank lines as-is
+            if not ln.strip():
+                lines.append('')
+            else:
+                # Normalize multiple spaces/tabs to single space, but preserve the line
+                normalized_line = re.sub(r'[ \t]+', ' ', ln.rstrip())
+                lines.append(normalized_line)
+        workout_title = None
+        blocks = []
+        current_block = None
+        
+        for raw in lines:
+            line = raw.strip()
+            if not line:
+                continue
+            
+            # Title line (handle case-insensitive and possible typos like "itle:")
+            # Match "Title:" or "itle:" followed by optional whitespace and title text
+            title_match = re.match(r'^[tT]?itle:\s*(.+)$', line, re.I)
+            if title_match:
+                workout_title = title_match.group(1).strip()
+                if not workout_title:
+                    workout_title = "Untitled Workout"
+                continue
+            
+            # Block line (handle "Block:" with optional whitespace and tabs)
+            # Match "Block:" followed by optional whitespace and optional label
+            block_match = re.match(r'^block:\s*(.*)$', line, re.I)
+            if block_match:
+                if current_block and current_block.get("exercises"):
+                    blocks.append(current_block)
+                block_label = block_match.group(1).strip()
+                # If block label is empty, use a default
+                if not block_label:
+                    block_label = "Workout"
+                current_block = {"label": block_label, "exercises": []}
+                continue
+            
+            # Exercise line (starts with "- " or bullet point "•", OR is a plain line in a block context)
+            # Handle both dash and bullet point formats, including tabs and indentation
+            # Also handle exercises without prefixes when they're in a block
+            exercise_content = None
+            
+            # Strip leading whitespace first to handle indentation
+            stripped_line = line.lstrip()
+            
+            if stripped_line.startswith("- "):
+                exercise_content = stripped_line[2:].strip()
+            elif stripped_line.startswith("•"):
+                # Handle bullet point - remove bullet and any whitespace/tabs after it
+                after_bullet = stripped_line[1:].strip()
+                exercise_content = after_bullet
+            elif '•' in stripped_line:
+                # Find bullet point even if there's something before it (shouldn't happen, but handle it)
+                bullet_index = stripped_line.find('•')
+                if bullet_index >= 0:
+                    after_bullet = stripped_line[bullet_index + 1:].strip()
+                    exercise_content = after_bullet
+            elif current_block is not None:
+                # If we're in a block context and the line doesn't start with "- " or "•",
+                # check if it looks like an exercise (contains "|" or "type:" or sets×reps pattern)
+                # This handles exercises without prefixes
+                if '|' in stripped_line or 'type:' in stripped_line.lower() or re.search(r'\d+[x×]\d+', stripped_line) or re.search(r'\d+[x×]AMRAP', stripped_line, re.I):
+                    exercise_content = stripped_line.strip()
+            
+            if exercise_content:
+                if current_block is None:
+                    current_block = {"label": "Workout", "exercises": []}
+                
+                # Split by pipe to get parts
+                parts = [p.strip() for p in exercise_content.split("|") if p.strip()]
+                if not parts:
+                    continue
+                
+                # Clean up exercise name (remove any remaining tabs or extra spaces)
+                parts[0] = re.sub(r'\s+', ' ', parts[0]).strip()
+                
+                name = parts[0]
+                sets = reps = None
+                reps_range = ex_type = note = None
+                
+                # Parse additional parts
+                for part in parts[1:]:
+                    lower = part.lower()
+                    if lower.startswith("type:"):
+                        ex_type = part[5:].strip()
+                        continue
+                    if lower.startswith("note:"):
+                        note = part[5:].strip()
+                        continue
+                    
+                    # Try to parse as sets/reps
+                    s, r, rr = ParserService._parse_sets_reps_field(part)
+                    if s or r or rr:
+                        sets, reps, reps_range = s, r, rr
+                
+                # Infer type from block label if not specified
+                if not ex_type:
+                    label_lower = (current_block.get("label") or "").lower()
+                    if "warm" in label_lower:
+                        ex_type = "warmup"
+                    elif "cool" in label_lower:
+                        ex_type = "cooldown"
+                    else:
+                        ex_type = "strength"
+                
+                # Add exercise to current block
+                exercise = {
+                    "name": name,
+                    "sets": sets,
+                    "reps": reps,
+                    "reps_range": reps_range,
+                    "type": ex_type,
+                }
+                if note:
+                    exercise["notes"] = note
+                
+                current_block["exercises"].append(exercise)
+                continue
+        
+        # Add last block if it has exercises
+        if current_block and current_block.get("exercises"):
+            blocks.append(current_block)
+        
+        # Debug: If we have a title or blocks, return them even if empty
+        # This helps catch cases where parsing might have issues
+        if not workout_title and blocks:
+            # If we have blocks but no title, try to infer from first block or use default
+            workout_title = "Untitled Workout"
+        
+        return {
+            "title": workout_title or "Untitled Workout",
+            "source": "ai_canonical_text",
+            "blocks": blocks
+        }
+    
+    @staticmethod
+    def parse_ai_workout(text: str, source: Optional[str] = None) -> Union[Workout, Dict[str, Any]]:
+        """
+        Router function that detects format and routes to appropriate parser.
+        
+        Supports:
+        1. Direct JSON mode - accepts WorkoutStructure JSON directly
+        2. Canonical AI format - structured format with Title:/Block: markers
+        3. Freeform AI format - legacy free-form text parsing (fallback)
+        
+        Args:
+            text: Raw workout text (JSON, canonical format, or freeform)
+            source: Optional source identifier
+            
+        Returns:
+            Parsed Workout object or dictionary (for JSON mode)
+        """
+        raw = text or ""
+        s = raw.strip()
+        
+        # Check for JSON first
+        if ParserService.looks_like_json(s):
+            return ParserService.parse_json_workout(s)
+        
+        # Check for canonical format
+        # Use the original text (before normalization) for detection to avoid false negatives
+        if ParserService.looks_like_canonical_ai_format(raw):
+            # Parse using normalized text for better whitespace handling
+            parsed = ParserService.parse_canonical_ai_workout(s)
+            if parsed.get("blocks") or parsed.get("title"):
+                # Convert to Workout object for consistency
+                blocks = []
+                for block_data in parsed["blocks"]:
+                    exercises = []
+                    for ex_data in block_data.get("exercises", []):
+                        exercises.append(Exercise(
+                            name=ex_data.get("name", ""),
+                            sets=ex_data.get("sets"),
+                            reps=ex_data.get("reps"),
+                            reps_range=ex_data.get("reps_range"),
+                            type=ex_data.get("type", "strength"),
+                            notes=ex_data.get("notes")
+                        ))
+                    blocks.append(Block(
+                        label=block_data.get("label", "Workout"),
+                        exercises=exercises
+                    ))
+                return Workout(
+                    title=parsed.get("title", "Untitled Workout"),
+                    source=parsed.get("source", source or "ai_canonical_text"),
+                    blocks=blocks
+                )
+        
+        # Fallback to freeform parser
+        return ParserService.parse_freeform_ai_workout(raw, source)
+    
+    @staticmethod
+    def parse_freeform_ai_workout(text: str, source: Optional[str] = None) -> Workout:
         """
         Parse AI/ChatGPT-generated workout text into a structured Workout object.
         
@@ -818,10 +1281,14 @@ class ParserService:
         
         # Extract title if present (look for title-like lines at the start)
         # Match titles with emoji or without, must contain "Workout" or be a workout-like description
+        # Also match formats like "Monday – Upper Push + Core (Strength & Power)"
+        # IMPORTANT: Don't match exercise lines (they have sets/reps indicators like "×", "x", numbers)
         title_patterns = [
             r'^([🔥🏋️💥🧊]*\s*[A-Z][^.\n]{5,80}Workout[^\n]*)',  # With emoji and "Workout"
             r'^([🔥🏋️💥🧊]*\s*[A-Z][^.\n]{10,80}(?:Strength|Endurance|Cardio|Upper|Lower|Full)[^\n]*)',  # With exercise type
             r'^([A-Z][^.\n]{5,60}Workout[^\n]*)',  # Without emoji
+            # Format: "Day – Description (Category)" but NOT exercise lines (no ×, x, sets, reps, numbers with ×)
+            r'^([A-Z][A-Za-z\s&/+-]+?[\s–\-]+[A-Z][A-Za-z\s&/+-]+?(?:\s*\([^)]+\))?)(?![^\n]*[×x]\s*\d)',  # No × or x followed by number
         ]
         
         blocks: List[Block] = []
@@ -845,20 +1312,43 @@ class ParserService:
         
         current_block: Optional[Block] = None
         pending_exercises: List[Exercise] = []  # Exercises collected before superset marker
+        consecutive_blank_lines = 0  # Track consecutive blank lines to detect block boundaries
         
         i = 0
         while i < len(lines):
             line = lines[i].strip()
+            is_blank = not line or line == '⸻'
             
             # Skip the title line (we already extracted it)
             if i == title_line_index:
                 i += 1
+                consecutive_blank_lines = 0
                 continue
             
-            # Skip empty lines and separator lines (⸻)
-            if not line or line == '⸻':
+            # Handle blank lines - use them to detect block boundaries
+            if is_blank:
+                consecutive_blank_lines += 1
+                # If we have 1+ blank lines, finish current block if it has any content
+                # This creates a block boundary - the next non-blank line will start a new block
+                if current_block:
+                    # Add any pending exercises first
+                    if pending_exercises:
+                        current_block.exercises.extend(pending_exercises)
+                        pending_exercises.clear()
+                    # Finish the block if it has any content (exercises or supersets)
+                    if current_block.exercises or current_block.supersets:
+                        blocks.append(current_block)
+                        current_block = None
                 i += 1
                 continue
+            
+            # Reset blank line counter when we hit a non-blank line
+            # If we just finished a block (current_block is None), the next non-blank line should start a new block
+            if consecutive_blank_lines > 0 and current_block is None:
+                # We just finished a block, so the next line should start a new one
+                # This will be handled by section header detection or exercise parsing
+                pass
+            consecutive_blank_lines = 0
             
             # Check for numbered section header (e.g., "1. Big Lifts (Single Sets)")
             # Only match if it looks like a section title (short, no exercise indicators like "sets", "reps", "x")
@@ -874,16 +1364,43 @@ class ParserService:
             # Match one or more emojis followed by text (may or may not end with colon)
             emoji_section_match = re.match(r'^[🔥🏋️💥🧊🧘🎯]+(?:\s+)?(.+?)(?:\s*\([^)]+\))?:?$', line)
             
-            # Check for plain text section headers ending with colon (e.g., "Warm-Up (10 min):")
+            # Check for plain text section headers ending with colon (e.g., "Warm-Up (10 min):", "Optional Finisher:")
+            # Also check for section headers that start with bullet point (e.g., "• Warm-up: description")
             # Must be relatively short and not contain exercise indicators
+            # IMPORTANT: Don't treat exercise lines as section headers (e.g., "Dips – 3×AMRAP" should not be a header)
             colon_section_match = None
-            if len(line) < 80 and ':' in line:
-                match = re.match(r'^([A-Z][A-Za-z\s&/+-]+?)(?:\s*\([^)]+\))?:?$', line)
+            # Remove bullet point if present for section header detection
+            line_for_section_check = re.sub(r'^(?:•|\d+\.)\s+', '', line).strip()
+            # Only check for section headers if line contains a colon (section headers typically have colons)
+            if len(line_for_section_check) < 80 and ':' in line_for_section_check:
+                # Split on colon - section header is the part before colon (may have description after)
+                parts = line_for_section_check.split(':', 1)
+                header_part = parts[0].strip()
+                # Match section header pattern (may have parentheses)
+                match = re.match(r'^([A-Z][A-Za-z\s&/+-]+?)(?:\s*\([^)]+\))?$', header_part)
                 if match:
                     section_text = match.group(1).lower()
-                    has_exercise_indicators = any(indicator in section_text for indicator in ['sets', 'reps', ' x ', '–', '-'])
-                    if not has_exercise_indicators:
-                        colon_section_match = match
+                    # Check if it's a known section header keyword
+                    section_keywords = ['warm-up', 'warmup', 'finisher', 'optional', 'cool-down', 'cooldown', 'primer']
+                    is_section_keyword = any(keyword in section_text for keyword in section_keywords)
+                    # Check for exercise indicators in the header part (not the full line)
+                    # Exercise indicators like "–", "×", "x", numbers with sets/reps suggest it's an exercise, not a header
+                    has_exercise_indicators = any(indicator in header_part for indicator in ['sets', 'reps', '×', 'x', '–', '-']) or re.search(r'\d+[x×]', header_part)
+                    # Also check if the header part looks like an exercise name (contains common exercise words)
+                    exercise_words = ['press', 'squat', 'deadlift', 'dip', 'pull', 'push', 'row', 'curl', 'raise', 'thruster', 'slam', 'ball', 'tuck']
+                    looks_like_exercise = any(word in section_text for word in exercise_words)
+                    
+                    # Only treat as section header if:
+                    # 1. It's a known section keyword, OR
+                    # 2. It doesn't have exercise indicators AND doesn't look like an exercise name
+                    if (is_section_keyword or (not has_exercise_indicators and not looks_like_exercise)) and len(section_text) > 3:
+                        # Create a match object that returns the section title
+                        class SectionMatch:
+                            def group(self, n):
+                                if n == 1:
+                                    return match.group(1)
+                                return header_part
+                        colon_section_match = SectionMatch()
             
             section_match = None
             if is_numbered_section:
@@ -922,6 +1439,45 @@ class ParserService:
                         current_block.time_work_sec = to_int(time_match.group(1)) * 60
                         current_block.structure = category
                 pending_exercises.clear()
+                
+                # Check if there's content after the colon that might be exercises
+                # For example: "Warm-up: Shoulder mobility, banded pull-aparts"
+                # or "Optional Finisher: Seated Wall Balls – 2×15"
+                if ':' in line:
+                    parts_after_colon = line.split(':', 1)[1].strip()
+                    if parts_after_colon:
+                        # Remove bullet point if present
+                        parts_after_colon = re.sub(r'^(?:•|\d+\.)\s+', '', parts_after_colon).strip()
+                        
+                        # Check if it contains exercise indicators (sets, reps, x, ×, AMRAP, etc.)
+                        has_exercise_format = re.search(r'\d+[x×]|AMRAP|sets|reps|[\s–\-]\s*\d+', parts_after_colon, re.I)
+                        
+                        if has_exercise_format:
+                            # It's an exercise on the same line (e.g., "Optional Finisher: Seated Wall Balls – 2×15")
+                            exercise = ParserService._parse_ai_exercise_line(parts_after_colon)
+                            if exercise:
+                                current_block.exercises.append(exercise)
+                        else:
+                            # It might be a comma-separated list of exercises (e.g., "Warm-up: Shoulder mobility, banded pull-aparts")
+                            # Split by comma and try to parse each as an exercise
+                            exercise_names = [name.strip() for name in parts_after_colon.split(',')]
+                            for exercise_name in exercise_names:
+                                if exercise_name:
+                                    # Try to parse as exercise (might need to add default sets/reps)
+                                    # For warm-up exercises, they might not have sets/reps specified
+                                    exercise = ParserService._parse_ai_exercise_line(exercise_name)
+                                    if exercise:
+                                        current_block.exercises.append(exercise)
+                                    else:
+                                        # If parsing fails, create a basic exercise with just the name
+                                        # This handles cases like "Shoulder mobility" without sets/reps
+                                        # Capitalize first letter of each word for consistency
+                                        exercise_name_formatted = ' '.join(word.capitalize() for word in exercise_name.split())
+                                        current_block.exercises.append(Exercise(
+                                            name=exercise_name_formatted,
+                                            type="warmup" if "warm" in block_label.lower() else "strength"
+                                        ))
+                
                 i += 1
                 continue
             
@@ -965,11 +1521,15 @@ class ParserService:
             # Check for numbered exercise list items (e.g., "1. Exercise Name – 4 sets x 5–8 reps")
             is_numbered_exercise = re.match(r'^\d+\.\s+.+?[\s–\-](?:sets|reps|x)', line, re.I)
             
+            # Check for compact format like "Exercise – 4×6–8" or "Exercise – 3×AMRAP"
+            has_compact_format = re.search(r'[\s–\-]\s*\d+[x×]\s*(\d+[\s–\-]\d+|\d+|AMRAP)', line, re.I)
+            
             # Exercise lines should contain exercise-related keywords or patterns
             has_exercise_indicators = (
                 re.search(r'\b(sets|reps|x|minutes?|sec|kg|lb|lbs?|weight|carry|press|row|pull|push|squat|deadlift|lunge|curl|raise|fly|extension|dip|pull.?up)\b', line, re.I) or
                 is_numbered_exercise or
-                line.startswith('•')
+                line.startswith('•') or
+                has_compact_format
             )
             
             if (line.startswith('•') or is_numbered_exercise) or (has_exercise_indicators and line and len(line) > 10 and not line.startswith('(')):
@@ -989,13 +1549,14 @@ class ParserService:
                 blank_lines_seen = 0
                 while j < len(lines):
                     next_line = lines[j].strip()
-                    # Stop if we hit a new exercise bullet, section, superset marker, or separator
+                    # Stop if we hit a blank line (block boundary), new exercise bullet, section, superset marker, or separator
                     # Also check for emoji headers (new block headers)
                     is_next_section_header = (
                         re.match(r'^[🔥🏋️💥🧊🧘🎯]+', next_line) or  # Emoji header
                         re.match(r'^\d+\.\s+(.+?)(?:\s*\([^)]+\))?$', next_line) and len(next_line) < 60  # Numbered section
                     )
-                    if (next_line == '⸻' or
+                    if (not next_line or  # Blank line - stop here (block boundary)
+                        next_line == '⸻' or
                         next_line.startswith('•') or
                         (next_line.startswith('(') and 'superset' in next_line.lower()) or
                         re.match(r'^\d+\.', next_line) or
@@ -1021,15 +1582,15 @@ class ParserService:
                             # Otherwise, might still be part of description
                             j += 1
                     else:
-                        # Blank line - allow one blank line between exercise and description
-                        blank_lines_seen += 1
-                        if blank_lines_seen > 1:
-                            break
-                        j += 1
+                        # Blank line - stop at first blank line (block boundary)
+                        break
                 
                 # Extract exercise name and details
                 exercise = ParserService._parse_ai_exercise_line(full_exercise_text)
-                if exercise and current_block:
+                if exercise:
+                    # Create a default block if none exists
+                    if not current_block:
+                        current_block = Block(label="Workout")
                     pending_exercises.append(exercise)
                 
                 # Skip the lines we already processed
@@ -1111,11 +1672,14 @@ class ParserService:
         
         # Must contain exercise-related keywords or patterns
         exercise_keywords = [
-            r'\b(sets|reps|x|minutes?|sec|kg|lb|lbs?|weight|carry|press|row|pull|push|squat|deadlift|lunge|curl|raise|fly|extension|dip|pull.?up|pullup|bike|row|run|jump|burpee|thruster|swing|snatch|clean|jerk|wall.?ball|farmer|sled|push.?up|pushup|inchworm|circle|band|stretch|warm.?up)\b',
-            r'–|x\s*\d+',  # Contains dash or "x" followed by number
+            r'\b(sets|reps|x|minutes?|sec|kg|lb|lbs?|weight|carry|press|row|pull|push|squat|deadlift|lunge|curl|raise|fly|extension|dip|pull.?up|pullup|bike|row|run|jump|burpee|thruster|swing|snatch|clean|jerk|wall.?ball|farmer|sled|push.?up|pushup|inchworm|circle|band|stretch|warm.?up|amrap)\b',
+            r'[\s–\-]\s*\d+[x×]',  # Contains dash/en-dash followed by number and x/× (compact format)
+            r'[x×]\s*\d+',  # Contains x/× followed by number
         ]
         has_exercise_content = any(re.search(pattern, line, re.I) for pattern in exercise_keywords)
-        if not has_exercise_content and len(line) < 20:
+        # Also check for compact format pattern (NUMBER×NUMBER or NUMBER×AMRAP)
+        has_compact_format = re.search(r'\d+[x×]\s*(\d+[\s–\-]\d+|\d+|AMRAP)', line, re.I)
+        if not has_exercise_content and not has_compact_format and len(line) < 20:
             return None
         
         # Split by newline if present (sometimes equipment is on separate line)
@@ -1214,15 +1778,22 @@ class ParserService:
         # This prevents "x 5" from "4 sets x 5–8 reps" from being set as reps=5
         # Pattern: "6–8 reps" or "8-10 reps" or "4 sets x 5–8 reps" (rep ranges)
         if not reps and not reps_range:
-            # Priority 1: Look for "X sets x Y–Z" or "X sets x Y–Z reps" pattern (most specific)
-            sets_x_range_match = re.search(r'sets?\s*[x×]\s*(\d+)[\s–\-]+(\d+)(?:\s*reps?)?', full_text, re.I)
-            if sets_x_range_match:
-                reps_range = f"{sets_x_range_match.group(1)}-{sets_x_range_match.group(2)}"
+            # Priority 1: Look for "NUMBER×NUMBER–NUMBER" format (e.g., "4×6–8" or "3×10–12")
+            # This is sets × rep range format without "sets" keyword
+            compact_format_match = re.search(r'(\d+)[x×]\s*(\d+)[\s–\-]+(\d+)', full_text, re.I)
+            if compact_format_match:
+                sets = to_int(compact_format_match.group(1))
+                reps_range = f"{compact_format_match.group(2)}-{compact_format_match.group(3)}"
             else:
-                # Priority 2: Look for "Y–Z reps" pattern (with explicit "reps" keyword)
-                reps_range_match = re.search(r'(\d+)[\s–\-]+(\d+)\s*reps?', full_text, re.I)
-                if reps_range_match:
-                    reps_range = f"{reps_range_match.group(1)}-{reps_range_match.group(2)}"
+                # Priority 2: Look for "X sets x Y–Z" or "X sets x Y–Z reps" pattern (most specific)
+                sets_x_range_match = re.search(r'sets?\s*[x×]\s*(\d+)[\s–\-]+(\d+)(?:\s*reps?)?', full_text, re.I)
+                if sets_x_range_match:
+                    reps_range = f"{sets_x_range_match.group(1)}-{sets_x_range_match.group(2)}"
+                else:
+                    # Priority 3: Look for "Y–Z reps" pattern (with explicit "reps" keyword)
+                    reps_range_match = re.search(r'(\d+)[\s–\-]+(\d+)\s*reps?', full_text, re.I)
+                    if reps_range_match:
+                        reps_range = f"{reps_range_match.group(1)}-{reps_range_match.group(2)}"
         
         # Pattern: "x 20" or "x20" (single number after x) - determine if it's sets or reps
         # Only check if we haven't already found reps/rep_range from patterns above
@@ -1257,6 +1828,18 @@ class ParserService:
         if amrap_match:
             reps_range = f"{amrap_match.group(1)}-{amrap_match.group(2)}"
         
+        # Pattern: "NUMBER×AMRAP" (e.g., "3×AMRAP") - sets with AMRAP as reps (special case)
+        amrap_sets_match = re.search(r'(\d+)[x×]\s*AMRAP', full_text, re.I)
+        if amrap_sets_match:
+            if not sets:
+                sets = to_int(amrap_sets_match.group(1))
+            # AMRAP is the reps value (special case - means "as many reps as possible")
+            # Store in reps_range since it's a string field (reps is int)
+            if not reps and not reps_range:
+                reps_range = "AMRAP"
+            # Mark as AMRAP type exercise
+            ex_type = "amrap"
+        
         # Pattern: "/side" or "/side" - indicates unilateral exercise
         if '/side' in full_text.lower() or 'per side' in full_text.lower():
             # Keep reps as is, but note it's per side in the name
@@ -1281,9 +1864,13 @@ class ParserService:
                 sets = 1
         
         # Determine exercise type
-        ex_type = "strength"
-        if duration_sec or 'hold' in full_text.lower():
+        # Check for AMRAP first (before other type checks)
+        if amrap_sets_match or ('amrap' in full_text.lower() and not reps and not reps_range):
+            ex_type = "amrap"
+        elif duration_sec or 'hold' in full_text.lower():
             ex_type = "interval"
+        else:
+            ex_type = "strength"
         
         return Exercise(
             name=exercise_name,

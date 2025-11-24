@@ -15,6 +15,9 @@ class Exercise(BaseModel):
     distance_range: Optional[str] = None
     type: str = "strength"
     notes: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields like 'id' from UI
 
 
 # Legacy Superset class for backward compatibility
@@ -40,6 +43,9 @@ class Block(BaseModel):
     - 'regular': Standard workout with rest between exercises
     """
     label: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields like 'id', 'supersets' from UI
     structure: Optional[Literal[
         'superset',
         'circuit', 
@@ -78,6 +84,9 @@ class Workout(BaseModel):
     title: str = "Imported Workout"
     source: Optional[str] = None
     blocks: List[Block] = Field(default_factory=list)
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields from UI
     
     def convert_to_new_structure(self) -> 'Workout':
         """
