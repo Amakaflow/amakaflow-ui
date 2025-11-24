@@ -7,28 +7,33 @@ export const workoutTemplates: WorkoutStructure[] = [
     blocks: [
       {
         label: "Hyrox Race Simulation",
-        structure: "for time (cap: 60 min)",
-        supersets: [
-          {
-            exercises: [
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "1000 m SkiErg", distance_m: 1000, type: "Cardio" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "50 m Sled Push", distance_m: 50, weight_kg: 152, type: "Strength" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "50 m Sled Pull", distance_m: 50, weight_kg: 103, type: "Strength" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "80 Burpee Broad Jumps", reps: 80, type: "HIIT" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "1000 m Row", distance_m: 1000, type: "Cardio" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "100 m Farmers Carry", distance_m: 100, weight_kg: 32, type: "Strength" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" },
-              { name: "100 Wall Balls", reps: 100, weight_kg: 9, type: "Strength" },
-              { name: "1000 m Run", distance_m: 1000, type: "Cardio" }
-            ]
-          }
-        ]
+        structure: null,
+        exercises: [
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "The race starts with a 1km run on the track" },
+          { name: "Ski Erg", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "1,000 meters on a ski ergometer" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Sled Push", distance_m: 50, type: "strength", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "A 50-meter sled push" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Sled Pull", distance_m: 50, type: "strength", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "A 50-meter sled pull" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Burpee Broad Jumps", distance_m: 80, type: "hirox", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "80 meters of burpee broad jumps" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Rowing", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "1,000 meters on a rowing machine" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Farmer's Carry", distance_m: 200, type: "strength", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "200 meters with a farmer's carry" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "Another 1km run" },
+          { name: "Sandbag Lunges", distance_m: 100, type: "strength", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "100 meters of sandbag lunges" },
+          { name: "Run", distance_m: 1000, type: "cardio", sets: null, reps: null, reps_range: null, duration_sec: null, rest_sec: null, distance_range: null, notes: "The final 1km run" },
+          { name: "Wall Balls", reps: 100, type: "strength", sets: null, reps_range: null, duration_sec: null, rest_sec: null, distance_m: null, distance_range: null, notes: "The final exercise is 100 wall balls" }
+        ],
+        supersets: [],
+        rounds: null,
+        sets: null,
+        time_cap_sec: null,
+        time_work_sec: null,
+        time_rest_sec: null,
+        rest_between_rounds_sec: null,
+        rest_between_sets_sec: null
       }
     ]
   },

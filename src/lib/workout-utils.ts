@@ -42,6 +42,31 @@ export function addIdsToWorkout(workout: WorkoutStructure): WorkoutStructure {
 }
 
 /**
+ * Create an empty workout structure for manual creation
+ */
+export function createEmptyWorkout(): WorkoutStructure {
+  return addIdsToWorkout({
+    title: "New Workout",
+    source: "manual",
+    blocks: [
+      {
+        label: "Workout",
+        structure: null,
+        exercises: [],
+        supersets: [],
+        rounds: null,
+        sets: null,
+        time_cap_sec: null,
+        time_work_sec: null,
+        time_rest_sec: null,
+        rest_between_rounds_sec: null,
+        rest_between_sets_sec: null
+      }
+    ]
+  });
+}
+
+/**
  * Clone a block with a new ID (for drag-and-drop from library)
  */
 export function cloneBlock(block: Block): Block {

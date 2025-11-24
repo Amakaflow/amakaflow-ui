@@ -38,9 +38,13 @@ export function WorkoutTemplates({ onSelectTemplate, onSelectHistory }: WorkoutT
   };
 
   const getExerciseCount = (workout: WorkoutStructure) => {
-    return workout.blocks.reduce((sum, block) => 
-      sum + block.supersets.reduce((s, ss) => s + ss.exercises.length, 0), 0
-    );
+    return workout.blocks.reduce((sum, block) => {
+      // Count exercises in block-level exercises array
+      const blockExercises = block.exercises?.length || 0;
+      // Count exercises in supersets
+      const supersetExercises = block.supersets?.reduce((s, ss) => s + (ss.exercises?.length || 0), 0) || 0;
+      return sum + blockExercises + supersetExercises;
+    }, 0);
   };
 
   return (

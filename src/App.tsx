@@ -63,6 +63,7 @@ export default function App() {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   const [isEditingFromHistory, setIsEditingFromHistory] = useState(false);
+  const [isCreatingFromScratch, setIsCreatingFromScratch] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -602,7 +603,21 @@ export default function App() {
     setSources([]);
     setCurrentStep('structure');
     setWorkoutSaved(false); // Template loaded, not saved yet
+    setIsCreatingFromScratch(false); // Template is not from scratch
+    setIsEditingFromHistory(false); // Template is not from history
     toast.success(`Loaded template: ${template.title}`);
+  };
+
+  const handleCreateNew = async () => {
+    const { createEmptyWorkout } = await import('./lib/workout-utils');
+    const emptyWorkout = createEmptyWorkout();
+    setWorkout(emptyWorkout);
+    setSources([]);
+    setCurrentStep('structure');
+    setWorkoutSaved(false); // New workout, not saved yet
+    setIsCreatingFromScratch(true); // Mark as creating from scratch
+    setIsEditingFromHistory(false); // Not from history
+    toast.success('Created new workout. Start building your workout structure!');
   };
 
   const handleAutoMap = async () => {
@@ -836,6 +851,7 @@ export default function App() {
     setExports(null);
     setCurrentStep('add-sources');
     setIsEditingFromHistory(false);
+    setIsCreatingFromScratch(false);
     setEditingWorkoutId(null);
     setWorkoutSaved(false);
   };
@@ -1235,6 +1251,7 @@ export default function App() {
             progress={generationProgress}
             onCancel={handleCancelGeneration} 
             onLoadTemplate={handleLoadTemplate}
+            onCreateNew={handleCreateNew}
             loading={loading} 
           />
         )}
@@ -1248,7 +1265,7 @@ export default function App() {
             }}
             onAutoMap={handleAutoMap}
             onValidate={handleValidate}
-            onSave={isEditingFromHistory ? async () => {
+            onSave={(isEditingFromHistory || isCreatingFromScratch) ? async () => {
               if (!user?.id || !workout) return;
               setLoading(true);
               try {
@@ -1267,10 +1284,15 @@ export default function App() {
                 const { getWorkoutHistory } = await import('./lib/workout-history');
                 const history = await getWorkoutHistory(user.id);
                 setWorkoutHistoryList(history);
-                // Optionally go back to history view
-                setCurrentView('history');
-                setIsEditingFromHistory(false);
-                setEditingWorkoutId(null);
+                // If creating from scratch, stay in structure view to continue editing
+                if (isEditingFromHistory) {
+                  setCurrentView('history');
+                  setIsEditingFromHistory(false);
+                  setEditingWorkoutId(null);
+                } else if (isCreatingFromScratch) {
+                  // Stay in structure view, but mark as no longer creating from scratch
+                  setIsCreatingFromScratch(false);
+                }
               } catch (error: any) {
                 toast.error(`Failed to save workout: ${error.message}`);
               } finally {
@@ -1278,6 +1300,7 @@ export default function App() {
               }
             } : undefined}
             isEditingFromHistory={isEditingFromHistory}
+            isCreatingFromScratch={isCreatingFromScratch}
             loading={loading}
             selectedDevice={selectedDevice}
             onDeviceChange={setSelectedDevice}
