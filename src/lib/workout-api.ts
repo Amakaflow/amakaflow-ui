@@ -203,17 +203,23 @@ export async function updateWorkoutInAPI(
  * Delete a workout
  */
 export async function deleteWorkoutFromAPI(workoutId: string, profileId: string): Promise<boolean> {
-  const queryParams = new URLSearchParams({
-    profile_id: profileId,
-  });
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
 
-  const response = await workoutApiCall<{ success: boolean; message: string }>(
-    `/workouts/${workoutId}?${queryParams.toString()}`,
-    {
-      method: 'DELETE',
-    }
-  );
+    const response = await workoutApiCall<{ success: boolean; message: string }>(
+      `/workouts/${workoutId}?${queryParams.toString()}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
-  return response.success;
+    console.log('[deleteWorkoutFromAPI] Response for id:', workoutId, response);
+    return response.success;
+  } catch (err) {
+    console.error('[deleteWorkoutFromAPI] Error deleting workout from API:', err);
+    return false;
+  }
 }
 

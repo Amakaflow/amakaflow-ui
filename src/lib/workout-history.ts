@@ -129,105 +129,88 @@ export async function saveWorkoutToHistory(
  * Get workout history from API (Supabase) with localStorage fallback
  */
 export async function getWorkoutHistory(profileId?: string): Promise<WorkoutHistoryItem[]> {
-  // If profileId provided, try to fetch from API
-  if (profileId) {
-    try {
-      const savedWorkouts = await getWorkoutsFromAPI({
-        profile_id: profileId,
-        limit: 100,
-      });
-      
-      // Convert SavedWorkout to WorkoutHistoryItem format
-      const apiHistory: WorkoutHistoryItem[] = savedWorkouts
-        .filter((workout) => workout.workout_data != null) // Filter out workouts with missing data
-        .map((workout) => ({
-          id: workout.id,
-          workout: workout.workout_data || { title: 'Untitled Workout', blocks: [] }, // Ensure workout_data exists
-          sources: workout.sources || [],
-          device: workout.device as DeviceId,
-          exports: workout.exports,
-          validation: workout.validation, // Include validation data
-          createdAt: workout.created_at,
-          updatedAt: workout.updated_at,
-          syncedToStrava: workout.synced_to_strava,
-          stravaActivityId: workout.strava_activity_id,
-          // Add export status (not in original type, but useful)
-          isExported: workout.is_exported,
-          exportedAt: workout.exported_at,
-          exportedToDevice: workout.exported_to_device,
-        } as WorkoutHistoryItem & { isExported?: boolean; exportedAt?: string; exportedToDevice?: string }));
-      
-      // Also get localStorage history for backward compatibility
-      const localHistory = getWorkoutHistoryFromLocalStorage();
-      
-      // Merge: prefer API data, but include unique localStorage items
-      const apiIds = new Set(apiHistory.map(item => item.id));
-      const uniqueLocal = localHistory.filter(item => !apiIds.has(item.id));
-      
-      // Combine API and localStorage history
-      const combined = [...apiHistory, ...uniqueLocal];
-      
-      // Deduplicate by title + date + device (same workout saved multiple times)
-      const deduplicated = combined.reduce((acc, item) => {
-        // Create a unique key based on title, date (within same day), and device
-        const date = new Date(item.createdAt);
-        const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-        const title = item.workout?.title || 'Untitled Workout';
-        const key = `${title.toLowerCase().trim()}:${dateKey}:${item.device}`;
-        
-        // Check if we already have a workout with this key
-        const existingIndex = acc.findIndex((existing) => {
-          const existingDate = new Date(existing.createdAt);
-          const existingDateKey = `${existingDate.getFullYear()}-${existingDate.getMonth()}-${existingDate.getDate()}`;
-          const existingTitle = existing.workout?.title || 'Untitled Workout';
-          const existingKey = `${existingTitle.toLowerCase().trim()}:${existingDateKey}:${existing.device}`;
-          return existingKey === key;
-        });
-        
-        if (existingIndex === -1) {
-          // New unique workout
-          acc.push(item);
-        } else {
-          // Duplicate found - keep the one with exports or newer timestamp
-          const existing = acc[existingIndex];
-          const existingHasExports = !!(existing.exports);
-          const itemHasExports = !!(item.exports);
-          
-          if (itemHasExports && !existingHasExports) {
-            // Replace with the one that has exports
-            acc[existingIndex] = item;
-          } else if (!itemHasExports && !existingHasExports) {
-            // Both don't have exports, keep the newer one
-            const existingDate = new Date(existing.createdAt).getTime();
-            const itemDate = new Date(item.createdAt).getTime();
-            if (itemDate > existingDate) {
-              acc[existingIndex] = item;
-            }
-          }
-        }
-        
-        return acc;
-      }, [] as WorkoutHistoryItem[]);
-      
-      return deduplicated.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA; // Newest first
-      });
-    } catch (error) {
-      console.error('Failed to load workout history from API:', error);
-      // Fallback to localStorage
-      return getWorkoutHistoryFromLocalStorage();
+  const localHistory = getWorkoutHistoryFromLocalStorage();
+
+  // No profileId → anonymous / local-only mode.
+  if (!profileId) {
+    return localHistory;
+  }
+
+  let apiHistory: WorkoutHistoryItem[] = [];
+
+  try {
+    const apiRaw = await getWorkoutsFromAPI({
+      profile_id: profileId,
+      limit: 100,
+    });
+
+    apiHistory = apiRaw.map((item: any) => normalizeApiWorkoutItem(item));
+  } catch (err) {
+    console.error('[getWorkoutHistory] Failed to fetch API history, falling back to local only:', err);
+    return localHistory;
+  }
+
+  // Use a Map keyed by our dedupe key. API wins over local for same key.
+  const byKey = new Map<string, WorkoutHistoryItem>();
+
+  // 1) Insert API items first (source of truth).
+  for (const item of apiHistory) {
+    const key = getHistoryDedupKey(item);
+    if (!key) continue;
+    byKey.set(key, item);
+  }
+
+  // 2) Add local items only if that key does not exist yet.
+  for (const item of localHistory) {
+    const key = getHistoryDedupKey(item);
+    if (!key) continue;
+    if (!byKey.has(key)) {
+      byKey.set(key, item);
     }
   }
-  
-  // No profileId, use localStorage only
-  return getWorkoutHistoryFromLocalStorage();
+
+  const merged = Array.from(byKey.values());
+
+  // Optional: sort newest first.
+  merged.sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return merged;
 }
 
 /**
  * Get workout history from localStorage only (for backward compatibility)
  */
+
+/**
+ * Helper: normalize API items to the same shape as local history
+ * Cursor: adjust this to your actual API shape.
+ * The goal: always return an object that has:
+ *   - id: string
+ *   - workout?: { title?: string }
+ *   - createdAt?: string
+ *   - device?: string
+ */
+function normalizeApiWorkoutItem(item: SavedWorkout): WorkoutHistoryItem {
+  // Example mapping — update according to your API response
+  return {
+    id: String(item.id), // make sure this matches what delete_workout() uses
+    workout: item.workout_data || { title: 'Untitled workout', blocks: [] },
+    sources: item.sources || [],
+    device: item.device as DeviceId,
+    exports: item.exports,
+    validation: item.validation,
+    createdAt: item.created_at ?? new Date().toISOString(),
+    updatedAt: item.updated_at ?? new Date().toISOString(),
+    syncedToStrava: item.synced_to_strava,
+    stravaActivityId: item.strava_activity_id,
+    // spread any other fields you need:
+  } as WorkoutHistoryItem & { isExported?: boolean; exportedAt?: string; exportedToDevice?: string };
+}
+
 export function getWorkoutHistoryFromLocalStorage(): WorkoutHistoryItem[] {
   try {
     const stored = localStorage.getItem(HISTORY_KEY);
@@ -253,38 +236,113 @@ export function getWorkoutHistoryFromLocalStorage(): WorkoutHistoryItem[] {
 /**
  * Delete a workout from both API and localStorage
  */
+
+// ======================
+// Helper: dedupe key
+// ======================
+
+/**
+ * Build a stable key used to detect duplicates between API + localStorage.
+ * Two items with the same (title, createdAt, device) are treated as the
+ * same logical workout in the history UI.
+ */
+function getHistoryDedupKey(item: WorkoutHistoryItem): string {
+  const title = item?.workout?.title ?? '';
+  const createdAt = item?.createdAt ?? '';
+  const device = item?.device ?? '';
+  return `${title}::${createdAt}::${device}`;
+}
+
+// ======================
+// deleteWorkoutFromHistory
+// ======================
+
 export async function deleteWorkoutFromHistory(id: string, profileId?: string): Promise<boolean> {
-  // Try to delete from API first if profileId is provided
-  if (profileId) {
-    try {
-      const { deleteWorkoutFromAPI } = await import('./workout-api');
-      const deleted = await deleteWorkoutFromAPI(id, profileId);
-      if (deleted) {
-        console.log(`Workout ${id} deleted from API`);
-      }
-    } catch (error) {
-      console.error('Failed to delete workout from API:', error);
-      // Continue to delete from localStorage anyway
-    }
-  }
-  
-  // Delete from localStorage
   try {
+    // 1) If we have a profile, delete from API first.
+    if (profileId) {
+      const { deleteWorkoutFromAPI } = await import('./workout-api');
+      const apiDeleted = await deleteWorkoutFromAPI(id, profileId);
+      if (!apiDeleted) {
+        console.error('[deleteWorkoutFromHistory] API delete failed for id:', id);
+        return false;
+      }
+    }
+
+    // 2) Delete from localStorage.
     const history = getWorkoutHistoryFromLocalStorage();
-    const filtered = history.filter(item => item.id !== id);
+
+    // Find the item in local history to derive its dedupe key
+    const itemToDelete = history.find((h) => h.id === id);
+
+    let filtered: WorkoutHistoryItem[];
+
+    if (itemToDelete) {
+      // Use dedupe key so ALL local entries that would show as the same row
+      // in the UI are removed.
+      const targetKey = getHistoryDedupKey(itemToDelete);
+      filtered = history.filter((h) => getHistoryDedupKey(h) !== targetKey);
+    } else {
+      // Fallback: no matching item found in local history, just filter by id.
+      filtered = history.filter((h) => h.id !== id);
+    }
+
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+    console.log('[deleteWorkoutFromHistory] Deleted from localStorage, id:', id);
+
     return true;
-  } catch (error) {
-    console.error('Failed to delete workout from localStorage:', error);
+  } catch (err) {
+    console.error('[deleteWorkoutFromHistory] Error deleting workout:', err);
     return false;
   }
 }
 
-export function clearWorkoutHistory(): void {
+export async function clearWorkoutHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY);
   } catch (error) {
     console.error('Failed to clear workout history:', error);
+  }
+}
+export async function clearAllWorkoutHistory(profileId?: string): Promise<boolean> {
+  try {
+    // 1) Delete all from API if profileId is provided
+    if (profileId) {
+      try {
+        const { getWorkoutsFromAPI, deleteWorkoutFromAPI } = await import('./workout-api');
+        const workouts = await getWorkoutsFromAPI({ profile_id: profileId, limit: 1000 });
+        
+        console.log(`[clearAllWorkoutHistory] Found ${workouts.length} workouts in API, deleting...`);
+        
+        // Delete each workout
+        let deletedCount = 0;
+        for (const workout of workouts) {
+          const deleted = await deleteWorkoutFromAPI(workout.id, profileId);
+          if (deleted) {
+            deletedCount++;
+          }
+        }
+        
+        console.log(`[clearAllWorkoutHistory] Deleted ${deletedCount} workouts from API`);
+      } catch (err) {
+        console.error('[clearAllWorkoutHistory] Error deleting from API:', err);
+        // Continue to clear localStorage even if API deletion fails
+      }
+    }
+
+    // 2) Clear localStorage
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+      console.log('[clearAllWorkoutHistory] Cleared localStorage');
+    } catch (err) {
+      console.error('[clearAllWorkoutHistory] Error clearing localStorage:', err);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[clearAllWorkoutHistory] Error clearing workout history:', err);
+    return false;
   }
 }
 

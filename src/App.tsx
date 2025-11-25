@@ -335,7 +335,7 @@ export default function App() {
       if (user?.id) {
         try {
           const history = await getWorkoutHistory(user.id);
-          setWorkoutHistoryList(history);
+                      setWorkoutHistoryList(history);
         } catch (error) {
           console.error('Failed to load workout history:', error);
           // Fallback to localStorage
@@ -659,7 +659,7 @@ export default function App() {
       // Refresh history
       if (user) {
         const history = await getWorkoutHistory(user.id);
-        setWorkoutHistoryList(history);
+                      setWorkoutHistoryList(history);
       }
     } catch (error: any) {
       toast.error(`Failed to auto-map workout: ${error.message || 'Unknown error'}`);
@@ -787,7 +787,7 @@ export default function App() {
         setWorkoutSaved(true); // Mark as saved
         try {
           const history = await getWorkoutHistory(user.id);
-          setWorkoutHistoryList(history);
+                      setWorkoutHistoryList(history);
         } catch (error) {
           console.error('Failed to refresh workout history:', error);
         }
@@ -1288,7 +1288,7 @@ export default function App() {
                 // Refresh history
                 const { getWorkoutHistory } = await import('./lib/workout-history');
                 const history = await getWorkoutHistory(user.id);
-                setWorkoutHistoryList(history);
+                      setWorkoutHistoryList(history);
                 // If creating from scratch, stay in structure view to continue editing
                 if (isEditingFromHistory) {
                   setCurrentView('history');
@@ -1359,15 +1359,16 @@ export default function App() {
                 const { saveWorkoutToAPI } = await import('./lib/workout-api');
                 await saveWorkoutToAPI({
                   profile_id: user.id,
+                  workout_id: item.id,
                   workout_data: item.workout,
                   sources: item.sources,
                   device: item.device,
                   exports: item.exports,
                   validation: item.validation,
-                  title: item.workout.title || `Workout ${new Date().toLocaleDateString()}`,
+                  title: item.workout?.title || `Workout ${new Date().toLocaleDateString()}`,
                 });
                 toast.success('Workout updated');
-                // Refresh history
+                // Refresh history (no filter needed for update)
                 const history = await getWorkoutHistory(user.id);
                 setWorkoutHistoryList(history);
               } catch (error: any) {
@@ -1376,24 +1377,43 @@ export default function App() {
             }}
             onDeleteWorkout={async (id) => {
               try {
+                // Optimistically remove from UI immediately
+                setWorkoutHistoryList(prev => prev.filter(item => item.id !== id));
+                
                 const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
                 const deleted = await deleteWorkoutFromHistory(id, user?.id);
+                
                 if (deleted) {
                   toast.success('Workout deleted');
-                  // Refresh history
+                  // Don't refresh - the optimistic update is sufficient
+                  // Refreshing can bring back the workout due to merge/deduplication logic
+                  // If the workout was successfully deleted from both API and localStorage,
+                  // it won't appear on the next page load anyway
+                } else {
+                  // Revert optimistic update if deletion completely failed
                   if (user) {
                     try {
+                      const { getWorkoutHistory } = await import('./lib/workout-history');
                       const history = await getWorkoutHistory(user.id);
                       setWorkoutHistoryList(history);
                     } catch (error) {
-                      console.error('Failed to refresh workout history:', error);
+                      console.error('Failed to refresh workout history after failed deletion:', error);
                     }
                   }
-                } else {
                   toast.error('Failed to delete workout');
                 }
               } catch (error) {
                 console.error('Error deleting workout:', error);
+                // Revert optimistic update on error
+                if (user) {
+                  try {
+                    const { getWorkoutHistory } = await import('./lib/workout-history');
+                    const history = await getWorkoutHistory(user.id);
+                    setWorkoutHistoryList(history);
+                  } catch (error) {
+                    console.error('Failed to refresh workout history after error:', error);
+                  }
+                }
                 toast.error('Failed to delete workout');
               }
             }}
