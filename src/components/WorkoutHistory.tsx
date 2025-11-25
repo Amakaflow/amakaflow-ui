@@ -56,16 +56,40 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'compact'>('compact');
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'summary' | 'detail'>('summary');
   const [showCardSelector, setShowCardSelector] = useState(false);
   
   // Modal and undo state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pageIndex, setPageIndex] = useState(0); // 0-based page index
+  const PAGE_SIZE = 10;
   
   // Ensure history is an array
   const safeHistory = Array.isArray(history) ? history : [];
+  
+  // Apply search filter
+  const filteredHistory = safeHistory.filter((item) => {
+    if (!searchQuery.trim()) return true;
+
+    const q = searchQuery.toLowerCase();
+    const title = item.workout?.title?.toLowerCase?.() ?? '';
+    const device = item.device?.toLowerCase?.() ?? '';
+    const status = item.workout?.status?.toLowerCase?.() ?? '';
+
+    return (
+      title.includes(q) ||
+      device.includes(q) ||
+      status.includes(q)
+    );
+  });
+
+  // Pagination over filtered list
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / PAGE_SIZE));
+  const currentPageIndex = Math.min(pageIndex, totalPages - 1);
+  const pageStart = currentPageIndex * PAGE_SIZE;
+  const displayedHistory = filteredHistory.slice(pageStart, pageStart + PAGE_SIZE);
   
   // Selection state for bulk delete
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -77,17 +101,23 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
   };
 
   const isAllSelected =
-    safeHistory.length > 0 &&
-    selectedIds.length === safeHistory.length;
+    displayedHistory.length > 0 &&
+    displayedHistory.every((item) => selectedIds.includes(item.id || ''));
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedIds([]);
+      // Unselect only items on the current page
+      setSelectedIds((prev) =>
+        prev.filter((id) => !displayedHistory.some((item) => item.id === id))
+      );
     } else {
-      setSelectedIds(
-        safeHistory
-          .map((w) => w.id)
-          .filter((id): id is string => Boolean(id))
+      // Select all items on the current page, keeping previous selections
+      const idsOnPage = displayedHistory
+        .map((item) => item.id)
+        .filter((id): id is string => Boolean(id));
+
+      setSelectedIds((prev) =>
+        Array.from(new Set([...prev, ...idsOnPage]))
       );
     }
   };
@@ -365,10 +395,20 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
         <div>
           <h2 className="text-2xl mb-1">Workout History</h2>
           <p className="text-sm text-muted-foreground">
-            {safeHistory.length} workout{safeHistory.length !== 1 ? 's' : ''} saved
+            {filteredHistory.length} workout{filteredHistory.length !== 1 ? 's' : ''} saved
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPageIndex(0); // reset to first page when searching
+            }}
+            placeholder="Search workouts..."
+            className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
           <input
             type="checkbox"
             checked={isAllSelected}
@@ -409,7 +449,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
 
       <ScrollArea className="h-[calc(100vh-200px)]">
         <div className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
-          {safeHistory.map((item) => {
+          {displayedHistory.map((item) => {
             // Safety check: ensure workout exists
             if (!item.workout) {
               console.warn('WorkoutHistory item missing workout data:', item);
@@ -650,6 +690,48 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
           })}
         </div>
       </ScrollArea>
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
+        <div>
+          Showing{' '}
+          {filteredHistory.length === 0
+            ? 0
+            : pageStart + 1}{' '}
+          –{' '}
+          {Math.min(pageStart + PAGE_SIZE, filteredHistory.length)}{' '}
+          of{' '}
+          {filteredHistory.length}{' '}
+          workout{filteredHistory.length === 1 ? '' : 's'}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={currentPageIndex === 0}
+            onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+          >
+            Previous
+          </Button>
+          <span>
+            Page {currentPageIndex + 1} of {totalPages}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={currentPageIndex >= totalPages - 1}
+            onClick={() =>
+              setPageIndex((prev) =>
+                Math.min(totalPages - 1, prev + 1)
+              )
+            }
+          >
+            Next
+          </Button>
+        </div>
+      </div>
 
       {/* Card Selector Modal - Similar to Google Analytics */}
       <Dialog open={showCardSelector && !!viewingWorkout} onOpenChange={(open) => {
