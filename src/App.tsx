@@ -811,7 +811,6 @@ export default function App() {
     setWorkoutSaved(true); // Loaded from history, already saved
     toast.success('Workout loaded from history');
   };
-
   const handleEditFromHistory = (historyItem: any) => {
     // Normalize workout structure to convert old format (supersets) to new format (exercises)
     // This ensures workouts loaded from history are in the correct format for StructureWorkout
@@ -831,6 +830,50 @@ export default function App() {
     setEditingWorkoutId(historyItem.id); // Store the workout ID for saving
     setWorkoutSaved(true); // Initially saved (from history), will be marked unsaved when modified
     toast.success('Workout opened for editing - you can edit directly or re-validate if needed');
+  };
+
+
+  const handleBulkDeleteWorkouts = async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+
+    // 1. Optimistic UI update: remove all selected items
+    setWorkoutHistoryList(prev =>
+      prev.filter(item => !ids.includes(item.id))
+    );
+
+    const profileId = user?.id;
+    const failed: string[] = [];
+
+    // 2. Delete each workout one by one using existing API
+    for (const id of ids) {
+      try {
+        const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
+        const ok = await deleteWorkoutFromHistory(id, profileId);
+        if (!ok) {
+          failed.push(id);
+        }
+      } catch (error) {
+        console.error(`Error deleting workout ${id}:`, error);
+        failed.push(id);
+      }
+    }
+
+    // 3. Handle failures
+    if (failed.length > 0) {
+      // Refresh from source of truth so UI is consistent
+      if (profileId) {
+        try {
+          const { getWorkoutHistory } = await import('./lib/workout-history');
+          const fresh = await getWorkoutHistory(profileId);
+          setWorkoutHistoryList(fresh);
+        } catch (error) {
+          console.error('Failed to refresh workout history after bulk delete:', error);
+        }
+      }
+      toast.error(`Failed to delete ${failed.length} workout(s).`);
+    } else {
+      toast.success(`Deleted ${ids.length} workout(s).`);
+    }
   };
 
   // Helper function to check for unsaved changes and show confirmation
@@ -1417,6 +1460,7 @@ export default function App() {
                 toast.error('Failed to delete workout');
               }
             }}
+            onBulkDeleteWorkouts={handleBulkDeleteWorkouts}
             onEnhanceStrava={(item) => {
               // Navigate to Strava enhance view
               checkUnsavedChanges(() => {
