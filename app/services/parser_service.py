@@ -2140,4 +2140,457 @@ class ParserService:
             # Try to parse as seconds
             return to_int(duration_str)
         return None
+    
+    @staticmethod
+    def transformFreeformToCanonical(text: str) -> str:
+        """
+        Transform free-form workout text into canonical format.
+        
+        This function takes unstructured human-written workout text and converts it
+        to the canonical format that can be parsed by parse_canonical_ai_workout().
+        
+        Steps:
+        1. Detect title from first line or generate "Custom Workout"
+        2. Detect blocks using keywords (warmup, strength, conditioning, etc.)
+        3. Parse exercises with sets×reps patterns
+        4. Handle supersets and circuits
+        5. Output canonical format text
+        
+        Args:
+            text: Free-form workout text
+            
+        Returns:
+            Canonical format text string
+        """
+        if not text or not text.strip():
+            return "Title: Custom Workout\n\nBlock: Main Block\n"
+        
+        lines = [ln.rstrip() for ln in text.splitlines()]
+        if not lines:
+            return "Title: Custom Workout\n\nBlock: Main Block\n"
+        
+        # Step 1: Detect title
+        workout_title = None
+        title_keywords = ['day', 'workout', 'session', 'routine', 'training']
+        first_line = lines[0].strip()
+        
+        # Check if first line looks like a title
+        if first_line and len(first_line) < 100:  # Reasonable title length
+            first_lower = first_line.lower()
+            if any(keyword in first_lower for keyword in title_keywords) or not any(char.isdigit() for char in first_line):
+                # If it contains title keywords or doesn't start with numbers/sets×reps, treat as title
+                if not re.search(r'\d+\s*[x×]\s*\d+', first_line):  # Not a sets×reps pattern
+                    workout_title = first_line
+                    lines = lines[1:]  # Remove title line from processing
+        
+        if not workout_title:
+            workout_title = "Custom Workout"
+        
+        # Step 2: Detect blocks and parse exercises
+        blocks = []
+        current_block_label = None
+        current_exercises = []
+        in_superset = False
+        in_circuit = False
+        circuit_type = None
+        
+        # Block detection keywords
+        block_keywords = {
+            'warmup': ['warmup', 'warm up', 'warm-up', 'warm'],
+            'strength': ['strength', 'main', 'main set', 'working sets', 'working'],
+            'conditioning': ['conditioning', 'cardio', 'metcon', 'circuit', 'hiit'],
+            'finisher': ['finisher', 'burnout', 'finish'],
+            'cooldown': ['cooldown', 'cool-down', 'cool down', 'stretch']
+        }
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Skip empty lines (but they can indicate block boundaries)
+            if not line:
+                i += 1
+                continue
+            
+            line_lower = line.lower()
+            
+            # Check for block headers
+            block_detected = None
+            block_label = None
+            for block_type, keywords in block_keywords.items():
+                for keyword in keywords:
+                    # Check if line is a block header (ends with colon or is standalone)
+                    if line_lower.startswith(keyword) and (line_lower.endswith(':') or len(line_lower.split()) <= 3):
+                        block_detected = block_type
+                        # Capitalize first letter for label
+                        if keyword == 'warm up':
+                            block_label = 'Warm-up'
+                        elif keyword == 'cool down':
+                            block_label = 'Cooldown'
+                        elif keyword == 'warm-up':
+                            block_label = 'Warm-up'
+                        else:
+                            block_label = keyword.title()
+                        break
+                if block_detected:
+                    break
+            
+            # If we detected a new block, save current block and start new one
+            if block_detected:
+                if current_block_label and current_exercises:
+                    blocks.append({
+                        'label': current_block_label,
+                        'exercises': current_exercises,
+                        'structure': 'superset' if in_superset else circuit_type if in_circuit else None
+                    })
+                current_block_label = block_label
+                current_exercises = []
+                # Reset superset/circuit flags for new block
+                in_superset = False
+                in_circuit = False
+                circuit_type = None
+                i += 1
+                continue
+            
+            # Check for circuit/superset keywords (after block detection, so they apply to current block)
+            if any(word in line_lower for word in ['circuit', 'rounds', 'emom', 'tabata', 'amrap']):
+                in_circuit = True
+                if 'emom' in line_lower:
+                    circuit_type = 'emom'
+                elif 'tabata' in line_lower:
+                    circuit_type = 'tabata'
+                elif 'amrap' in line_lower:
+                    circuit_type = 'amrap'
+                else:
+                    circuit_type = 'circuit'
+            
+            if any(word in line_lower for word in ['superset', 'ss', 'pair', 'pairing']):
+                in_superset = True
+            
+            # If no block detected yet and we have exercises, create default block
+            if not current_block_label:
+                current_block_label = "Main Block"
+            
+            # Parse exercise line
+            # Try to parse as exercise - be more lenient, accept any line that looks like an exercise
+            exercise = ParserService._parse_freeform_exercise_line(line, in_superset)
+            if exercise:
+                current_exercises.append(exercise)
+                # If we're in a superset and this is the second exercise, mark superset complete
+                if in_superset and len(current_exercises) >= 2:
+                    in_superset = False  # Superset complete
+            elif line and not line.lower().endswith(':') and len(line.split()) > 0:
+                # If parsing failed but line looks like it could be an exercise, try to capture it anyway
+                # This handles cases where exercises don't match our patterns
+                # Only do this if the line has content and isn't clearly a header
+                words = line.split()
+                if len(words) >= 1 and not re.match(r'^\d+$', words[0]):
+                    # Treat as exercise with no sets/reps
+                    current_exercises.append({
+                        'name': line,
+                        'sets': None,
+                        'reps': None,
+                        'reps_range': None,
+                        'type': 'strength',
+                        'notes': None
+                    })
+            
+            i += 1
+        
+        # Add final block
+        if not current_block_label:
+            current_block_label = "Main Block"
+        if current_exercises:
+            blocks.append({
+                'label': current_block_label,
+                'exercises': current_exercises,
+                'structure': 'superset' if in_superset else circuit_type if in_circuit else None
+            })
+        
+        # If no blocks created, create empty one
+        if not blocks:
+            blocks.append({'label': 'Main Block', 'exercises': []})
+        
+        # Step 3: Build canonical format output
+        output_lines = [f"Title: {workout_title}", ""]
+        
+        for block in blocks:
+            output_lines.append(f"Block: {block['label']}")
+            for exercise in block.get('exercises', []):
+                parts = [exercise['name']]
+                
+                # Add sets×reps
+                if exercise.get('sets') and exercise.get('reps'):
+                    parts.append(f"{exercise['sets']}×{exercise['reps']}")
+                elif exercise.get('sets') and exercise.get('reps_range'):
+                    parts.append(f"{exercise['sets']}×{exercise['reps_range']}")
+                elif exercise.get('sets'):
+                    parts.append(str(exercise['sets']))
+                elif exercise.get('reps'):
+                    parts.append(str(exercise['reps']))
+                elif exercise.get('reps_range'):
+                    parts.append(exercise['reps_range'])
+                
+                # Add type
+                ex_type = exercise.get('type', 'strength')
+                parts.append(f"type:{ex_type}")
+                
+                # Add notes if present
+                if exercise.get('notes'):
+                    parts.append(f"note:{exercise['notes']}")
+                
+                output_lines.append(f"- {' | '.join(parts)}")
+            
+            output_lines.append("")  # Blank line between blocks
+        
+        return "\n".join(output_lines)
+    
+    @staticmethod
+    def _parse_freeform_exercise_line(line: str, in_superset: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Parse a single exercise line from free-form text.
+        
+        Handles patterns like:
+        - "bench 4x10"
+        - "4 x 12 squats"
+        - "3×AMRAP pull-ups"
+        - "deadlift 5x5 heavy"
+        - "superset dips + pushups 3x10"
+        
+        Args:
+            line: Exercise line to parse
+            in_superset: Whether we're currently in a superset context
+            
+        Returns:
+            Dictionary with exercise data or None if not an exercise
+        """
+        line = line.strip()
+        
+        # Remove bullet points and dashes at start (but preserve the line)
+        original_line = line
+        line = re.sub(r'^[•\-\s]+', '', line)
+        line = line.strip()
+        
+        if not line:
+            return None
+        
+        # Skip lines that are clearly not exercises (headers, instructions, etc.)
+        # But be more lenient - only skip if it's clearly a header
+        if line.lower().endswith(':') and len(line.split()) <= 3:
+            return None
+        
+        # Skip lines that are just numbers or metadata
+        if re.match(r'^\d+\s*(sets?|reps?|rounds?|times?)?\s*$', line, re.I):
+            return None
+        
+        # Handle superset format: "dips + pushups 3x10" or "superset: dips + pushups 3x10"
+        if '+' in line or (in_superset and 'and' in line.lower()):
+            # For now, treat as single exercise with notes about pairing
+            # Could be enhanced to split into multiple exercises
+            line = line.replace('+', 'and')
+        
+        # Extract sets×reps patterns
+        sets = reps = None
+        reps_range = None
+        notes = None
+        
+        # Pattern: "3×AMRAP" or "3xAMRAP"
+        amrap_match = re.search(r'(\d+)\s*[x×]\s*AMRAP', line, re.I)
+        if amrap_match:
+            sets = int(amrap_match.group(1))
+            reps_range = "AMRAP"
+            line = re.sub(r'\d+\s*[x×]\s*AMRAP', '', line, flags=re.I).strip()
+        
+        # Pattern: "4 sets of 10-12 reps" or "4 sets, 10-12 reps" (with "sets" and "reps" keywords)
+        sets_reps_range_match = None
+        if not amrap_match:
+            sets_reps_range_match = re.search(r'(\d+)\s+sets?\s+(?:of|,|×|x)\s+(\d+)\s*[-–]\s*(\d+)\s+reps?', line, re.I)
+            if sets_reps_range_match:
+                sets = int(sets_reps_range_match.group(1))
+                reps_range = f"{sets_reps_range_match.group(2)}-{sets_reps_range_match.group(3)}"
+                line = re.sub(r'\d+\s+sets?\s+(?:of|,|×|x)\s+\d+\s*[-–]\s*\d+\s+reps?', '', line, flags=re.I).strip()
+        
+        # Pattern: "4 sets of 10 reps" or "4 sets, 10 reps" or "4 sets × 10 reps" (with "sets" and "reps" keywords)
+        sets_reps_with_keywords_match = None
+        if not amrap_match and not sets_reps_range_match:
+            sets_reps_with_keywords_match = re.search(r'(\d+)\s+sets?\s+(?:of|,|×|x)\s+(\d+)\s+reps?', line, re.I)
+            if sets_reps_with_keywords_match:
+                sets = int(sets_reps_with_keywords_match.group(1))
+                reps = int(sets_reps_with_keywords_match.group(2))
+                line = re.sub(r'\d+\s+sets?\s+(?:of|,|×|x)\s+\d+\s+reps?', '', line, flags=re.I).strip()
+        
+        # Pattern: "10 reps for 4 sets" or "10 reps, 4 sets" (reps first, then sets)
+        reps_sets_match = None
+        if not sets and not reps and not reps_range:
+            reps_sets_match = re.search(r'(\d+)\s+reps?\s+(?:for|,|×|x)\s+(\d+)\s+sets?', line, re.I)
+            if reps_sets_match:
+                reps = int(reps_sets_match.group(1))
+                sets = int(reps_sets_match.group(2))
+                line = re.sub(r'\d+\s+reps?\s+(?:for|,|×|x)\s+\d+\s+sets?', '', line, flags=re.I).strip()
+        
+        # Pattern: "4×6–8" or "4x6-8" (compact format with range)
+        range_match = None
+        if not amrap_match and not sets_reps_range_match:
+            range_match = re.search(r'(\d+)\s*[x×]\s*(\d+)\s*[-–]\s*(\d+)', line)
+            if range_match:
+                sets = int(range_match.group(1))
+                reps_range = f"{range_match.group(2)}-{range_match.group(3)}"
+                line = re.sub(r'\d+\s*[x×]\s*\d+\s*[-–]\s*\d+', '', line).strip()
+        
+        # Pattern: "3×8" or "3x8" (compact format)
+        sets_reps_match = None
+        if not amrap_match and not sets_reps_range_match and not sets_reps_with_keywords_match and not reps_sets_match and not range_match:
+            sets_reps_match = re.search(r'(\d+)\s*[x×]\s*(\d+)', line)
+            if sets_reps_match:
+                sets = int(sets_reps_match.group(1))
+                reps = int(sets_reps_match.group(2))
+                line = re.sub(r'\d+\s*[x×]\s*\d+', '', line).strip()
+        
+        # Pattern: "4 x 12" (with spaces, no keywords)
+        if not sets_reps_match and not sets_reps_with_keywords_match and not reps_sets_match:
+            spaced_match = re.search(r'(\d+)\s+[x×]\s+(\d+)', line)
+            if spaced_match:
+                sets = int(spaced_match.group(1))
+                reps = int(spaced_match.group(2))
+                line = re.sub(r'\d+\s+[x×]\s+\d+', '', line).strip()
+        
+        # Pattern: "4 sets" (sets only, try to find reps elsewhere in the line)
+        if not sets and not reps and not reps_range:
+            sets_only_match = re.search(r'(\d+)\s+sets?', line, re.I)
+            if sets_only_match:
+                sets = int(sets_only_match.group(1))
+                # Try to find reps in the same line (e.g., "4 sets, 10 reps" or "4 sets of 10")
+                reps_in_line = re.search(r'(?:sets?|,|of)\s+(\d+)\s+reps?', line, re.I)
+                if reps_in_line:
+                    reps = int(reps_in_line.group(1))
+                    line = re.sub(r'\d+\s+sets?.*?(\d+\s+reps?)', '', line, flags=re.I).strip()
+                else:
+                    # Try to find a number that might be reps (e.g., "4 sets 10" or "4 sets, 10")
+                    reps_after_sets = re.search(r'sets?\s+(?:,|of)?\s*(\d+)(?:\s+reps?)?', line, re.I)
+                    if reps_after_sets:
+                        reps = int(reps_after_sets.group(1))
+                        line = re.sub(r'sets?\s+(?:,|of)?\s*\d+(?:\s+reps?)?', '', line, flags=re.I).strip()
+                    else:
+                        # Remove "X sets" from line
+                        line = re.sub(r'\d+\s+sets?', '', line, flags=re.I).strip()
+        
+        # Handle exercises with just reps (e.g., "Arm circles 10 each way")
+        # Look for patterns like "10 each way", "15 reps", "30 seconds"
+        if not sets and not reps and not reps_range:
+            # Pattern: number followed by descriptive text (reps, seconds, each, etc.)
+            reps_only_match = re.search(r'(\d+)\s+(each|reps?|seconds?|secs?|times?|repetitions?)', line, re.I)
+            if reps_only_match:
+                reps = int(reps_only_match.group(1))
+                # Remove the number and unit from line
+                line = re.sub(r'\d+\s+(each|reps?|seconds?|secs?|times?|repetitions?)', '', line, flags=re.I).strip()
+            else:
+                # Pattern: just a number at the end (e.g., "Arm circles 10")
+                number_at_end = re.search(r'(\d+)\s*$', line)
+                if number_at_end:
+                    reps = int(number_at_end.group(1))
+                    line = re.sub(r'\d+\s*$', '', line).strip()
+        
+        # Extract exercise name (everything remaining)
+        exercise_name = line.strip()
+        
+        # Remove common prefixes/suffixes that aren't part of the name
+        exercise_name = re.sub(r'^(superset|ss|pair|pairing):?\s*', '', exercise_name, flags=re.I)
+        exercise_name = exercise_name.strip()
+        
+        # Extract notes (text in parentheses)
+        notes_match = re.search(r'\(([^)]+)\)', exercise_name)
+        if notes_match:
+            notes = notes_match.group(1)
+            exercise_name = re.sub(r'\([^)]+\)', '', exercise_name).strip()
+        
+        # Extract notes after exercise name - be more conservative
+        # Only treat as notes if there are clear note indicators or if it's clearly descriptive text
+        if not notes:
+            words = exercise_name.split()
+            # Look for note indicators: "heavy", "light", "weighted", "if possible", etc.
+            note_indicators = ['heavy', 'light', 'weighted', 'if', 'possible', 'needed', 'optional', 'focus', 'strict']
+            # Find where notes might start (after exercise name)
+            if len(words) > 1:
+                # Check if any word matches note indicators
+                note_start_idx = None
+                for i, word in enumerate(words):
+                    if word.lower() in note_indicators or (i > 0 and word.lower() in ['if', 'or', 'and']):
+                        note_start_idx = i
+                        break
+                
+                # Also check for patterns like "each way", "per side", etc.
+                if note_start_idx is None:
+                    for i in range(len(words) - 1):
+                        if words[i].lower() in ['each', 'per'] and words[i+1].lower() in ['way', 'side', 'leg', 'arm']:
+                            note_start_idx = i
+                            break
+                
+                if note_start_idx is not None and note_start_idx > 0:
+                    # Split exercise name and notes
+                    exercise_name = ' '.join(words[:note_start_idx])
+                    notes = ' '.join(words[note_start_idx:])
+        
+        exercise_name = exercise_name.strip()
+        
+        # Don't reject exercises without sets×reps - they're still valid
+        # Only reject if there's no exercise name at all
+        if not exercise_name:
+            return None
+        
+        # If we have a number but no sets/reps extracted, it might be just reps
+        # This handles cases like "Arm circles 10" where 10 is the reps
+        if not sets and not reps and not reps_range:
+            # Check if there's a standalone number in the name
+            number_in_name = re.search(r'\b(\d+)\b', exercise_name)
+            if number_in_name:
+                # Only extract if it's at the end or followed by descriptive text
+                number_pos = exercise_name.find(number_in_name.group(1))
+                remaining_text = exercise_name[number_pos + len(number_in_name.group(1)):].strip()
+                if not remaining_text or remaining_text.lower() in ['each', 'reps', 'times', 'seconds', 'secs']:
+                    reps = int(number_in_name.group(1))
+                    # Remove the number from exercise name
+                    exercise_name = re.sub(r'\b' + number_in_name.group(1) + r'\b', '', exercise_name).strip()
+                    if remaining_text:
+                        # Add remaining text to notes if it's descriptive
+                        if notes:
+                            notes = remaining_text + ' ' + notes
+                        else:
+                            notes = remaining_text
+        
+        # Clean up exercise name (remove extra spaces)
+        exercise_name = re.sub(r'\s+', ' ', exercise_name).strip()
+        
+        if not exercise_name:
+            return None
+        
+        # Apply default reps if sets are found but reps are not
+        # Default to 10 reps when sets are present but reps are missing
+        # This matches the default in the UI edit workout dialog
+        # TODO: Later, this will use a user setting for default reps
+        if sets and not reps and not reps_range:
+            reps = 10
+
+        # Determine exercise type (default to strength, but infer from block context if needed)
+        ex_type = "strength"
+        name_lower = exercise_name.lower()
+        if any(word in name_lower for word in ['run', 'jog', 'bike', 'cycle', 'row', 'cardio']):
+            ex_type = "cardio"
+        elif any(word in name_lower for word in ['amrap', 'as many', 'max']):
+            ex_type = "amrap"
+        elif any(word in name_lower for word in ['warm', 'mobility', 'stretch', 'circles']):
+            ex_type = "warmup"
+        
+        # Default reps to 10 if sets are found but reps are not specified
+        # TODO: This will be configurable via user settings (FEAT-013)
+        if sets and not reps and not reps_range:
+            reps = 10
+        
+        return {
+            'name': exercise_name,
+            'sets': sets,
+            'reps': reps,
+            'reps_range': reps_range,
+            'type': ex_type,
+            'notes': notes
+        }
 

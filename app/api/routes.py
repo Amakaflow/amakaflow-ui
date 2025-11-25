@@ -243,11 +243,13 @@ Supinated Dumbbell Curl: 3 sets x 12 reps
 CRITICAL RULES:
 1. Only extract actual EXERCISES (movements like presses, pulls, rows, curls, raises, squats, deadlifts, etc.)
 2. IGNORE all conversational text, explanations, technique tips, greetings, sign-offs, and non-exercise content
-3. Extract sets and reps when mentioned (e.g., "3 sets of 6 reps", "2 sets x 10 reps", "three sets of four")
-4. If an exercise is mentioned multiple times, only include it once with the most complete information
-5. Group exercises that are supersetted together on the same line separated by " / "
-6. If sets/reps aren't mentioned, just list the exercise name
-7. Do NOT include warm-up activities, stretching, or non-exercise movements unless they're part of the workout
+3. ALWAYS extract BOTH sets AND reps when mentioned (e.g., "3 sets of 6 reps", "2 sets x 10 reps", "three sets of four", "4 sets, 10 reps")
+4. If you see "X sets" mentioned, look for reps in the same sentence or nearby context (e.g., "4 sets of 10", "4 sets, 10 reps", "doing 10 reps for 4 sets")
+5. If an exercise is mentioned multiple times, only include it once with the most complete information (prefer the mention that includes both sets AND reps)
+6. Group exercises that are supersetted together on the same line separated by " / "
+7. If sets/reps aren't mentioned anywhere, just list the exercise name
+8. Do NOT include warm-up activities, stretching, or non-exercise movements unless they're part of the workout
+9. IMPORTANT: If the transcript says "X sets" but doesn't explicitly mention reps in the same sentence, look for reps mentioned earlier or later in the context for that exercise
 
 Common exercise patterns to look for:
 - "X sets of Y reps on [exercise]"
@@ -357,6 +359,75 @@ def health():
     return {"ok": True}
 
 
+@router.post("/workouts/create-empty")
+def create_empty_workout():
+    """Create an empty workout structure for manual creation.
+    
+    Returns:
+        A workout structure with:
+        - title: "New Workout"
+        - source: "manual"
+        - blocks: Single empty block with label "Workout"
+    """
+    from app.models import Workout, Block
+    
+    empty_workout = Workout(
+        title="New Workout",
+        source="manual",
+        blocks=[
+            Block(
+                label="Workout",
+                structure=None,
+                exercises=[],
+                rounds=None,
+                sets=None,
+                time_cap_sec=None,
+                time_work_sec=None,
+                time_rest_sec=None,
+                rest_between_rounds_sec=None,
+                rest_between_sets_sec=None
+            )
+        ]
+    )
+    
+    return empty_workout.model_dump()
+
+
+@router.get("/exercises/wger")
+def get_wger_exercises():
+    """Get all exercises from WGER API with disk caching.
+    
+    Returns:
+        List of normalized exercises with:
+        - id: WGER exercise ID
+        - name: Exercise name
+        - description_plain: Plain text description
+        - category: Exercise category
+        - primary_muscles: List of primary muscle groups
+        - secondary_muscles: List of secondary muscle groups
+        - equipment: List of required equipment
+        - image_urls: List of exercise image URLs
+        - source: "wger"
+    
+    The exercises are cached on disk for 24 hours to avoid
+    overloading WGER servers.
+    """
+    from app.services.wger_service import get_all_exercises
+    import traceback
+    
+    try:
+        exercises = get_all_exercises()
+        return {"exercises": exercises, "count": len(exercises)}
+    except Exception as e:
+        # Log full traceback for debugging
+        error_trace = traceback.format_exc()
+        print(f"Error fetching WGER exercises: {error_trace}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch WGER exercises: {str(e)}"
+        )
+
+
 @router.post("/ingest/text")
 async def ingest_text(
     text: str = Form(...), 
@@ -460,6 +531,33 @@ async def ingest_ai_workout(text: str = Body(..., media_type="text/plain")):
     # Convert to new structure format
     wk = wk.convert_to_new_structure()
     return JSONResponse(content=wk.model_dump(), media_type="application/json")
+
+@router.post("/transform/freeform-to-canonical")
+async def transform_freeform_to_canonical(text: str = Body(..., media_type="text/plain")):
+    """
+    Transform free-form workout text into canonical format.
+    
+    This endpoint takes unstructured human-written workout text and converts it
+    to the canonical format. The output can then be processed by the regular
+    ingestion pipeline.
+    
+    Args:
+        text: Free-form workout text
+        
+    Returns:
+        Canonical format text string
+    """
+    try:
+        canonical_text = ParserService.transformFreeformToCanonical(text)
+        return JSONResponse(
+            content={"canonical_text": canonical_text},
+            media_type="application/json"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to transform free-form text: {str(e)}"
+        )
 
 
 @router.post("/ingest/image")
@@ -1033,6 +1131,10 @@ async def ingest_youtube(payload: YouTubeTranscriptRequest):
                         exercises = []
                         for ex_data in block_data.get("exercises", []):
                             ex_data.setdefault("type", "strength")  # Default to strength if not specified
+                            # Default reps to 10 if sets are found but reps are not specified
+                            # TODO: This will be configurable via user settings (FEAT-013)
+                            if ex_data.get("sets") and not ex_data.get("reps") and not ex_data.get("reps_range"):
+                                ex_data["reps"] = 10
                             exercises.append(Exercise(**ex_data))
                         block = Block(
                             label=block_data.get("label", "Block 1"),
@@ -1069,6 +1171,17 @@ async def ingest_youtube(payload: YouTubeTranscriptRequest):
             text_for_parser = summary_text or transcript_text
 
             wk = ParserService.parse_free_text_to_workout(text_for_parser, source=source)
+
+
+
+    # Post-process: Apply default reps (10) to exercises with sets but no reps
+    # TODO: This will be configurable via user settings (FEAT-013)
+    if wk and wk.blocks:
+        for block in wk.blocks:
+            if block.exercises:
+                for exercise in block.exercises:
+                    if exercise.sets and not exercise.reps and not exercise.reps_range:
+                        exercise.reps = 10
 
     if wk and title:
         wk.title = title[:80]
