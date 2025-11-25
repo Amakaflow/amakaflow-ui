@@ -118,3 +118,4 @@ CREATE TRIGGER update_follow_along_workout_updated_at
 
 
 
+

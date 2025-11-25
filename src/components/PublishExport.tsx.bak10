@@ -260,7 +260,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         (workout && (workout.title || (workout as any).name)) ||
         'AmakaFlow Workout';
 
-      const res = await fetch('http://localhost:8095/generate-fit', {
+      const res = await fetch('/api/garmin-usb-fit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
