@@ -663,42 +663,62 @@ def push_to_garmin_endpoint(workout_id: str, request: PushToGarminRequest):
             "message": "Workout not found"
         }
     
+    # Get Garmin credentials from environment
+    garmin_email = os.getenv("GARMIN_EMAIL")
+    garmin_password = os.getenv("GARMIN_PASSWORD")
+    
+    if not garmin_email or not garmin_password:
+        return {
+            "success": False,
+            "status": "error",
+            "message": "Garmin credentials not configured. Set GARMIN_EMAIL and GARMIN_PASSWORD environment variables."
+        }
+    
     # Map to Garmin format
-    garmin_payload = {
-        "name": workout["title"],
-        "steps": [
+    garmin_workouts = {
+        workout["title"]: [
             {
-                "type": "time",
-                "durationSec": step.get("duration_sec", 0),
-                "notes": step.get("label", "")
+                "exercise": step.get("label", ""),
+                "reps": step.get("target_reps") or f"{step.get('duration_sec', 0)}s"
             }
             for step in workout.get("steps", [])
         ]
     }
     
-    # Call Garmin sync API
+    # Call Garmin sync API - use /workouts/import endpoint
     garmin_url = os.getenv("GARMIN_SERVICE_URL", "http://garmin-sync-api:8002")
+    
+    garmin_payload = {
+        "email": garmin_email,
+        "password": garmin_password,
+        "workouts": garmin_workouts,
+        "delete_same_name": False
+    }
     
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(
-                f"{garmin_url}/workouts",
+                f"{garmin_url}/workouts/import",
                 json=garmin_payload
             )
             response.raise_for_status()
             garmin_data = response.json()
         
+        # Get the workout ID from Garmin (we need to fetch it by name)
+        # For now, use the workout title as the ID
+        garmin_workout_id = workout["title"]
+        
         # Update sync status
         update_follow_along_garmin_sync(
             workout_id=workout_id,
             user_id=request.userId,
-            garmin_workout_id=garmin_data.get("id", workout_id)
+            garmin_workout_id=garmin_workout_id
         )
         
         return {
             "success": True,
             "status": "success",
-            "garminWorkoutId": garmin_data.get("id")
+            "garminWorkoutId": garmin_workout_id
         }
     except Exception as e:
         logger.error(f"Failed to push to Garmin: {e}")
