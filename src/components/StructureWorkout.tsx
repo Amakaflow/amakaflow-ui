@@ -8,12 +8,45 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, X, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { WorkoutStructure, Exercise, Block } from '../types/workout';
+import { WorkoutStructure, Exercise, Block, Superset } from '../types/workout';
 import { DeviceId, getDevicesByIds, getDeviceById } from '../lib/devices';
 import { ExerciseSearch } from './ExerciseSearch';
 import { Badge } from './ui/badge';
 import { addIdsToWorkout, generateId, getStructureDisplayName } from '../lib/workout-utils';
 import { EditExerciseDialog } from './EditExerciseDialog';
+
+// ============================================================================
+// Immutable helpers for Workout cloning (Industry-standard: avoid JSON.parse(JSON.stringify))
+// ============================================================================
+function cloneExercise(ex: Exercise): Exercise {
+  return { ...ex };
+}
+
+function cloneSuperset(s: Superset): Superset {
+  return {
+    ...s,
+    exercises: (s.exercises || []).map(cloneExercise),
+  };
+}
+
+function cloneBlock(b: Block): Block {
+  return {
+    ...b,
+    exercises: (b.exercises || []).map(cloneExercise),
+    supersets: b.supersets ? b.supersets.map(cloneSuperset) : undefined,
+  };
+}
+
+function cloneWorkout(w: WorkoutStructure): WorkoutStructure {
+  return {
+    ...w,
+    blocks: (w.blocks || []).map(cloneBlock),
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
 
 type Props = {
   workout: WorkoutStructure;
@@ -130,6 +163,8 @@ function DraggableExercise({
 }
 
 // Droppable Exercise Container (Block-level exercises or Superset exercises)
+// Industry-standard: ExerciseDropZone focuses on UI + drop intent, not business logic like sorting
+// Array order in state is the single source of truth
 function ExerciseDropZone({
   blockIdx,
   exercises,
@@ -147,25 +182,22 @@ function ExerciseDropZone({
   label?: string;
   supersetIdx?: number;
 }) {
-  // Sort exercises by addedAt timestamp (oldest first, newest last)
-  // If no timestamp, treat as very old (put at top)
-  const sortedExercises = [...exercises].sort((a, b) => {
-    const aTime = a.addedAt || 0;
-    const bTime = b.addedAt || 0;
-    return aTime - bTime; // Oldest first
-  });
-  const [{ isOver }, drop] = useDrop(() => ({
-    accept: ItemTypes.EXERCISE,
-    drop: (item: DraggableExerciseData, monitor) => {
-      // Calculate target index based on drop position within the zone
-      // For now, append to end, but this could be enhanced to detect position
-      const targetIdx = exercises.length;
-      onDrop(item, targetIdx, supersetIdx);
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
+  const [{ isOver }, drop] = useDrop(
+    () => ({
+      accept: ItemTypes.EXERCISE,
+      drop: (item: DraggableExerciseData) => {
+        // For now, this drop zone appends to the end of its container.
+        // More advanced patterns (above/below/into) should be handled
+        // with additional sub-zones or hover position logic.
+        const targetIdx = exercises.length;
+        onDrop(item, targetIdx, supersetIdx);
+      },
+      collect: (monitor) => ({
+        isOver: monitor.isOver(),
+      }),
     }),
-  }));
+    [exercises.length, supersetIdx, onDrop]
+  );
 
   return (
     <div
@@ -185,21 +217,17 @@ function ExerciseDropZone({
           Drop exercise here or click Add Exercise
         </div>
       )}
-      {sortedExercises.map((exercise, idx) => {
-        // Find original index in unsorted array for callbacks
-        const originalIdx = exercises.findIndex(ex => ex.id === exercise.id);
-        return (
-          <DraggableExercise
-            key={exercise.id || idx}
-            exercise={exercise}
-            blockIdx={blockIdx}
-            exerciseIdx={originalIdx !== -1 ? originalIdx : idx}
-            supersetIdx={supersetIdx}
-            onEdit={() => onEdit(originalIdx !== -1 ? originalIdx : idx)}
-            onDelete={() => onDelete(originalIdx !== -1 ? originalIdx : idx)}
-          />
-        );
-      })}
+      {exercises.map((exercise, idx) => (
+        <DraggableExercise
+          key={exercise.id}
+          exercise={exercise}
+          blockIdx={blockIdx}
+          exerciseIdx={idx}
+          supersetIdx={supersetIdx}
+          onEdit={() => onEdit(idx)}
+          onDelete={() => onDelete(idx)}
+        />
+      ))}
     </div>
   );
 }
@@ -391,7 +419,43 @@ function DraggableBlock({
           </CardHeader>
           {!isCollapsed && (
             <CardContent className="space-y-4">
-              {/* Supersets - always show first */}
+              {/* Exercises at index 0 (before supersets) - show if supersets exist */}
+              {(block.supersets || []).length > 0 && (block.exercises || []).length > 0 && (
+                <div>
+                  <ExerciseDropZone
+                    blockIdx={blockIdx}
+                    exercises={(block.exercises || []).slice(0, 1)} // Only show first exercise if it exists
+                    onDrop={(item, targetIdx) => {
+                      // Drop at index 0 to place above supersets
+                      onExerciseDrop(item, 0);
+                    }}
+                    onEdit={(idx) => onEditExercise(0)}
+                    onDelete={(idx) => onDeleteExercise(0)}
+                    label={(block.exercises || []).length > 0 ? "Exercises" : undefined}
+                    supersetIdx={undefined}
+                  />
+                </div>
+              )}
+
+              {/* Drop zone before supersets - allows dragging exercises above supersets (empty zone) */}
+              {(block.supersets || []).length > 0 && (block.exercises || []).length === 0 && (
+                <div>
+                  <ExerciseDropZone
+                    blockIdx={blockIdx}
+                    exercises={[]}
+                    onDrop={(item) => {
+                      // Drop at index 0 to place above supersets
+                      onExerciseDrop(item, 0);
+                    }}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    label={undefined}
+                    supersetIdx={undefined}
+                  />
+                </div>
+              )}
+
+              {/* Supersets */}
               {(block.supersets || []).length > 0 && (
                 <div className="space-y-3">
                   {(block.supersets || []).map((superset, supersetIdx) => (
@@ -448,19 +512,62 @@ function DraggableBlock({
                 </div>
               )}
 
-              {/* Block-level exercises - always show AFTER supersets, sorted by addedAt (oldest first, newest last) */}
+              {/* Block-level exercises - show AFTER supersets (index 1+). We preserve the
+                  array order; no extra sorting in the UI. */}
               <div>
                 <ExerciseDropZone
                   blockIdx={blockIdx}
-                  exercises={block.exercises || []}
-                  onDrop={(item, targetIdx) => {
-                    // Always append to the end of block-level exercises (will be at bottom after sorting)
+                  exercises={(block.exercises || [])
+                    .slice((block.supersets || []).length > 0 ? 1 : 0)
+                    .filter(ex => ex != null)}
+                  onDrop={(item) => {
+                    // When dropping below supersets, append to the end of all block-level exercises
+                    // This ensures it goes after supersets in the UI
                     const finalTargetIdx = (block.exercises || []).length;
                     onExerciseDrop(item, finalTargetIdx);
                   }}
-                  onEdit={(idx) => onEditExercise(idx)}
-                  onDelete={(idx) => onDeleteExercise(idx)}
-                  label={(block.exercises || []).length > 0 ? "Exercises" : undefined}
+                  onEdit={(idx) => {
+                    const baseIdx = (block.supersets || []).length > 0 ? 1 : 0;
+                    // Map filtered index back to original array index
+                    const filteredSlice = (block.exercises || []).slice(baseIdx).filter(ex => ex != null);
+                    const originalSlice = (block.exercises || []).slice(baseIdx);
+                    // Find the original index by counting non-null exercises up to idx
+                    let count = 0;
+                    let actualIdx = baseIdx;
+                    for (let i = 0; i < originalSlice.length; i++) {
+                      if (originalSlice[i] != null) {
+                        if (count === idx) {
+                          actualIdx = baseIdx + i;
+                          break;
+                        }
+                        count++;
+                      }
+                    }
+                    onEditExercise(actualIdx);
+                  }}
+                  onDelete={(idx) => {
+                    const baseIdx = (block.supersets || []).length > 0 ? 1 : 0;
+                    // Map filtered index back to original array index
+                    const originalSlice = (block.exercises || []).slice(baseIdx);
+                    let count = 0;
+                    let actualIdx = baseIdx;
+                    for (let i = 0; i < originalSlice.length; i++) {
+                      if (originalSlice[i] != null) {
+                        if (count === idx) {
+                          actualIdx = baseIdx + i;
+                          break;
+                        }
+                        count++;
+                      }
+                    }
+                    onDeleteExercise(actualIdx);
+                  }}
+                  label={
+                    (block.exercises || []).filter(ex => ex != null).length >
+                    ((block.supersets || []).length > 0 ? 1 : 0)
+                      ? 'Exercises'
+                      : undefined
+                  }
                   supersetIdx={undefined}
                 />
               </div>
@@ -588,7 +695,7 @@ export function StructureWorkout({
   const handleBlockDrop = (draggedIdx: number, targetIdx: number) => {
     if (draggedIdx === targetIdx) return;
     
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     const [draggedBlock] = newWorkout.blocks.splice(draggedIdx, 1);
     
     // Adjust target index if dragging down
@@ -598,129 +705,131 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
-  // Handle exercise drag and drop
+  // Industry-standard: Use indices from DraggableExerciseData instead of re-searching arrays by id/name
+  // Perform immutable updates via clone helpers
+  // Correctly adjust target index when moving within the same container
   const handleExerciseDrop = (
     item: DraggableExerciseData,
     targetBlockIdx: number,
-    targetExerciseIdx: number,
+    rawTargetExerciseIdx: number,
     targetSupersetIdx?: number
   ) => {
-    // Use the current workout prop directly to ensure we have the latest state
-    const currentWorkout = workout || workoutWithIds;
-    const newWorkout = JSON.parse(JSON.stringify(currentWorkout));
-    
-    // Use the exercise from the drag item directly (it's already captured)
-    const draggedExercise = item.exercise;
-    
-    // Remove exercise from source location - find by ID first, then by name as fallback
-    let removed = false;
-    
-    if (item.supersetIdx !== undefined) {
-      // Remove from source superset
-      const superset = newWorkout.blocks[item.blockIdx]?.supersets?.[item.supersetIdx];
-      if (superset && superset.exercises) {
-        // Try to find and remove by ID
-        const idxById = superset.exercises.findIndex(ex => ex && ex.id === item.exercise.id);
-        if (idxById !== -1) {
-          superset.exercises.splice(idxById, 1);
-          removed = true;
-        } else {
-          // Fallback: try to find by name
-          const idxByName = superset.exercises.findIndex(ex => ex && ex.name === item.exercise.name);
-          if (idxByName !== -1) {
-            superset.exercises.splice(idxByName, 1);
-            removed = true;
-          }
-        }
-      }
-    } else {
-      // Remove from source block-level exercises
-      const block = newWorkout.blocks[item.blockIdx];
-      if (block && block.exercises) {
-        // Try to find and remove by ID
-        const idxById = block.exercises.findIndex(ex => ex && ex.id === item.exercise.id);
-        if (idxById !== -1) {
-          block.exercises.splice(idxById, 1);
-          removed = true;
-        } else {
-          // Fallback: try to find by name
-          const idxByName = block.exercises.findIndex(ex => ex && ex.name === item.exercise.name);
-          if (idxByName !== -1) {
-            block.exercises.splice(idxByName, 1);
-            removed = true;
-          }
-        }
-      }
-    }
-    
-    // Log warning if we couldn't remove from source, but continue anyway (exercise might have been moved already)
-    if (!removed) {
-      console.warn('Could not find exercise to remove from source (may have been moved already)', {
-        blockIdx: item.blockIdx,
-        exerciseIdx: item.exerciseIdx,
-        supersetIdx: item.supersetIdx,
-        exerciseId: item.exercise.id,
-        exerciseName: item.exercise.name,
-        availableExercises: item.supersetIdx !== undefined 
-          ? newWorkout.blocks[item.blockIdx]?.supersets?.[item.supersetIdx]?.exercises?.map(e => ({ id: e?.id, name: e?.name }))
-          : newWorkout.blocks[item.blockIdx]?.exercises?.map(e => ({ id: e?.id, name: e?.name }))
+    const currentWorkout: WorkoutStructure | undefined = workout || workoutWithIds;
+    if (!currentWorkout) return;
+
+    const newWorkout = cloneWorkout(currentWorkout);
+
+    const sourceBlockIdx = item.blockIdx;
+    const sourceSupersetIdx = item.supersetIdx;
+    const sourceExerciseIdx = item.exerciseIdx;
+
+    const sourceBlock = newWorkout.blocks[sourceBlockIdx];
+    const targetBlock = newWorkout.blocks[targetBlockIdx];
+
+    if (!sourceBlock || !targetBlock) {
+      console.warn('handleExerciseDrop: invalid block index', {
+        sourceBlockIdx,
+        targetBlockIdx,
       });
-      // Continue anyway - the exercise might have been moved already or the source might be different
-    }
-    
-    // Check if we're dropping in the same location (no-op)
-    if (item.blockIdx === targetBlockIdx && 
-        item.supersetIdx === targetSupersetIdx && 
-        sourceExerciseIdx !== undefined &&
-        sourceExerciseIdx === targetExerciseIdx) {
-      // Same location, no change needed
       return;
     }
-    
-    // Add to target (block-level or superset)
-    if (targetSupersetIdx !== undefined) {
-      // Add to target superset
-      if (!newWorkout.blocks[targetBlockIdx].supersets) {
-        newWorkout.blocks[targetBlockIdx].supersets = [];
+
+    let movedExercise: Exercise | undefined;
+
+    // 1) Remove from source
+    if (sourceSupersetIdx !== undefined && sourceSupersetIdx !== null) {
+      const sourceSuperset = sourceBlock.supersets?.[sourceSupersetIdx];
+      if (!sourceSuperset || !sourceSuperset.exercises) {
+        console.warn('handleExerciseDrop: invalid source superset', {
+          sourceSupersetIdx,
+        });
+        return;
       }
-      if (!newWorkout.blocks[targetBlockIdx].supersets[targetSupersetIdx]) {
-        newWorkout.blocks[targetBlockIdx].supersets[targetSupersetIdx] = {
+      movedExercise = sourceSuperset.exercises[sourceExerciseIdx];
+      if (!movedExercise) {
+        console.warn('handleExerciseDrop: no exercise at source index', {
+          sourceExerciseIdx,
+        });
+        return;
+      }
+      sourceSuperset.exercises.splice(sourceExerciseIdx, 1);
+    } else {
+      if (!sourceBlock.exercises) {
+        console.warn('handleExerciseDrop: source block has no exercises');
+        return;
+      }
+      movedExercise = sourceBlock.exercises[sourceExerciseIdx];
+      if (!movedExercise) {
+        console.warn('handleExerciseDrop: no exercise at source index', {
+          sourceExerciseIdx,
+        });
+        return;
+      }
+      sourceBlock.exercises.splice(sourceExerciseIdx, 1);
+    }
+
+    // Safety check
+    if (!movedExercise) {
+      console.warn('handleExerciseDrop: movedExercise is undefined after removal');
+      return;
+    }
+
+    // 2) Insert into target
+    if (targetSupersetIdx !== undefined && targetSupersetIdx !== null) {
+      // Ensure superset exists
+      if (!targetBlock.supersets) {
+        targetBlock.supersets = [];
+      }
+      if (!targetBlock.supersets[targetSupersetIdx]) {
+        targetBlock.supersets[targetSupersetIdx] = {
           id: generateId(),
           exercises: [],
           rest_between_sec: 60,
         };
       }
-      if (!newWorkout.blocks[targetBlockIdx].supersets[targetSupersetIdx].exercises) {
-        newWorkout.blocks[targetBlockIdx].supersets[targetSupersetIdx].exercises = [];
+      const targetSuperset = targetBlock.supersets[targetSupersetIdx];
+      if (!targetSuperset.exercises) {
+        targetSuperset.exercises = [];
       }
-      // Adjust target index if dragging within the same superset
-      let adjustedTargetIdx = targetExerciseIdx;
-      if (item.blockIdx === targetBlockIdx && item.supersetIdx === targetSupersetIdx && sourceExerciseIdx !== undefined) {
-        if (sourceExerciseIdx < targetExerciseIdx) {
-          adjustedTargetIdx = targetExerciseIdx - 1;
-        }
+
+      let targetExerciseIdx = rawTargetExerciseIdx;
+
+      // Adjust for moving within the same superset container
+      const movingWithinSameSuperset =
+        sourceBlockIdx === targetBlockIdx &&
+        sourceSupersetIdx !== undefined &&
+        sourceSupersetIdx === targetSupersetIdx;
+
+      if (movingWithinSameSuperset && sourceExerciseIdx < rawTargetExerciseIdx) {
+        targetExerciseIdx = rawTargetExerciseIdx - 1;
       }
-      newWorkout.blocks[targetBlockIdx].supersets[targetSupersetIdx].exercises.splice(adjustedTargetIdx, 0, draggedExercise);
+
+      targetExerciseIdx = clamp(targetExerciseIdx, 0, targetSuperset.exercises.length);
+      targetSuperset.exercises.splice(targetExerciseIdx, 0, movedExercise);
     } else {
-      // Add to target block-level exercises
-      if (!newWorkout.blocks[targetBlockIdx].exercises) {
-        newWorkout.blocks[targetBlockIdx].exercises = [];
+      if (!targetBlock.exercises) {
+        targetBlock.exercises = [];
       }
-      // Adjust target index if dragging within the same block-level exercises
-      let adjustedTargetIdx = targetExerciseIdx;
-      if (item.blockIdx === targetBlockIdx && item.supersetIdx === undefined && sourceExerciseIdx !== undefined) {
-        if (sourceExerciseIdx < targetExerciseIdx) {
-          adjustedTargetIdx = targetExerciseIdx - 1;
-        }
+
+      let targetExerciseIdx = rawTargetExerciseIdx;
+
+      // Adjust for moving within the same block-level exercises container
+      const movingWithinSameBlockExercises =
+        sourceBlockIdx === targetBlockIdx && (sourceSupersetIdx === undefined || sourceSupersetIdx === null);
+
+      if (movingWithinSameBlockExercises && sourceExerciseIdx < rawTargetExerciseIdx) {
+        targetExerciseIdx = rawTargetExerciseIdx - 1;
       }
-      newWorkout.blocks[targetBlockIdx].exercises.splice(adjustedTargetIdx, 0, draggedExercise);
+
+      targetExerciseIdx = clamp(targetExerciseIdx, 0, targetBlock.exercises.length);
+      targetBlock.exercises.splice(targetExerciseIdx, 0, movedExercise);
     }
-    
+
     onWorkoutChange(newWorkout);
   };
 
   const updateExercise = (blockIdx: number, exerciseIdx: number, updates: Partial<Exercise>, supersetIdx?: number) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     
     if (supersetIdx !== undefined) {
       // Update exercise in superset
@@ -741,7 +850,7 @@ export function StructureWorkout({
   };
 
   const deleteExercise = (blockIdx: number, exerciseIdx: number, supersetIdx?: number) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     
     if (supersetIdx !== undefined) {
       // Delete exercise from superset
@@ -758,8 +867,15 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
+  // Industry-standard: Use cloneWorkout for immutability
+  // Ensure new exercises always have an id and (optionally) addedAt for any upstream sorting
+  // Let the array order define what the UI shows; don't override it inside the drop zone
   const addExercise = (blockIdx: number, exerciseName: string, supersetIdx?: number) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const baseWorkout: WorkoutStructure | undefined = workoutWithIds || workout;
+    if (!baseWorkout) return;
+
+    const newWorkout = cloneWorkout(baseWorkout);
+
     const newExercise: Exercise = {
       id: generateId(),
       name: exerciseName,
@@ -772,33 +888,52 @@ export function StructureWorkout({
       distance_range: null,
       type: 'strength',
       notes: null,
-      addedAt: Date.now() // Track when exercise was added for sorting
+      addedAt: Date.now(), // optional metadata; actual order is defined by array position
     };
-    
-    if (supersetIdx !== undefined) {
-      // Add to superset - always append to end
-      if (!newWorkout.blocks[blockIdx].supersets) {
-        newWorkout.blocks[blockIdx].supersets = [];
+
+    const block = newWorkout.blocks[blockIdx];
+    if (!block) {
+      console.warn('addExercise: invalid blockIdx', { blockIdx });
+      return;
+    }
+
+    if (supersetIdx !== undefined && supersetIdx !== null) {
+      if (!block.supersets) {
+        block.supersets = [];
       }
-      if (!newWorkout.blocks[blockIdx].supersets[supersetIdx]) {
-        newWorkout.blocks[blockIdx].supersets[supersetIdx] = {
+      if (!block.supersets[supersetIdx]) {
+        block.supersets[supersetIdx] = {
           id: generateId(),
           exercises: [],
           rest_between_sec: 60,
         };
       }
-      if (!newWorkout.blocks[blockIdx].supersets[supersetIdx].exercises) {
-        newWorkout.blocks[blockIdx].supersets[supersetIdx].exercises = [];
+      if (!block.supersets[supersetIdx].exercises) {
+        block.supersets[supersetIdx].exercises = [];
       }
-      newWorkout.blocks[blockIdx].supersets[supersetIdx].exercises.push(newExercise);
+      block.supersets[supersetIdx].exercises.push(newExercise);
     } else {
-      // Add to block-level exercises - always append to end (will be at bottom after sorting)
-      if (!newWorkout.blocks[blockIdx].exercises) {
-        newWorkout.blocks[blockIdx].exercises = [];
+      if (!block.exercises) {
+        block.exercises = [];
       }
-      newWorkout.blocks[blockIdx].exercises.push(newExercise);
+      // When adding to block-level exercises:
+      // - If there are supersets, we want the exercise to go AFTER supersets
+      //   - Index 0 is shown before supersets (if it exists)
+      //   - Index 1+ are shown after supersets
+      //   - So if this is the first exercise with supersets, insert at index 1
+      //   - Otherwise, append to end (will be at index 1+)
+      // - If no supersets, append normally
+      const hasSupersets = (block.supersets || []).length > 0;
+      if (hasSupersets && block.exercises.length === 0) {
+        // First exercise with supersets - insert at index 1 (after supersets)
+        // This creates a sparse array, but that's okay - index 0 will be undefined
+        block.exercises[1] = newExercise;
+      } else {
+        // Not the first exercise, or no supersets - append normally
+        block.exercises.push(newExercise);
+      }
     }
-    
+
     onWorkoutChange(newWorkout);
     setShowExerciseSearch(false);
     setAddingToBlock(null);
@@ -806,11 +941,11 @@ export function StructureWorkout({
   };
 
   const addSuperset = (blockIdx: number) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     if (!newWorkout.blocks[blockIdx].supersets) {
       newWorkout.blocks[blockIdx].supersets = [];
     }
-    const newSuperset = {
+    const newSuperset: Superset = {
       id: generateId(),
       exercises: [],
       rest_between_sec: 60,
@@ -820,7 +955,7 @@ export function StructureWorkout({
   };
 
   const deleteSuperset = (blockIdx: number, supersetIdx: number) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     if (newWorkout.blocks[blockIdx].supersets) {
       newWorkout.blocks[blockIdx].supersets.splice(supersetIdx, 1);
     }
@@ -828,7 +963,7 @@ export function StructureWorkout({
   };
 
   const addBlock = () => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     const newBlock: Block = {
       id: generateId(),
       label: `Block ${(workoutWithIds.blocks || []).length + 1}`,
@@ -840,7 +975,7 @@ export function StructureWorkout({
   };
 
   const updateBlock = (blockIdx: number, updates: Partial<Block>) => {
-    const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
+    const newWorkout = cloneWorkout(workoutWithIds);
     newWorkout.blocks[blockIdx] = { ...newWorkout.blocks[blockIdx], ...updates };
     onWorkoutChange(newWorkout);
   };

@@ -1,7 +1,7 @@
 {
   "appName": "AmakaFlow",
-  "version": "0.0.0-dev",
-  "gitSha": "7f76b3e",
-  "builtAt": "2025-11-23T18:41:07.664Z",
+  "version": "0.1.0",
+  "gitSha": "1520d0f",
+  "builtAt": "2025-11-25T01:20:19.042Z",
   "env": "development"
 }

@@ -20,6 +20,7 @@ export function addIdsToWorkout(workout: WorkoutStructure): WorkoutStructure {
     };
   }
   
+  // Industry-standard: ensure all exercises and supersets have required IDs
   return {
     ...workout,
     blocks: workout.blocks.map(block => ({
@@ -27,14 +28,14 @@ export function addIdsToWorkout(workout: WorkoutStructure): WorkoutStructure {
       id: block.id || generateId(),
       exercises: (block.exercises || []).filter(ex => ex != null).map(exercise => ({
         ...exercise,
-        id: exercise.id || generateId(),
+        id: exercise.id || generateId(), // Required field
       })),
       supersets: (block.supersets || []).map(superset => ({
         ...superset,
-        id: superset.id || generateId(),
+        id: superset.id || generateId(), // Required field
         exercises: (superset.exercises || []).filter(ex => ex != null).map(exercise => ({
           ...exercise,
-          id: exercise.id || generateId(),
+          id: exercise.id || generateId(), // Required field
         })),
       })),
     })),

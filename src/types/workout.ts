@@ -1,7 +1,7 @@
 // API Request/Response Types matching the actual backend
 
 export interface Exercise {
-  id?: string; // Unique ID for drag-and-drop stability
+  id: string; // Industry-standard: required for stable drag-and-drop
   name: string;
   sets: number | null;
   reps: number | null;
@@ -13,7 +13,7 @@ export interface Exercise {
   type: 'strength' | 'cardio' | 'HIIT' | 'interval' | string;
   followAlongUrl?: string | null; // Instagram, TikTok, YouTube, or any video URL for this exercise
   notes?: string | null;
-  addedAt?: number; // Timestamp when exercise was added (for sorting - oldest first, newest last)
+  addedAt?: number; // Timestamp when exercise was added (can be used upstream to seed initial order)
 }
 
 export type WorkoutStructureType = 
@@ -58,7 +58,7 @@ export interface Block {
 
 // Superset interface - containers within blocks that hold exercises
 export interface Superset {
-  id?: string; // Unique ID for drag-and-drop stability
+  id: string; // Industry-standard: required for stable drag-and-drop
   exercises: Exercise[];
   rest_between_sec?: number | null; // Rest after completing all exercises in the superset
 }
