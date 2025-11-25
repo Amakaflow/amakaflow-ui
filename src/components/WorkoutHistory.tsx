@@ -36,6 +36,7 @@ type Props = {
   onEditWorkout?: (item: WorkoutHistoryItem) => void;
   onUpdateWorkout?: (item: WorkoutHistoryItem) => Promise<void>;
   onDeleteWorkout: (id: string) => void;
+  onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onEnhanceStrava?: (item: WorkoutHistoryItem) => void;
 };
 
@@ -48,7 +49,7 @@ type ViewCard = {
   category: string;
 };
 
-export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdateWorkout, onDeleteWorkout, onEnhanceStrava }: Props) {
+export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdateWorkout, onDeleteWorkout, onBulkDeleteWorkouts, onEnhanceStrava }: Props) {
   const stravaConnected = isAccountConnectedSync('strava');
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -89,6 +90,19 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
 
   const clearSelection = () => {
     setSelectedIds([]);
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (!onBulkDeleteWorkouts || selectedIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedIds.length} selected workout(s)?`
+    );
+
+    if (!confirmed) return;
+
+    onBulkDeleteWorkouts(selectedIds);
+    clearSelection();
   };
   
   const handleDeleteClick = (id: string) => {
@@ -317,6 +331,23 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isAllSelected}
+            onChange={toggleSelectAll}
+            aria-label="Select all workouts"
+            className="w-4 h-4"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={selectedIds.length === 0}
+            onClick={handleBulkDeleteClick}
+            className="gap-2"
+          >
+            Delete selected ({selectedIds.length})
+          </Button>
           <Button
             variant={viewMode === 'cards' ? 'default' : 'outline'}
             size="sm"
@@ -374,6 +405,13 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
                   key={item.id}
                   className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors group"
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(item.id || '')}
+                    onChange={() => toggleSelect(item.id || '')}
+                    aria-label="Select workout"
+                    className="w-4 h-4 flex-shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold truncate">{item.workout?.title || 'Untitled Workout'}</h3>
@@ -462,6 +500,13 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
               <Card key={item.id} className="hover:shadow-md transition-all border-border/50 bg-card">
                 <CardHeader className="pb-3 px-4 pt-4">
                   <div className="flex items-start justify-between gap-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item.id || '')}
+                      onChange={() => toggleSelect(item.id || '')}
+                      aria-label="Select workout"
+                      className="w-4 h-4 flex-shrink-0 mt-1"
+                    />
                     <div className="flex-1 min-w-0 space-y-2">
                       <CardTitle className="text-lg font-bold truncate text-foreground">
                         {item.workout?.title || 'Untitled Workout'}
