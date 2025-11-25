@@ -25,14 +25,14 @@ export function addIdsToWorkout(workout: WorkoutStructure): WorkoutStructure {
     blocks: workout.blocks.map(block => ({
       ...block,
       id: block.id || generateId(),
-      exercises: (block.exercises || []).map(exercise => ({
+      exercises: (block.exercises || []).filter(ex => ex != null).map(exercise => ({
         ...exercise,
         id: exercise.id || generateId(),
       })),
       supersets: (block.supersets || []).map(superset => ({
         ...superset,
         id: superset.id || generateId(),
-        exercises: (superset.exercises || []).map(exercise => ({
+        exercises: (superset.exercises || []).filter(ex => ex != null).map(exercise => ({
           ...exercise,
           id: exercise.id || generateId(),
         })),

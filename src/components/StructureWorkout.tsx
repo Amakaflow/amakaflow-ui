@@ -378,21 +378,6 @@ function DraggableBlock({
           </CardHeader>
           {!isCollapsed && (
             <CardContent className="space-y-4">
-              {/* Block-level exercises */}
-              {(block.exercises || []).length > 0 && (
-                <div>
-                <ExerciseDropZone
-                  blockIdx={blockIdx}
-                  exercises={block.exercises || []}
-                  onDrop={(item, targetIdx) => onExerciseDrop(item, targetIdx)}
-                  onEdit={(idx) => onEditExercise(idx)}
-                  onDelete={(idx) => onDeleteExercise(idx)}
-                  label="Exercises"
-                  supersetIdx={undefined}
-                />
-                </div>
-              )}
-
               {/* Supersets */}
               {(block.supersets || []).length > 0 && (
                 <div className="space-y-3">
@@ -434,6 +419,7 @@ function DraggableBlock({
                           onDeleteExercise(idx, supersetIdx);
                         }}
                         label={`Superset ${supersetIdx + 1} Exercises`}
+                        supersetIdx={supersetIdx}
                       />
                       <Button
                         variant="outline"
@@ -448,6 +434,19 @@ function DraggableBlock({
                   ))}
                 </div>
               )}
+
+              {/* Block-level exercises drop zone - always show (after supersets if they exist) */}
+              <div>
+                <ExerciseDropZone
+                  blockIdx={blockIdx}
+                  exercises={block.exercises || []}
+                  onDrop={(item, targetIdx) => onExerciseDrop(item, targetIdx)}
+                  onEdit={(idx) => onEditExercise(idx)}
+                  onDelete={(idx) => onDeleteExercise(idx)}
+                  label={(block.exercises || []).length > 0 ? "Exercises" : undefined}
+                  supersetIdx={undefined}
+                />
+              </div>
 
               {/* Action buttons */}
               <div className="flex gap-2 pt-2 border-t">
@@ -589,16 +588,27 @@ export function StructureWorkout({
     const newWorkout = JSON.parse(JSON.stringify(workoutWithIds));
     
     // Get exercise from source (block-level or superset)
-    let draggedExercise: Exercise;
+    let draggedExercise: Exercise | undefined;
     if (item.supersetIdx !== undefined) {
       // Remove from source superset
-      draggedExercise = newWorkout.blocks[item.blockIdx].supersets[item.supersetIdx].exercises.splice(item.exerciseIdx, 1)[0];
+      const superset = newWorkout.blocks[item.blockIdx].supersets?.[item.supersetIdx];
+      if (superset && superset.exercises && superset.exercises[item.exerciseIdx]) {
+        draggedExercise = superset.exercises.splice(item.exerciseIdx, 1)[0];
+      }
     } else {
       // Remove from source block-level exercises
       if (!newWorkout.blocks[item.blockIdx].exercises) {
         newWorkout.blocks[item.blockIdx].exercises = [];
       }
-      draggedExercise = newWorkout.blocks[item.blockIdx].exercises.splice(item.exerciseIdx, 1)[0];
+      if (newWorkout.blocks[item.blockIdx].exercises[item.exerciseIdx]) {
+        draggedExercise = newWorkout.blocks[item.blockIdx].exercises.splice(item.exerciseIdx, 1)[0];
+      }
+    }
+    
+    // If exercise wasn't found, abort
+    if (!draggedExercise) {
+      console.error('Could not find exercise to drag');
+      return;
     }
     
     // Add to target (block-level or superset)
@@ -921,10 +931,14 @@ export function StructureWorkout({
         {/* Exercise Search Modal */}
         {showExerciseSearch && addingToBlock !== null && (
           <ExerciseSearch
-            onSelect={(exerciseName) => addExercise(addingToBlock, exerciseName)}
+            onSelect={(exerciseName) => {
+              const supersetIdx = addingToSuperset?.supersetIdx;
+              addExercise(addingToBlock, exerciseName, supersetIdx);
+            }}
             onClose={() => {
               setShowExerciseSearch(false);
               setAddingToBlock(null);
+              setAddingToSuperset(null);
             }}
             device={selectedDevice}
           />
