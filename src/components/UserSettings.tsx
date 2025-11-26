@@ -26,6 +26,7 @@ import { useClerkUser, useClerkAuth, updateUserProfileFromClerk } from '../lib/c
 import { cn } from './ui/utils';
 import { getPreferences, savePreferences, ImageProcessingMethod, getImageProcessingMethod, setImageProcessingMethod } from '../lib/preferences';
 import { Alert, AlertDescription } from './ui/alert';
+import { ENABLE_GARMIN_USB_EXPORT } from '../lib/env';
 
 type Props = {
   user: {
@@ -50,8 +51,8 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [selectedDevices, setSelectedDevices] = useState<DeviceId[]>(user.selectedDevices);
-    // Derive Garmin USB state from selectedDevices
-  const exportGarminUsb = selectedDevices.includes('garmin_usb');
+    // Derive Garmin USB state from selectedDevices (only if feature flag is enabled)
+  const exportGarminUsb = ENABLE_GARMIN_USB_EXPORT && selectedDevices.includes('garmin_usb');
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
@@ -673,29 +674,31 @@ Block: Warm-Up
                       />
                     </div>
 
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">Garmin (USB FIT Export)</span>
-                        <span className="text-xs text-muted-foreground">
-                          Export FIT files for manual USB transfer to your Garmin watch
-                        </span>
+                    {ENABLE_GARMIN_USB_EXPORT && (
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">Garmin (USB FIT Export)</span>
+                          <span className="text-xs text-muted-foreground">
+                            Export FIT files for manual USB transfer to your Garmin watch
+                          </span>
+                        </div>
+                        <Switch
+                          checked={exportGarminUsb}
+                          onCheckedChange={(val) => {
+                            setSelectedDevices((prev) => {
+                              const hasUsb = prev.includes('garmin_usb');
+                              if (val && !hasUsb) {
+                                return [...prev, 'garmin_usb'];
+                              }
+                              if (!val && hasUsb) {
+                                return prev.filter((d) => d !== 'garmin_usb');
+                              }
+                              return prev;
+                            });
+                          }}
+                        />
                       </div>
-                      <Switch
-                        checked={exportGarminUsb}
-                        onCheckedChange={(val) => {
-                          setSelectedDevices((prev) => {
-                            const hasUsb = prev.includes('garmin_usb');
-                            if (val && !hasUsb) {
-                              return [...prev, 'garmin_usb'];
-                            }
-                            if (!val && hasUsb) {
-                              return prev.filter((d) => d !== 'garmin_usb');
-                            }
-                            return prev;
-                          });
-                        }}
-                      />
-                    </div>
+                    )}
 
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
