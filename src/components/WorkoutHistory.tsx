@@ -380,16 +380,20 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
       <div className="text-center py-16">
         <Dumbbell className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-20" />
         <h3 className="text-xl mb-2">No workout history yet</h3>
-        <p className="text-muted-foreground mb-6">
-          Create your first workout to see it here
+        <p className="text-muted-foreground mb-4">
+          Your saved workouts will appear here. To get started:
         </p>
-        <Button onClick={() => window.location.reload()}>
-          Create Workout
+        <div className="text-sm text-muted-foreground mb-6 space-y-1">
+          <p>1. Create a workout (YouTube, Instagram, or manual entry)</p>
+          <p>2. Validate and map exercises</p>
+          <p>3. Click "Save Workout" in the Publish & Export step</p>
+        </div>
+        <Button onClick={() => { window.location.href = "/"; }}>
+          Create Your First Workout
         </Button>
       </div>
     );
   }
-
   return (
     <div className="space-y-4">
       {/* Delete Confirmation Modal */}
