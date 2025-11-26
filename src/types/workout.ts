@@ -81,6 +81,13 @@ export interface ExerciseSuggestion {
   keyword?: string;
 }
 
+// New format: simple list of {name, confidence} tuples from exercise_name_matcher
+export interface Suggestion {
+  name: string;
+  confidence: number;
+}
+
+// Legacy format (kept for backward compatibility)
 export interface ValidationSuggestions {
   similar: ExerciseSuggestion[];
   by_type: ExerciseSuggestion[];
@@ -91,12 +98,16 @@ export interface ValidationSuggestions {
 export interface ValidationResult {
   original_name: string;
   mapped_to: string | null;
+  mapped_name?: string | null; // New field from backend (same as mapped_to)
   confidence: number;
   description: string;
   block: string;
   location: string;
-  status: 'valid' | 'needs_review';
-  suggestions: ValidationSuggestions;
+  status: 'valid' | 'needs_review' | 'unmapped';
+  // New format: list of {name, confidence} tuples
+  suggestions: Suggestion[];
+  // Legacy format (optional, for backward compatibility)
+  suggestions_legacy?: ValidationSuggestions;
 }
 
 export interface ValidationResponse {

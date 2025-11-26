@@ -112,16 +112,34 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
     return 'text-red-600';
   };
 
-  // Combine original suggestions with search results
-  const originalSuggestions = [
-    ...(result.suggestions?.similar || []),
-    ...(result.suggestions?.by_type || [])
-  ];
+  // Extract suggestions from new format (array of {name, confidence}) or legacy format
+  const getSuggestions = () => {
+    // New format: result.suggestions is an array of {name, confidence}
+    if (Array.isArray(result.suggestions) && result.suggestions.length > 0) {
+      // Check if it's the new format (has 'confidence' property)
+      if (result.suggestions[0] && 'confidence' in result.suggestions[0]) {
+        return result.suggestions.map(s => ({
+          name: s.name,
+          score: s.confidence, // Map confidence to score for compatibility
+        }));
+      }
+    }
+    // Legacy format: result.suggestions has similar and by_type arrays
+    if (result.suggestions && typeof result.suggestions === 'object' && 'similar' in result.suggestions) {
+      return [
+        ...((result.suggestions as any).similar || []),
+        ...((result.suggestions as any).by_type || [])
+      ];
+    }
+    return [];
+  };
+
+  const originalSuggestions = getSuggestions();
   
   // If we have search results, use them, otherwise use original suggestions
   const allSuggestions = searchResults.length > 0 ? searchResults : originalSuggestions;
   
-  const topSuggestions = originalSuggestions.slice(0, 2);
+  const topSuggestions = originalSuggestions.slice(0, 5); // Show up to 5 suggestions
 
   return (
     <Card className={`transition-all duration-300 ${
@@ -205,48 +223,51 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
           </div>
         )}
 
-        {/* Quick Suggestions - Show for unmapped exercises with suggestions */}
-        {topSuggestions.length > 0 && !result.mapped_to && (
+        {/* Quick Suggestions - Show for unmapped or needs_review exercises with suggestions */}
+        {topSuggestions.length > 0 && (result.status === 'unmapped' || result.status === 'needs_review') && (
           <div className="space-y-2">
-            <Label className="text-xs">AI Suggestions - Click to Select</Label>
-            {topSuggestions.map((suggestion, idx) => (
-              <div
-                key={idx}
-                className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
-                  selectedSuggestionIndex === idx 
-                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
-                    : 'bg-muted/50 hover:bg-muted hover:border-primary/50'
-                }`}
-                onClick={() => {
-                  setSelectedSuggestionIndex(idx);
-                  // Apply immediately when clicking the suggestion
-                  onApplyMapping(result.original_name, suggestion.name);
-                  setSelectedSuggestionIndex(null);
-                }}
-              >
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{suggestion.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {(suggestion.score * 100).toFixed(0)}% match - Click to select
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant={selectedSuggestionIndex === idx ? "default" : "outline"}
-                  onClick={(e) => {
-                    e.stopPropagation();
+            <Label className="text-xs">Suggestions - Click to Apply</Label>
+            <div className="flex flex-wrap gap-2">
+              {topSuggestions.map((suggestion, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer ${
+                    selectedSuggestionIndex === idx 
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
+                      : 'bg-muted/50 hover:bg-muted hover:border-primary/50'
+                  }`}
+                  onClick={() => {
                     setSelectedSuggestionIndex(idx);
+                    // Apply immediately when clicking the suggestion
                     onApplyMapping(result.original_name, suggestion.name);
                     setSelectedSuggestionIndex(null);
                   }}
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
-            {originalSuggestions.length > 2 && (
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{suggestion.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {(suggestion.score * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSuggestionIndex(idx);
+                      onApplyMapping(result.original_name, suggestion.name);
+                      setSelectedSuggestionIndex(null);
+                    }}
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {originalSuggestions.length > topSuggestions.length && (
               <p className="text-xs text-muted-foreground text-center">
-                + {originalSuggestions.length - 2} more suggestions available in "Find & Select Mapping"
+                + {originalSuggestions.length - topSuggestions.length} more suggestions available in "Find & Select Mapping"
               </p>
             )}
           </div>
