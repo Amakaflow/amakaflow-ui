@@ -244,7 +244,7 @@ CREATE TABLE strava_tokens (
 Logs include:
 - OAuth initiation and callbacks
 - Token refresh operations
-- Strava API calls and responses
+- Strava API calls and responses6
 - Error conditions
 
 ## Future Enhancements
