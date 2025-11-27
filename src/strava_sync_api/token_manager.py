@@ -3,10 +3,10 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import logging
 
-from config import settings
-from database import db
-from strava_client import StravaClient, StravaAPIError
-from crypto_utils import encrypt_token, decrypt_token
+from strava_sync_api.config import settings
+from strava_sync_api.database import db
+from strava_sync_api.strava_client import StravaClient, StravaAPIError
+from strava_sync_api.crypto_utils import encrypt_token, decrypt_token
 
 logger = logging.getLogger(__name__)
 

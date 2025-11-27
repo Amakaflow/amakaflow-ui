@@ -11,11 +11,11 @@ import logging
 from urllib.parse import urlencode
 import httpx
 
-from config import settings
-from crypto_utils import init_encryption
-from token_manager import token_manager
-from strava_client import StravaClient, StravaAPIError
-from database import db
+from strava_sync_api.config import settings
+from strava_sync_api.crypto_utils import init_encryption
+from strava_sync_api.token_manager import token_manager
+from strava_sync_api.strava_client import StravaClient, StravaAPIError
+from strava_sync_api.database import db
 
 # Initialize encryption
 init_encryption(settings.encryption_key)
