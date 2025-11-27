@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { AddSources } from '../AddSources';
 
 describe('AddSources', () => {
@@ -29,10 +29,16 @@ describe('AddSources', () => {
 
   it('should render tabs for different source types', () => {
     render(<AddSources {...defaultProps} />);
-    const instagramTabs = screen.getAllByText(/Instagram/i);
-    expect(instagramTabs.length).toBeGreaterThan(0);
-    const youtubeTabs = screen.getAllByText(/YouTube/i);
-    expect(youtubeTabs.length).toBeGreaterThan(0);
+
+    // We now expect YouTube + Image tabs (and at least one more tab)
+    const youtubeTab = screen.getByRole('tab', { name: /YouTube/i });
+    const imageTab = screen.getByRole('tab', { name: /Image/i });
+
+    const allTabs = screen.getAllByRole('tab');
+
+    expect(youtubeTab).toBeInTheDocument();
+    expect(imageTab).toBeInTheDocument();
+    expect(allTabs.length).toBeGreaterThanOrEqual(2); // handles any third tab label safely
   });
 
   it('should have generate button', () => {
@@ -40,4 +46,3 @@ describe('AddSources', () => {
     expect(screen.getByText(/Generate Structure/i)).toBeInTheDocument();
   });
 });
-
