@@ -32,3 +32,15 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "ok"}
 
+
+# --- Health check endpoint (added for tests & uptime checks) ---
+from fastapi import FastAPI
+
+try:
+    app  # type: ignore[name-defined]
+except NameError:
+    app = FastAPI()
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
