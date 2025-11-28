@@ -1,324 +1,142 @@
-import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Youtube, Image, Sparkles, Plus, Trash2, Loader2, Upload, X, Eye, Sparkles as VisionIcon, XCircle, Copy, Check } from 'lucide-react';
-import { Source, SourceType, WorkoutStructure } from '../types/workout';
-import { Textarea } from './ui/textarea';
-import { WorkoutTemplates } from './WorkoutTemplates';
-import { getImageProcessingMethod } from '../lib/preferences';
-import { Badge } from './ui/badge';
-import { Alert, AlertDescription } from './ui/alert';
-import { Info, ChevronDown, ChevronUp } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+"use client";
 
-interface AddSourcesProps {
-  onGenerate: (sources: Source[]) => void;
-  onLoadTemplate: (workout: WorkoutStructure) => void;
-  onCreateNew?: () => void;
-  loading: boolean;
-  progress?: string | null;
-  onCancel?: () => void;
-}
+import * as React from "react";
+import { Youtube, Image as ImageIcon, Sparkles } from "lucide-react";
 
-// Universal AI prompt component for copying (collapsible)
-function AIPromptCopyButton() {
-  const [copied, setCopied] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const prompt = `WORKOUT FORMAT RULES — USE EXACTLY THIS FORMAT EVERY TIME
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Button } from "./ui/button";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import type { IngestResponse } from "../lib/api/ingest";
+import { ingestWorkout } from "../lib/api/ingest";
 
-Your job is to generate workout plans in the exact text format below, with no extra commentary, no explanations, and no deviations.
+type AddSourcesProps = {
+  // Existing props
+  sources: any[];
+  onSourcesChange: (sources: any[]) => void;
+  /**
+   * Kept backwards compatible: callers that ignore the argument still work.
+   * When using real ingest, we pass { blocks, ingestMeta } so the parent
+   * can wire into mapping / exports.
+   */
+  onGenerateStructure: (result?: { blocks?: any[]; ingestMeta?: IngestResponse }) => void;
+};
 
-OUTPUT FORMAT (MUST MATCH EXACTLY)
+function AddSources(props: AddSourcesProps) {
+  const { sources, onSourcesChange, onGenerateStructure } = props;
 
-Title: [Workout Name]
-
-Block: [Block Name]
-- Exercise Name | sets×reps | type:type | note:optional notes
-
-FORMAT RULES
-
-1. Title must use: Title: [Workout Name]
-
-2. Every section must start with: Block: [Block Name]
-   Examples: Warm-Up, Main Strength, Conditioning, Finisher, Cool-Down
-
-3. Exercises must start with "- " or "•" (either is acceptable)
-
-4. Exercise line format: Exercise Name | sets×reps | type:type | note:optional notes
-   Examples:
-   - 3×8 = 3 sets of 8 reps
-   - 4×6–8 = 4 sets of 6–8 reps
-   - 3×AMRAP = as many reps as possible
-   - If no sets/reps: omit it → Exercise Name | type:warmup
-
-5. Valid types:
-   - strength
-   - warmup
-   - cooldown
-   - cardio
-   - amrap
-
-6. Use ONLY real exercise names. Examples: Bench Press, Pull-Ups, Wall Balls, Deadlift
-   Do NOT generate placeholders like "Exercise 1", "Set 1", "Do 20 steps," etc.
-
-7. NEVER add extra explanations before or after the workout. The output must be only the formatted workout.
-
-RESPONSE STYLE REQUIREMENT
-- No bullet points outside exercises
-- No code fences unless shown above
-- No chatty text
-- No intros, no outros
-- Only output the formatted workout
-
-EXAMPLE OUTPUT
-
-Title: Lower Body Strength
-
-Block: Warm-Up
-- Leg swings | type:warmup
-- Bodyweight squats | type:warmup
-
-Block: Main Strength
-- Back Squat | 4×6–8 | type:strength | note:Heavy, focus on depth
-- Romanian Deadlift | 3×8 | type:strength
-- Walking Lunges | 3×10 | type:strength
-
-Block: Cool-Down
-- Hip flexor stretch | type:cooldown
-
-TEST REQUESTS YOU CAN USE
-- Generate a Lower Body workout
-- Create an Abs workout
-- Make an Upper Body Strength workout
-- Give me a Full Body workout
-- Create a Cardio workout
-
-FINAL RULE
-Always follow the exact format above. No exceptions.`;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-between"
-        >
-          <span className="flex items-center gap-2">
-            <Copy className="w-3 h-3" />
-            {isOpen ? 'Hide Prompt' : 'Show Prompt to Copy'}
-          </span>
-          {isOpen ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-3">
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Step 1: Copy this prompt</p>
-          <div className="relative">
-            <pre className="text-xs bg-background p-3 rounded border overflow-x-auto max-h-64 overflow-y-auto font-mono whitespace-pre-wrap">
-              {prompt}
-            </pre>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopy}
-              className="absolute top-2 right-2"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3 h-3 mr-1" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3 mr-1" />
-                  Copy Prompt
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        <div className="space-y-2 pt-2 border-t">
-          <p className="text-xs font-medium text-muted-foreground">Step 2: Paste into your AI tool and ask for a workout</p>
-          <div className="bg-muted/50 p-2 rounded text-xs space-y-1">
-            <p className="font-medium">Try saying:</p>
-            <ul className="list-disc list-inside ml-2 space-y-0.5 text-muted-foreground">
-              <li>"Generate a Lower Body workout"</li>
-              <li>"Create an Abs workout"</li>
-              <li>"Make an Upper Body Strength workout"</li>
-              <li>"Give me a Full Body workout"</li>
-            </ul>
-          </div>
-        </div>
-        
-        <div className="space-y-2 pt-2 border-t">
-          <p className="text-xs font-medium text-muted-foreground">Step 3: Copy the workout and paste it above</p>
-          <p className="text-xs text-muted-foreground">
-            The AI will generate a workout in the correct format. Just copy it and paste it in the text area above, then click "Add Description".
-          </p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+  const [activeTab, setActiveTab] = React.useState<"youtube" | "image" | "ai">(
+    "youtube"
   );
-}
+  const [youtubeUrl, setYoutubeUrl] = React.useState("");
+  const [imageUrlsText, setImageUrlsText] = React.useState("");
+  const [aiText, setAiText] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, progress, onCancel }: AddSourcesProps) {
-  const [sources, setSources] = useState<Source[]>([]);
-  const [currentInput, setCurrentInput] = useState('');
-  const [activeTab, setActiveTab] = useState<SourceType>('image');
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [imageMethod, setImageMethod] = useState<'ocr' | 'vision'>(getImageProcessingMethod());
+  const env = (import.meta as any).env || {};
+  const nodeEnv = (globalThis as any).process?.env || {};
 
-  // Listen for preference changes
-  useEffect(() => {
-    const checkMethod = () => {
-      setImageMethod(getImageProcessingMethod());
-    };
-    // Check on mount and when tab changes to image
-    checkMethod();
-    const interval = setInterval(checkMethod, 1000); // Check every second for preference changes
-    return () => clearInterval(interval);
-  }, [activeTab]);
+  // If either Vite or Node env provides this URL, we treat ingest as "live"
+  const hasRealIngest =
+    Boolean(env.VITE_WORKOUT_INGESTOR_API_URL) ||
+    Boolean(nodeEnv.VITE_WORKOUT_INGESTOR_API_URL);
 
-  const addSource = () => {
-    if (!currentInput.trim() && !uploadedImage) return;
-    
-    // For images: prefer URL if provided, otherwise handle file upload
-    let content: string;
-    if (activeTab === 'image') {
-      if (currentInput.trim()) {
-        // Check if it's a YouTube URL
-        if (/youtube\.com|youtu\.be/i.test(currentInput.trim())) {
-          // YouTube URL detected - switch to YouTube tab
-          setActiveTab('youtube');
-          return;
+  async function handleGenerateStructure() {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // 1) Build up canonical "sources" list so the rest of the app
+      //    still sees everything it needs.
+      const updatedSources = [...sources];
+
+      if (youtubeUrl.trim()) {
+        updatedSources.push({
+          type: "youtube",
+          url: youtubeUrl.trim(),
+        });
+      }
+
+      const imageLines = imageUrlsText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      if (imageLines.length > 0) {
+        for (const url of imageLines) {
+          updatedSources.push({
+            type: "image",
+            url,
+          });
         }
-        // Use URL for image
-        content = currentInput.trim();
-        setCurrentInput('');
-      } else if (uploadedImage) {
-        // For file uploads, create a blob URL to store
-        content = URL.createObjectURL(uploadedImage);
-        setUploadedImage(null);
-        setImagePreview(null);
+      }
+
+      if (aiText.trim()) {
+        updatedSources.push({
+          type: "ai_text",
+          text: aiText.trim(),
+        });
+      }
+
+      onSourcesChange(updatedSources);
+
+      // 2) If we have a real ingest service configured AND a YouTube URL,
+      //    hit the real ingest pipeline and pass blocks to the parent.
+      if (hasRealIngest && youtubeUrl.trim()) {
+        const started = Date.now();
+
+        const ingestResult = await ingestWorkout({
+          sourceType: "youtube",
+          url: youtubeUrl.trim(),
+        });
+
+        const duration = Date.now() - started;
+        // Helpful when running in dev / tests
+        // eslint-disable-next-line no-console
+        console.log(
+          `[AddSources] Ingest completed in ${duration}ms, title="${
+            ingestResult.title
+          }", blocks=${Array.isArray(ingestResult.blocks)
+            ? ingestResult.blocks.length
+            : 0
+          }`
+        );
+
+        // Even if blocks is empty, we pass the result up so the parent
+        // can decide how to handle "no structure found yet".
+        onGenerateStructure({
+          blocks: ingestResult.blocks ?? [],
+          ingestMeta: ingestResult,
+        });
       } else {
-        return;
+        // 3) Fallback: no real ingest configured – keep old behavior
+        //    and let the mock pipeline or other layers handle it.
+        onGenerateStructure();
       }
-    } else {
-      // For other types, use currentInput or filename
-      content = uploadedImage ? uploadedImage.name : currentInput;
-      
-      // Auto-detect YouTube URLs and switch to YouTube tab if needed
-      if (content && /youtube\.com|youtu\.be/i.test(content) && activeTab !== 'youtube') {
-        // YouTube URL detected but wrong tab - switch to YouTube tab
-        setActiveTab('youtube');
-        // Don't add source yet, let user confirm or re-add
-        return;
-      }
-      
-      setCurrentInput('');
-      setUploadedImage(null);
-      setImagePreview(null);
+    } catch (err: any) {
+      console.error("[AddSources] Failed to ingest workout:", err);
+      setError(err?.message || "Failed to ingest workout. Please try again.");
+      // Still notify parent that generation was attempted; they may
+      // show their own error UI or stay in the same step.
+      onGenerateStructure();
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    const newSource: Source = {
-      id: Date.now().toString(),
-      type: activeTab,
-      content,
-      timestamp: new Date()
-    };
-    
-    setSources([...sources, newSource]);
-  };
-
-  const handleTabChange = (newTab: SourceType) => {
-    setActiveTab(newTab);
-    setCurrentInput('');
-    setUploadedImage(null);
-    setImagePreview(null);
-  };
-
-  const handleImageUpload = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      setUploadedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      handleImageUpload(file);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const clearImage = () => {
-    setUploadedImage(null);
-    setImagePreview(null);
-  };
-
-  const removeSource = (id: string) => {
-    setSources(sources.filter(s => s.id !== id));
-  };
-
-  const handleGenerate = () => {
-    if (sources.length > 0) {
-      onGenerate(sources);
-    }
-  };
-
-  const getSourceIcon = (type: SourceType) => {
-    switch (type) {
-      case 'youtube': return <Youtube className="w-4 h-4" />;
-      case 'image': return <Image className="w-4 h-4" />;
-      case 'ai-text': return <Sparkles className="w-4 h-4" />;
-      default: return null;
-    }
-  };
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Main input card */}
+      <div className="space-y-6 lg:col-span-2">
         <div>
           <h2 className="mb-2">Add Workout Sources</h2>
           <p className="text-muted-foreground">
-            Transform workout content from YouTube videos, images, or AI text into structured blocks that sync with your watches
+            Transform workout content from YouTube videos, images, or AI text into
+            structured blocks that sync with your watches.
           </p>
         </div>
 
@@ -326,358 +144,127 @@ export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, p
           <CardHeader>
             <CardTitle>Input Sources</CardTitle>
             <CardDescription>
-              Add links or content from various platforms to build your workout
+              Add links or content from various platforms to build your workout.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList className="grid w-full grid-cols-3">
+          <CardContent className="space-y-4">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+            >
+              <TabsList className="grid h-10 w-full grid-cols-3">
                 <TabsTrigger value="youtube">
-                  <Youtube className="w-4 h-4 mr-2" />
+                  <Youtube className="mr-2 h-4 w-4" />
                   YouTube
                 </TabsTrigger>
                 <TabsTrigger value="image">
-                  <Image className="w-4 h-4 mr-2" />
-                  Image
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Images
                 </TabsTrigger>
-                <TabsTrigger value="ai-text">
-                  <Sparkles className="w-4 h-4 mr-2" />
+                <TabsTrigger value="ai">
+                  <Sparkles className="mr-2 h-4 w-4" />
                   AI Text
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="youtube" className="space-y-4">
-                {/* Show current processing method */}
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    <Youtube className="w-4 h-4 text-red-600" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        Processing: Transcript + AI Exercise Extraction
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        OpenAI GPT-4o-mini or Claude 3.5 Sonnet
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="default" className="bg-blue-600">AI-Powered</Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>YouTube Video URL</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="https://youtube.com/watch?v=..."
-                      value={currentInput}
-                      onChange={(e) => setCurrentInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addSource()}
-                    />
-                    <Button onClick={addSource}>
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      <strong>Step 1:</strong> Transcripts extracted using <a href="https://www.youtube-transcript.io/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">youtube-transcript.io</a>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <strong>Step 2:</strong> Exercises extracted from transcript using AI (OpenAI GPT-4o-mini or Anthropic Claude)
-                    </p>
-                  </div>
-
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <AlertDescription className="text-xs text-blue-800 dark:text-blue-200">
-                      <strong>Free Tier:</strong> 25 transcripts per month. See <span className="font-medium">Settings → General → YouTube Ingestion</span> for more info.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="image" className="space-y-4">
-                {/* Show current processing method */}
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    {imageMethod === 'vision' ? (
-                      <VisionIcon className="w-4 h-4 text-blue-600" />
-                    ) : (
-                      <Eye className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <span className="text-sm font-medium">
-                      Processing Method: {imageMethod === 'vision' ? 'AI Vision Model' : 'OCR'}
-                    </span>
-                  </div>
-                  <Badge variant={imageMethod === 'vision' ? 'default' : 'secondary'} className={imageMethod === 'vision' ? 'bg-blue-600 hover:bg-blue-700' : ''}>
-                    {imageMethod === 'vision' ? 'Premium' : 'Free'}
-                  </Badge>
-                </div>
+              <TabsContent value="youtube" className="space-y-2 pt-4">
+                <Label htmlFor="youtube-url">YouTube / Shorts URL</Label>
+                <Input
+                  id="youtube-url"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Change processing method in <span className="font-medium">Settings → General</span>
+                  Paste a workout video URL. We&apos;ll fetch the transcript and
+                  try to infer sets, reps, and structure.
                 </p>
-                <div className="space-y-2">
-                  <Label>Image URL</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="https://example.com/image.jpg"
-                      value={currentInput}
-                      onChange={(e) => setCurrentInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addSource()}
-                    />
-                    <Button onClick={addSource}>
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Or upload from file below
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Upload Image File</Label>
-                  <div
-                    className={`relative flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed rounded-lg transition-colors cursor-pointer ${
-                      isDragging 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border bg-muted/50 hover:bg-muted'
-                    }`}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onClick={() => document.getElementById('image-upload')?.click()}
-                  >
-                    {imagePreview ? (
-                      <div className="relative w-full p-4">
-                        <img
-                          src={imagePreview}
-                          alt="Uploaded workout"
-                          className="max-h-[300px] mx-auto rounded-lg object-contain"
-                        />
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearImage();
-                          }}
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Remove
-                        </Button>
-                        <div className="mt-3 text-center text-sm text-muted-foreground">
-                          {uploadedImage?.name}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center p-8">
-                        <Upload className="w-12 h-12 text-muted-foreground mb-4" />
-                        <div className="text-center">
-                          <p className="mb-1">
-                            Drag & drop an image here
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            or click to browse files
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Supports: JPG, PNG, GIF, WebP
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleImageUpload(file);
-                        }
-                      }}
-                    />
-                  </div>
-                  {uploadedImage && (
-                    <Button onClick={addSource} className="w-full">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Image
-                    </Button>
-                  )}
-                </div>
               </TabsContent>
 
-              <TabsContent value="ai-text" className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Workout Description</Label>
-                    <Badge variant="outline" className="text-xs">Accepts: Canonical format, Free-form text, or JSON</Badge>
-                  </div>
-                  <Textarea
-                    placeholder="Paste your workout text here (canonical format, free-form, or JSON), or use the AI prompt below to generate one..."
-                    value={currentInput}
-                    onChange={(e) => setCurrentInput(e.target.value)}
-                    rows={4}
-                  />
-                  <Button onClick={addSource} className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Description
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    💡 Tip: You can always paste canonical format text here (Title:, Block:, exercises) - it will be automatically detected and parsed.
-                  </p>
-                </div>
-                
-                <Card className="bg-muted/30 border-dashed">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">💡 AI Tool Prompt</CardTitle>
-                      <Badge variant="outline" className="text-xs">Universal</Badge>
-                    </div>
-                    <CardDescription className="text-xs">
-                      Copy this prompt to ChatGPT, Grok, DeepSeek, or any AI tool for perfect workout formatting
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <AIPromptCopyButton />
-                    
-                    <div className="pt-2 border-t space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        💾 Use Pre-Made GPT (Easiest)
-                        <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                      </p>
-                      <div className="bg-background/50 p-2 rounded text-xs space-y-2">
-                        <div className="bg-green-50 dark:bg-green-950/20 p-2 rounded border border-green-200 dark:border-green-800">
-                          <p className="font-medium text-foreground mb-1">✅ Quick Start:</p>
-                          <ol className="list-decimal list-inside ml-2 space-y-0.5 text-muted-foreground text-xs">
-                            <li>Click: <a href="https://chatgpt.com/g/g-6923bf09941081919d29cb2c964c3a00-canonical-workout-builder" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Canonical Workout Builder GPT</a></li>
-                            <li>Click <strong>"Use"</strong> → Ask: <span className="italic">"Create a full body workout"</span></li>
-                            <li>Copy the output → Paste above → Click "Add Description"</li>
-                          </ol>
-                        </div>
-                        
-                        <div className="pt-2 border-t">
-                          <p className="font-medium text-foreground mb-1 text-xs">🔧 Want to create your own?</p>
-                          <p className="text-muted-foreground text-xs mb-1">Go to <a href="https://chat.openai.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">chat.openai.com</a> → Explore GPTs → Create GPT</p>
-                          <p className="text-muted-foreground text-xs">In the chat box, say: <span className="italic">"Create a GPT that outputs workouts in canonical format with Title, Block, and exercises"</span></p>
-                          <p className="text-muted-foreground text-xs mt-1">Or paste the full prompt from above into the Configure → Instructions field.</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <p className="text-xs text-muted-foreground">
-                      This prompt ensures AI tools generate workouts in the correct format that will parse perfectly every time.
-                    </p>
-                  </CardContent>
-                </Card>
+              <TabsContent value="image" className="space-y-2 pt-4">
+                <Label htmlFor="image-urls">Images / Screenshots (one per line)</Label>
+                <Textarea
+                  id="image-urls"
+                  placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
+                  rows={4}
+                  value={imageUrlsText}
+                  onChange={(e) => setImageUrlsText(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Links to screenshots of workouts (e.g. Instagram posts, whiteboard photos).
+                </p>
+              </TabsContent>
+
+              <TabsContent value="ai" className="space-y-2 pt-4">
+                <Label htmlFor="ai-text">AI / Hand-Typed Description</Label>
+                <Textarea
+                  id="ai-text"
+                  placeholder="E.g. 4 rounds: 400m run + 20 wall balls..."
+                  rows={5}
+                  value={aiText}
+                  onChange={(e) => setAiText(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste a written description of the workout (from ChatGPT, notes, etc.).
+                </p>
               </TabsContent>
             </Tabs>
+
+            {error && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertTitle>Ingest error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-xs text-muted-foreground">
+                {hasRealIngest ? (
+                  <span>
+                    Using <span className="font-medium">live ingest API</span> for
+                    YouTube sources.
+                  </span>
+                ) : (
+                  <span>
+                    Live ingest API not configured – using mock pipeline only.
+                  </span>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleGenerateStructure}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Generating..." : "Generate Structure"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
-
-        {sources.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Added Sources ({sources.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {sources.map((source) => (
-                  <div
-                    key={source.id}
-                    className="flex items-start gap-3 p-3 rounded-lg border bg-muted/50"
-                  >
-                    <div className="mt-0.5">
-                      {getSourceIcon(source.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-muted-foreground capitalize mb-1">
-                        {source.type.replace('-', ' ')}
-                      </div>
-                      <div className="text-sm break-all">
-                        {source.content}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSource(source.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="flex justify-end">
-          <div className="flex flex-col gap-2">
-            <Button
-              size="lg"
-              onClick={handleGenerate}
-              disabled={sources.length === 0 || loading}
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {progress || 'Generating Structure...'}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Generate Structure
-                </>
-              )}
-            </Button>
-            {loading && onCancel && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onCancel}
-                className="w-full"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-            )}
-            {loading && progress && (
-              <p className="text-xs text-muted-foreground text-center">{progress}</p>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Right sidebar - Templates & History */}
-      <div className="lg:col-span-1 space-y-4">
-        {/* Create New Workout Button */}
-        {onCreateNew && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Create New Workout</CardTitle>
-              <CardDescription>
-                Start with a blank workout and build it manually
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={onCreateNew}
-                className="w-full"
-                variant="default"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create New Workout
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-        
-        <WorkoutTemplates
-          onSelectTemplate={onLoadTemplate}
-          onSelectHistory={onLoadTemplate}
-        />
+      {/* Right side helper card (simple, non-essential) */}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tips</CardTitle>
+            <CardDescription>
+              For the best results from YouTube ingestion:
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm space-y-2 text-muted-foreground">
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Use videos with clear exercise callouts and timestamps.</li>
+              <li>Avoid &quot;vlog style&quot; content with minimal workout detail.</li>
+              <li>
+                If blocks come back empty, try a different video or paste AI text.
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
+
+export default AddSources;
