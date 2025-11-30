@@ -241,3 +241,32 @@ def update_follow_along_apple_watch_sync(
         logger.error(f"Failed to update Apple Watch sync: {e}")
         return False
 
+
+def update_follow_along_ios_companion_sync(
+    workout_id: str,
+    user_id: str
+) -> bool:
+    """
+    Update iOS Companion App sync status for a follow-along workout.
+    
+    Args:
+        workout_id: Workout ID
+        user_id: User ID (for security)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+    
+    try:
+        result = supabase.table("follow_along_workouts").update({
+            "ios_companion_synced_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", workout_id).eq("user_id", user_id).execute()
+        
+        return result.data is not None
+    except Exception as e:
+        logger.error(f"Failed to update iOS Companion sync: {e}")
+        return False
+

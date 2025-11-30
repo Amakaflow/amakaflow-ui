@@ -55,7 +55,8 @@ from backend.follow_along_database import (
     get_follow_along_workouts,
     get_follow_along_workout,
     update_follow_along_garmin_sync,
-    update_follow_along_apple_watch_sync
+    update_follow_along_apple_watch_sync,
+    update_follow_along_ios_companion_sync
 )
 
 # Feature flag for unofficial Garmin sync
@@ -653,6 +654,171 @@ def delete_workout_endpoint(
         }
 
 
+@app.post("/workouts/{workout_id}/push/ios-companion")
+def push_workout_to_ios_companion_endpoint(workout_id: str, request: PushToIOSCompanionRequest):
+    """
+    Push a regular (blocks-based) workout to iOS Companion App.
+    Transforms the workout structure into the iOS app's interval format.
+    
+    This endpoint is for workouts created through the standard workflow,
+    not follow-along workouts ingested from Instagram.
+    """
+    from backend.database import get_workout
+    
+    # Get workout
+    workout_record = get_workout(workout_id, request.userId)
+    if not workout_record:
+        return {
+            "success": False,
+            "status": "error",
+            "message": "Workout not found"
+        }
+    
+    workout_data = workout_record.get("workout_data", {})
+    title = workout_record.get("title") or workout_data.get("title", "Workout")
+    
+    # Detect sport type from workout structure
+    # Check first block's structure or exercise types
+    blocks = workout_data.get("blocks", [])
+    sport = "strength"  # Default
+    
+    for block in blocks:
+        structure = block.get("structure", "")
+        if structure in ["tabata", "hiit", "circuit", "emom", "amrap"]:
+            sport = "cardio"
+            break
+    
+    # Build intervals from blocks
+    intervals = []
+    total_duration = 0
+    
+    for block in blocks:
+        structure = block.get("structure", "regular")
+        exercises = block.get("exercises", [])
+        rounds = block.get("rounds", 1) or 1
+        rest_between_rounds = block.get("rest_between_rounds_sec") or block.get("rest_between_sec", 60)
+        
+        # Warmup block
+        if block.get("label", "").lower() in ["warmup", "warm up", "warm-up"]:
+            warmup_duration = sum(
+                e.get("duration_sec", 60) for e in exercises
+            ) or 300
+            intervals.append({
+                "kind": "warmup",
+                "seconds": warmup_duration,
+                "target": block.get("label", "Warmup")
+            })
+            total_duration += warmup_duration
+            continue
+        
+        # Cooldown block
+        if block.get("label", "").lower() in ["cooldown", "cool down", "cool-down"]:
+            cooldown_duration = sum(
+                e.get("duration_sec", 60) for e in exercises
+            ) or 300
+            intervals.append({
+                "kind": "cooldown",
+                "seconds": cooldown_duration,
+                "target": block.get("label", "Cooldown")
+            })
+            total_duration += cooldown_duration
+            continue
+        
+        # Create repeat block if rounds > 1
+        if rounds > 1:
+            inner_intervals = []
+            for exercise in exercises:
+                inner_interval = convert_exercise_to_interval(exercise)
+                inner_intervals.append(inner_interval)
+            
+            intervals.append({
+                "kind": "repeat",
+                "reps": rounds,
+                "intervals": inner_intervals
+            })
+            
+            # Calculate duration for repeat
+            inner_duration = sum(
+                (e.get("duration_sec", 0) or 0) + (e.get("rest_sec", 0) or 0)
+                for e in exercises
+            )
+            total_duration += (inner_duration * rounds) + (rest_between_rounds * (rounds - 1))
+        else:
+            # Single round - add exercises directly
+            for exercise in exercises:
+                interval = convert_exercise_to_interval(exercise)
+                intervals.append(interval)
+                total_duration += (exercise.get("duration_sec", 0) or 0) + (exercise.get("rest_sec", 0) or 0)
+    
+    # Create payload for iOS Companion App
+    payload = {
+        "id": workout_id,
+        "name": title,
+        "sport": sport,
+        "duration": total_duration,
+        "source": "amakaflow",
+        "sourceUrl": None,
+        "intervals": intervals
+    }
+    
+    return {
+        "success": True,
+        "status": "success",
+        "iosCompanionWorkoutId": workout_id,
+        "payload": payload
+    }
+
+
+def convert_exercise_to_interval(exercise: dict) -> dict:
+    """
+    Convert a workout exercise to iOS companion interval format.
+    """
+    name = exercise.get("name", "Exercise")
+    reps = exercise.get("reps")
+    sets = exercise.get("sets", 1) or 1
+    duration_sec = exercise.get("duration_sec")
+    rest_sec = exercise.get("rest_sec", 60)
+    follow_along_url = exercise.get("followAlongUrl")
+    
+    # Determine load string
+    load_parts = []
+    if exercise.get("load"):
+        load_parts.append(exercise.get("load"))
+    if sets and sets > 1:
+        load_parts.append(f"{sets} sets")
+    load = ", ".join(load_parts) if load_parts else None
+    
+    if reps:
+        # Rep-based exercise
+        return {
+            "kind": "reps",
+            "reps": reps * (sets or 1),  # Total reps if multiple sets
+            "name": name,
+            "load": load,
+            "restSec": rest_sec,
+            "followAlongUrl": follow_along_url,
+            "carouselPosition": None
+        }
+    elif duration_sec:
+        # Time-based exercise
+        return {
+            "kind": "time",
+            "seconds": duration_sec,
+            "target": name
+        }
+    else:
+        # Default to time-based with 60 seconds
+        return {
+            "kind": "time",
+            "seconds": 60,
+            "target": name
+        }
+
+
+class PushWorkoutToIOSCompanionRequest(BaseModel):
+    userId: str
+
+
 # ============================================================================
 # Follow-Along Workout Endpoints
 # ============================================================================
@@ -668,6 +834,10 @@ class PushToGarminRequest(BaseModel):
 
 
 class PushToAppleWatchRequest(BaseModel):
+    userId: str
+
+
+class PushToIOSCompanionRequest(BaseModel):
     userId: str
 
 
@@ -1248,6 +1418,97 @@ def push_to_apple_watch_endpoint(workout_id: str, request: PushToAppleWatchReque
         "appleWatchWorkoutId": workout_id,
         "payload": payload
     }
+
+
+@app.post("/follow-along/{workout_id}/push/ios-companion")
+def push_to_ios_companion_endpoint(workout_id: str, request: PushToIOSCompanionRequest):
+    """
+    Push follow-along workout to iOS Companion App.
+    Returns payload formatted for the iOS app's WorkoutFlowView with full video URLs.
+    
+    This endpoint transforms the follow-along workout into the iOS companion app's
+    expected format, including video URLs for the follow-along experience.
+    """
+    # Get workout
+    workout = get_follow_along_workout(workout_id, request.userId)
+    if not workout:
+        return {
+            "success": False,
+            "status": "error",
+            "message": "Workout not found"
+        }
+    
+    # Detect video platform from source URL
+    source_url = workout.get("source_url", "")
+    source = workout.get("source", "other")
+    
+    # Map source to sport type
+    sport_mapping = {
+        "instagram": "strength",
+        "youtube": "strength",
+        "tiktok": "strength",
+        "vimeo": "strength",
+    }
+    sport = sport_mapping.get(source, "other")
+    
+    # Build intervals from steps
+    intervals = []
+    for step in workout.get("steps", []):
+        duration_sec = step.get("duration_sec", 0)
+        target_reps = step.get("target_reps")
+        label = step.get("label", "")
+        notes = step.get("notes")
+        
+        if target_reps:
+            # Reps-based exercise
+            interval = {
+                "kind": "reps",
+                "reps": target_reps,
+                "name": label,
+                "load": notes,  # Use notes as load hint if available
+                "restSec": 60,  # Default rest
+                "followAlongUrl": source_url,  # Full video URL for the workout
+                "carouselPosition": None  # Can be set per-step if needed
+            }
+        else:
+            # Time-based exercise
+            interval = {
+                "kind": "time",
+                "seconds": duration_sec,
+                "target": label
+            }
+        
+        intervals.append(interval)
+    
+    # Calculate total duration
+    total_duration = workout.get("video_duration_sec") or sum(
+        step.get("duration_sec", 0) for step in workout.get("steps", [])
+    )
+    
+    # Create payload for iOS Companion App
+    payload = {
+        "id": workout["id"],
+        "name": workout["title"],
+        "sport": sport,
+        "duration": total_duration,
+        "source": source,
+        "sourceUrl": source_url,
+        "intervals": intervals
+    }
+    
+    # Update sync status
+    update_follow_along_ios_companion_sync(
+        workout_id=workout_id,
+        user_id=request.userId
+    )
+    
+    return {
+        "success": True,
+        "status": "success",
+        "iosCompanionWorkoutId": workout_id,
+        "payload": payload
+    }
+
 
 @app.get("/health")
 def health():
