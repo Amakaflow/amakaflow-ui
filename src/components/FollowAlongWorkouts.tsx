@@ -6,9 +6,9 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
-import { Play, Clock, List, CheckCircle2, ExternalLink, Plus, Loader2, CalendarIcon, Smartphone } from 'lucide-react';
+import { Play, Clock, List, CheckCircle2, ExternalLink, Plus, Loader2, CalendarIcon, Smartphone, Trash2 } from 'lucide-react';
 // Using native Date formatting
-import { ingestFollowAlong, listFollowAlong, getFollowAlong, pushToGarmin, pushToAppleWatch, pushToIOSCompanion } from '../lib/follow-along-api';
+import { ingestFollowAlong, listFollowAlong, getFollowAlong, pushToGarmin, pushToAppleWatch, pushToIOSCompanion, deleteFollowAlong } from '../lib/follow-along-api';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { toast } from 'sonner';
 import { useClerkUser } from '../lib/clerk-auth';
@@ -184,6 +184,31 @@ export function FollowAlongWorkouts() {
     }
   };
 
+  const handleDeleteWorkout = async (workoutId: string) => {
+    if (!clerkUser?.id) {
+      toast.error('Please sign in to delete workouts');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this workout?')) {
+      return;
+    }
+
+    try {
+      const result = await deleteFollowAlong(workoutId, clerkUser.id);
+      if (result.success) {
+        toast.success('Workout deleted successfully');
+        setShowDetailDialog(false);
+        setSelectedWorkout(null);
+        loadWorkouts();
+      } else {
+        toast.error(result.message || 'Failed to delete workout');
+      }
+    } catch (error: any) {
+      toast.error(`Failed to delete workout: ${error.message}`);
+    }
+  };
+
   const formatDuration = (seconds?: number) => {
     if (!seconds) return 'Unknown';
     const mins = Math.floor(seconds / 60);
@@ -344,9 +369,9 @@ export function FollowAlongWorkouts() {
                           href={selectedWorkout.sourceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:underline flex items-center gap-1"
+                          className="text-primary hover:underline flex items-center gap-1 capitalize"
                         >
-                          Instagram
+                          {selectedWorkout.source || 'Video'}
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
@@ -361,7 +386,7 @@ export function FollowAlongWorkouts() {
                       <Button
                         variant={selectedWorkout.garminWorkoutId ? "outline" : "default"}
                         size="sm"
-                        className="w-full"
+                        className="w-full justify-start"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (selectedWorkout.garminWorkoutId) return;
@@ -371,17 +396,17 @@ export function FollowAlongWorkouts() {
                       >
                         {selectedWorkout.garminWorkoutId ? (
                           <>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Synced to Garmin
+                            <CheckCircle2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">Synced to Garmin</span>
                           </>
                         ) : (
-                          'Sync to Garmin (Unofficial API)'
+                          'Sync to Garmin'
                         )}
                       </Button>
                       <Button
                         variant={selectedWorkout.appleWatchWorkoutId ? "outline" : "default"}
                         size="sm"
-                        className="w-full"
+                        className="w-full justify-start"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePushToAppleWatch(selectedWorkout.id);
@@ -390,8 +415,8 @@ export function FollowAlongWorkouts() {
                       >
                         {selectedWorkout.appleWatchWorkoutId ? (
                           <>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Synced to Apple Watch
+                            <CheckCircle2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">Synced to Watch</span>
                           </>
                         ) : (
                           'Send to Apple Watch'
@@ -400,7 +425,7 @@ export function FollowAlongWorkouts() {
                       <Button
                         variant={selectedWorkout.iosCompanionSyncedAt ? "outline" : "default"}
                         size="sm"
-                        className="w-full"
+                        className="w-full justify-start"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePushToIOSCompanion(selectedWorkout.id);
@@ -408,13 +433,13 @@ export function FollowAlongWorkouts() {
                       >
                         {selectedWorkout.iosCompanionSyncedAt ? (
                           <>
-                            <Smartphone className="mr-2 h-4 w-4" />
-                            Sent to iOS App - Tap to Resync
+                            <Smartphone className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">iOS Synced - Resync</span>
                           </>
                         ) : (
                           <>
-                            <Smartphone className="mr-2 h-4 w-4" />
-                            Send to iOS Companion (Follow-Along)
+                            <Smartphone className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">Send to iOS App</span>
                           </>
                         )}
                       </Button>
@@ -447,6 +472,18 @@ export function FollowAlongWorkouts() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Delete button */}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteWorkout(selectedWorkout.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Workout
+                  </Button>
+                </div>
               </div>
             </>
           )}

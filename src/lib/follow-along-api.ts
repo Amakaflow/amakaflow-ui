@@ -68,7 +68,7 @@ export async function listFollowAlong(userId: string): Promise<ListFollowAlongRe
   const items: FollowAlongWorkout[] = (result.items || []).map((w: any) => ({
     id: w.id,
     userId: w.user_id,
-    source: w.source as "instagram",
+    source: w.source as VideoPlatform,
     sourceUrl: w.source_url,
     title: w.title,
     description: w.description,
@@ -125,7 +125,7 @@ export async function getFollowAlong(id: string, userId: string): Promise<GetFol
   const followAlongWorkout: FollowAlongWorkout = {
     id: w.id,
     userId: w.user_id,
-    source: w.source as "instagram",
+    source: w.source as VideoPlatform,
     sourceUrl: w.source_url,
     title: w.title,
     description: w.description,
@@ -329,3 +329,27 @@ export function isValidVideoUrl(url: string): boolean {
   }
 }
 
+/**
+ * Delete a follow-along workout
+ * Uses mapper-api endpoint
+ */
+export async function deleteFollowAlong(id: string, userId: string): Promise<{ success: boolean; message?: string }> {
+  
+  const response = await fetch(`${MAPPER_API_BASE_URL}/follow-along/${id}?userId=${userId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: response.statusText }));
+    return {
+      success: false,
+      message: error.message || `Failed to delete workout: ${response.statusText}`,
+    };
+  }
+
+  const result = await response.json();
+  return {
+    success: result.success,
+    message: result.message,
+  };
+}
