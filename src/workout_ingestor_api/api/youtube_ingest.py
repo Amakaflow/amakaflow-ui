@@ -48,7 +48,7 @@ def _generate_id() -> str:
     return f"{int(__import__('time').time() * 1000)}-{uuid.uuid4().hex[:8]}"
 
 
-def _parse_with_openai(transcript: str, title: str) -> Dict:
+def _parse_with_openai(transcript: str, title: str, video_duration_sec: Optional[int] = None, chapter_info: str = "") -> Dict:
     """Parse transcript using OpenAI GPT-4."""
     try:
         import openai
@@ -67,6 +67,17 @@ def _parse_with_openai(transcript: str, title: str) -> Dict:
     
     client = openai.OpenAI(api_key=api_key, timeout=60.0)
     
+    # Build duration context for timestamp estimation
+    duration_context = ""
+    if video_duration_sec:
+        duration_context = f"\nThe video is {video_duration_sec} seconds long ({video_duration_sec // 60} minutes {video_duration_sec % 60} seconds)."
+    
+    # Add chapter info if available
+    if chapter_info:
+        duration_context += chapter_info + "\nUse these chapter timestamps for video_start_sec values."
+    elif video_duration_sec:
+        duration_context += " Estimate the approximate start time in seconds for each exercise based on when it's discussed in the transcript."
+    
     prompt = f"""You are a fitness expert who extracts structured workout information from video transcripts.
 
 Analyze this transcript and extract the workout routine being described. Focus on:
@@ -75,6 +86,7 @@ Analyze this transcript and extract the workout routine being described. Focus o
 3. Important form cues and technique notes
 4. Rest periods if mentioned
 5. Any workout structure (supersets, circuits, etc.)
+6. Approximate timestamp in the video where each exercise is discussed{duration_context}
 
 Transcript from video titled "{title}":
 ---
@@ -84,6 +96,7 @@ Transcript from video titled "{title}":
 Return ONLY a valid JSON object with this exact structure:
 {{
   "title": "{title}",
+  "video_duration_sec": {video_duration_sec if video_duration_sec else 'null'},
   "blocks": [
     {{
       "label": "Main Workout",
@@ -98,7 +111,9 @@ Return ONLY a valid JSON object with this exact structure:
           "rest_sec": null,
           "distance_m": null,
           "type": "strength",
-          "notes": "Form cues and tips here"
+          "notes": "Form cues and tips here",
+          "video_start_sec": 60,
+          "video_end_sec": 120
         }}
       ]
     }}
@@ -112,6 +127,8 @@ Rules:
 - Include helpful notes from the transcript about form, tempo, or technique
 - Standardize exercise names (e.g., "Beijing curl" should be normalized to a proper exercise name if it's a variation)
 - Group related exercises together if the video describes them as supersets or circuits
+- For video_start_sec: estimate when each exercise is first discussed/demonstrated in the video
+- For video_end_sec: estimate when the discussion of that exercise ends (before the next exercise starts)
 
 Return ONLY the JSON, no other text."""
 
@@ -141,7 +158,7 @@ Return ONLY the JSON, no other text."""
         )
 
 
-def _parse_with_anthropic(transcript: str, title: str) -> Dict:
+def _parse_with_anthropic(transcript: str, title: str, video_duration_sec: Optional[int] = None, chapter_info: str = "") -> Dict:
     """Parse transcript using Anthropic Claude."""
     try:
         from anthropic import Anthropic
@@ -160,6 +177,17 @@ def _parse_with_anthropic(transcript: str, title: str) -> Dict:
     
     client = Anthropic(api_key=api_key, timeout=60.0)
     
+    # Build duration context for timestamp estimation
+    duration_context = ""
+    if video_duration_sec:
+        duration_context = f"\nThe video is {video_duration_sec} seconds long ({video_duration_sec // 60} minutes {video_duration_sec % 60} seconds)."
+    
+    # Add chapter info if available
+    if chapter_info:
+        duration_context += chapter_info + "\nUse these chapter timestamps for video_start_sec values."
+    elif video_duration_sec:
+        duration_context += " Estimate the approximate start time in seconds for each exercise based on when it's discussed in the transcript."
+    
     prompt = f"""You are a fitness expert who extracts structured workout information from video transcripts.
 
 Analyze this transcript and extract the workout routine being described. Focus on:
@@ -168,6 +196,7 @@ Analyze this transcript and extract the workout routine being described. Focus o
 3. Important form cues and technique notes
 4. Rest periods if mentioned
 5. Any workout structure (supersets, circuits, etc.)
+6. Approximate timestamp in the video where each exercise is discussed{duration_context}
 
 Transcript from video titled "{title}":
 ---
@@ -177,6 +206,7 @@ Transcript from video titled "{title}":
 Return ONLY a valid JSON object with this exact structure:
 {{
   "title": "{title}",
+  "video_duration_sec": {video_duration_sec if video_duration_sec else 'null'},
   "blocks": [
     {{
       "label": "Main Workout",
@@ -191,7 +221,9 @@ Return ONLY a valid JSON object with this exact structure:
           "rest_sec": null,
           "distance_m": null,
           "type": "strength",
-          "notes": "Form cues and tips here"
+          "notes": "Form cues and tips here",
+          "video_start_sec": 60,
+          "video_end_sec": 120
         }}
       ]
     }}
@@ -205,6 +237,8 @@ Rules:
 - Include helpful notes from the transcript about form, tempo, or technique
 - Standardize exercise names
 - Group related exercises together if the video describes them as supersets or circuits
+- For video_start_sec: estimate when each exercise is first discussed/demonstrated in the video
+- For video_end_sec: estimate when the discussion of that exercise ends (before the next exercise starts)
 
 Return ONLY the JSON, no markdown formatting, no code blocks, just pure JSON."""
 
@@ -359,6 +393,41 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
 
     # Get video title
     title = entry.get("title") or "Imported Workout"
+    
+    # Extract video duration from microformat
+    video_duration_sec = None
+    try:
+        microformat = entry.get("microformat", {})
+        renderer = microformat.get("playerMicroformatRenderer", {})
+        length_str = renderer.get("lengthSeconds")
+        if length_str:
+            video_duration_sec = int(length_str)
+    except Exception:
+        pass
+    
+    # Fallback: estimate from last transcript segment
+    if not video_duration_sec:
+        try:
+            tracks = entry.get("tracks", [])
+            if tracks:
+                transcript = tracks[0].get("transcript", [])
+                if transcript:
+                    last_seg = transcript[-1]
+                    start = float(last_seg.get("start", 0))
+                    dur = float(last_seg.get("dur", 0))
+                    video_duration_sec = int(start + dur)
+        except Exception:
+            pass
+    
+    # Extract chapters if available (these have exact timestamps!)
+    chapters = entry.get("chapters", [])
+    chapter_info = ""
+    if chapters:
+        chapter_info = "\n\nVideo Chapters with timestamps:\n"
+        for ch in chapters:
+            mins = ch.get("start_time", 0) // 60
+            secs = ch.get("start_time", 0) % 60
+            chapter_info += f"- {ch.get('title', 'Unknown')} at {mins}:{secs:02d} ({ch.get('start_time', 0)} seconds)\n"
 
     # Check if video seems to be about fitness
     lower = transcript_text.lower()
@@ -385,7 +454,8 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
             "has_asr": False,
             "has_ocr": False,
             "youtube_strategy": "transcript_not_usable",
-            "reason": "No workout-related keywords found in transcript"
+            "reason": "No workout-related keywords found in transcript",
+            "video_duration_sec": video_duration_sec,
         })
         return JSONResponse(payload)
 
@@ -397,7 +467,7 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
     # Try OpenAI first if available
     if os.getenv("OPENAI_API_KEY"):
         try:
-            workout_dict = _parse_with_openai(transcript_text, title)
+            workout_dict = _parse_with_openai(transcript_text, title, video_duration_sec, chapter_info)
             llm_provider = "openai"
         except Exception as e:
             llm_error = f"OpenAI: {str(e)}"
@@ -405,7 +475,7 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
     # Fall back to Anthropic if OpenAI failed or not configured
     if workout_dict is None and os.getenv("ANTHROPIC_API_KEY"):
         try:
-            workout_dict = _parse_with_anthropic(transcript_text, title)
+            workout_dict = _parse_with_anthropic(transcript_text, title, video_duration_sec, chapter_info)
             llm_provider = "anthropic"
         except Exception as e:
             if llm_error:
@@ -459,7 +529,8 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
             "has_asr": False,
             "has_ocr": False,
             "youtube_strategy": f"llm_{llm_provider}",
-            "validation_warning": str(e)
+            "validation_warning": str(e),
+            "video_duration_sec": video_duration_sec,
         })
         return JSONResponse(workout_dict)
 
@@ -474,6 +545,7 @@ async def ingest_youtube_impl(video_url: str) -> JSONResponse:
         "has_ocr": False,
         "youtube_strategy": f"llm_{llm_provider}",
         "llm_provider": llm_provider,
+        "video_duration_sec": video_duration_sec,
     })
 
     return JSONResponse(response_payload)

@@ -15,6 +15,9 @@ class Exercise(BaseModel):
     distance_range: Optional[str] = None
     type: str = "strength"
     notes: Optional[str] = None
+    # Video timestamp fields for follow-along mode
+    video_start_sec: Optional[int] = None  # When this exercise starts in the source video
+    video_end_sec: Optional[int] = None  # When this exercise ends in the source video
     
     class Config:
         extra = "ignore"  # Ignore extra fields like 'id' from UI
@@ -140,4 +143,3 @@ class Workout(BaseModel):
             source=self.source,
             blocks=converted_blocks
         )
-
