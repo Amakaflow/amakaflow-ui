@@ -29,7 +29,8 @@ import {
   ExternalLink,
   Play,
   Link,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WorkoutStructure, Block, Exercise } from '../types/workout';
@@ -41,6 +42,7 @@ interface StepConfig {
   exerciseName: string;
   videoSource: VideoSourceType;
   customUrl: string;
+  startTimeSec: number;
 }
 
 interface FollowAlongSetupProps {
@@ -49,37 +51,129 @@ interface FollowAlongSetupProps {
   sourceUrl?: string;
 }
 
+// Format seconds to MM:SS
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Parse MM:SS to seconds
+function parseTime(timeStr: string): number {
+  const parts = timeStr.split(':');
+  if (parts.length === 2) {
+    const mins = parseInt(parts[0], 10) || 0;
+    const secs = parseInt(parts[1], 10) || 0;
+    return mins * 60 + secs;
+  }
+  return parseInt(timeStr, 10) || 0;
+}
+
 export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetupProps) {
   const [enabled, setEnabled] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
   const [stepConfigs, setStepConfigs] = useState<StepConfig[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTimestamp, setPreviewTimestamp] = useState<number>(0);
   const [isSending, setIsSending] = useState(false);
   const [sendTarget, setSendTarget] = useState<'ios' | 'watch' | 'both' | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [isLoadingDuration, setIsLoadingDuration] = useState(false);
 
   const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
 
-  // Initialize step configs from workout
+  // Fetch video duration when sourceUrl changes
+  useEffect(() => {
+    if (!sourceUrl) return;
+    
+    const isYouTube = sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be');
+    if (!isYouTube) return;
+
+    setIsLoadingDuration(true);
+    
+    // Try to get duration from the workout provenance or fetch it
+    const fetchDuration = async () => {
+      try {
+        // Check if workout has provenance with duration
+        const provenance = (workout as any)?._provenance;
+        if (provenance?.video_duration_sec) {
+          setVideoDuration(provenance.video_duration_sec);
+          return;
+        }
+
+        // Otherwise, fetch from ingestor
+        const videoId = getYouTubeId(sourceUrl);
+        if (videoId) {
+          const response = await fetch(
+            `${MAPPER_API_BASE_URL.replace('8001', '8004')}/youtube/info?video_id=${videoId}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.duration_sec) {
+              setVideoDuration(data.duration_sec);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch video duration:', error);
+      } finally {
+        setIsLoadingDuration(false);
+      }
+    };
+
+    fetchDuration();
+  }, [sourceUrl, workout, MAPPER_API_BASE_URL]);
+
+  // Initialize step configs from workout with timestamps from LLM or estimated
   useEffect(() => {
     if (!workout?.blocks) return;
 
     const configs: StepConfig[] = [];
     let stepIndex = 0;
+    let totalExercises = 0;
+
+    // First count total exercises
+    workout.blocks.forEach((block: Block) => {
+      totalExercises += block.exercises?.length || 0;
+    });
+
+    // Get video duration from provenance or state
+    const provenance = (workout as any)?._provenance;
+    const durationFromProvenance = provenance?.video_duration_sec;
+    const effectiveDuration = videoDuration || durationFromProvenance;
+    
+    // Calculate fallback time per exercise if no timestamps in data
+    const introBuffer = effectiveDuration ? effectiveDuration * 0.05 : 0;
+    const usableDuration = effectiveDuration ? effectiveDuration * 0.9 : 0;
+    const timePerExercise = totalExercises > 0 ? usableDuration / totalExercises : 0;
 
     workout.blocks.forEach((block: Block) => {
       block.exercises?.forEach((exercise: Exercise) => {
+        // Use video_start_sec from LLM if available, otherwise estimate
+        const exerciseAny = exercise as any;
+        const llmTimestamp = exerciseAny.video_start_sec;
+        const estimatedTime = effectiveDuration 
+          ? Math.floor(introBuffer + (stepIndex * timePerExercise))
+          : 0;
+        
         configs.push({
           exerciseId: exercise.id || `step-${stepIndex}`,
           exerciseName: exercise.name,
           videoSource: sourceUrl ? 'original' : 'none',
           customUrl: '',
+          startTimeSec: llmTimestamp ?? estimatedTime,
         });
         stepIndex++;
       });
     });
 
     setStepConfigs(configs);
-  }, [workout, sourceUrl]);
+    
+    // Update video duration from provenance if not already set
+    if (!videoDuration && durationFromProvenance) {
+      setVideoDuration(durationFromProvenance);
+    }
+  }, [workout, sourceUrl, videoDuration]);
 
   const updateStepConfig = (exerciseId: string, updates: Partial<StepConfig>) => {
     setStepConfigs(prev => 
@@ -89,6 +183,11 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
           : config
       )
     );
+  };
+
+  const handlePreview = (url: string, timestamp: number) => {
+    setPreviewUrl(url);
+    setPreviewTimestamp(timestamp);
   };
 
   const handleSend = async (target: 'ios' | 'watch' | 'both') => {
@@ -108,7 +207,7 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
           userId,
           workout,
           sourceUrl: sourceUrl || '',
-          stepConfigs: stepConfigs, // Send step configurations
+          stepConfigs: stepConfigs,
         }),
       });
 
@@ -169,17 +268,6 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
   
   const isYouTubeSource = sourceUrl?.includes('youtube.com') || sourceUrl?.includes('youtu.be');
 
-  const getVideoSourceLabel = (source: VideoSourceType) => {
-    switch (source) {
-      case 'original':
-        return isYouTubeSource ? 'YouTube Video' : 'Original Video';
-      case 'custom':
-        return 'Custom URL';
-      case 'none':
-        return 'No Video';
-    }
-  };
-
   return (
     <Card className={enabled ? 'border-primary ring-2 ring-primary/20' : ''}>
       <CardHeader className="pb-3">
@@ -213,6 +301,12 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
               <span className="font-medium">{exerciseCount} exercises</span>
               <span className="text-muted-foreground"> • </span>
               <span className="text-muted-foreground">{stepsWithVideo} with video</span>
+              {videoDuration && (
+                <>
+                  <span className="text-muted-foreground"> • </span>
+                  <span className="text-muted-foreground">{formatTime(videoDuration)} total</span>
+                </>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -242,7 +336,7 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                     YouTube
                   </span>
                 )}
-                <span className="text-sm truncate max-w-[250px]">{sourceUrl}</span>
+                <span className="text-sm truncate max-w-[200px]">{sourceUrl}</span>
                 <a
                   href={sourceUrl}
                   target="_blank"
@@ -252,12 +346,19 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
+              {isLoadingDuration ? (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              ) : videoDuration ? (
+                <span className="text-sm text-muted-foreground">
+                  {formatTime(videoDuration)}
+                </span>
+              ) : null}
             </div>
           )}
 
           {/* Per-Step Configuration */}
           {showSteps && (
-            <ScrollArea className="h-[300px] pr-4">
+            <ScrollArea className="h-[350px] pr-4">
               <div className="space-y-3">
                 {stepConfigs.map((config, idx) => (
                   <div
@@ -269,16 +370,22 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                         {idx + 1}
                       </div>
                       <span className="font-medium text-sm flex-1">{config.exerciseName}</span>
+                      {config.videoSource !== 'none' && videoDuration && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          ~{formatTime(config.startTimeSec)}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Select
                         value={config.videoSource}
                         onValueChange={(value: VideoSourceType) =>
                           updateStepConfig(config.exerciseId, { videoSource: value })
                         }
                       >
-                        <SelectTrigger className="w-[160px]">
+                        <SelectTrigger className="w-[140px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -305,6 +412,32 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                         </SelectContent>
                       </Select>
 
+                      {config.videoSource === 'original' && sourceUrl && (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <Input
+                              value={formatTime(config.startTimeSec)}
+                              onChange={(e) => {
+                                const seconds = parseTime(e.target.value);
+                                updateStepConfig(config.exerciseId, { startTimeSec: seconds });
+                              }}
+                              className="w-[70px] h-8 text-sm text-center"
+                              placeholder="0:00"
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePreview(sourceUrl, config.startTimeSec)}
+                            className="h-8"
+                          >
+                            <Play className="w-3 h-3 mr-1" />
+                            Preview
+                          </Button>
+                        </>
+                      )}
+
                       {config.videoSource === 'custom' && (
                         <div className="flex-1 flex items-center gap-2">
                           <Input
@@ -313,28 +446,18 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                             onChange={(e) =>
                               updateStepConfig(config.exerciseId, { customUrl: e.target.value })
                             }
-                            className="text-sm h-9"
+                            className="text-sm h-8"
                           />
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => setPreviewUrl(config.customUrl)}
+                            onClick={() => handlePreview(config.customUrl, 0)}
                             disabled={!config.customUrl}
+                            className="h-8"
                           >
                             <Play className="w-3 h-3" />
                           </Button>
                         </div>
-                      )}
-
-                      {config.videoSource === 'original' && sourceUrl && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setPreviewUrl(sourceUrl)}
-                        >
-                          <Play className="w-3 h-3 mr-1" />
-                          Preview
-                        </Button>
                       )}
                     </div>
                   </div>
@@ -403,7 +526,7 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
           <DialogHeader>
             <DialogTitle>Preview Video</DialogTitle>
             <DialogDescription>
-              Verify this is the correct video for the exercise
+              {previewTimestamp > 0 && `Starting at ${formatTime(previewTimestamp)}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -411,7 +534,7 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
               <div className="aspect-video bg-muted rounded-lg overflow-hidden flex items-center justify-center">
                 {previewUrl.includes('youtube.com') || previewUrl.includes('youtu.be') ? (
                   <iframe
-                    src={`https://www.youtube.com/embed/${getYouTubeId(previewUrl)}`}
+                    src={`https://www.youtube.com/embed/${getYouTubeId(previewUrl)}?start=${previewTimestamp}&autoplay=1`}
                     className="w-full h-full"
                     allowFullScreen
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -430,7 +553,7 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                     </a>
                   </div>
                 ) : (
-                  <video src={previewUrl} controls className="w-full h-full" />
+                  <video src={previewUrl} controls autoPlay className="w-full h-full" />
                 )}
               </div>
             )}
