@@ -32,10 +32,97 @@ import {
   X,
   Clock,
   Volume2,
-  VolumeX
+  VolumeX,
+  Dumbbell
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WorkoutStructure, Block, Exercise } from '../types/workout';
+import Lottie from 'lottie-react';
+
+// Simple embedded exercise animation (a pulsing dumbbell icon)
+// This avoids external CDN dependencies and works offline
+const EXERCISE_ANIMATION_DATA = {
+  "v": "5.7.4",
+  "fr": 30,
+  "ip": 0,
+  "op": 60,
+  "w": 200,
+  "h": 200,
+  "nm": "Exercise",
+  "ddd": 0,
+  "assets": [],
+  "layers": [
+    {
+      "ddd": 0,
+      "ind": 1,
+      "ty": 4,
+      "nm": "Dumbbell",
+      "sr": 1,
+      "ks": {
+        "o": { "a": 0, "k": 100 },
+        "r": { "a": 0, "k": 0 },
+        "p": { "a": 0, "k": [100, 100, 0] },
+        "a": { "a": 0, "k": [0, 0, 0] },
+        "s": {
+          "a": 1,
+          "k": [
+            { "t": 0, "s": [100, 100, 100], "e": [110, 110, 100] },
+            { "t": 15, "s": [110, 110, 100], "e": [100, 100, 100] },
+            { "t": 30, "s": [100, 100, 100], "e": [110, 110, 100] },
+            { "t": 45, "s": [110, 110, 100], "e": [100, 100, 100] },
+            { "t": 60, "s": [100, 100, 100] }
+          ]
+        }
+      },
+      "ao": 0,
+      "shapes": [
+        {
+          "ty": "gr",
+          "it": [
+            {
+              "ty": "rc",
+              "d": 1,
+              "s": { "a": 0, "k": [80, 20] },
+              "p": { "a": 0, "k": [0, 0] },
+              "r": { "a": 0, "k": 5 }
+            },
+            {
+              "ty": "rc",
+              "d": 1,
+              "s": { "a": 0, "k": [20, 50] },
+              "p": { "a": 0, "k": [-40, 0] },
+              "r": { "a": 0, "k": 5 }
+            },
+            {
+              "ty": "rc",
+              "d": 1,
+              "s": { "a": 0, "k": [20, 50] },
+              "p": { "a": 0, "k": [40, 0] },
+              "r": { "a": 0, "k": 5 }
+            },
+            {
+              "ty": "fl",
+              "c": { "a": 0, "k": [0.2, 0.5, 0.9, 1] },
+              "o": { "a": 0, "k": 100 }
+            },
+            {
+              "ty": "tr",
+              "p": { "a": 0, "k": [0, 0] },
+              "a": { "a": 0, "k": [0, 0] },
+              "s": { "a": 0, "k": [100, 100] },
+              "r": { "a": 0, "k": 0 },
+              "o": { "a": 0, "k": 100 }
+            }
+          ],
+          "nm": "Dumbbell Shape"
+        }
+      ],
+      "ip": 0,
+      "op": 60,
+      "st": 0
+    }
+  ]
+};
 
 type VideoSourceType = 'original' | 'custom' | 'none';
 type VoiceContentType = 'name' | 'name-reps' | 'name-notes';
@@ -142,6 +229,10 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
     enabled: true,
     content: 'name-reps',
   });
+  
+  // Lottie animation data (embedded, no fetch needed)
+  const [animationPreviewExercise, setAnimationPreviewExercise] = useState<string | null>(null);
+  const exerciseAnimation = EXERCISE_ANIMATION_DATA;
 
   const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
 
@@ -206,9 +297,14 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
     let stepIndex = 0;
     let totalExercises = 0;
 
-    // First count total exercises
+    // First count total exercises (including those in supersets)
     workout.blocks.forEach((block: Block) => {
       totalExercises += block.exercises?.length || 0;
+      // Also count exercises in supersets
+      const supersets = (block as any).supersets || [];
+      supersets.forEach((superset: any) => {
+        totalExercises += superset.exercises?.length || 0;
+      });
     });
 
     // Get video duration from provenance or state
@@ -221,23 +317,36 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
     const usableDuration = effectiveDuration ? effectiveDuration * 0.9 : 0;
     const timePerExercise = totalExercises > 0 ? usableDuration / totalExercises : 0;
 
+    // Helper to add exercise to configs
+    const addExercise = (exercise: Exercise) => {
+      const exerciseAny = exercise as any;
+      const llmTimestamp = exerciseAny.video_start_sec;
+      const estimatedTime = effectiveDuration 
+        ? Math.floor(introBuffer + (stepIndex * timePerExercise))
+        : 0;
+      
+      configs.push({
+        exerciseId: exercise.id || `step-${stepIndex}`,
+        exerciseName: exercise.name,
+        videoSource: sourceUrl ? 'original' : 'none',
+        customUrl: '',
+        startTimeSec: llmTimestamp ?? estimatedTime,
+      });
+      stepIndex++;
+    };
+
     workout.blocks.forEach((block: Block) => {
+      // Handle regular exercises
       block.exercises?.forEach((exercise: Exercise) => {
-        // Use video_start_sec from LLM if available, otherwise estimate
-        const exerciseAny = exercise as any;
-        const llmTimestamp = exerciseAny.video_start_sec;
-        const estimatedTime = effectiveDuration 
-          ? Math.floor(introBuffer + (stepIndex * timePerExercise))
-          : 0;
-        
-        configs.push({
-          exerciseId: exercise.id || `step-${stepIndex}`,
-          exerciseName: exercise.name,
-          videoSource: sourceUrl ? 'original' : 'none',
-          customUrl: '',
-          startTimeSec: llmTimestamp ?? estimatedTime,
+        addExercise(exercise);
+      });
+      
+      // Handle exercises in supersets
+      const supersets = (block as any).supersets || [];
+      supersets.forEach((superset: any) => {
+        superset.exercises?.forEach((exercise: Exercise) => {
+          addExercise(exercise);
         });
-        stepIndex++;
       });
     });
 
@@ -501,16 +610,31 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
             <ScrollArea className="h-[350px] pr-4">
               <div className="space-y-3">
                 {stepConfigs.map((config, idx) => {
-                  // Find the actual exercise for voice preview
+                  // Find the actual exercise for voice preview (check both exercises and supersets)
                   let exercise: Exercise | undefined;
                   let exerciseIdx = 0;
                   for (const block of workout.blocks) {
+                    // Check regular exercises
                     for (const ex of block.exercises || []) {
                       if (exerciseIdx === idx) {
                         exercise = ex;
                         break;
                       }
                       exerciseIdx++;
+                    }
+                    if (exercise) break;
+                    
+                    // Check supersets
+                    const supersets = (block as any).supersets || [];
+                    for (const superset of supersets) {
+                      for (const ex of superset.exercises || []) {
+                        if (exerciseIdx === idx) {
+                          exercise = ex;
+                          break;
+                        }
+                        exerciseIdx++;
+                      }
+                      if (exercise) break;
                     }
                     if (exercise) break;
                   }
@@ -625,6 +749,18 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
                             </Button>
                           </div>
                         )}
+
+                        {config.videoSource === 'none' && exerciseAnimation && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAnimationPreviewExercise(config.exerciseName)}
+                            className="h-8"
+                          >
+                            <Dumbbell className="w-3 h-3 mr-1" />
+                            Preview Animation
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -726,6 +862,36 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
             )}
             <div className="flex justify-end">
               <Button onClick={() => setPreviewUrl(null)}>Close</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Animation Preview Dialog */}
+      <Dialog open={!!animationPreviewExercise} onOpenChange={() => setAnimationPreviewExercise(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{animationPreviewExercise}</DialogTitle>
+            <DialogDescription>
+              Placeholder animation (will be enhanced with exercise-specific videos later)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg overflow-hidden flex items-center justify-center p-8">
+              {exerciseAnimation && (
+                <Lottie 
+                  animationData={exerciseAnimation} 
+                  loop={true}
+                  className="w-full h-full"
+                />
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              This generic animation will play during the exercise. 
+              You can add specific exercise videos later.
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setAnimationPreviewExercise(null)}>Close</Button>
             </div>
           </div>
         </DialogContent>

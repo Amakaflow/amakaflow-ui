@@ -53,6 +53,7 @@
     "cmdk": "^1.1.1",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "*",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",

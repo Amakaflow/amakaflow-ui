@@ -211,7 +211,7 @@ export function ValidateMap({
       ...workoutToUpdate,
       blocks: workoutToUpdate.blocks.map(block => ({
         ...block,
-        exercises: block.exercises.map(exercise => {
+        exercises: (block.exercises || []).map(exercise => {
           const mappedName = nameMapping.get(exercise.name);
           if (mappedName) {
             // Update exercise name to mapped name
