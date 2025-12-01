@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -955,6 +955,101 @@ def list_follow_along_endpoint(
         "success": True,
         "items": workouts
     }
+
+
+class CreateFollowAlongFromWorkoutRequest(BaseModel):
+    userId: str
+    workout: Dict[str, Any]
+    sourceUrl: Optional[str] = None
+    followAlongConfig: Optional[Dict[str, Any]] = None
+
+
+@app.post("/follow-along/from-workout")
+def create_follow_along_from_workout(request: CreateFollowAlongFromWorkoutRequest):
+    """
+    Create a follow-along workout from an existing structured workout.
+    This converts a workout created through the normal flow into a follow-along format.
+    """
+    try:
+        workout = request.workout
+        config = request.followAlongConfig or {}
+        
+        # Extract title
+        title = workout.get("title", "Follow-Along Workout")
+        
+        # Detect source type from URL
+        source = "manual"
+        source_url = request.sourceUrl or ""
+        if "youtube.com" in source_url or "youtu.be" in source_url:
+            source = "youtube"
+        elif "instagram.com" in source_url:
+            source = "instagram"
+        elif "tiktok.com" in source_url:
+            source = "tiktok"
+        
+        # Convert workout blocks to follow-along steps
+        steps = []
+        step_order = 1
+        config_steps = {s.get("exerciseId"): s for s in config.get("steps", [])}
+        
+        for block in workout.get("blocks", []):
+            for exercise in block.get("exercises", []):
+                exercise_id = exercise.get("id", f"step-{step_order}")
+                step_config = config_steps.get(exercise_id, {})
+                
+                # Determine video URL based on config
+                video_url = None
+                video_source = step_config.get("videoSource", "none")
+                
+                if video_source == "original" and config.get("useOriginalVideo"):
+                    video_url = config.get("originalVideoUrl")
+                elif video_source == "custom":
+                    video_url = step_config.get("customUrl")
+                
+                steps.append({
+                    "order": step_order,
+                    "label": exercise.get("name", f"Exercise {step_order}"),
+                    "name": exercise.get("name"),
+                    "targetReps": exercise.get("reps"),
+                    "targetDurationSec": exercise.get("duration_sec"),
+                    "notes": exercise.get("notes"),
+                    "sets": exercise.get("sets"),
+                    "followAlongUrl": video_url,
+                    "videoStartTimeSec": step_config.get("startTimeSec", 0),
+                })
+                step_order += 1
+        
+        # Save to database
+        saved_workout = save_follow_along_workout(
+            user_id=request.userId,
+            source=source,
+            source_url=source_url,
+            title=title,
+            description=workout.get("description"),
+            video_duration_sec=None,
+            thumbnail_url=None,
+            video_proxy_url=config.get("originalVideoUrl") if config.get("useOriginalVideo") else None,
+            steps=steps
+        )
+        
+        if saved_workout:
+            return {
+                "success": True,
+                "followAlongWorkoutId": saved_workout.get("id"),
+                "followAlongWorkout": saved_workout
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Failed to save follow-along workout"
+            }
+            
+    except Exception as e:
+        logger.error(f"Failed to create follow-along from workout: {e}")
+        return {
+            "success": False,
+            "message": str(e)
+        }
 
 
 @app.get("/follow-along/{workout_id}")
