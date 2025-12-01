@@ -962,6 +962,7 @@ class CreateFollowAlongFromWorkoutRequest(BaseModel):
     workout: Dict[str, Any]
     sourceUrl: Optional[str] = None
     followAlongConfig: Optional[Dict[str, Any]] = None
+    stepConfigs: Optional[List[Dict[str, Any]]] = None  # Phase 2: per-step video config
 
 
 @app.post("/follow-along/from-workout")
@@ -973,6 +974,10 @@ def create_follow_along_from_workout(request: CreateFollowAlongFromWorkoutReques
     try:
         workout = request.workout
         config = request.followAlongConfig or {}
+        step_configs_list = request.stepConfigs or []
+        
+        # Create lookup for step configs by exerciseId
+        step_configs_map = {s.get("exerciseId"): s for s in step_configs_list}
         
         # Extract title
         title = workout.get("title", "Follow-Along Workout")
@@ -990,19 +995,24 @@ def create_follow_along_from_workout(request: CreateFollowAlongFromWorkoutReques
         # Convert workout blocks to follow-along steps
         steps = []
         step_order = 1
-        config_steps = {s.get("exerciseId"): s for s in config.get("steps", [])}
         
         for block in workout.get("blocks", []):
             for exercise in block.get("exercises", []):
                 exercise_id = exercise.get("id", f"step-{step_order}")
-                step_config = config_steps.get(exercise_id, {})
+                
+                # Get step config from Phase 2 stepConfigs or fallback to old config format
+                step_config = step_configs_map.get(exercise_id, {})
+                if not step_config:
+                    # Fallback to old config format
+                    old_config_steps = {s.get("exerciseId"): s for s in config.get("steps", [])}
+                    step_config = old_config_steps.get(exercise_id, {})
                 
                 # Determine video URL based on config
                 video_url = None
                 video_source = step_config.get("videoSource", "none")
                 
-                if video_source == "original" and config.get("useOriginalVideo"):
-                    video_url = config.get("originalVideoUrl")
+                if video_source == "original":
+                    video_url = source_url  # Use the original source URL
                 elif video_source == "custom":
                     video_url = step_config.get("customUrl")
                 
@@ -1028,7 +1038,7 @@ def create_follow_along_from_workout(request: CreateFollowAlongFromWorkoutReques
             description=workout.get("description"),
             video_duration_sec=None,
             thumbnail_url=None,
-            video_proxy_url=config.get("originalVideoUrl") if config.get("useOriginalVideo") else None,
+            video_proxy_url=source_url if source != "manual" else None,
             steps=steps
         )
         
