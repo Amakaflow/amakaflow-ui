@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity, Video } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity, Video, CalendarDays } from 'lucide-react';
 import { AddSources, Source } from './components/AddSources';
 import { StructureWorkout } from './components/StructureWorkout';
 import { ValidateMap } from './components/ValidateMap';
@@ -17,6 +17,7 @@ import { ProfileCompletion } from './components/ProfileCompletion';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { FollowAlongWorkouts } from './components/FollowAlongWorkouts';
+import { Calendar } from './components/Calendar';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
@@ -40,7 +41,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'follow-along';
+type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'follow-along' | 'calendar';
 
 export default function App() {
   // Clerk authentication
@@ -49,7 +50,7 @@ export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [currentView, setCurrentView] = useState<'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance'>('home');
+  const [currentView, setCurrentView] = useState<View>('home');
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('add-sources');
   const [showStravaEnhance, setShowStravaEnhance] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
@@ -1103,6 +1104,20 @@ export default function App() {
                   Workflow
                 </Button>
                 <Button
+                  variant={currentView === 'calendar' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setCurrentView('calendar');
+                    });
+                  }}
+                  className="gap-2"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  Calendar
+                </Button>
+                <Button
                   variant={currentView === 'history' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1563,6 +1578,10 @@ export default function App() {
 
         {currentView === 'follow-along' && (
           <FollowAlongWorkouts />
+        )}
+
+        {currentView === 'calendar' && (
+          <Calendar />
         )}
       </div>
 
