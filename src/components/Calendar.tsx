@@ -220,7 +220,7 @@ export function Calendar() {
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className={`border-r bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
+      <div className={`border-r border-gray-900 bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
         {!sidebarCollapsed && (
           <>
             {showMiniCalendar && (
@@ -251,7 +251,7 @@ export function Calendar() {
                 />
               </div>
             </div>
-            <div className="border-t border-slate-200" />
+            <hr className="border-t border-gray-900 w-full" />
             <ScrollArea className="flex-1">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
