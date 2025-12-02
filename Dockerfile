@@ -2,10 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for tesseract-ocr and Node.js
+# Install system dependencies for tesseract-ocr, Node.js, and ffmpeg
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
+    ffmpeg \
     curl \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \

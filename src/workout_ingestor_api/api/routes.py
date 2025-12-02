@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import json
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import re
 import requests
@@ -19,6 +19,7 @@ from fastapi import (
     Form,
     Body,
     HTTPException,
+    Query,
 )
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -31,6 +32,10 @@ from workout_ingestor_api.services.export_service import ExportService
 from workout_ingestor_api.services.instagram_service import (
     InstagramService,
     InstagramServiceError,
+)
+from workout_ingestor_api.services.tiktok_service import (
+    TikTokService,
+    TikTokServiceError,
 )
 from workout_ingestor_api.services.vision_service import VisionService
 from workout_ingestor_api.services.llm_service import LLMService
@@ -82,6 +87,13 @@ class InstagramTestRequest(BaseModel):
     url: str
     username: Optional[str] = None
     password: Optional[str] = None
+
+
+class TikTokIngestRequest(BaseModel):
+    url: str
+    use_vision: bool = True  # Use GPT-4o Vision by default
+    vision_provider: str = "openai"
+    vision_model: Optional[str] = "gpt-4o-mini"
 
 
 class NotWorkoutFeedback(BaseModel):
@@ -756,3 +768,92 @@ async def export_fit(workout: Workout):
 async def ingest_youtube(payload: YouTubeTranscriptRequest):
     """Thin wrapper that delegates to youtube_ingest.ingest_youtube_impl."""
     return await ingest_youtube_impl(payload.url)
+
+
+# ---------------------------------------------------------------------------
+# TikTok ingest with Vision AI support
+# ---------------------------------------------------------------------------
+
+@router.post("/ingest/tiktok")
+async def ingest_tiktok(payload: TikTokIngestRequest):
+    """Ingest workout from TikTok video using Vision AI only."""
+    url = payload.url
+    
+    if not TikTokService.is_tiktok_url(url):
+        raise HTTPException(status_code=400, detail="Invalid TikTok URL")
+    
+    tmpdir = tempfile.mkdtemp(prefix="tiktok_ingest_")
+    
+    try:
+        metadata = TikTokService.extract_metadata(url)
+        
+        video_path = TikTokService.download_video(url, tmpdir)
+        if not video_path:
+            raise HTTPException(status_code=400, detail="Could not download video")
+        
+        VideoService.sample_frames(video_path, tmpdir, fps=0.2, max_secs=30)
+        
+        frame_files = sorted([
+            os.path.join(tmpdir, f) for f in os.listdir(tmpdir)
+            if f.endswith('.png')
+        ])[:5]
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        
+        workout_dict = VisionService.extract_and_structure_workout_openai(
+            frame_files, model="gpt-4o-mini", api_key=api_key
+        )
+        
+        for block in workout_dict.get("blocks", []):
+            block["structure"] = block.get("structure") or "regular"
+            for ex in block.get("exercises", []):
+                ex["type"] = ex.get("type") or "strength"
+        
+        workout_dict["title"] = workout_dict.get("title") or metadata.title or "TikTok Workout"
+        workout = Workout(**workout_dict)
+        workout.source = url
+        
+        if metadata.title:
+            clean_title = re.sub(r'#\w+\s*', '', metadata.title).strip()
+            if clean_title and (not workout.title or workout.title == "Imported Workout"):
+                workout.title = clean_title[:80]
+        
+        response = workout.convert_to_new_structure().model_dump()
+        response["_provenance"] = {
+            "mode": "tiktok_vision",
+            "video_id": metadata.video_id,
+            "author": metadata.author_name,
+            "frames": len(frame_files)
+        }
+        return JSONResponse(response)
+        
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@router.get("/tiktok/metadata")
+async def get_tiktok_metadata(url: str):
+    """
+    Get metadata for a TikTok video without full ingestion.
+    
+    Useful for previewing video info before ingesting.
+    
+    Args:
+        url: TikTok video URL
+        
+    Returns:
+        Video metadata (title, author, thumbnail, etc.)
+    """
+    if not TikTokService.is_tiktok_url(url):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid TikTok URL"
+        )
+    
+    try:
+        metadata = TikTokService.extract_metadata(url)
+        return JSONResponse(metadata.to_dict())
+    except TikTokServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
