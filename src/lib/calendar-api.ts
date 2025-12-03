@@ -1,160 +1,209 @@
 /**
- * Calendar API Client
- * Interfaces with the calendar-api backend service
+ * Calendar API client
+ * Connects to the calendar-api backend for workout events
  */
 
-import { CalendarEvent } from '../types/calendar';
+const API_BASE_URL = import.meta.env.VITE_CALENDAR_API_URL || 'http://127.0.0.1:8000';
 
-const CALENDAR_API_BASE_URL = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CALENDAR_API_URL) || 
-  'http://localhost:8003';
+// Types matching the API schemas
+export interface WorkoutEvent {
+  id: string;
+  user_id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  source: string;
+  type?: string;
+  start_time?: string;
+  end_time?: string;
+  status: 'planned' | 'completed';
+  is_anchor: boolean;
+  primary_muscle?: string;
+  intensity?: number;
+  connected_calendar_id?: string;
+  connected_calendar_type?: string;
+  external_event_url?: string;
+  recurrence_rule?: string;
+  json_payload?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
 
-// API timeout in milliseconds
-const API_TIMEOUT = 30000;
+export interface CreateWorkoutEvent {
+  title: string;
+  date: string;
+  source?: string;
+  type?: string;
+  start_time?: string;
+  end_time?: string;
+  status?: 'planned' | 'completed';
+  is_anchor?: boolean;
+  primary_muscle?: string;
+  intensity?: number;
+  connected_calendar_id?: string;
+  connected_calendar_type?: string;
+  external_event_url?: string;
+  recurrence_rule?: string;
+  json_payload?: Record<string, any>;
+}
 
-/**
- * Generic API call helper with timeout and error handling
- */
-async function apiCall<T>(
-  endpoint: string,
-  options: RequestInit = {},
-  userId: string
-): Promise<T> {
-  const url = `${CALENDAR_API_BASE_URL}${endpoint}`;
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+export interface UpdateWorkoutEvent {
+  title?: string;
+  date?: string;
+  source?: string;
+  type?: string;
+  start_time?: string;
+  end_time?: string;
+  status?: 'planned' | 'completed';
+  is_anchor?: boolean;
+  primary_muscle?: string;
+  intensity?: number;
+  connected_calendar_id?: string;
+  connected_calendar_type?: string;
+  external_event_url?: string;
+  recurrence_rule?: string;
+  json_payload?: Record<string, any>;
+}
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        ...options.headers,
-      },
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
+export interface ConnectedCalendar {
+  id: string;
+  user_id: string;
+  name: string;
+  type: 'runna' | 'apple' | 'google' | 'outlook' | 'ics_custom';
+  integration_type: 'ics_url' | 'oauth' | 'os_integration';
+  is_workout_calendar: boolean;
+  ics_url?: string;
+  last_sync?: string;
+  sync_status: 'active' | 'error' | 'paused';
+  sync_error_message?: string;
+  color?: string;
+  workouts_this_week: number;
+  created_at?: string;
+  updated_at?: string;
+}
 
+export interface CreateConnectedCalendar {
+  name: string;
+  type: 'runna' | 'apple' | 'google' | 'outlook' | 'ics_custom';
+  integration_type: 'ics_url' | 'oauth' | 'os_integration';
+  is_workout_calendar?: boolean;
+  ics_url?: string;
+  color?: string;
+}
+
+class CalendarApiClient {
+  private baseUrl: string;
+  private userId: string | null = null;
+
+  constructor(baseUrl: string = API_BASE_URL) {
+    this.baseUrl = baseUrl;
+  }
+
+  setUserId(userId: string) {
+    this.userId = userId;
+  }
+
+  private getHeaders(): HeadersInit {
+    if (!this.userId) {
+      throw new Error('User ID not set. Call setUserId() first.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      'X-User-Id': this.userId,
+    };
+  }
+
+  private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        detail: response.statusText,
-      }));
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
       throw new Error(error.detail || `API error: ${response.status}`);
     }
-
     return response.json();
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout');
-    }
-    throw error;
   }
-}
 
-/**
- * Get calendar events within a date range
- */
-export async function getCalendarEvents(
-  userId: string,
-  startDate: string,
-  endDate: string
-): Promise<CalendarEvent[]> {
-  return apiCall<CalendarEvent[]>(
-    `/calendar?start=${startDate}&end=${endDate}`,
-    { method: 'GET' },
-    userId
-  );
-}
+  // ==========================================
+  // WORKOUT EVENTS
+  // ==========================================
 
-/**
- * Create a new calendar event
- */
-export async function createCalendarEvent(
-  userId: string,
-  event: Omit<CalendarEvent, 'id' | 'user_id' | 'created_at' | 'updated_at'>
-): Promise<CalendarEvent> {
-  return apiCall<CalendarEvent>(
-    '/calendar',
-    {
+  async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
+    const response = await fetch(
+      `${this.baseUrl}/calendar?start=${start}&end=${end}`,
+      { headers: this.getHeaders() }
+    );
+    return this.handleResponse<WorkoutEvent[]>(response);
+  }
+
+  async getEvent(eventId: string): Promise<WorkoutEvent> {
+    const response = await fetch(
+      `${this.baseUrl}/calendar/${eventId}`,
+      { headers: this.getHeaders() }
+    );
+    return this.handleResponse<WorkoutEvent>(response);
+  }
+
+  async createEvent(event: CreateWorkoutEvent): Promise<WorkoutEvent> {
+    const response = await fetch(`${this.baseUrl}/calendar`, {
       method: 'POST',
+      headers: this.getHeaders(),
       body: JSON.stringify(event),
-    },
-    userId
-  );
-}
-
-/**
- * Update an existing calendar event
- */
-export async function updateCalendarEvent(
-  userId: string,
-  eventId: string,
-  updates: Partial<CalendarEvent>
-): Promise<CalendarEvent> {
-  return apiCall<CalendarEvent>(
-    `/calendar/${eventId}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    },
-    userId
-  );
-}
-
-/**
- * Delete a calendar event
- */
-export async function deleteCalendarEvent(
-  userId: string,
-  eventId: string
-): Promise<{ success: boolean }> {
-  return apiCall<{ success: boolean }>(
-    `/calendar/${eventId}`,
-    { method: 'DELETE' },
-    userId
-  );
-}
-
-/**
- * Check if calendar API is available
- */
-export async function checkCalendarApiHealth(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const response = await fetch(`${CALENDAR_API_BASE_URL}/health`, {
-      signal: controller.signal,
     });
-    
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch {
-    return false;
+    return this.handleResponse<WorkoutEvent>(response);
   }
-}
 
-/**
- * Bulk create calendar events (for Smart Planner)
- */
-export async function bulkCreateCalendarEvents(
-  userId: string,
-  events: Array<Omit<CalendarEvent, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
-): Promise<CalendarEvent[]> {
-  const results: CalendarEvent[] = [];
-  
-  for (const event of events) {
-    try {
-      const created = await createCalendarEvent(userId, event);
-      results.push(created);
-    } catch (error) {
-      console.error('Failed to create event:', event.title, error);
+  async updateEvent(eventId: string, event: UpdateWorkoutEvent): Promise<WorkoutEvent> {
+    const response = await fetch(`${this.baseUrl}/calendar/${eventId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(event),
+    });
+    return this.handleResponse<WorkoutEvent>(response);
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/calendar/${eventId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `API error: ${response.status}`);
     }
   }
-  
-  return results;
+
+  // ==========================================
+  // CONNECTED CALENDARS
+  // ==========================================
+
+  async getConnectedCalendars(): Promise<ConnectedCalendar[]> {
+    const response = await fetch(
+      `${this.baseUrl}/calendar/connected-calendars`,
+      { headers: this.getHeaders() }
+    );
+    return this.handleResponse<ConnectedCalendar[]>(response);
+  }
+
+  async createConnectedCalendar(calendar: CreateConnectedCalendar): Promise<ConnectedCalendar> {
+    const response = await fetch(`${this.baseUrl}/calendar/connected-calendars`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(calendar),
+    });
+    return this.handleResponse<ConnectedCalendar>(response);
+  }
+
+  async deleteConnectedCalendar(calendarId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/calendar/connected-calendars/${calendarId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `API error: ${response.status}`);
+    }
+  }
 }
+
+// Export singleton instance
+export const calendarApi = new CalendarApiClient();
+
+// Export class for testing
+export { CalendarApiClient };

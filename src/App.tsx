@@ -1581,7 +1581,7 @@ export default function App() {
         )}
 
         {currentView === 'calendar' && (
-          <Calendar />
+          <Calendar userId={user.id} />
         )}
       </div>
 
