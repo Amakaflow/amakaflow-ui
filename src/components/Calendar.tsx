@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-// import { useUser } from '@clerk/clerk-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
@@ -11,24 +10,16 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Plus,
-  Clock,
   Check,
   Menu,
   ChevronDown,
   ChevronUp,
-  MoreHorizontal,
-  Circle,
   Search,
   Sparkles,
   Dumbbell,
   Link as LinkIcon,
   Settings
 } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from './ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,11 +47,11 @@ const BASE_WORKOUT_FILTERS = [
   { id: 'instagram', label: 'Social Media', color: 'bg-pink-500', sources: ['instagram', 'tiktok'], subscribed: false },
 ];
 
-export function Calendar() {
-  // Get user from Clerk
-  // const { user } = useUser();
-  const userId = 'demo-user-1'; // Hardcoded for testing
+interface CalendarProps {
+  userId: string;
+}
 
+export function Calendar({ userId }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -70,11 +61,6 @@ export function Calendar() {
   const [showEventDrawer, setShowEventDrawer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMiniCalendar, setShowMiniCalendar] = useState(true);
-  const [expandedSections, setExpandedSections] = useState({
-    inbox: true,
-    today: true,
-    filters: true,
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [showSmartPlanner, setShowSmartPlanner] = useState(false);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
