@@ -1,11 +1,10 @@
 /**
  * SmartPlannerDrawer Component
- * Right-side drawer for AI-powered weekly workout suggestions
+ * Centered modal dialog for AI-powered weekly workout suggestions
  */
 
 import { useState } from 'react';
 import { Button } from '../ui/button';
-import { ScrollArea } from '../ui/scroll-area';
 import { 
   X, 
   RefreshCw, 
@@ -414,14 +413,14 @@ export function SmartPlannerDrawer({
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/20 z-[90] animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/20 z-50 transition-opacity"
         onClick={onClose}
       />
-
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-[400px] bg-background border-l shadow-2xl z-[100] flex flex-col animate-in slide-in-from-right duration-300 ease-out">
-        {/* Header (Fixed) */}
-        <div className="flex-shrink-0 p-6 border-b space-y-1 bg-background z-10">
+      
+      {/* Drawer Panel */}
+      <div className="bg-background rounded-lg shadow-lg flex flex-col border" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "580px", maxHeight: "80vh", zIndex: 50 }}>
+        {/* Header */}
+        <div className="p-6 pb-4 border-b space-y-1 flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h2 className="text-xl font-semibold">Smart Planner</h2>
@@ -429,29 +428,21 @@ export function SmartPlannerDrawer({
                 Week of {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={state === 'loading'}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${state === 'loading' ? 'animate-spin' : ''}`} />
-                Regenerate
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={onClose}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={state === 'loading'}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${state === 'loading' ? 'animate-spin' : ''}`} />
+              Regenerate
+            </Button>
           </div>
         </div>
 
         {/* Scrollable Content */}
-        <ScrollArea className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
           <div className="p-6 space-y-6">
             {state === 'loading' ? (
               <LoadingState />
@@ -523,22 +514,22 @@ export function SmartPlannerDrawer({
               </>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Footer Actions (Fixed) */}
         {state === 'idle' && (
-          <div className="flex-shrink-0 py-4 px-6 pb-6 border-t flex items-center gap-3 bg-background">
+          <div className="flex-shrink-0 p-6 pt-4 border-t flex items-center gap-3 bg-background">
             <Button 
               variant="ghost" 
               onClick={onClose}
-              className="h-11 text-muted-foreground"
+              className="flex-1 h-11"
             >
               Discard
             </Button>
             <Button 
               onClick={handleSaveSelected}
               disabled={selectedCount === 0}
-              className="h-11 font-semibold flex-1"
+              className="flex-1 h-11 font-semibold"
             >
               Save Selected ({selectedCount})
             </Button>
