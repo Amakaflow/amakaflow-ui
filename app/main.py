@@ -1,11 +1,9 @@
 """
 FastAPI application for Calendar API.
-
 Provides CRUD operations for workout events stored in PostgreSQL.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from .routes.calendar import router as calendar_router
 
 app = FastAPI(
@@ -14,10 +12,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configure CORS to allow requests from the UI
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "*"],  # Allow all for development
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,21 +24,7 @@ app.add_middleware(
 # Include calendar routes
 app.include_router(calendar_router, prefix="/calendar", tags=["calendar"])
 
-
-@app.get("/healthz")
+@app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok"}
-
-
-# --- Health check endpoint (added for tests & uptime checks) ---
-from fastapi import FastAPI
-
-try:
-    app  # type: ignore[name-defined]
-except NameError:
-    app = FastAPI()
-
-@app.get("/health")
-async def health():
     return {"status": "ok"}
