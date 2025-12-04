@@ -28,6 +28,7 @@ from backend.adapters.blocks_to_hyrox_yaml import (
 from backend.adapters.blocks_to_hiit_garmin_yaml import to_hiit_garmin_yaml, is_hiit_workout
 from backend.adapters.blocks_to_workoutkit import to_workoutkit
 from backend.adapters.blocks_to_zwo import to_zwo
+from backend.adapters.blocks_to_fit import to_fit, to_fit_response
 
 from backend.core.exercise_suggestions import suggest_alternatives, find_similar_exercises, find_exercises_by_type, categorize_exercise
 from backend.core.exercise_categories import add_category_to_exercise_name
@@ -1740,3 +1741,12 @@ def health():
     Simple liveness endpoint for mapper-api.
     """
     return {"status": "ok"}
+
+@app.post("/map/to-fit")
+def map_to_fit(p: BlocksPayload):
+    """Convert blocks JSON directly to Garmin FIT file for USB transfer to watch.
+    
+    Returns:
+        Binary .fit file download ready for Garmin watch
+    """
+    return to_fit_response(p.blocks_json)
