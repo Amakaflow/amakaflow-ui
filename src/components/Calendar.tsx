@@ -394,7 +394,7 @@ export function Calendar({ userId }: CalendarProps) {
 
       <EventDialogEnhanced open={showEventDialog} event={selectedEvent} defaultData={eventDialogData} onSave={handleSaveEvent} onClose={() => { setShowEventDialog(false); setSelectedEvent(null); setEventDialogData(null); }} />
       <EventDrawer open={showEventDrawer} event={selectedEvent} onEdit={handleEditEvent} onDelete={handleDeleteEvent} onClose={() => { setShowEventDrawer(false); setSelectedEvent(null); }} />
-      <SmartPlannerDrawer open={showSmartPlanner} onClose={() => setShowSmartPlanner(false)} weekStart={weekStart} weekEnd={weekEnd} calendarEvents={typedEvents} onSaveWorkouts={handleSaveSmartPlannerWorkouts} />
+      <SmartPlannerDrawer open={showSmartPlanner} onClose={() => setShowSmartPlanner(false)} weekStart={weekStart} weekEnd={weekEnd} calendarEvents={typedEvents} onSaveWorkouts={handleSaveSmartPlannerWorkouts} userId={userId} />
       <ConnectedCalendarsModal open={showConnectedCalendars} onClose={() => setShowConnectedCalendars(false)} />
     </div>
   );
