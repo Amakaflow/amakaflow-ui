@@ -181,7 +181,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         const syncResponse = await fetch(`${MAPPER_API_BASE_URL}/workout/sync/garmin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify({ blocks_json: workout,
             blocks_json: workout,
             workout_title: workout.title || 'Workout',
             schedule_date: new Date().toISOString().split('T')[0]
@@ -239,15 +239,13 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         (workout && (workout.title || (workout as any).name)) ||
         'AmakaFlow Workout';
 
-      const res = await fetch('http://localhost:8095/generate-fit', {
+      const res = await fetch('http://localhost:8001/map/to-fit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          workout_id: workoutId,
-          title,
-          workout: workoutJson,
+        body: JSON.stringify({ blocks_json: workout,
+          
         }),
       });
 

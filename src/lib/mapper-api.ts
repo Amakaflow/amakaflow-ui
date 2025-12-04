@@ -107,7 +107,8 @@ export async function exportWorkoutToDevice(
   device: DeviceId
 ): Promise<ExportFormats> {
   switch (device) {
-    case 'garmin': {
+    case 'garmin':
+    case 'garmin_usb': {
       const result = await autoMapWorkoutToGarmin(workout);
       return { yaml: result.yaml };
     }
