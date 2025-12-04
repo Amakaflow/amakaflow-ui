@@ -5,11 +5,13 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, X, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code } from 'lucide-react';
+import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, X, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code, Download, Send, Info, Clock } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Alert, AlertDescription } from './ui/alert';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { WorkoutStructure, Exercise, Block, Superset } from '../types/workout';
-import { DeviceId, getDevicesByIds, getDeviceById } from '../lib/devices';
+import { DeviceId, getDevicesByIds, getDeviceById, Device, getPrimaryExportDestinations } from '../lib/devices';
 import { ExerciseSearch } from './ExerciseSearch';
 import { Badge } from './ui/badge';
 import { addIdsToWorkout, generateId, getStructureDisplayName } from '../lib/workout-utils';
@@ -1014,59 +1016,160 @@ export function StructureWorkout({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label>Target Device</Label>
-              <div className="flex gap-2 mt-2">
-                {availableDevices.map((device) => (
-                  <Button
-                    key={device.id}
-                    variant={selectedDevice === device.id ? 'default' : 'outline'}
-                    onClick={() => onDeviceChange(device.id)}
-                    className="gap-2"
-                  >
-                    {device.id === 'garmin' && <Watch className="w-4 h-4" />}
-                    {device.id === 'apple' && <Watch className="w-4 h-4" />}
-                    {device.id === 'zwift' && <Bike className="w-4 h-4" />}
-                    {device.name}
-                  </Button>
-                ))}
-              </div>
+            {/* Export Destination Selector */}
+            <div className="space-y-3">
+              <Label>Export Destination</Label>
+              <Select value={selectedDevice} onValueChange={(value) => onDeviceChange(value as DeviceId)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select destination" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getPrimaryExportDestinations().map((device) => (
+                    <SelectItem 
+                      key={device.id} 
+                      value={device.id}
+                      disabled={device.exportMethod === 'coming_soon'}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{device.icon}</span>
+                        <span>{device.name}</span>
+                        {device.exportMethod === 'coming_soon' && (
+                          <span className="text-xs text-muted-foreground ml-2">(Coming Soon)</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Destination Info */}
+              {(() => {
+                const device = getDeviceById(selectedDevice);
+                if (!device) return null;
+                
+                return (
+                  <Alert className="bg-muted/50">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      {device.requiresMapping ? (
+                        <>
+                          <strong>Requires exercise mapping.</strong> Your exercises will be matched to {device.name}'s exercise database for proper tracking on your device.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Direct export.</strong> Your workout will be exported directly without exercise mapping.
+                        </>
+                      )}
+                      {device.setupInstructions && (
+                        <span className="block mt-1 text-muted-foreground">{device.setupInstructions}</span>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                );
+              })()}
             </div>
 
+            {/* Action Buttons - Dynamic based on destination */}
             <div className="flex gap-2 flex-wrap">
-              {(isEditingFromHistory || isCreatingFromScratch) ? (
-                <>
-                  {onSave && (
-                    <Button onClick={onSave} disabled={loading} className="gap-2">
-                      <Save className="w-4 h-4" />
-                      {isCreatingFromScratch ? 'Save Workout' : 'Save Changes'}
-                    </Button>
-                  )}
-                  {isEditingFromHistory && (
+              {(() => {
+                const device = getDeviceById(selectedDevice);
+                const needsMapping = device?.requiresMapping ?? true;
+                const isAvailable = device?.exportMethod !== 'coming_soon';
+
+                if (!isAvailable) {
+                  return (
                     <>
-                      <Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">
+                      {onSave && (
+                        <Button onClick={onSave} disabled={loading} className="gap-2">
+                          <Save className="w-4 h-4" />
+                          Save to Library
+                        </Button>
+                      )}
+                      <Button disabled className="gap-2 opacity-50">
+                        <Clock className="w-4 h-4" />
+                        {device?.name} Coming Soon
+                      </Button>
+                    </>
+                  );
+                }
+
+                if (isEditingFromHistory || isCreatingFromScratch) {
+                  return (
+                    <>
+                      {onSave && (
+                        <Button onClick={onSave} disabled={loading} className="gap-2">
+                          <Save className="w-4 h-4" />
+                          {isCreatingFromScratch ? 'Save Workout' : 'Save Changes'}
+                        </Button>
+                      )}
+                      {isEditingFromHistory && needsMapping && (
+                        <>
+                          <Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">
+                            <Wand2 className="w-4 h-4" />
+                            Re-Map & Export
+                          </Button>
+                          <Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2">
+                            <ShieldCheck className="w-4 h-4" />
+                            Validate & Review
+                          </Button>
+                        </>
+                      )}
+                      {isEditingFromHistory && !needsMapping && (
+                        <Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">
+                          {device?.exportMethod === 'file_download' ? (
+                            <Download className="w-4 h-4" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          Export to {device?.name}
+                        </Button>
+                      )}
+                    </>
+                  );
+                }
+
+                // Normal flow (not editing)
+                if (needsMapping) {
+                  return (
+                    <>
+                      <Button onClick={onAutoMap} disabled={loading} className="gap-2">
                         <Wand2 className="w-4 h-4" />
-                        Re-Auto-Map & Export
+                        Auto-Map & Export
                       </Button>
                       <Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2">
                         <ShieldCheck className="w-4 h-4" />
-                        Re-Validate & Review
+                        Validate & Review
                       </Button>
+                      {onSave && (
+                        <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2">
+                          <Save className="w-4 h-4" />
+                          Save Draft
+                        </Button>
+                      )}
                     </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Button onClick={onAutoMap} disabled={loading} className="gap-2">
-                    <Wand2 className="w-4 h-4" />
-                    Auto-Map & Export
-                  </Button>
-                  <Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2">
-                    <ShieldCheck className="w-4 h-4" />
-                    Validate & Review
-                  </Button>
-                </>
-              )}
+                  );
+                } else {
+                  // Direct export (no mapping)
+                  return (
+                    <>
+                      <Button onClick={onAutoMap} disabled={loading} className="gap-2">
+                        {device?.exportMethod === 'file_download' ? (
+                          <Download className="w-4 h-4" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        Export to {device?.name}
+                      </Button>
+                      {onSave && (
+                        <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2">
+                          <Save className="w-4 h-4" />
+                          Save Draft
+                        </Button>
+                      )}
+                    </>
+                  );
+                }
+              })()}
               {process.env.NODE_ENV === 'development' && (
                 <Button onClick={() => setShowDebugJson(true)} variant="outline" className="gap-2">
                   <Code className="w-4 h-4" />

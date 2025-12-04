@@ -1,21 +1,9 @@
 /**
- * Environment configuration and feature flags
+ * Environment configuration with sensible defaults
+ * 
+ * For local development, create a .env.local file with your overrides.
  */
 
-/**
- * Feature flag: Enable Garmin USB FIT Export functionality
- * 
- * Set VITE_ENABLE_GARMIN_USB_EXPORT=true in .env.local to enable.
- * Default: false (disabled)
- */
-export const ENABLE_GARMIN_USB_EXPORT =
-  import.meta.env.VITE_ENABLE_GARMIN_USB_EXPORT === 'true';
-
-/**
- * Feature flag: Enable Garmin Debug mode
- * 
- * Set VITE_ENABLE_GARMIN_DEBUG=true in .env.local to enable.
- * Default: false (disabled)
- */
-export const ENABLE_GARMIN_DEBUG =
-  import.meta.env.VITE_ENABLE_GARMIN_DEBUG === 'true';
+// Garmin USB Export - enabled by default
+export const ENABLE_GARMIN_USB_EXPORT = 
+  import.meta.env.VITE_ENABLE_GARMIN_USB_EXPORT !== 'false';  // Default to true unless explicitly disabled

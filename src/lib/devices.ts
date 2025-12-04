@@ -1,13 +1,19 @@
+// Export Destinations - renamed from "Connected Devices"
+// Each destination has an export method and whether it requires exercise mapping
+
 export type DeviceId = 
   | 'garmin'
+  | 'garmin_usb'
   | 'apple'
-  | 'zwift'
-  | 'suunto'
-  | 'polar'
+  | 'hevy'
   | 'coros'
-  | 'wahoo'
+  | 'zwift'
   | 'trainingpeaks'
   | 'strava'
+  // Legacy device IDs (kept for backward compatibility)
+  | 'suunto'
+  | 'polar'
+  | 'wahoo'
   | 'whoop'
   | 'fitbit'
   | 'oura'
@@ -16,36 +22,118 @@ export type DeviceId =
   | 'trainerroad'
   | 'final-surge';
 
+export type ExportMethod = 'api' | 'file_download' | 'coming_soon';
+
 export interface Device {
   id: DeviceId;
   name: string;
   description: string;
-  category: 'watch' | 'platform' | 'equipment' | 'tracker';
+  category: 'watch' | 'platform' | 'app' | 'tracker' | 'equipment';
   format: string;
   icon: string;
   popular?: boolean;
+  // New fields for export workflow
+  exportMethod: ExportMethod;
+  requiresMapping: boolean;
+  setupInstructions?: string;
 }
 
 export const AVAILABLE_DEVICES: Device[] = [
-  // Watches
+  // === PRIMARY DESTINATIONS (shown in UI) ===
   {
     id: 'garmin',
-    name: 'Garmin',
-    description: 'Fenix, Forerunner, Instinct',
+    name: 'Garmin Connect',
+    description: 'Sync directly to your Garmin account',
     category: 'watch',
-    format: 'YAML',
-    icon: '⌚',
-    popular: true
+    format: 'FIT',
+    icon: '📱',
+    popular: true,
+    exportMethod: 'api',
+    requiresMapping: true,
+    setupInstructions: 'Connect your Garmin account to sync workouts automatically',
+  },
+  {
+    id: 'garmin_usb',
+    name: 'Garmin USB',
+    description: 'Download FIT file for manual upload',
+    category: 'watch',
+    format: 'FIT',
+    icon: '💾',
+    popular: true,
+    exportMethod: 'file_download',
+    requiresMapping: true,
+    setupInstructions: 'Download the .FIT file and copy to GARMIN/NewFiles on your watch',
+  },
+  {
+    id: 'coros',
+    name: 'COROS',
+    description: 'Download FIT for COROS Training Hub',
+    category: 'watch',
+    format: 'FIT',
+    icon: '🏃',
+    exportMethod: 'file_download',
+    requiresMapping: true,
+    setupInstructions: 'Upload the .FIT file at training.coros.com',
   },
   {
     id: 'apple',
     name: 'Apple Watch',
-    description: 'Watch & Fitness app',
+    description: 'Send to Apple Workout app',
     category: 'watch',
-    format: 'PLIST',
+    format: 'WorkoutKit',
     icon: '⌚',
-    popular: true
+    popular: true,
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+    setupInstructions: 'Requires AmakaFlow iOS app (coming soon)',
   },
+  {
+    id: 'hevy',
+    name: 'Hevy',
+    description: 'Create routine in Hevy app',
+    category: 'app',
+    format: 'Hevy JSON',
+    icon: '💪',
+    popular: true,
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+    setupInstructions: 'Requires Hevy Pro subscription and API key',
+  },
+  {
+    id: 'zwift',
+    name: 'Zwift',
+    description: 'Virtual cycling workouts',
+    category: 'platform',
+    format: 'ZWO',
+    icon: '🚴',
+    popular: true,
+    exportMethod: 'file_download',
+    requiresMapping: false,
+    setupInstructions: 'Download .ZWO file and import into Zwift',
+  },
+  {
+    id: 'trainingpeaks',
+    name: 'TrainingPeaks',
+    description: 'Professional training platform',
+    category: 'platform',
+    format: 'JSON',
+    icon: '📊',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+  },
+  {
+    id: 'strava',
+    name: 'Strava',
+    description: 'Post-workout activity sync',
+    category: 'platform',
+    format: 'Activity',
+    icon: '🏃',
+    exportMethod: 'api',
+    requiresMapping: false,
+    setupInstructions: 'Connect Strava to auto-post completed workouts',
+  },
+
+  // === LEGACY DEVICES (kept for backward compatibility) ===
   {
     id: 'suunto',
     name: 'Suunto',
@@ -53,7 +141,8 @@ export const AVAILABLE_DEVICES: Device[] = [
     category: 'watch',
     format: 'FIT',
     icon: '⌚',
-    popular: true
+    exportMethod: 'coming_soon',
+    requiresMapping: true,
   },
   {
     id: 'polar',
@@ -62,15 +151,8 @@ export const AVAILABLE_DEVICES: Device[] = [
     category: 'watch',
     format: 'TCX',
     icon: '⌚',
-    popular: true
-  },
-  {
-    id: 'coros',
-    name: 'COROS',
-    description: 'Pace, Apex, Vertix',
-    category: 'watch',
-    format: 'FIT',
-    icon: '⌚'
+    exportMethod: 'coming_soon',
+    requiresMapping: true,
   },
   {
     id: 'wahoo',
@@ -78,62 +160,19 @@ export const AVAILABLE_DEVICES: Device[] = [
     description: 'ELEMNT, RIVAL',
     category: 'watch',
     format: 'FIT',
-    icon: '⌚'
+    icon: '⌚',
+    exportMethod: 'coming_soon',
+    requiresMapping: true,
   },
-  
-  // Training Platforms
-  {
-    id: 'trainingpeaks',
-    name: 'TrainingPeaks',
-    description: 'Professional training platform',
-    category: 'platform',
-    format: 'JSON',
-    icon: '📊',
-    popular: true
-  },
-  {
-    id: 'strava',
-    name: 'Strava',
-    description: 'Social fitness network',
-    category: 'platform',
-    format: 'TCX',
-    icon: '🏃',
-    popular: true
-  },
-  {
-    id: 'zwift',
-    name: 'Zwift',
-    description: 'Virtual training platform',
-    category: 'platform',
-    format: 'ZWO',
-    icon: '🚴',
-    popular: true
-  },
-  {
-    id: 'trainerroad',
-    name: 'TrainerRoad',
-    description: 'Structured training',
-    category: 'platform',
-    format: 'MRC',
-    icon: '🚴'
-  },
-  {
-    id: 'final-surge',
-    name: 'Final Surge',
-    description: 'Coaching platform',
-    category: 'platform',
-    format: 'JSON',
-    icon: '📈'
-  },
-  
-  // Fitness Trackers
   {
     id: 'whoop',
     name: 'WHOOP',
     description: 'Recovery & strain tracker',
     category: 'tracker',
     format: 'JSON',
-    icon: '💪'
+    icon: '💪',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
   },
   {
     id: 'fitbit',
@@ -141,7 +180,9 @@ export const AVAILABLE_DEVICES: Device[] = [
     description: 'Fitness & wellness',
     category: 'tracker',
     format: 'TCX',
-    icon: '⌚'
+    icon: '⌚',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
   },
   {
     id: 'oura',
@@ -149,17 +190,19 @@ export const AVAILABLE_DEVICES: Device[] = [
     description: 'Sleep & recovery',
     category: 'tracker',
     format: 'JSON',
-    icon: '💍'
+    icon: '💍',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
   },
-  
-  // Equipment
   {
     id: 'peloton',
     name: 'Peloton',
     description: 'Bike & Tread',
     category: 'equipment',
     format: 'JSON',
-    icon: '🚴'
+    icon: '🚴',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
   },
   {
     id: 'concept2',
@@ -167,8 +210,30 @@ export const AVAILABLE_DEVICES: Device[] = [
     description: 'Rowing & SkiErg',
     category: 'equipment',
     format: 'CSV',
-    icon: '🚣'
-  }
+    icon: '🚣',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+  },
+  {
+    id: 'trainerroad',
+    name: 'TrainerRoad',
+    description: 'Structured training',
+    category: 'platform',
+    format: 'MRC',
+    icon: '🚴',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+  },
+  {
+    id: 'final-surge',
+    name: 'Final Surge',
+    description: 'Coaching platform',
+    category: 'platform',
+    format: 'JSON',
+    icon: '📈',
+    exportMethod: 'coming_soon',
+    requiresMapping: false,
+  },
 ];
 
 export const getDeviceById = (id: DeviceId): Device | undefined => {
@@ -185,4 +250,28 @@ export const getDevicesByCategory = (category: Device['category']): Device[] => 
 
 export const getPopularDevices = (): Device[] => {
   return AVAILABLE_DEVICES.filter(d => d.popular);
+};
+
+// New helpers for export workflow
+export const getDevicesRequiringMapping = (): Device[] => {
+  return AVAILABLE_DEVICES.filter(d => d.requiresMapping);
+};
+
+export const getDirectExportDevices = (): Device[] => {
+  return AVAILABLE_DEVICES.filter(d => !d.requiresMapping);
+};
+
+export const getAvailableExportDevices = (): Device[] => {
+  return AVAILABLE_DEVICES.filter(d => d.exportMethod !== 'coming_soon');
+};
+
+export const isDeviceAvailable = (id: DeviceId): boolean => {
+  const device = getDeviceById(id);
+  return device ? device.exportMethod !== 'coming_soon' : false;
+};
+
+// Get primary export destinations (shown prominently in UI)
+export const getPrimaryExportDestinations = (): Device[] => {
+  const primaryIds: DeviceId[] = ['garmin', 'garmin_usb', 'coros', 'apple', 'hevy', 'zwift', 'strava'];
+  return primaryIds.map(id => getDeviceById(id)).filter(Boolean) as Device[];
 };

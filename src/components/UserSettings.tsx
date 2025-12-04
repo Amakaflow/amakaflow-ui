@@ -172,7 +172,7 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
     {
       category: 'DEVICES',
       items: [
-        { id: 'devices' as SettingsSection, label: 'Connected devices', icon: Smartphone },
+        { id: 'devices' as SettingsSection, label: 'Export destinations', icon: Smartphone },
       ],
     },
     {
@@ -641,13 +641,13 @@ Block: Warm-Up
             </div>
           )}
 
-          {/* Connected Devices */}
+          {/* Export Destinations */}
           {activeSection === 'devices' && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-semibold mb-1">Connected devices</h1>
+                <h1 className="text-2xl font-semibold mb-1">Export Destinations</h1>
                 <p className="text-muted-foreground text-sm">
-                  Select which devices you want to export workouts to
+                  Select where you want to send your workouts. Each destination has different export methods.
                 </p>
               </div>
 
@@ -655,17 +655,18 @@ Block: Warm-Up
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Smartphone className="w-5 h-5" />
-                    Connected Devices
+                    Export Destinations
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
+                    {/* Garmin Connect */}
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <Watch className="w-5 h-5 text-blue-600" />
+                        <span className="text-xl">📱</span>
                         <div>
-                          <p className="font-medium">Garmin</p>
-                          <p className="text-sm text-muted-foreground">Fenix, Forerunner, etc.</p>
+                          <p className="font-medium">Garmin Connect</p>
+                          <p className="text-sm text-muted-foreground">Sync via API (requires mapping)</p>
                         </div>
                       </div>
                       <Switch
@@ -674,13 +675,15 @@ Block: Warm-Up
                       />
                     </div>
 
+                    {/* Garmin USB */}
                     {ENABLE_GARMIN_USB_EXPORT && (
                       <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">Garmin (USB FIT Export)</span>
-                          <span className="text-xs text-muted-foreground">
-                            Export FIT files for manual USB transfer to your Garmin watch
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">💾</span>
+                          <div>
+                            <p className="font-medium">Garmin USB</p>
+                            <p className="text-sm text-muted-foreground">Download FIT file for manual upload</p>
+                          </div>
                         </div>
                         <Switch
                           checked={exportGarminUsb}
@@ -700,26 +703,60 @@ Block: Warm-Up
                       </div>
                     )}
 
+                    {/* COROS */}
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <Watch className="w-5 h-5 text-purple-600" />
+                        <span className="text-xl">🏃</span>
+                        <div>
+                          <p className="font-medium">COROS</p>
+                          <p className="text-sm text-muted-foreground">Download FIT for Training Hub</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={selectedDevices.includes('coros')}
+                        onCheckedChange={() => toggleDevice('coros')}
+                      />
+                    </div>
+
+                    {/* Apple Watch */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">⌚</span>
                         <div>
                           <p className="font-medium">Apple Watch</p>
-                          <p className="text-sm text-muted-foreground">Series 4 and later</p>
+                          <p className="text-sm text-muted-foreground">Coming soon - requires iOS app</p>
                         </div>
                       </div>
                       <Switch
                         checked={selectedDevices.includes('apple')}
                         onCheckedChange={() => toggleDevice('apple')}
+                        disabled
                       />
                     </div>
 
+                    {/* Hevy */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">💪</span>
+                        <div>
+                          <p className="font-medium">Hevy</p>
+                          <p className="text-sm text-muted-foreground">Coming soon - direct export</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={selectedDevices.includes('hevy')}
+                        onCheckedChange={() => toggleDevice('hevy')}
+                        disabled
+                      />
+                    </div>
+
+                    {/* Zwift */}
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <Bike className="w-5 h-5 text-orange-600" />
+                        <span className="text-xl">🚴</span>
                         <div>
                           <p className="font-medium">Zwift</p>
-                          <p className="text-sm text-muted-foreground">Indoor cycling platform</p>
+                          <p className="text-sm text-muted-foreground">Download ZWO file</p>
                         </div>
                       </div>
                       <Switch
@@ -731,11 +768,11 @@ Block: Warm-Up
 
                   {selectedDevices.length === 0 && (
                     <p className="text-sm text-orange-600">
-                      ⚠ Please select at least one device
+                      ⚠ Please select at least one destination
                     </p>
                   )}
 
-                  <Button onClick={handleSave}>Save Devices</Button>
+                  <Button onClick={handleSave}>Save Destinations</Button>
                 </CardContent>
               </Card>
             </div>
