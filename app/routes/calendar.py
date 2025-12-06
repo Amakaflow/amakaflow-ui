@@ -141,170 +141,10 @@ async def create_calendar_event(
             return WorkoutEvent(**event_dict)
 
 
-@router.get("/{event_id}", response_model=WorkoutEvent)
-async def get_calendar_event(
-    event_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
-):
-    """Get a single workout event by ID."""
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT 
-                    id, user_id, title, source, date, start_time, end_time,
-                    type, status, is_anchor, primary_muscle, intensity,
-                    connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
-                FROM workout_events
-                WHERE id = %s AND user_id = %s
-            """, (str(event_id), x_user_id))
-            
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Event not found")
-            
-            columns = [desc[0] for desc in cur.description]
-            event_dict = dict(zip(columns, row))
-            
-            if event_dict.get('created_at'):
-                event_dict['created_at'] = event_dict['created_at'].isoformat()
-            if event_dict.get('updated_at'):
-                event_dict['updated_at'] = event_dict['updated_at'].isoformat()
-            if event_dict.get('start_time'):
-                event_dict['start_time'] = event_dict['start_time'].isoformat()
-            if event_dict.get('end_time'):
-                event_dict['end_time'] = event_dict['end_time'].isoformat()
-            
-            return WorkoutEvent(**event_dict)
-
-
-@router.put("/{event_id}", response_model=WorkoutEvent)
-async def update_calendar_event(
-    event_id: UUID,
-    event_update: WorkoutEventUpdate,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
-):
-    """Update an existing workout event."""
-    # Build dynamic UPDATE query
-    update_fields = []
-    values = []
-    
-    if event_update.title is not None:
-        update_fields.append("title = %s")
-        values.append(event_update.title)
-    if event_update.date is not None:
-        update_fields.append("date = %s")
-        values.append(event_update.date)
-    if event_update.source is not None:
-        update_fields.append("source = %s")
-        values.append(event_update.source)
-    if event_update.type is not None:
-        update_fields.append("type = %s")
-        values.append(event_update.type)
-    if event_update.start_time is not None:
-        update_fields.append("start_time = %s")
-        values.append(event_update.start_time)
-    if event_update.end_time is not None:
-        update_fields.append("end_time = %s")
-        values.append(event_update.end_time)
-    if event_update.status is not None:
-        update_fields.append("status = %s")
-        values.append(event_update.status)
-    if event_update.is_anchor is not None:
-        update_fields.append("is_anchor = %s")
-        values.append(event_update.is_anchor)
-    if event_update.primary_muscle is not None:
-        update_fields.append("primary_muscle = %s")
-        values.append(event_update.primary_muscle)
-    if event_update.intensity is not None:
-        update_fields.append("intensity = %s")
-        values.append(event_update.intensity)
-    if event_update.connected_calendar_id is not None:
-        update_fields.append("connected_calendar_id = %s")
-        values.append(str(event_update.connected_calendar_id))
-    if event_update.connected_calendar_type is not None:
-        update_fields.append("connected_calendar_type = %s")
-        values.append(event_update.connected_calendar_type)
-    if event_update.external_event_url is not None:
-        update_fields.append("external_event_url = %s")
-        values.append(event_update.external_event_url)
-    if event_update.recurrence_rule is not None:
-        update_fields.append("recurrence_rule = %s")
-        values.append(event_update.recurrence_rule)
-    if event_update.json_payload is not None:
-        update_fields.append("json_payload = %s")
-        values.append(json.dumps(event_update.json_payload))
-    
-    if not update_fields:
-        raise HTTPException(status_code=400, detail="No fields to update")
-    
-    # Add updated_at
-    update_fields.append("updated_at = NOW()")
-    
-    # Add WHERE clause values
-    values.extend([str(event_id), x_user_id])
-    
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            # Check ownership first
-            cur.execute(
-                "SELECT id FROM workout_events WHERE id = %s AND user_id = %s",
-                (str(event_id), x_user_id)
-            )
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Event not found")
-            
-            query = f"""
-                UPDATE workout_events
-                SET {', '.join(update_fields)}
-                WHERE id = %s AND user_id = %s
-                RETURNING 
-                    id, user_id, title, source, date, start_time, end_time,
-                    type, status, is_anchor, primary_muscle, intensity,
-                    connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
-            """
-            
-            cur.execute(query, values)
-            row = cur.fetchone()
-            columns = [desc[0] for desc in cur.description]
-            event_dict = dict(zip(columns, row))
-            
-            if event_dict.get('created_at'):
-                event_dict['created_at'] = event_dict['created_at'].isoformat()
-            if event_dict.get('updated_at'):
-                event_dict['updated_at'] = event_dict['updated_at'].isoformat()
-            if event_dict.get('start_time'):
-                event_dict['start_time'] = event_dict['start_time'].isoformat()
-            if event_dict.get('end_time'):
-                event_dict['end_time'] = event_dict['end_time'].isoformat()
-            
-            return WorkoutEvent(**event_dict)
-
-
-@router.delete("/{event_id}")
-async def delete_calendar_event(
-    event_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
-):
-    """Delete a workout event."""
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM workout_events WHERE id = %s AND user_id = %s RETURNING id",
-                (str(event_id), x_user_id)
-            )
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Event not found")
-            
-            return {"success": True}
-
-
 # ============================================
 # CONNECTED CALENDARS ENDPOINTS
 # ============================================
+# NOTE: These must come BEFORE /{event_id} routes to avoid route matching conflicts
 
 @router.get("/connected-calendars", response_model=List[ConnectedCalendar])
 async def get_connected_calendars(
@@ -397,5 +237,171 @@ async def delete_connected_calendar(
             )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Calendar not found")
-            
+
+            return {"success": True}
+
+
+# ============================================
+# SINGLE WORKOUT EVENT ENDPOINTS (with dynamic ID)
+# ============================================
+# NOTE: These must come AFTER static routes like /connected-calendars
+
+@router.get("/{event_id}", response_model=WorkoutEvent)
+async def get_calendar_event(
+    event_id: UUID,
+    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+):
+    """Get a single workout event by ID."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    id, user_id, title, source, date, start_time, end_time,
+                    type, status, is_anchor, primary_muscle, intensity,
+                    connected_calendar_id, connected_calendar_type,
+                    external_event_url, recurrence_rule, json_payload,
+                    created_at, updated_at
+                FROM workout_events
+                WHERE id = %s AND user_id = %s
+            """, (str(event_id), x_user_id))
+
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Event not found")
+
+            columns = [desc[0] for desc in cur.description]
+            event_dict = dict(zip(columns, row))
+
+            if event_dict.get('created_at'):
+                event_dict['created_at'] = event_dict['created_at'].isoformat()
+            if event_dict.get('updated_at'):
+                event_dict['updated_at'] = event_dict['updated_at'].isoformat()
+            if event_dict.get('start_time'):
+                event_dict['start_time'] = event_dict['start_time'].isoformat()
+            if event_dict.get('end_time'):
+                event_dict['end_time'] = event_dict['end_time'].isoformat()
+
+            return WorkoutEvent(**event_dict)
+
+
+@router.put("/{event_id}", response_model=WorkoutEvent)
+async def update_calendar_event(
+    event_id: UUID,
+    event_update: WorkoutEventUpdate,
+    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+):
+    """Update an existing workout event."""
+    # Build dynamic UPDATE query
+    update_fields = []
+    values = []
+
+    if event_update.title is not None:
+        update_fields.append("title = %s")
+        values.append(event_update.title)
+    if event_update.date is not None:
+        update_fields.append("date = %s")
+        values.append(event_update.date)
+    if event_update.source is not None:
+        update_fields.append("source = %s")
+        values.append(event_update.source)
+    if event_update.type is not None:
+        update_fields.append("type = %s")
+        values.append(event_update.type)
+    if event_update.start_time is not None:
+        update_fields.append("start_time = %s")
+        values.append(event_update.start_time)
+    if event_update.end_time is not None:
+        update_fields.append("end_time = %s")
+        values.append(event_update.end_time)
+    if event_update.status is not None:
+        update_fields.append("status = %s")
+        values.append(event_update.status)
+    if event_update.is_anchor is not None:
+        update_fields.append("is_anchor = %s")
+        values.append(event_update.is_anchor)
+    if event_update.primary_muscle is not None:
+        update_fields.append("primary_muscle = %s")
+        values.append(event_update.primary_muscle)
+    if event_update.intensity is not None:
+        update_fields.append("intensity = %s")
+        values.append(event_update.intensity)
+    if event_update.connected_calendar_id is not None:
+        update_fields.append("connected_calendar_id = %s")
+        values.append(str(event_update.connected_calendar_id))
+    if event_update.connected_calendar_type is not None:
+        update_fields.append("connected_calendar_type = %s")
+        values.append(event_update.connected_calendar_type)
+    if event_update.external_event_url is not None:
+        update_fields.append("external_event_url = %s")
+        values.append(event_update.external_event_url)
+    if event_update.recurrence_rule is not None:
+        update_fields.append("recurrence_rule = %s")
+        values.append(event_update.recurrence_rule)
+    if event_update.json_payload is not None:
+        update_fields.append("json_payload = %s")
+        values.append(json.dumps(event_update.json_payload))
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    # Add updated_at
+    update_fields.append("updated_at = NOW()")
+
+    # Add WHERE clause values
+    values.extend([str(event_id), x_user_id])
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Check ownership first
+            cur.execute(
+                "SELECT id FROM workout_events WHERE id = %s AND user_id = %s",
+                (str(event_id), x_user_id)
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Event not found")
+
+            query = f"""
+                UPDATE workout_events
+                SET {', '.join(update_fields)}
+                WHERE id = %s AND user_id = %s
+                RETURNING
+                    id, user_id, title, source, date, start_time, end_time,
+                    type, status, is_anchor, primary_muscle, intensity,
+                    connected_calendar_id, connected_calendar_type,
+                    external_event_url, recurrence_rule, json_payload,
+                    created_at, updated_at
+            """
+
+            cur.execute(query, values)
+            row = cur.fetchone()
+            columns = [desc[0] for desc in cur.description]
+            event_dict = dict(zip(columns, row))
+
+            if event_dict.get('created_at'):
+                event_dict['created_at'] = event_dict['created_at'].isoformat()
+            if event_dict.get('updated_at'):
+                event_dict['updated_at'] = event_dict['updated_at'].isoformat()
+            if event_dict.get('start_time'):
+                event_dict['start_time'] = event_dict['start_time'].isoformat()
+            if event_dict.get('end_time'):
+                event_dict['end_time'] = event_dict['end_time'].isoformat()
+
+            return WorkoutEvent(**event_dict)
+
+
+@router.delete("/{event_id}")
+async def delete_calendar_event(
+    event_id: UUID,
+    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+):
+    """Delete a workout event."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM workout_events WHERE id = %s AND user_id = %s RETURNING id",
+                (str(event_id), x_user_id)
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Event not found")
+
             return {"success": True}
