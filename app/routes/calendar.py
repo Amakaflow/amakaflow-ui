@@ -9,12 +9,14 @@ from uuid import UUID
 import json
 
 from fastapi import APIRouter, HTTPException, Header, Query
+import httpx
 
 from ..schemas import (
     WorkoutEvent, WorkoutEventCreate, WorkoutEventUpdate,
     ConnectedCalendar, ConnectedCalendarCreate, ConnectedCalendarUpdate
 )
 from ..db import get_db_connection
+from ..utils.ics_parser import parse_ics_content, convert_to_workout_event
 
 router = APIRouter()
 
@@ -239,6 +241,165 @@ async def delete_connected_calendar(
                 raise HTTPException(status_code=404, detail="Calendar not found")
 
             return {"success": True}
+
+
+@router.post("/connected-calendars/{calendar_id}/sync")
+async def sync_connected_calendar(
+    calendar_id: UUID,
+    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+):
+    """
+    Sync a connected calendar by fetching and parsing its ICS feed.
+    Creates/updates workout events from the ICS data.
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Get the calendar and verify ownership
+            cur.execute(
+                """SELECT id, ics_url, type FROM connected_calendars
+                   WHERE id = %s AND user_id = %s""",
+                (str(calendar_id), x_user_id)
+            )
+            calendar_row = cur.fetchone()
+
+            if not calendar_row:
+                raise HTTPException(status_code=404, detail="Calendar not found")
+
+            cal_id, ics_url, cal_type = calendar_row
+
+            if not ics_url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Calendar does not have an ICS URL configured"
+                )
+
+            # Fetch ICS content
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(ics_url)
+                    response.raise_for_status()
+                    ics_content = response.text
+            except httpx.HTTPError as e:
+                cur.execute(
+                    """UPDATE connected_calendars
+                       SET sync_status = 'error',
+                           sync_error_message = %s,
+                           updated_at = NOW()
+                       WHERE id = %s""",
+                    (f"Failed to fetch ICS: {str(e)}", str(calendar_id))
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to fetch ICS feed: {str(e)}"
+                )
+
+            # Parse ICS content
+            try:
+                events = parse_ics_content(ics_content)
+            except Exception as e:
+                cur.execute(
+                    """UPDATE connected_calendars
+                       SET sync_status = 'error',
+                           sync_error_message = %s,
+                           updated_at = NOW()
+                       WHERE id = %s""",
+                    (f"Failed to parse ICS: {str(e)}", str(calendar_id))
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to parse ICS content: {str(e)}"
+                )
+
+            # Convert and insert/update events
+            created_count = 0
+            updated_count = 0
+
+            for ics_event in events:
+                workout_event = convert_to_workout_event(
+                    ics_event,
+                    str(calendar_id),
+                    x_user_id
+                )
+
+                # Check if event already exists by external ics_uid
+                ics_uid = workout_event['json_payload'].get('ics_uid')
+
+                cur.execute(
+                    """SELECT id FROM workout_events
+                       WHERE user_id = %s
+                       AND connected_calendar_id = %s
+                       AND json_payload->>'ics_uid' = %s""",
+                    (x_user_id, str(calendar_id), ics_uid)
+                )
+                existing = cur.fetchone()
+
+                if existing:
+                    # Update existing event
+                    cur.execute("""
+                        UPDATE workout_events
+                        SET title = %s,
+                            date = %s,
+                            start_time = %s,
+                            end_time = %s,
+                            type = %s,
+                            status = %s,
+                            external_event_url = %s,
+                            json_payload = %s,
+                            updated_at = NOW()
+                        WHERE id = %s
+                    """, (
+                        workout_event['title'],
+                        workout_event['date'],
+                        workout_event.get('start_time'),
+                        workout_event.get('end_time'),
+                        workout_event['type'],
+                        workout_event['status'],
+                        workout_event.get('external_event_url'),
+                        json.dumps(workout_event['json_payload']),
+                        existing[0]
+                    ))
+                    updated_count += 1
+                else:
+                    # Insert new event
+                    cur.execute("""
+                        INSERT INTO workout_events (
+                            user_id, title, source, date, start_time, end_time,
+                            type, status, connected_calendar_id, connected_calendar_type,
+                            external_event_url, json_payload
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        x_user_id,
+                        workout_event['title'],
+                        workout_event['source'],
+                        workout_event['date'],
+                        workout_event.get('start_time'),
+                        workout_event.get('end_time'),
+                        workout_event['type'],
+                        workout_event['status'],
+                        workout_event['connected_calendar_id'],
+                        workout_event['connected_calendar_type'],
+                        workout_event.get('external_event_url'),
+                        json.dumps(workout_event['json_payload'])
+                    ))
+                    created_count += 1
+
+            # Update calendar sync status
+            cur.execute(
+                """UPDATE connected_calendars
+                   SET last_sync = NOW(),
+                       sync_status = 'active',
+                       sync_error_message = NULL,
+                       updated_at = NOW()
+                   WHERE id = %s""",
+                (str(calendar_id),)
+            )
+
+            return {
+                "success": True,
+                "events_created": created_count,
+                "events_updated": updated_count,
+                "total_events": len(events)
+            }
 
 
 # ============================================
