@@ -50,9 +50,15 @@ const BASE_WORKOUT_FILTERS = [
 
 interface CalendarProps {
   userId: string;
+  userLocation?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  };
 }
 
-export function Calendar({ userId }: CalendarProps) {
+export function Calendar({ userId, userLocation }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -68,22 +74,28 @@ export function Calendar({ userId }: CalendarProps) {
   const [showConnectedCalendars, setShowConnectedCalendars] = useState(false);
   const [showGymEventModal, setShowGymEventModal] = useState(false);
 
-  // Calculate week range
+  // Calculate date range based on view mode
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+
+  // Use the appropriate range based on view mode
+  const rangeStart = viewMode === 'month' ? monthStart : weekStart;
+  const rangeEnd = viewMode === 'month' ? monthEnd : weekEnd;
 
   // Use calendar API hooks
-  const { 
-    events, 
-    isLoading: loading, 
+  const {
+    events,
+    isLoading: loading,
     error,
     refetch: fetchEvents,
     createEvent,
     updateEvent,
-    deleteEvent 
+    deleteEvent
   } = useCalendarEvents({
-    start: format(weekStart, 'yyyy-MM-dd'),
-    end: format(weekEnd, 'yyyy-MM-dd'),
+    start: format(rangeStart, 'yyyy-MM-dd'),
+    end: format(rangeEnd, 'yyyy-MM-dd'),
     userId,
     enabled: !!userId,
   });
@@ -151,7 +163,13 @@ export function Calendar({ userId }: CalendarProps) {
   const handleEditEvent = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setEventDialogData(null);
-    setShowEventDialog(true);
+    // Open GymEventModal for gym events, regular dialog for others
+    if (event.source === 'gym_manual_sync') {
+      setShowEventDrawer(false); // Close the drawer first
+      setShowGymEventModal(true);
+    } else {
+      setShowEventDialog(true);
+    }
   };
 
   const handleEventClick = (event: CalendarEvent) => {
@@ -406,6 +424,7 @@ export function Calendar({ userId }: CalendarProps) {
         defaultData={eventDialogData}
         onSave={handleSaveEvent}
         onClose={() => { setShowGymEventModal(false); setSelectedEvent(null); setEventDialogData(null); }}
+        userLocation={userLocation}
       />
       <ConnectedCalendarsModal
         open={showConnectedCalendars}

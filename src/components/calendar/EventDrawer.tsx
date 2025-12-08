@@ -10,7 +10,7 @@ import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { CalendarEvent } from '../../types/calendar';
 import { format, parseISO } from 'date-fns';
-import { Clock, Calendar, Tag, Activity, AlertCircle, Edit, Trash, MapPin, ExternalLink, Route, Timer } from 'lucide-react';
+import { Clock, Calendar, Tag, Activity, AlertCircle, Edit, Trash, MapPin, ExternalLink, Route, Timer, Repeat } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +49,37 @@ export function EventDrawer({ open, event, onEdit, onDelete, onClose }: EventDra
       return `${hours}h ${minutes}m`;
     }
     return `${minutes} min`;
+  };
+
+  // Parse recurrence rule to human-readable text
+  const formatRecurrenceRule = (rrule: string): string => {
+    if (!rrule) return '';
+
+    if (rrule.includes('FREQ=DAILY')) {
+      return 'Daily';
+    } else if (rrule.includes('BYDAY=MO,TU,WE,TH,FR')) {
+      return 'Every weekday (Mon-Fri)';
+    } else if (rrule.includes('FREQ=WEEKLY')) {
+      const dayMatch = rrule.match(/BYDAY=([A-Z,]+)/);
+      if (dayMatch) {
+        const days = dayMatch[1].split(',');
+        const dayNames = days.map(d => {
+          const map: Record<string, string> = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' };
+          return map[d] || d;
+        });
+        if (days.length === 1) {
+          return `Weekly on ${dayNames[0]}`;
+        }
+        return `Weekly on ${dayNames.join(', ')}`;
+      }
+      if (rrule.includes('INTERVAL=2')) {
+        return 'Every 2 weeks';
+      }
+      return 'Weekly';
+    } else if (rrule.includes('FREQ=MONTHLY')) {
+      return 'Monthly';
+    }
+    return 'Repeats (custom)';
   };
 
   const typeColors = {
@@ -120,6 +151,18 @@ export function EventDrawer({ open, event, onEdit, onDelete, onClose }: EventDra
                     <div className="text-sm text-muted-foreground">
                       {event.start_time.substring(0, 5)}
                       {event.end_time && ` - ${event.end_time.substring(0, 5)}`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {event.recurrence_rule && (
+                <div className="flex items-start gap-3">
+                  <Repeat className="w-5 h-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">Repeats</div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatRecurrenceRule(event.recurrence_rule)}
                     </div>
                   </div>
                 </div>
