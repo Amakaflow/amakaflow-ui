@@ -35,6 +35,7 @@ export interface SaveWorkoutRequest {
   validation?: any;
   title?: string;
   description?: string;
+  workout_id?: string; // Optional: for explicit updates to existing workouts
 }
 
 export interface GetWorkoutsParams {
@@ -173,15 +174,15 @@ export async function updateWorkoutInAPI(
   workoutId: string,
   request: SaveWorkoutRequest
 ): Promise<SavedWorkout> {
-  // For now, we'll delete and recreate since mapper-api doesn't have an update endpoint
-  // In the future, we can add a PUT endpoint to mapper-api
+  // Use the save endpoint with workout_id for explicit updates
+  // The API will update the existing workout instead of creating a duplicate
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
     `/workouts/save`,
     {
       method: 'POST',
       body: JSON.stringify({
         ...request,
-        // Include the workout ID in the request if the API supports updating
+        workout_id: workoutId, // Pass workout ID for explicit update
       }),
     }
   );

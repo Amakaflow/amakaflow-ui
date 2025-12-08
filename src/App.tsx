@@ -838,20 +838,18 @@ export default function App() {
   const handleBulkDeleteWorkouts = async (ids: string[]) => {
     if (!ids || ids.length === 0) return;
 
-    // 1. Optimistic UI update: remove all selected items
-    setWorkoutHistoryList(prev =>
-      prev.filter(item => !ids.includes(item.id))
-    );
-
     const profileId = user?.id;
+    const succeeded: string[] = [];
     const failed: string[] = [];
 
-    // 2. Delete each workout one by one using existing API
+    // Pessimistic delete: delete each workout and track results
     for (const id of ids) {
       try {
         const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
         const ok = await deleteWorkoutFromHistory(id, profileId);
-        if (!ok) {
+        if (ok) {
+          succeeded.push(id);
+        } else {
           failed.push(id);
         }
       } catch (error) {
@@ -860,18 +858,17 @@ export default function App() {
       }
     }
 
-    // 3. Handle failures
-    if (failed.length > 0) {
-      // Refresh from source of truth so UI is consistent
-      if (profileId) {
-        try {
-          const { getWorkoutHistory } = await import('./lib/workout-history');
-          const fresh = await getWorkoutHistory(profileId);
-          setWorkoutHistoryList(fresh);
-        } catch (error) {
-          console.error('Failed to refresh workout history after bulk delete:', error);
-        }
-      }
+    // Update UI only with successfully deleted items
+    if (succeeded.length > 0) {
+      setWorkoutHistoryList(prev =>
+        prev.filter(item => !succeeded.includes(item.id))
+      );
+    }
+
+    // Show appropriate toast message
+    if (failed.length > 0 && succeeded.length > 0) {
+      toast.warning(`Deleted ${succeeded.length} workout(s). Failed to delete ${failed.length}.`);
+    } else if (failed.length > 0) {
       toast.error(`Failed to delete ${failed.length} workout(s).`);
     } else {
       toast.success(`Deleted ${ids.length} workout(s).`);
@@ -1450,43 +1447,19 @@ export default function App() {
             }}
             onDeleteWorkout={async (id) => {
               try {
-                // Optimistically remove from UI immediately
-                setWorkoutHistoryList(prev => prev.filter(item => item.id !== id));
-                
+                // Pessimistic delete: wait for server confirmation before updating UI
                 const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
                 const deleted = await deleteWorkoutFromHistory(id, user?.id);
-                
+
                 if (deleted) {
+                  // Only remove from UI after successful deletion
+                  setWorkoutHistoryList(prev => prev.filter(item => item.id !== id));
                   toast.success('Workout deleted');
-                  // Don't refresh - the optimistic update is sufficient
-                  // Refreshing can bring back the workout due to merge/deduplication logic
-                  // If the workout was successfully deleted from both API and localStorage,
-                  // it won't appear on the next page load anyway
                 } else {
-                  // Revert optimistic update if deletion completely failed
-                  if (user) {
-                    try {
-                      const { getWorkoutHistory } = await import('./lib/workout-history');
-                      const history = await getWorkoutHistory(user.id);
-                      setWorkoutHistoryList(history);
-                    } catch (error) {
-                      console.error('Failed to refresh workout history after failed deletion:', error);
-                    }
-                  }
                   toast.error('Failed to delete workout');
                 }
               } catch (error) {
                 console.error('Error deleting workout:', error);
-                // Revert optimistic update on error
-                if (user) {
-                  try {
-                    const { getWorkoutHistory } = await import('./lib/workout-history');
-                    const history = await getWorkoutHistory(user.id);
-                    setWorkoutHistoryList(history);
-                  } catch (error) {
-                    console.error('Failed to refresh workout history after error:', error);
-                  }
-                }
                 toast.error('Failed to delete workout');
               }
             }}

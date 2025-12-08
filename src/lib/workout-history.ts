@@ -77,12 +77,14 @@ function saveWorkoutToHistoryLocal(data: {
 
 /**
  * Build a stable key used to detect duplicates between API + localStorage.
+ * Uses title + device (without timestamp) for more stable deduplication.
+ * Timestamps can vary between saves, causing duplicates to not be detected.
  */
 function getHistoryDedupKey(item: WorkoutHistoryItem): string {
   const title = item?.workout?.title ?? '';
-  const createdAt = item?.createdAt ?? '';
   const device = item?.device ?? '';
-  return `${title}::${createdAt}::${device}`;
+  // Don't include createdAt - it can vary between saves causing duplicate detection to fail
+  return `${title}::${device}`;
 }
 
 /**
@@ -195,25 +197,51 @@ export async function getWorkoutHistory(profileId?: string): Promise<WorkoutHist
     return localHistory;
   }
 
-  const byKey = new Map<string, WorkoutHistoryItem>();
+  // Use two-phase deduplication:
+  // 1. First deduplicate API items by ID (primary key - most reliable)
+  // 2. Then use dedup key (title::device) to merge localStorage items
 
-  // API is source of truth
+  const byId = new Map<string, WorkoutHistoryItem>();
+  const byDedupKey = new Map<string, WorkoutHistoryItem>();
+
+  // API is source of truth - deduplicate by ID first
   for (const item of apiHistory) {
-    const key = getHistoryDedupKey(item);
-    if (!key) continue;
-    byKey.set(key, item);
-  }
+    // Skip if we already have this ID (shouldn't happen but safety check)
+    if (byId.has(item.id)) {
+      console.log('[getWorkoutHistory] Duplicate API item by ID:', item.id);
+      continue;
+    }
+    byId.set(item.id, item);
 
-  // Add local items only if they don't collide with an API item
-  for (const item of localHistory) {
-    const key = getHistoryDedupKey(item);
-    if (!key) continue;
-    if (!byKey.has(key)) {
-      byKey.set(key, item);
+    // Also track by dedup key to prevent localStorage duplicates
+    const dedupKey = getHistoryDedupKey(item);
+    if (dedupKey) {
+      byDedupKey.set(dedupKey, item);
     }
   }
 
-  const merged = Array.from(byKey.values());
+  // Add local items only if they don't collide with an API item
+  // Check both by ID and by dedup key
+  for (const item of localHistory) {
+    // Skip if we already have this ID from API
+    if (byId.has(item.id)) {
+      continue;
+    }
+
+    // Skip if we have an API item with the same dedup key (same workout)
+    const dedupKey = getHistoryDedupKey(item);
+    if (dedupKey && byDedupKey.has(dedupKey)) {
+      continue;
+    }
+
+    // This is a unique local-only item, add it
+    byId.set(item.id, item);
+    if (dedupKey) {
+      byDedupKey.set(dedupKey, item);
+    }
+  }
+
+  const merged = Array.from(byId.values());
 
   merged.sort((a, b) => {
     const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -248,20 +276,17 @@ export async function deleteWorkoutFromHistory(
       }
     }
 
+    // Delete from localStorage by ID only (not by dedup key)
+    // This prevents accidentally deleting multiple workouts that share the same dedup key
     const history = readHistoryFromLocalStorage();
-    const itemToDelete = history.find((h) => h.id === id);
+    const filtered = history.filter((h) => h.id !== id);
 
-    let filtered: WorkoutHistoryItem[];
-
-    if (itemToDelete) {
-      const targetKey = getHistoryDedupKey(itemToDelete);
-      filtered = history.filter((h) => getHistoryDedupKey(h) !== targetKey);
+    if (filtered.length < history.length) {
+      writeHistoryToLocalStorage(filtered);
+      console.log('[deleteWorkoutFromHistory] Deleted from localStorage, id:', id);
     } else {
-      filtered = history.filter((h) => h.id !== id);
+      console.log('[deleteWorkoutFromHistory] Item not found in localStorage, id:', id);
     }
-
-    writeHistoryToLocalStorage(filtered);
-    console.log('[deleteWorkoutFromHistory] Deleted from localStorage, id:', id);
 
     return true;
   } catch (err) {
