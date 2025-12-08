@@ -17,6 +17,7 @@ from ..schemas import (
 )
 from ..db import get_db_connection
 from ..utils.ics_parser import parse_ics_content, convert_to_workout_event
+from ..utils.recurrence import expand_recurring_event, should_expand_recurring_event
 
 router = APIRouter()
 
@@ -51,25 +52,34 @@ async def get_calendar_events(
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Query for events in two parts:
+            # 1. Non-recurring events in the date range
+            # 2. Recurring events that might have instances in the date range
+            #    (original event date is before or during the range)
             cur.execute("""
-                SELECT 
+                SELECT
                     id, user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
                     external_event_url, recurrence_rule, json_payload,
                     created_at, updated_at
                 FROM workout_events
-                WHERE user_id = %s AND date >= %s AND date <= %s
+                WHERE user_id = %s AND (
+                    (recurrence_rule IS NULL AND date >= %s AND date <= %s)
+                    OR (recurrence_rule IS NOT NULL AND date <= %s)
+                )
                 ORDER BY date, start_time
-            """, (x_user_id, start_date, end_date))
-            
+            """, (x_user_id, start_date, end_date, end_date))
+
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
-            
-            events = []
+
+            all_events = []
+
             for row in rows:
                 event_dict = dict(zip(columns, row))
-                # Convert datetime objects to ISO strings
+
+                # Convert datetime objects to ISO strings for serialization
                 if event_dict.get('created_at'):
                     event_dict['created_at'] = event_dict['created_at'].isoformat()
                 if event_dict.get('updated_at'):
@@ -79,9 +89,24 @@ async def get_calendar_events(
                     event_dict['start_time'] = event_dict['start_time'].isoformat()
                 if event_dict.get('end_time'):
                     event_dict['end_time'] = event_dict['end_time'].isoformat()
-                events.append(WorkoutEvent(**event_dict))
-            
-            return events
+
+                # Check if this is a recurring event
+                if event_dict.get('recurrence_rule'):
+                    # Expand recurring event into instances
+                    instances = expand_recurring_event(event_dict, start_date, end_date)
+                    for instance in instances:
+                        # Convert date to ISO string for response
+                        if isinstance(instance['date'], date):
+                            instance['date'] = instance['date'].isoformat()
+                        all_events.append(WorkoutEvent(**instance))
+                else:
+                    # Non-recurring event - add as-is
+                    all_events.append(WorkoutEvent(**event_dict))
+
+            # Sort by date and time (ensure start_time is string for comparison)
+            all_events.sort(key=lambda e: (e.date, str(e.start_time) if e.start_time else ''))
+
+            return all_events
 
 
 @router.post("", response_model=WorkoutEvent, status_code=201)
