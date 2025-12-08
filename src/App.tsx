@@ -1547,23 +1547,24 @@ export default function App() {
               toast.success('Your account has been deleted');
             }}
             onUserUpdate={(updates) => {
-              // Update local user state with new device selections
-              if (updates.selectedDevices && user) {
+              // Update local user state with all updates
+              if (user) {
                 setUser({
                   ...user,
-                  selectedDevices: updates.selectedDevices,
+                  ...updates,
                 });
-                
+
                 // Update selectedDevice if the current device is no longer in selected devices
-                // Or use the first selected device if current device is not selected
-                if (updates.selectedDevices.length > 0) {
-                  if (!updates.selectedDevices.includes(selectedDevice)) {
-                    // Current device is not in the selected list, use the first one
-                    setSelectedDevice(updates.selectedDevices[0]);
+                if (updates.selectedDevices) {
+                  if (updates.selectedDevices.length > 0) {
+                    if (!updates.selectedDevices.includes(selectedDevice)) {
+                      // Current device is not in the selected list, use the first one
+                      setSelectedDevice(updates.selectedDevices[0]);
+                    }
+                  } else if (selectedDevice && !updates.selectedDevices.includes(selectedDevice)) {
+                    // No devices selected, but we still have a selectedDevice, keep it for now
+                    // (user can still export even if device is not in their profile)
                   }
-                } else if (selectedDevice && !updates.selectedDevices.includes(selectedDevice)) {
-                  // No devices selected, but we still have a selectedDevice, keep it for now
-                  // (user can still export even if device is not in their profile)
                 }
               }
             }}
@@ -1581,7 +1582,15 @@ export default function App() {
         )}
 
         {currentView === 'calendar' && (
-          <Calendar userId={user.id} />
+          <Calendar
+            userId={user.id}
+            userLocation={{
+              address: user.address,
+              city: user.city,
+              state: user.state,
+              zipCode: user.zipCode,
+            }}
+          />
         )}
       </div>
 

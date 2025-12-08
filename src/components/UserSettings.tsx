@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './ui/alert-dialog';
-import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info } from 'lucide-react';
+import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin } from 'lucide-react';
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
@@ -36,11 +36,15 @@ type Props = {
     subscription: string;
     selectedDevices: DeviceId[];
     billingDate?: Date;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
   };
   onBack: () => void;
   onAccountsChange?: () => void;
   onAccountDeleted?: () => void;
-  onUserUpdate?: (updates: { selectedDevices?: DeviceId[] }) => void;
+  onUserUpdate?: (updates: { selectedDevices?: DeviceId[], address?: string, city?: string, state?: string, zipCode?: string }) => void;
 };
 
 type SettingsSection = 'general' | 'account' | 'devices' | 'notifications' | 'security' | 'connected-apps';
@@ -61,6 +65,13 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['GENERAL']));
   const [imageProcessingMethod, setImageProcessingMethodState] = useState<ImageProcessingMethod>(getImageProcessingMethod());
+
+  // Location fields
+  const [address, setAddress] = useState(user.address || '');
+  const [city, setCity] = useState(user.city || '');
+  const [state, setState] = useState(user.state || '');
+  const [zipCode, setZipCode] = useState(user.zipCode || '');
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
 
   useEffect(() => {
     // Load linked OAuth providers from Clerk user
@@ -97,18 +108,35 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
       JSON.stringify([...selectedDevices].sort()) !==
       JSON.stringify([...user.selectedDevices].sort());
 
-    if (!devicesChanged) {
+    const locationChanged =
+      address !== (user.address || '') ||
+      city !== (user.city || '') ||
+      state !== (user.state || '') ||
+      zipCode !== (user.zipCode || '');
+
+    if (!devicesChanged && !locationChanged) {
       toast.success('Settings saved successfully');
       return;
     }
 
     await updateUserProfileFromClerk(clerkUser.id, {
       selectedDevices,
+      address: address || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      zipCode: zipCode || undefined,
     });
 
-    onUserUpdate?.({ selectedDevices });
+    onUserUpdate?.({
+      selectedDevices,
+      address: address || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      zipCode: zipCode || undefined,
+    });
 
-    toast.success('Settings and devices saved successfully');
+    setIsEditingLocation(false);
+    toast.success('Settings saved successfully');
   } catch (error: any) {
     console.error('Error saving settings:', error);
     toast.error(error?.message || 'Failed to save settings. Please try again.');
@@ -556,6 +584,89 @@ Block: Warm-Up
                       className="mt-1"
                     />
                   </div>
+
+                  <Separator />
+
+                  {/* Location Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <Label className="text-sm font-medium">Location (Optional)</Label>
+                      </div>
+                      {!isEditingLocation && (user.address || user.city || user.state || user.zipCode) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsEditingLocation(true)}
+                          className="h-8"
+                        >
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Help us suggest nearby gyms and workout locations
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="settings-address" className="text-sm">Street Address</Label>
+                        <Input
+                          id="settings-address"
+                          type="text"
+                          placeholder="123 Main St"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          className="mt-1"
+                          disabled={!isEditingLocation && !!(user.address || user.city || user.state || user.zipCode)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="settings-city" className="text-sm">City</Label>
+                          <Input
+                            id="settings-city"
+                            type="text"
+                            placeholder="New York"
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            className="mt-1"
+                            disabled={!isEditingLocation && !!(user.address || user.city || user.state || user.zipCode)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="settings-state" className="text-sm">State</Label>
+                          <Input
+                            id="settings-state"
+                            type="text"
+                            placeholder="NY"
+                            value={state}
+                            onChange={(e) => setState(e.target.value)}
+                            className="mt-1"
+                            maxLength={2}
+                            disabled={!isEditingLocation && !!(user.address || user.city || user.state || user.zipCode)}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="settings-zipCode" className="text-sm">Zip Code</Label>
+                        <Input
+                          id="settings-zipCode"
+                          type="text"
+                          placeholder="10001"
+                          value={zipCode}
+                          onChange={(e) => setZipCode(e.target.value)}
+                          className="mt-1 w-1/2"
+                          maxLength={10}
+                          disabled={!isEditingLocation && !!(user.address || user.city || user.state || user.zipCode)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <Button onClick={handleSave}>Save Changes</Button>
                 </CardContent>
               </Card>

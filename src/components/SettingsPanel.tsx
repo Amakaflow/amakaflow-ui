@@ -9,17 +9,18 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { 
-  User as UserIcon, 
-  CreditCard, 
-  Watch, 
-  Check, 
+import {
+  User as UserIcon,
+  CreditCard,
+  Watch,
+  Check,
   ChevronRight,
   Crown,
   Zap,
   Star,
   Plus,
-  Search
+  Search,
+  MapPin
 } from 'lucide-react';
 import {
   Sheet,
@@ -42,6 +43,12 @@ export function SettingsPanel({ user, isOpen, onClose, onUpdateUser }: SettingsP
   const [email, setEmail] = useState(user.email);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Location fields
+  const [address, setAddress] = useState(user.address || '');
+  const [city, setCity] = useState(user.city || '');
+  const [state, setState] = useState(user.state || '');
+  const [zipCode, setZipCode] = useState(user.zipCode || '');
+
   const toggleDevice = (deviceId: DeviceId) => {
     const newDevices = user.selectedDevices.includes(deviceId)
       ? user.selectedDevices.filter(d => d !== deviceId)
@@ -54,7 +61,14 @@ export function SettingsPanel({ user, isOpen, onClose, onUpdateUser }: SettingsP
   };
 
   const saveProfile = () => {
-    onUpdateUser({ name, email });
+    onUpdateUser({
+      name,
+      email,
+      address: address || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      zipCode: zipCode || undefined,
+    });
     toast.success('Profile updated successfully');
   };
 
@@ -365,7 +379,7 @@ export function SettingsPanel({ user, isOpen, onClose, onUpdateUser }: SettingsP
           )}
 
           {activeTab === 'profile' && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <h3 className="font-semibold mb-1">Profile Information</h3>
                 <p className="text-sm text-muted-foreground mb-4">
@@ -391,10 +405,76 @@ export function SettingsPanel({ user, isOpen, onClose, onUpdateUser }: SettingsP
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                <Button onClick={saveProfile} className="w-full">
-                  Save Changes
-                </Button>
               </div>
+
+              <Separator />
+
+              {/* Location Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <h3 className="font-semibold">Location</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Help us suggest nearby gyms and workout locations
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-address">Street Address</Label>
+                    <Input
+                      id="settings-address"
+                      type="text"
+                      placeholder="123 Main St"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="settings-city">City</Label>
+                      <Input
+                        id="settings-city"
+                        type="text"
+                        placeholder="New York"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="settings-state">State</Label>
+                      <Input
+                        id="settings-state"
+                        type="text"
+                        placeholder="NY"
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-zipCode">Zip Code</Label>
+                    <Input
+                      id="settings-zipCode"
+                      type="text"
+                      placeholder="10001"
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                      className="w-1/2"
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={saveProfile} className="w-full">
+                Save Changes
+              </Button>
             </div>
           )}
 

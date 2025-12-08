@@ -4,14 +4,16 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
+import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
-import { 
-  Watch, 
-  Activity, 
-  CheckCircle2, 
+import {
+  Watch,
+  Activity,
+  CheckCircle2,
   AlertCircle,
   Loader2,
-  Link as LinkIcon
+  Link as LinkIcon,
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { AVAILABLE_DEVICES, DeviceId, Device } from '../lib/devices';
@@ -32,6 +34,12 @@ export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) 
   const [connectOtherAccounts, setConnectOtherAccounts] = useState<'now' | 'later'>('later');
   const [loading, setLoading] = useState(false);
   const [connectingStrava, setConnectingStrava] = useState(false);
+
+  // Location fields
+  const [address, setAddress] = useState(user.address || '');
+  const [city, setCity] = useState(user.city || '');
+  const [state, setState] = useState(user.state || '');
+  const [zipCode, setZipCode] = useState(user.zipCode || '');
 
   const hasSelection = selectedDevices.length > 0 || connectStrava;
   const error = !hasSelection ? 'Please select at least one device or connect Strava' : null;
@@ -82,6 +90,10 @@ export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) 
 
       const { data, error } = await updateUserProfileFromClerk(clerkUser.id, {
         selectedDevices: devicesToSave,
+        address: address || undefined,
+        city: city || undefined,
+        state: state || undefined,
+        zipCode: zipCode || undefined,
       });
 
       if (error) {
@@ -97,6 +109,10 @@ export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) 
       const updatedUser: User = {
         ...user,
         selectedDevices: devicesToSave,
+        address: address || undefined,
+        city: city || undefined,
+        state: state || undefined,
+        zipCode: zipCode || undefined,
       };
 
       onComplete(updatedUser);
@@ -196,6 +212,72 @@ export function ProfileCompletion({ user, onComplete }: ProfileCompletionProps) 
                   ))}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Location Information (Optional) */}
+          <div className="space-y-4 border-t pt-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <MapPin className="w-5 h-5 text-muted-foreground" />
+                <Label className="text-base font-semibold">Location (Optional)</Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Help us suggest nearby gyms and workout locations
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <Label htmlFor="address" className="text-sm">Street Address</Label>
+                <Input
+                  id="address"
+                  type="text"
+                  placeholder="123 Main St"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="mt-1.5"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="city" className="text-sm">City</Label>
+                  <Input
+                    id="city"
+                    type="text"
+                    placeholder="New York"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="state" className="text-sm">State</Label>
+                  <Input
+                    id="state"
+                    type="text"
+                    placeholder="NY"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="mt-1.5"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              <div className="w-1/2">
+                <Label htmlFor="zipCode" className="text-sm">Zip Code</Label>
+                <Input
+                  id="zipCode"
+                  type="text"
+                  placeholder="10001"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  className="mt-1.5"
+                  maxLength={10}
+                />
+              </div>
             </div>
           </div>
 

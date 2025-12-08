@@ -105,9 +105,12 @@ export async function getUserProfileFromClerk(clerkUserId: string): Promise<User
       subscription: data.subscription || 'free',
       workoutsThisWeek: data.workouts_this_week || 0,
       selectedDevices,
-        exportGarminUsb,
       exportGarminUsb,
       billingDate: data.billing_date ? new Date(data.billing_date) : undefined,
+      zipCode: data.zip_code,
+      address: data.address,
+      city: data.city,
+      state: data.state,
     };
   } catch (error: any) {
     console.error('Error fetching user profile:', error);
@@ -199,8 +202,11 @@ export async function syncClerkUserToProfile(clerkUser: any): Promise<User | nul
         workoutsThisWeek: insertData.workouts_this_week || 0,
         selectedDevices,
         exportGarminUsb,
-        exportGarminUsb,
         billingDate: insertData.billing_date ? new Date(insertData.billing_date) : undefined,
+        zipCode: insertData.zip_code,
+        address: insertData.address,
+        city: insertData.city,
+        state: insertData.state,
       };
     }
 
@@ -225,8 +231,11 @@ export async function syncClerkUserToProfile(clerkUser: any): Promise<User | nul
         workoutsThisWeek: data.workouts_this_week || 0,
         selectedDevices,
         exportGarminUsb,
-      exportGarminUsb,
         billingDate: data.billing_date ? new Date(data.billing_date) : undefined,
+        zipCode: data.zip_code,
+        address: data.address,
+        city: data.city,
+        state: data.state,
       };
     }
 
@@ -256,6 +265,12 @@ export async function updateUserProfileFromClerk(clerkUserId: string, updates: P
 
     // For now we do NOT persist exportGarminUsb to Supabase.
     // We'll add a dedicated column later when the DB is ready.
+
+    // Location fields
+    if (updates.zipCode !== undefined) updateData.zip_code = updates.zipCode;
+    if (updates.address !== undefined) updateData.address = updates.address;
+    if (updates.city !== undefined) updateData.city = updates.city;
+    if (updates.state !== undefined) updateData.state = updates.state;
 
     // If nothing except updated_at changed, just return
     if (Object.keys(updateData).length <= 1) {

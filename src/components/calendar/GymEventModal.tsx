@@ -16,6 +16,12 @@ interface GymEventModalProps {
   defaultData?: { date?: string; startTime?: string } | null;
   onSave: (event: Partial<CalendarEvent>) => void;
   onClose: () => void;
+  userLocation?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  };
 }
 
 // Gym locations in the area (can be customized based on user's location)
@@ -73,7 +79,7 @@ const DAYS_OF_WEEK = [
   { value: 'SU', label: 'Sun' },
 ];
 
-export function GymEventModal({ open, event, defaultData, onSave, onClose }: GymEventModalProps) {
+export function GymEventModal({ open, event, defaultData, onSave, onClose, userLocation }: GymEventModalProps) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -87,6 +93,27 @@ export function GymEventModal({ open, event, defaultData, onSave, onClose }: Gym
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [isAnchor, setIsAnchor] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Filter gyms based on user location
+  // If no location is set, show all NYC gyms (default)
+  // If location is set and is NYC, show NYC gyms
+  // If location is set and is NOT NYC, only show custom gym option
+  const hasLocation = userLocation && (userLocation.city || userLocation.state || userLocation.zipCode);
+  const isUserInNYC = hasLocation &&
+    userLocation.city?.toLowerCase().includes('new york') &&
+    userLocation.state?.toUpperCase() === 'NY';
+
+  let filteredGymLocations = !hasLocation || isUserInNYC
+    ? GYM_LOCATIONS
+    : [{ id: 'custom', name: 'Other Gym (Custom)', address: '' }];
+
+  // If editing an existing event with a gym that's not in the filtered list, include it
+  if (gymLocation && gymLocation !== 'custom' && !filteredGymLocations.find(g => g.id === gymLocation)) {
+    const currentGym = GYM_LOCATIONS.find(g => g.id === gymLocation);
+    if (currentGym) {
+      filteredGymLocations = [currentGym, ...filteredGymLocations];
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -223,6 +250,24 @@ export function GymEventModal({ open, event, defaultData, onSave, onClose }: Gym
           </DialogDescription>
         </DialogHeader>
 
+        {/* User Location Display */}
+        {hasLocation && (
+          <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">Your Location</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {[userLocation.city, userLocation.state, userLocation.zipCode].filter(Boolean).join(', ')}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {isUserInNYC
+                  ? 'Showing gyms in your area'
+                  : 'We currently have gym listings for NYC only. Use "Other Gym" to add your local gym.'}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-5 py-4">
           {/* Class Type */}
           <div className="space-y-2">
@@ -257,11 +302,11 @@ export function GymEventModal({ open, event, defaultData, onSave, onClose }: Gym
             <Select value={gymLocation} onValueChange={setGymLocation}>
               <SelectTrigger>
                 <SelectValue>
-                  {GYM_LOCATIONS.find(g => g.id === gymLocation)?.name || 'Select a gym...'}
+                  {filteredGymLocations.find(g => g.id === gymLocation)?.name || 'Select a gym...'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {GYM_LOCATIONS.map(gym => (
+                {filteredGymLocations.map(gym => (
                   <SelectItem key={gym.id} value={gym.id}>
                     <div className="flex flex-col gap-0.5 py-1">
                       <div className="font-medium">{gym.name}</div>
