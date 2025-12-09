@@ -3,12 +3,11 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ArrowLeft, History, BarChart3, Users, Activity, Video, CalendarDays } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ArrowLeft, BarChart3, Users, Activity, CalendarDays } from 'lucide-react';
 import { AddSources, Source } from './components/AddSources';
 import { StructureWorkout } from './components/StructureWorkout';
 import { ValidateMap } from './components/ValidateMap';
 import { PublishExport } from './components/PublishExport';
-import { WorkoutHistory } from './components/WorkoutHistory';
 import { Analytics } from './components/Analytics';
 import { TeamSharing } from './components/TeamSharing';
 import { UserSettings } from './components/UserSettings';
@@ -16,7 +15,6 @@ import { StravaEnhance } from './components/StravaEnhance';
 import { ProfileCompletion } from './components/ProfileCompletion';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { FollowAlongWorkouts } from './components/FollowAlongWorkouts';
 import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import BuildBadge from './components/BuildBadge';
@@ -42,7 +40,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'history' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'follow-along' | 'calendar' | 'workouts';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts';
 
 export default function App() {
   // Clerk authentication
@@ -1130,20 +1128,6 @@ export default function App() {
                   My Workouts
                 </Button>
                 <Button
-                  variant={currentView === 'history' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    checkUnsavedChanges(() => {
-                      clearWorkflowState();
-                      setCurrentView('history');
-                    });
-                  }}
-                  className="gap-2"
-                >
-                  <History className="w-4 h-4" />
-                  History
-                </Button>
-                <Button
                   variant={currentView === 'analytics' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1170,20 +1154,6 @@ export default function App() {
                 >
                   <Users className="w-4 h-4" />
                   Team
-                </Button>
-                <Button
-                  variant={currentView === 'follow-along' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    checkUnsavedChanges(() => {
-                      clearWorkflowState();
-                      setCurrentView('follow-along');
-                    });
-                  }}
-                  className="gap-2"
-                >
-                  <Video className="w-4 h-4" />
-                  Follow Along
                 </Button>
                 {stravaConnected && (
                   <Button
@@ -1433,62 +1403,6 @@ export default function App() {
           />
         )}
 
-        {currentView === 'history' && (
-          <WorkoutHistory
-            history={workoutHistoryList}
-            onLoadWorkout={handleLoadFromHistory}
-            onEditWorkout={handleEditFromHistory}
-            onUpdateWorkout={async (item) => {
-              if (!user?.id) return;
-              try {
-                const { saveWorkoutToAPI } = await import('./lib/workout-api');
-                await saveWorkoutToAPI({
-                  profile_id: user.id,
-                  workout_id: item.id,
-                  workout_data: item.workout,
-                  sources: item.sources,
-                  device: item.device,
-                  exports: item.exports,
-                  validation: item.validation,
-                  title: item.workout?.title || `Workout ${new Date().toLocaleDateString()}`,
-                });
-                toast.success('Workout updated');
-                // Refresh history (no filter needed for update)
-                const history = await getWorkoutHistory(user.id);
-                setWorkoutHistoryList(history);
-              } catch (error: any) {
-                toast.error(`Failed to update workout: ${error.message}`);
-              }
-            }}
-            onDeleteWorkout={async (id) => {
-              try {
-                // Pessimistic delete: wait for server confirmation before updating UI
-                const { deleteWorkoutFromHistory } = await import('./lib/workout-history');
-                const deleted = await deleteWorkoutFromHistory(id, user?.id);
-
-                if (deleted) {
-                  // Only remove from UI after successful deletion
-                  setWorkoutHistoryList(prev => prev.filter(item => item.id !== id));
-                  toast.success('Workout deleted');
-                } else {
-                  toast.error('Failed to delete workout');
-                }
-              } catch (error) {
-                console.error('Error deleting workout:', error);
-                toast.error('Failed to delete workout');
-              }
-            }}
-            onBulkDeleteWorkouts={handleBulkDeleteWorkouts}
-            onEnhanceStrava={(item) => {
-              // Navigate to Strava enhance view
-              checkUnsavedChanges(() => {
-                clearWorkflowState();
-                setCurrentView('strava-enhance');
-              });
-            }}
-          />
-        )}
-
         {currentView === 'analytics' && (
           user ? (
             <Analytics
@@ -1563,10 +1477,6 @@ export default function App() {
           <StravaEnhance
             onClose={() => setCurrentView('workflow')}
           />
-        )}
-
-        {currentView === 'follow-along' && (
-          <FollowAlongWorkouts />
         )}
 
         {currentView === 'calendar' && (
