@@ -14,6 +14,13 @@ import { useClerkUser } from '../lib/clerk-auth';
 import { FollowAlongInstructions } from './FollowAlongInstructions';
 import { VideoIngestDialog } from './VideoIngestDialog';
 
+// Helper to ensure URLs have a protocol
+function ensureProtocol(url: string | undefined): string {
+  if (!url) return '#';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `https://${url}`;
+}
+
 export function FollowAlongWorkouts() {
   const { user: clerkUser } = useClerkUser();
   const [workouts, setWorkouts] = useState<FollowAlongWorkout[]>([]);
@@ -323,7 +330,7 @@ export function FollowAlongWorkouts() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Source:</span>
                         <a
-                          href={selectedWorkout.sourceUrl}
+                          href={ensureProtocol(selectedWorkout.sourceUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline flex items-center gap-1 capitalize"

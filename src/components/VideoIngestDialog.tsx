@@ -122,6 +122,14 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     }
   }, [searchQuery]);
 
+  // Helper to ensure URLs have a protocol
+  const normalizeUrl = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    return `https://${trimmed}`;
+  };
+
   // Client-side platform detection (fallback when API unavailable)
   const detectPlatformFromUrl = (url: string): VideoPlatform => {
     const lowerUrl = url.toLowerCase();
@@ -137,12 +145,16 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       return;
     }
 
+    // Normalize URL to ensure it has https://
+    const normalizedVideoUrl = normalizeUrl(videoUrl);
+    setVideoUrl(normalizedVideoUrl);
+
     setIsLoading(true);
     setError(null);
     setStep('detecting');
 
     // First do client-side detection as fallback
-    const clientPlatform = detectPlatformFromUrl(videoUrl);
+    const clientPlatform = detectPlatformFromUrl(normalizedVideoUrl);
 
     if (clientPlatform === 'unknown') {
       setError('Could not detect video platform. Supported: YouTube, TikTok, Instagram');
@@ -153,12 +165,12 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 
     // Set platform from client-side detection
     setPlatform(clientPlatform);
-    setNormalizedUrl(videoUrl);
+    setNormalizedUrl(normalizedVideoUrl);
 
     try {
       // Try to check cache first (non-blocking)
       try {
-        const cacheResult = await checkVideoCache(videoUrl);
+        const cacheResult = await checkVideoCache(normalizedVideoUrl);
         if (cacheResult.cached && cacheResult.cache_entry) {
           setCachedVideo(cacheResult.cache_entry);
           setVideoId(cacheResult.cache_entry.video_id);
@@ -177,7 +189,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 
       // Try to get more info from backend API
       try {
-        const detectResult = await detectVideoUrl(videoUrl);
+        const detectResult = await detectVideoUrl(normalizedVideoUrl);
         if (detectResult.video_id) {
           setVideoId(detectResult.video_id);
         }
@@ -192,7 +204,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       if (supportsAutoExtraction(clientPlatform)) {
         // Use existing auto-extraction flow
         setStep('extracting');
-        const result = await ingestFollowAlong(videoUrl, userId);
+        const result = await ingestFollowAlong(normalizedVideoUrl, userId);
         onWorkoutCreated(result.followAlongWorkout);
         toast.success('Workout extracted successfully!');
         onOpenChange(false);
@@ -200,7 +212,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
         // Instagram - fetch oEmbed and show manual entry
         setStep('preview');
         try {
-          const oembed = await fetchOEmbed(videoUrl, clientPlatform);
+          const oembed = await fetchOEmbed(normalizedVideoUrl, clientPlatform);
           setOembedData(oembed);
 
           // Pre-fill title from oEmbed
