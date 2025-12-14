@@ -1151,7 +1151,9 @@ class ParserService:
                 
                 # Clean up exercise name (remove any remaining tabs or extra spaces)
                 parts[0] = re.sub(r'\s+', ' ', parts[0]).strip()
-                
+                # Remove any trailing pipe characters that might be left over from split edge cases
+                parts[0] = parts[0].rstrip('|').strip()
+
                 name = parts[0]
                 sets = reps = distance_m = None
                 reps_range = ex_type = note = None
