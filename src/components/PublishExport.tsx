@@ -136,6 +136,25 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
     }
   };
 
+  const copyDebugJson = async () => {
+    if (!workout) {
+      toast.error('No workout data to copy');
+      return;
+    }
+    const mappedWorkout = applyValidationMappings(workout, validation);
+    const debugData = {
+      original_workout: workout,
+      mapped_workout: mappedWorkout,
+      validation: validation,
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
+      toast.success('Debug JSON copied to clipboard');
+    } catch (err) {
+      toast.error('Failed to copy debug JSON');
+    }
+  };
+
   const downloadFile = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -805,6 +824,14 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
             {workout && (
               <FitPreviewModal workout={workout} validation={validation} />
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={copyDebugJson}
+              title="Copy debug JSON (workout + validation)"
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
             <Button
               variant="outline"
               onClick={handleDownloadGarminUsbFit}

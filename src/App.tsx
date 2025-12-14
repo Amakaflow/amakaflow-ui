@@ -634,13 +634,13 @@ export default function App() {
       const isMapperApiAvailable = await checkMapperApiHealth();
       
       if (isMapperApiAvailable) {
-        // Use real mapper API - process workout and export to selected device
-        const exportFormats = await exportWorkoutToDevice(workout, selectedDevice);
-        setExports(exportFormats);
-        
-        // Also validate to show in export view
+        // Use real mapper API - validate first, then export with validation mappings
         const validationResult = await validateWorkoutMapping(workout);
         setValidation(validationResult);
+
+        // Export using the validation mappings to preserve user-confirmed Garmin names
+        const exportFormats = await exportWorkoutToDevice(workout, selectedDevice, validationResult);
+        setExports(exportFormats);
       } else {
         // Fallback to mock if API unavailable
         const { processWorkflow } = await import('./lib/mock-api');
@@ -771,7 +771,7 @@ export default function App() {
         if (processResult.validation.can_proceed || processResult.yaml) {
           // Try to export to device-specific format
           try {
-            exportFormats = await exportWorkoutToDevice(updatedWorkout, selectedDevice);
+            exportFormats = await exportWorkoutToDevice(updatedWorkout, selectedDevice, validationResult);
             // If device export has yaml, prefer it over process result yaml
             if (!exportFormats.yaml && processResult.yaml) {
               exportFormats.yaml = processResult.yaml;

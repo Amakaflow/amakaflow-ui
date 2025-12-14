@@ -1,11 +1,12 @@
-import { 
-  WorkoutStructure, 
-  ValidationResponse, 
-  ExportFormats, 
+import {
+  WorkoutStructure,
+  ValidationResponse,
+  ExportFormats,
   ExerciseSuggestResponse,
-  WorkflowProcessResponse 
+  WorkflowProcessResponse
 } from '../types/workout';
 import { DeviceId } from './devices';
+import { applyValidationMappings } from './workout-utils';
 
 // API base URL - defaults to localhost:8001 (mapper-api)
 const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
@@ -88,44 +89,54 @@ export async function processWorkoutWithValidation(
 /**
  * Auto-map workout to Garmin YAML
  * Calls /map/auto-map endpoint
+ * If validation is provided, applies user-confirmed mappings before export
  */
 export async function autoMapWorkoutToGarmin(
-  workout: WorkoutStructure
+  workout: WorkoutStructure,
+  validation?: ValidationResponse | null
 ): Promise<{ yaml: string }> {
+  // Apply validation mappings to use user-confirmed Garmin names
+  const mappedWorkout = applyValidationMappings(workout, validation);
+
   return mapperApiCall<{ yaml: string }>('/map/auto-map', {
     method: 'POST',
-    body: JSON.stringify({ blocks_json: workout }),
+    body: JSON.stringify({ blocks_json: mappedWorkout }),
   });
 }
 
 /**
  * Convert workout to device-specific format
  * Handles Garmin, Apple Watch, and Zwift exports
+ * If validation is provided, applies user-confirmed mappings before export
  */
 export async function exportWorkoutToDevice(
   workout: WorkoutStructure,
-  device: DeviceId
+  device: DeviceId,
+  validation?: ValidationResponse | null
 ): Promise<ExportFormats> {
+  // Apply validation mappings to use user-confirmed Garmin names
+  const mappedWorkout = applyValidationMappings(workout, validation);
+
   switch (device) {
     case 'garmin':
     case 'garmin_usb': {
-      const result = await autoMapWorkoutToGarmin(workout);
+      const result = await autoMapWorkoutToGarmin(mappedWorkout, null); // Already applied mappings
       return { yaml: result.yaml };
     }
-    
+
     case 'apple': {
       // Call /map/to-workoutkit for Apple Watch
       const result = await mapperApiCall<any>('/map/to-workoutkit', {
         method: 'POST',
-        body: JSON.stringify({ blocks_json: workout }),
+        body: JSON.stringify({ blocks_json: mappedWorkout }),
       });
-      
+
       // Convert WorkoutKit DTO to plist format (or return as JSON)
       // For now, return as plist string if available, otherwise JSON
       const plist = result.plist || JSON.stringify(result, null, 2);
       return { plist, yaml: '' };
     }
-    
+
     case 'zwift': {
       // Call /map/to-zwo for Zwift
       // Auto-detect sport from workout content
@@ -134,18 +145,18 @@ export async function exportWorkoutToDevice(
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ blocks_json: workout }),
+        body: JSON.stringify({ blocks_json: mappedWorkout }),
       });
-      
+
       if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: response.statusText }));
         throw new Error(error.detail || `Zwift export error: ${response.status}`);
       }
-      
+
       const zwo = await response.text();
       return { zwo, yaml: '' };
     }
-    
+
     default:
       throw new Error(`Unsupported device: ${device}`);
   }
