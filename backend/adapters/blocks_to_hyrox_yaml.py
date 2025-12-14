@@ -624,13 +624,9 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                         original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
                         ex_entry[garmin_name_with_category] = f"{original_clean} x{reps} ({reason})"
                 else:
-                    # Default fallback
-                    if not reason:
-                        # Already a valid Garmin name - use "lap" as default
-                        ex_entry[garmin_name_with_category] = "lap"
-                    else:
-                        original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
-                        ex_entry[garmin_name_with_category] = f"{original_clean} ({reason})"
+                    # Default fallback - use "lap" (lap button press) when no reps available
+                    # This is standard for cardio/running exercises like "Indoor Track Run"
+                    ex_entry[garmin_name_with_category] = "lap"
                 exercises_list.append(ex_entry)
         
         # Process supersets - combine all supersets in a block into one repeat
