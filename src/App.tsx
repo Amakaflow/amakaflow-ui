@@ -674,13 +674,30 @@ export default function App() {
       toast.error('No workout to validate');
       return;
     }
+
+    // Check if we already have complete validation data (loaded from saved workout)
+    // If all exercises are already validated, skip re-validation to preserve user's mappings
+    if (validation) {
+      const hasAllValidated = validation.validated_exercises?.length > 0;
+      const hasNeedsReview = (validation.needs_review?.length || 0) > 0;
+      const hasUnmapped = (validation.unmapped_exercises?.length || 0) > 0;
+
+      // If we have validated exercises and no exercises need review/mapping, use existing validation
+      if (hasAllValidated && !hasNeedsReview && !hasUnmapped) {
+        console.log('Using existing validation data (workout already has complete Garmin mappings)');
+        setCurrentStep('validate');
+        toast.success('Loaded saved Garmin mappings');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       console.log('Starting validation...');
       // Check if mapper API is available
       const isMapperApiAvailable = await checkMapperApiHealth();
       console.log('Mapper API available:', isMapperApiAvailable);
-      
+
       let validationResult: ValidationResponse;
       if (isMapperApiAvailable) {
         // Use real mapper API
@@ -693,7 +710,7 @@ export default function App() {
         const { validateWorkout } = await import('./lib/mock-api');
         validationResult = await validateWorkout(workout);
       }
-      
+
       setValidation(validationResult);
       setCurrentStep('validate');
       if (validationResult.can_proceed) {
