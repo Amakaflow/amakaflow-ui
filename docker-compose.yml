@@ -4,12 +4,12 @@ services:
   # UI - React frontend
   ui:
     build:
-      context: ./ui
+      context: ./amakaflow-ui
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - ./ui:/app
+      - ./amakaflow-ui:/app
       - /app/node_modules
     env_file:
       - .env
@@ -50,6 +50,7 @@ services:
       - "8001:8001"
     volumes:
       - ./mapper-api:/app
+      - ./amakaflow-fitfiletool:/amakaflow-fitfiletool
     env_file:
       - .env
     environment:
