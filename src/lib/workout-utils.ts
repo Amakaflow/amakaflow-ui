@@ -382,6 +382,11 @@ function formatExerciseForStrava(exercise: Exercise, index: number, inSuperset: 
  * get the same mapped_to value. This handles workouts with repeated
  * exercises (like 5 rounds of the same exercises).
  *
+ * IMPORTANT: If the workout already has a user-confirmed Garmin name
+ * (Title Case), we preserve it instead of applying potentially stale
+ * mappings from validation. This handles cases where the workout was
+ * edited after validation.
+ *
  * @param workout - The workout structure with original exercise names
  * @param validation - The validation response with mapped_to values
  * @returns A new workout with exercise names replaced by their mapped_to values
@@ -418,18 +423,41 @@ export function applyValidationMappings(
     return workout;
   }
 
+  // Helper to check if name is already a user-confirmed Garmin name
+  const isUserConfirmedName = (name: string): boolean => {
+    if (!name || name.length < 2) return false;
+    // Check for distance prefix (e.g., "500m Run")
+    if (/^[\d.]+\s*(m|km|mi)\s+/i.test(name)) return false;
+    // Check for rep/set counts (e.g., "Push Up x10")
+    if (/\s*\d*x\d+/i.test(name)) return false;
+    // Check if it looks like Title Case
+    const words = name.split(/\s+/);
+    if (words.length === 0) return false;
+    const capitalized = words.filter((w) => w.length > 0 && w[0] === w[0].toUpperCase()).length;
+    return capitalized >= words.length * 0.6;
+  };
+
   // Deep clone and apply mappings by exercise name
+  // BUT: If the current name is already a user-confirmed Garmin name, preserve it
   return {
     ...workout,
     blocks: workout.blocks.map((block) => ({
       ...block,
       exercises: (block.exercises || []).map((exercise) => {
+        // If current name is already a user-confirmed Garmin name, preserve it
+        if (isUserConfirmedName(exercise.name)) {
+          return exercise;
+        }
         const mappedName = mappingsByName.get(exercise.name);
         return mappedName ? { ...exercise, name: mappedName } : exercise;
       }),
       supersets: (block.supersets || []).map((superset) => ({
         ...superset,
         exercises: (superset.exercises || []).map((exercise) => {
+          // If current name is already a user-confirmed Garmin name, preserve it
+          if (isUserConfirmedName(exercise.name)) {
+            return exercise;
+          }
           const mappedName = mappingsByName.get(exercise.name);
           return mappedName ? { ...exercise, name: mappedName } : exercise;
         }),
