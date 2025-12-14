@@ -49,11 +49,46 @@ export function ValidateMap({
   loading,
   selectedDevice
 }: ValidateMapProps) {
-  // Initialize validation with sort order added to each exercise
+  // Initialize validation with sort order based on ORIGINAL workout position
   const [localValidation, setLocalValidation] = useState<ValidationResponse>(() => {
-    let globalIndex = 0;
+    // Combine ALL exercises from all categories
+    const allExercises = [
+      ...validation.validated_exercises,
+      ...validation.needs_review,
+      ...validation.unmapped_exercises
+    ];
+
+    // Sort by location to get original workout order
+    // Location format is "exercises[N]" or "supersets[N].exercises[M]"
+    const sortedExercises = [...allExercises].sort((a, b) => {
+      // Extract exercise index from location like "exercises[0]" or "supersets[0].exercises[1]"
+      const matchA = a.location.match(/exercises\[(\d+)\]/);
+      const matchB = b.location.match(/exercises\[(\d+)\]/);
+      const posA = matchA ? parseInt(matchA[1]) : 999;
+      const posB = matchB ? parseInt(matchB[1]) : 999;
+      // First compare by block name to keep exercises grouped by block
+      const blockCompare = a.block.localeCompare(b.block);
+      if (blockCompare !== 0) return blockCompare;
+      // Then by exercise position within block
+      return posA - posB;
+    });
+
+    // Create a map from exercise identity to sort order
+    // Use location + original_name as key since same exercise can appear at different positions
+    const sortOrderMap = new Map<string, number>();
+    sortedExercises.forEach((ex, idx) => {
+      const key = `${ex.location}|${ex.original_name}`;
+      if (!sortOrderMap.has(key)) {
+        sortOrderMap.set(key, idx);
+      }
+    });
+
+    // Add _sortOrder to each exercise based on its position in the sorted list
     const addSortOrder = (exercises: ValidationResult[]): ValidationResultWithOrder[] =>
-      exercises.map(ex => ({ ...ex, _sortOrder: globalIndex++ } as ValidationResultWithOrder));
+      exercises.map(ex => {
+        const key = `${ex.location}|${ex.original_name}`;
+        return { ...ex, _sortOrder: sortOrderMap.get(key) ?? 999 } as ValidationResultWithOrder;
+      });
 
     return {
       ...validation,
