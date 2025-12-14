@@ -26,99 +26,88 @@ import { listFollowAlong } from './follow-along-api';
 
 /**
  * Infer workout category from exercise types and names.
- * Uses heuristics based on common exercise patterns.
+ * Uses a scoring system to determine the most appropriate category.
  */
 function inferCategoryFromExercises(exercises: string[]): WorkoutCategory {
+  if (exercises.length === 0) return 'other';
+
   const lowerExercises = exercises.map((e) => e.toLowerCase());
   const exerciseText = lowerExercises.join(' ');
 
-  // Check for running keywords
-  if (
-    exerciseText.includes('run') ||
-    exerciseText.includes('jog') ||
-    exerciseText.includes('sprint') ||
-    exerciseText.includes('tempo') ||
-    exerciseText.includes('interval')
-  ) {
-    return 'run';
+  // Count exercises matching each category
+  const scores: Record<WorkoutCategory, number> = {
+    strength: 0,
+    cardio: 0,
+    hiit: 0,
+    run: 0,
+    cycling: 0,
+    yoga: 0,
+    mobility: 0,
+    swimming: 0,
+    walking: 0,
+    other: 0,
+  };
+
+  // Strength exercises (most common in mixed workouts)
+  const strengthPatterns = /squat|deadlift|press|curl|row|pull.?up|push.?up|lunge|bench|dumbbell|barbell|kettle|wall ball|sled|farmer|carry/i;
+  // Running exercises
+  const runPatterns = /\b(run|jog|sprint|tempo)\b/i;
+  // Cardio machines and movements
+  const cardioPatterns = /\b(ski|row|erg|bike|assault|echo|jump|box|rope|burpee|mountain climber)\b/i;
+  // HIIT indicators
+  const hiitPatterns = /hiit|tabata|emom|amrap|wod|crossfit/i;
+  // Yoga/mobility
+  const yogaPatterns = /yoga|pose|stretch|downward|warrior|pigeon/i;
+  const mobilityPatterns = /mobility|foam roll|recovery|stretch/i;
+  // Cycling
+  const cyclingPatterns = /\b(cycle|bike|spin|cadence)\b/i;
+  // Swimming
+  const swimmingPatterns = /swim|freestyle|breaststroke|backstroke|butterfly/i;
+  // Walking
+  const walkingPatterns = /\b(walk|hike)\b/i;
+
+  // Score each exercise
+  for (const exercise of lowerExercises) {
+    if (strengthPatterns.test(exercise)) scores.strength++;
+    if (runPatterns.test(exercise)) scores.run++;
+    if (cardioPatterns.test(exercise)) scores.cardio++;
+    if (hiitPatterns.test(exercise)) scores.hiit++;
+    if (yogaPatterns.test(exercise)) scores.yoga++;
+    if (mobilityPatterns.test(exercise)) scores.mobility++;
+    if (cyclingPatterns.test(exercise)) scores.cycling++;
+    if (swimmingPatterns.test(exercise)) scores.swimming++;
+    if (walkingPatterns.test(exercise)) scores.walking++;
   }
 
-  // Check for cycling keywords
-  if (
-    exerciseText.includes('cycle') ||
-    exerciseText.includes('bike') ||
-    exerciseText.includes('spin') ||
-    exerciseText.includes('cadence')
-  ) {
-    return 'cycling';
-  }
-
-  // Check for swimming keywords
-  if (
-    exerciseText.includes('swim') ||
-    exerciseText.includes('freestyle') ||
-    exerciseText.includes('breaststroke') ||
-    exerciseText.includes('backstroke') ||
-    exerciseText.includes('butterfly') ||
-    exerciseText.includes('lap')
-  ) {
-    return 'swimming';
-  }
-
-  // Check for yoga/mobility keywords
-  if (
-    exerciseText.includes('yoga') ||
-    exerciseText.includes('pose') ||
-    exerciseText.includes('stretch') ||
-    exerciseText.includes('flexibility') ||
-    exerciseText.includes('downward') ||
-    exerciseText.includes('warrior')
-  ) {
-    return 'yoga';
-  }
-
-  // Check for mobility keywords
-  if (
-    exerciseText.includes('mobility') ||
-    exerciseText.includes('foam roll') ||
-    exerciseText.includes('recovery')
-  ) {
-    return 'mobility';
-  }
-
-  // Check for HIIT patterns
-  if (
-    exerciseText.includes('hiit') ||
-    exerciseText.includes('tabata') ||
-    exerciseText.includes('emom') ||
-    exerciseText.includes('amrap') ||
-    exerciseText.includes('burpee')
-  ) {
+  // Check overall text for HIIT patterns (these override individual scores)
+  if (hiitPatterns.test(exerciseText)) {
     return 'hiit';
   }
 
-  // Check for cardio keywords
-  if (
-    exerciseText.includes('cardio') ||
-    exerciseText.includes('jump') ||
-    exerciseText.includes('box') ||
-    exerciseText.includes('rope') ||
-    exerciseText.includes('mountain climber')
-  ) {
-    return 'cardio';
+  // Mixed workouts with both strength and cardio exercises → HIIT
+  if (scores.strength >= 2 && (scores.cardio >= 2 || scores.run >= 1)) {
+    return 'hiit';
   }
 
-  // Check for walking
-  if (exerciseText.includes('walk') || exerciseText.includes('hike')) {
-    return 'walking';
+  // Find highest scoring category
+  let maxCategory: WorkoutCategory = 'strength';
+  let maxScore = scores.strength;
+
+  // Check each category (in priority order for ties)
+  const priorities: WorkoutCategory[] = ['strength', 'hiit', 'cardio', 'run', 'yoga', 'mobility', 'cycling', 'swimming', 'walking'];
+  for (const cat of priorities) {
+    if (scores[cat] > maxScore) {
+      maxScore = scores[cat];
+      maxCategory = cat;
+    }
   }
 
-  // Default to strength for most workouts with exercises
-  if (exercises.length > 0) {
+  // If no clear category from exercises, default to strength for workouts with exercises
+  if (maxScore === 0 && exercises.length > 0) {
     return 'strength';
   }
 
-  return 'other';
+  return maxCategory;
 }
 
 /**
@@ -127,15 +116,18 @@ function inferCategoryFromExercises(exercises: string[]): WorkoutCategory {
 function inferCategoryFromTitle(title: string): WorkoutCategory | null {
   const lower = title.toLowerCase();
 
-  if (lower.includes('run') || lower.includes('5k') || lower.includes('10k')) return 'run';
-  if (lower.includes('strength') || lower.includes('lift') || lower.includes('weight')) return 'strength';
-  if (lower.includes('hiit') || lower.includes('tabata') || lower.includes('circuit')) return 'hiit';
-  if (lower.includes('cardio')) return 'cardio';
+  // Check specific workout types first (more specific patterns before general ones)
+  if (lower.includes('hyrox') || lower.includes('crossfit') || lower.includes('wod')) return 'hiit';
+  if (lower.includes('hiit') || lower.includes('tabata') || lower.includes('circuit') || lower.includes('emom') || lower.includes('amrap')) return 'hiit';
+  if (lower.includes('strength') || lower.includes('lift') || lower.includes('weight') || lower.includes('leg day') || lower.includes('upper body') || lower.includes('lower body')) return 'strength';
   if (lower.includes('yoga')) return 'yoga';
   if (lower.includes('mobility') || lower.includes('stretch')) return 'mobility';
   if (lower.includes('cycle') || lower.includes('bike') || lower.includes('spin')) return 'cycling';
   if (lower.includes('swim')) return 'swimming';
   if (lower.includes('walk') || lower.includes('hike')) return 'walking';
+  if (lower.includes('cardio')) return 'cardio';
+  // Only categorize as "run" if it's clearly a running workout (not just contains "run")
+  if (/\b(run|running|5k|10k|marathon|jog)\b/i.test(title) && !lower.includes('wall') && !lower.includes('ball')) return 'run';
 
   return null;
 }
