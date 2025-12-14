@@ -985,47 +985,67 @@ class ParserService:
         return has_block and has_exercise
     
     @staticmethod
-    def _parse_sets_reps_field(field: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+    def _parse_sets_reps_field(field: str) -> Tuple[Optional[int], Optional[int], Optional[str], Optional[int]]:
         """
-        Parse sets/reps field from canonical format.
-        
+        Parse sets/reps/distance field from canonical format.
+
         Handles formats like:
-        - "3×AMRAP" -> (3, None, "AMRAP")
-        - "4×6–8" -> (4, None, "6-8")
-        - "3×8" -> (3, 8, None)
-        - "8" -> (None, 8, None)
-        
+        - "3×AMRAP" -> (3, None, "AMRAP", None)
+        - "4×6–8" -> (4, None, "6-8", None)
+        - "3×8" -> (3, 8, None, None)
+        - "8" -> (None, 8, None, None)
+        - "1×500m" -> (1, None, None, 500)  # distance in meters
+        - "1×1.5km" -> (1, None, None, 1500)  # distance in meters
+        - "500m" -> (None, None, None, 500)  # distance only
+
         Args:
             field: Field string to parse
-            
+
         Returns:
-            Tuple of (sets, reps, reps_range)
+            Tuple of (sets, reps, reps_range, distance_m)
         """
         field = field.strip()
         if not field:
-            return None, None, None
-        
+            return None, None, None, None
+
         # Pattern: "3×AMRAP"
         m = re.match(r"(\d+)\s*[x×]\s*AMRAP", field, re.I)
         if m:
-            return int(m.group(1)), None, "AMRAP"
-        
-        # Pattern: "4×6–8" or "4×6-8"
+            return int(m.group(1)), None, "AMRAP", None
+
+        # Pattern: "4×6–8" or "4×6-8" (rep range)
         m = re.match(r"(\d+)\s*[x×]\s*(\d+)\s*[-–]\s*(\d+)", field)
         if m:
-            return int(m.group(1)), None, f"{m.group(2)}-{m.group(3)}"
-        
-        # Pattern: "3×8"
-        m = re.match(r"(\d+)\s*[x×]\s*(\d+)", field)
+            return int(m.group(1)), None, f"{m.group(2)}-{m.group(3)}", None
+
+        # Pattern: "1×500m" or "1×1.5km" (sets × distance)
+        m = re.match(r"(\d+)\s*[x×]\s*([\d.]+)\s*(km|m)", field, re.I)
         if m:
-            return int(m.group(1)), int(m.group(2)), None
-        
+            sets = int(m.group(1))
+            dist_val = float(m.group(2))
+            unit = m.group(3).lower()
+            distance_m = int(dist_val * 1000) if unit == "km" else int(dist_val)
+            return sets, None, None, distance_m
+
+        # Pattern: "500m" or "1.5km" (distance only, no sets)
+        m = re.match(r"^([\d.]+)\s*(km|m)$", field, re.I)
+        if m:
+            dist_val = float(m.group(1))
+            unit = m.group(2).lower()
+            distance_m = int(dist_val * 1000) if unit == "km" else int(dist_val)
+            return None, None, None, distance_m
+
+        # Pattern: "3×8" (sets × reps) - must come AFTER distance patterns
+        m = re.match(r"(\d+)\s*[x×]\s*(\d+)$", field)
+        if m:
+            return int(m.group(1)), int(m.group(2)), None, None
+
         # Pattern: "8" (just a number)
         m = re.match(r"^\d+$", field)
         if m:
-            return None, int(field), None
-        
-        return None, None, None
+            return None, int(field), None, None
+
+        return None, None, None, None
     
     @staticmethod
     def parse_canonical_ai_workout(text: str) -> Dict[str, Any]:
@@ -1133,9 +1153,9 @@ class ParserService:
                 parts[0] = re.sub(r'\s+', ' ', parts[0]).strip()
                 
                 name = parts[0]
-                sets = reps = None
+                sets = reps = distance_m = None
                 reps_range = ex_type = note = None
-                
+
                 # Parse additional parts
                 for part in parts[1:]:
                     lower = part.lower()
@@ -1145,12 +1165,15 @@ class ParserService:
                     if lower.startswith("note:"):
                         note = part[5:].strip()
                         continue
-                    
-                    # Try to parse as sets/reps
-                    s, r, rr = ParserService._parse_sets_reps_field(part)
-                    if s or r or rr:
-                        sets, reps, reps_range = s, r, rr
-                
+
+                    # Try to parse as sets/reps/distance
+                    s, r, rr, dm = ParserService._parse_sets_reps_field(part)
+                    if s or r or rr or dm:
+                        sets = s if s else sets
+                        reps = r if r else reps
+                        reps_range = rr if rr else reps_range
+                        distance_m = dm if dm else distance_m
+
                 # Infer type from block label if not specified
                 if not ex_type:
                     label_lower = (current_block.get("label") or "").lower()
@@ -1158,15 +1181,19 @@ class ParserService:
                         ex_type = "warmup"
                     elif "cool" in label_lower:
                         ex_type = "cooldown"
+                    elif distance_m:
+                        # Distance-based exercises are usually cardio
+                        ex_type = "cardio"
                     else:
                         ex_type = "strength"
-                
+
                 # Add exercise to current block
                 exercise = {
                     "name": name,
                     "sets": sets,
                     "reps": reps,
                     "reps_range": reps_range,
+                    "distance_m": distance_m,
                     "type": ex_type,
                 }
                 if note:

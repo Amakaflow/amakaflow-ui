@@ -185,38 +185,67 @@ class TestSetsRepsParsing:
     
     def test_parse_amrap(self):
         """Test parsing AMRAP format."""
-        sets, reps, reps_range = ParserService._parse_sets_reps_field("3×AMRAP")
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("3×AMRAP")
         assert sets == 3
         assert reps is None
         assert reps_range == "AMRAP"
-    
+        assert distance_m is None
+
     def test_parse_rep_range(self):
         """Test parsing rep range format."""
-        sets, reps, reps_range = ParserService._parse_sets_reps_field("4×6–8")
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("4×6–8")
         assert sets == 4
         assert reps is None
         assert reps_range == "6-8"
-    
+        assert distance_m is None
+
     def test_parse_sets_and_reps(self):
         """Test parsing sets and reps format."""
-        sets, reps, reps_range = ParserService._parse_sets_reps_field("3×8")
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("3×8")
         assert sets == 3
         assert reps == 8
         assert reps_range is None
-    
+        assert distance_m is None
+
     def test_parse_just_reps(self):
         """Test parsing just reps (no sets)."""
-        sets, reps, reps_range = ParserService._parse_sets_reps_field("8")
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("8")
         assert sets is None
         assert reps == 8
         assert reps_range is None
-    
+        assert distance_m is None
+
     def test_parse_invalid_format(self):
         """Test parsing invalid format returns None."""
-        sets, reps, reps_range = ParserService._parse_sets_reps_field("invalid")
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("invalid")
         assert sets is None
         assert reps is None
         assert reps_range is None
+        assert distance_m is None
+
+    def test_parse_distance_meters(self):
+        """Test parsing distance in meters format."""
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("1×500m")
+        assert sets == 1
+        assert reps is None
+        assert reps_range is None
+        assert distance_m == 500
+
+    def test_parse_distance_kilometers(self):
+        """Test parsing distance in kilometers format."""
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("1×1.5km")
+        assert sets == 1
+        assert reps is None
+        assert reps_range is None
+        assert distance_m == 1500
+
+    def test_parse_distance_only(self):
+        """Test parsing distance only (no sets)."""
+        sets, reps, reps_range, distance_m = ParserService._parse_sets_reps_field("500m")
+        assert sets is None
+        assert reps is None
+        assert reps_range is None
+        assert distance_m == 500
 
 
 class TestRouterFunction:
