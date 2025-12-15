@@ -30,14 +30,15 @@ interface BackendPreviewStep {
 export function FitPreviewModal({ workout, validation, trigger, useLapButton = false }: FitPreviewModalProps) {
   const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<BackendPreviewStep[]>([]);
+  const [sportType, setSportType] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch preview steps from backend when modal opens
+  // Fetch preview steps and sport type from backend when modal opens
   useEffect(() => {
     if (!open || !workout) return;
 
-    const fetchPreviewSteps = async () => {
+    const fetchPreviewData = async () => {
       setLoading(true);
       setError(null);
 
@@ -45,20 +46,35 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
         const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
         // Apply validation mappings to use user-confirmed Garmin names
         const mappedWorkout = applyValidationMappings(workout, validation);
-        const res = await fetch(`${MAPPER_API_BASE_URL}/map/preview-steps?use_lap_button=${useLapButton}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ blocks_json: mappedWorkout }),
-        });
 
-        if (!res.ok) {
+        // Fetch both preview steps and metadata in parallel
+        const [stepsRes, metadataRes] = await Promise.all([
+          fetch(`${MAPPER_API_BASE_URL}/map/preview-steps?use_lap_button=${useLapButton}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blocks_json: mappedWorkout }),
+          }),
+          fetch(`${MAPPER_API_BASE_URL}/map/fit-metadata?use_lap_button=${useLapButton}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blocks_json: mappedWorkout }),
+          })
+        ]);
+
+        if (!stepsRes.ok) {
           throw new Error('Failed to fetch preview');
         }
 
-        const data = await res.json();
-        setSteps(data.steps || []);
+        const stepsData = await stepsRes.json();
+        setSteps(stepsData.steps || []);
+
+        // Get sport type from metadata
+        if (metadataRes.ok) {
+          const metadata = await metadataRes.json();
+          setSportType(metadata.detected_sport || null);
+        }
       } catch (err) {
-        console.error('Failed to fetch preview steps:', err);
+        console.error('Failed to fetch preview data:', err);
         setError('Failed to load preview');
         // Fallback to empty
         setSteps([]);
@@ -67,7 +83,7 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
       }
     };
 
-    fetchPreviewSteps();
+    fetchPreviewData();
   }, [open, workout, validation, useLapButton]);
 
   const defaultTrigger = (
@@ -97,9 +113,25 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
         {/* Watch-like display */}
         <div style={{ backgroundColor: '#1a1a1a', borderRadius: '24px', padding: '20px' }}>
           <div style={{ border: '2px solid #333', borderRadius: '16px', padding: '16px', backgroundColor: '#000' }}>
-            {/* Workout title */}
-            <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #333' }}>
-              {workout?.title || 'Workout'}
+            {/* Workout title and sport type */}
+            <div style={{ textAlign: 'center', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #333' }}>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+                {workout?.title || 'Workout'}
+              </div>
+              {sportType && (
+                <span style={{
+                  backgroundColor: sportType === 'cardio' ? '#dc2626' :
+                                   sportType === 'running' ? '#16a34a' : '#6366f1',
+                  color: 'white',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'capitalize'
+                }}>
+                  {sportType}
+                </span>
+              )}
             </div>
 
             {loading ? (
