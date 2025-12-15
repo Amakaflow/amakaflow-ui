@@ -1,5 +1,10 @@
 // API Request/Response Types matching the actual backend
 
+// Rest type determines how rest periods work on the device
+export type RestType = 'timed' | 'button';
+// - 'timed': Countdown timer (e.g., 30s, 60s)
+// - 'button': Wait for user to press lap button when ready
+
 export interface Exercise {
   id: string; // Industry-standard: required for stable drag-and-drop
   name: string;
@@ -8,6 +13,7 @@ export interface Exercise {
   reps_range: string | null;
   duration_sec: number | null;
   rest_sec: number | null; // Rest after this exercise (only used in 'regular' structure)
+  rest_type?: RestType; // How rest is triggered: 'timed' (default) or 'button'
   distance_m: number | null;
   distance_range: string | null;
   type: 'strength' | 'cardio' | 'HIIT' | 'interval' | string;
@@ -49,7 +55,8 @@ export interface Block {
   // Rest periods
   rest_between_rounds_sec?: number | null;  // Rest between rounds (for 'rounds', 'circuit', 'superset')
   rest_between_sets_sec?: number | null;    // Rest between sets (for 'sets' structure)
-  
+  rest_type?: RestType;                      // How rest is triggered: 'timed' (default) or 'button'
+
   // Legacy fields for backward compatibility (deprecated)
   rest_between_sec?: number | null;          // Alias for rest_between_rounds_sec
   default_reps_range?: string | null;        // Deprecated
@@ -61,6 +68,7 @@ export interface Superset {
   id: string; // Industry-standard: required for stable drag-and-drop
   exercises: Exercise[];
   rest_between_sec?: number | null; // Rest after completing all exercises in the superset
+  rest_type?: RestType; // How rest is triggered: 'timed' (default) or 'button'
 }
 
 export interface WorkoutStructure {
