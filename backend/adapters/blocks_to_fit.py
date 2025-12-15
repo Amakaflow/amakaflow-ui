@@ -34,16 +34,19 @@ MAX_VALID_CATEGORY_ID = 32
 
 # Fallback remapping for invalid categories
 # Maps invalid category IDs to valid FIT SDK categories
+# IMPORTANT: Most extended categories (33+) are STRENGTH exercises, not cardio!
+# Only truly cardio-oriented categories (like Indoor Rower) should map to Cardio.
 INVALID_CATEGORY_FALLBACK = {
     # 33-43 are "extended" categories that some watches don't support
-    33: 2,   # Map to Cardio
-    34: 2,   # Map to Cardio
-    35: 2,   # Map to Cardio
-    36: 2,   # Map to Cardio
-    37: 2,   # Map to Cardio
-    38: 2,   # Indoor Rower -> Cardio (Row 23 doesn't work for erg machines)
+    # Map most to Total Body (29) to preserve "Strength" sport type detection
+    33: 29,  # Map to Total Body (strength)
+    34: 29,  # Suspension (TRX chest fly, rows, etc.) -> Total Body (strength)
+    35: 29,  # Map to Total Body (strength)
+    36: 29,  # Map to Total Body (strength)
+    37: 29,  # Map to Total Body (strength)
+    38: 2,   # Indoor Rower -> Cardio (this is actually cardio equipment)
     39: 29,  # Map to Total Body
-    40: 29,  # Map to Total Body
+    40: 29,  # Banded Exercises -> Total Body (strength)
     41: 29,  # Map to Total Body
     42: 29,  # Map to Total Body
     43: 29,  # Map to Total Body
@@ -194,6 +197,19 @@ def blocks_to_steps(blocks_json, use_lap_button=False):
     steps = []
     category_ids_used = set()  # Track which categories are in the workout
 
+    # Add warmup step at the beginning (matches YAML warmup: cardio: lap)
+    # FIT SDK intensity values: 0=active, 1=warmup, 2=cooldown, 3=rest
+    # Using OPEN duration (5) = lap button press to end warmup
+    steps.append({
+        'type': 'warmup',
+        'display_name': 'Warmup',
+        'intensity': 1,  # warmup intensity
+        'duration_type': 5,  # OPEN (lap button)
+        'duration_value': 0,
+        'category_id': 2,  # Cardio
+        'category_name': 'Cardio',
+    })
+
     blocks = blocks_json.get('blocks', [])
     num_blocks = len(blocks)
 
@@ -334,8 +350,22 @@ def blocks_to_steps(blocks_json, use_lap_button=False):
             steps.append(step)
 
             # Rest step between sets (if sets > 1)
-            if sets > 1 and rest_between_sets > 0:
-                steps.append(_create_rest_step(rest_between_sets, rest_type_block))
+            # Priority: exercise rest_type > block rest_type
+            # For button type: always add lap button rest (user presses lap when ready)
+            # For timed type: use exercise rest_sec > block rest_between_sets
+            exercise_rest_type = exercise.get('rest_type') or rest_type_block
+            exercise_rest_sec = exercise.get('rest_sec')
+
+            if sets > 1:
+                if exercise_rest_type == 'button':
+                    # Lap button rest - always add for button type
+                    steps.append(_create_rest_step(0, 'button'))
+                elif exercise_rest_sec and exercise_rest_sec > 0:
+                    # Exercise has its own timed rest duration
+                    steps.append(_create_rest_step(exercise_rest_sec, 'timed'))
+                elif rest_between_sets > 0:
+                    # Fall back to block-level rest between sets
+                    steps.append(_create_rest_step(rest_between_sets, rest_type_block))
 
             # Repeat step (if sets > 1)
             if sets > 1:
@@ -385,19 +415,25 @@ def detect_sport_type(category_ids):
     NOTE: fitness_equipment (4) does NOT work on most Garmin watches!
     Always use training (10) for custom workouts.
 
-    Priority: If workout has ANY cardio (run, row, ski) → cardio_training
+    Priority: If workout has ANY cardio (run, ski erg, etc.) → cardio_training
     This is important for HYROX and similar mixed conditioning workouts.
 
     Category IDs that indicate specific sports:
     - 32 = Run
-    - 2 = Cardio (also used for erg machines like ski/rower)
-    - 23 = Row
+    - 2 = Cardio (for cardio machines: ski erg, assault bike, etc.)
+
+    NOTE: Category 23 (Row) is NOT treated as cardio because it contains
+    strength exercises like Dumbbell Row, Barbell Row, etc. "Indoor Row"
+    (rowing machine) is mapped to category 2 (Cardio) via builtin_keywords.
 
     Note: Invalid categories (33+) are remapped before reaching here.
     """
     # Categories that work best with different sport types
     RUNNING_CATEGORIES = {32}  # Run
-    CARDIO_MACHINE_CATEGORIES = {2, 23}  # Cardio, Row
+    # Only category 2 (Cardio) is truly cardio machines
+    # Category 23 (Row) is mostly strength exercises (dumbbell row, barbell row, etc.)
+    # "Indoor Row" for rowing machine is mapped to category 2 via builtin_keywords
+    CARDIO_MACHINE_CATEGORIES = {2}  # Cardio only (NOT Row!)
 
     has_running = bool(category_ids & RUNNING_CATEGORIES)
     has_cardio_machines = bool(category_ids & CARDIO_MACHINE_CATEGORIES)
@@ -639,9 +675,9 @@ def get_fit_metadata(blocks_json, use_lap_button=False):
     steps, category_ids = blocks_to_steps(blocks_json, use_lap_button=use_lap_button)
     sport_id, sub_sport_id, sport_name, warnings = detect_sport_type(category_ids)
 
-    # Category analysis
+    # Category analysis (must match detect_sport_type)
     RUNNING_CATEGORIES = {32}
-    CARDIO_MACHINE_CATEGORIES = {2, 23}  # Cardio, Row (38 is remapped to 2)
+    CARDIO_MACHINE_CATEGORIES = {2}  # Only Cardio (Row is strength, Indoor Row maps to 2)
 
     has_running = bool(category_ids & RUNNING_CATEGORIES)
     has_cardio = bool(category_ids & CARDIO_MACHINE_CATEGORIES)

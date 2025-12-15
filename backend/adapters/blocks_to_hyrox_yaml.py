@@ -627,7 +627,41 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                     # Default fallback - use "lap" (lap button press) when no reps available
                     # This is standard for cardio/running exercises like "Indoor Track Run"
                     ex_entry[garmin_name_with_category] = "lap"
-                exercises_list.append(ex_entry)
+
+                # Get rest settings for this exercise
+                ex_rest_type = ex.get('rest_type')
+                ex_rest_sec = ex.get('rest_sec')
+
+                # If exercise has multiple sets, wrap in repeat block with rest between sets
+                if sets and sets > 1:
+                    set_steps = [ex_entry]
+                    # Add rest between sets based on rest_type
+                    if ex_rest_type == 'button':
+                        set_steps.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        set_steps.append({"rest": f"{ex_rest_sec}s"})
+                    # Wrap in repeat for multiple sets
+                    repeat_block = {f"repeat({sets})": set_steps}
+                    exercises_list.append(repeat_block)
+                else:
+                    # Single set - just add exercise directly
+                    exercises_list.append(ex_entry)
+                    # Add rest step after exercise based on rest_type
+                    if ex_rest_type == 'button':
+                        exercises_list.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        exercises_list.append({"rest": f"{ex_rest_sec}s"})
+                continue  # Skip the rest handling below since we handled it above
+
+            # Add rest step after exercise based on rest_type (for duration_sec exercises)
+            # rest_type='button' -> lap button press rest
+            # rest_type='timed' with rest_sec > 0 -> timed rest
+            ex_rest_type = ex.get('rest_type')
+            ex_rest_sec = ex.get('rest_sec')
+            if ex_rest_type == 'button':
+                exercises_list.append({"rest": "lap"})
+            elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                exercises_list.append({"rest": f"{ex_rest_sec}s"})
         
         # Process supersets - combine all supersets in a block into one repeat
         all_block_exercises = []
@@ -677,8 +711,30 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                         original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
                         ex_entry[garmin_name_with_category] = f"{original_clean} ({reason})"
 
-                exercises.append(ex_entry)
-            
+                # Get rest settings for this exercise
+                ex_rest_type = ex.get('rest_type')
+                ex_rest_sec = ex.get('rest_sec')
+
+                # If exercise has multiple sets, wrap in repeat block with rest between sets
+                if sets and sets > 1:
+                    set_steps = [ex_entry]
+                    # Add rest between sets based on rest_type
+                    if ex_rest_type == 'button':
+                        set_steps.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        set_steps.append({"rest": f"{ex_rest_sec}s"})
+                    # Wrap in repeat for multiple sets
+                    repeat_block = {f"repeat({sets})": set_steps}
+                    exercises.append(repeat_block)
+                else:
+                    # Single set - just add exercise directly
+                    exercises.append(ex_entry)
+                    # Add rest step after exercise based on rest_type
+                    if ex_rest_type == 'button':
+                        exercises.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        exercises.append({"rest": f"{ex_rest_sec}s"})
+
             # Add exercises from this superset to the block
             all_block_exercises.extend(exercises)
             
