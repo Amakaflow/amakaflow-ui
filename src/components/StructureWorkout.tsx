@@ -116,6 +116,10 @@ function DraggableExercise({
 
   const getDisplayText = () => {
     const parts: string[] = [];
+    // Show warmup sets indicator if configured (AMA-94)
+    if (exercise.warmup_sets && exercise.warmup_sets > 0 && exercise.warmup_reps && exercise.warmup_reps > 0) {
+      parts.push(`🔥 ${exercise.warmup_sets}×${exercise.warmup_reps} warmup`);
+    }
     if (exercise.sets) parts.push(`${exercise.sets} sets`);
     if (exercise.reps) parts.push(`${exercise.reps} reps`);
     if (exercise.reps_range) parts.push(`${exercise.reps_range} reps`);
@@ -632,16 +636,16 @@ export function StructureWorkout({
     // Include exercise names to detect when new exercises are added
     workout?.blocks?.map(b => b?.exercises?.map(e => e?.name || '').join(',') || '').join('|') || '',
     workout?.blocks?.map(b => b?.supersets?.map(ss => ss?.exercises?.map(e => e?.name || '').join(',') || '').join('|') || '').join('||') || '',
-    // Include exercise properties to detect changes to distance, duration, reps, etc.
-    workout?.blocks?.map(b => 
-      b?.exercises?.map(e => 
-        `${e?.name || ''}|${e?.sets || ''}|${e?.reps || ''}|${e?.reps_range || ''}|${e?.duration_sec || ''}|${e?.distance_m || ''}|${e?.distance_range || ''}|${e?.rest_sec || ''}|${e?.notes || ''}`
+    // Include exercise properties to detect changes to distance, duration, reps, warmup, etc.
+    workout?.blocks?.map(b =>
+      b?.exercises?.map(e =>
+        `${e?.name || ''}|${e?.sets || ''}|${e?.reps || ''}|${e?.reps_range || ''}|${e?.duration_sec || ''}|${e?.distance_m || ''}|${e?.distance_range || ''}|${e?.rest_sec || ''}|${e?.notes || ''}|${e?.warmup_sets || ''}|${e?.warmup_reps || ''}`
       ).join('||') || ''
     ).join('|||') || '',
-    workout?.blocks?.map(b => 
-      b?.supersets?.map(ss => 
-        ss?.exercises?.map(e => 
-          `${e?.name || ''}|${e?.sets || ''}|${e?.reps || ''}|${e?.reps_range || ''}|${e?.duration_sec || ''}|${e?.distance_m || ''}|${e?.distance_range || ''}|${e?.rest_sec || ''}|${e?.notes || ''}`
+    workout?.blocks?.map(b =>
+      b?.supersets?.map(ss =>
+        ss?.exercises?.map(e =>
+          `${e?.name || ''}|${e?.sets || ''}|${e?.reps || ''}|${e?.reps_range || ''}|${e?.duration_sec || ''}|${e?.distance_m || ''}|${e?.distance_range || ''}|${e?.rest_sec || ''}|${e?.notes || ''}|${e?.warmup_sets || ''}|${e?.warmup_reps || ''}`
         ).join('||') || ''
       ).join('|||') || ''
     ).join('||||') || ''
@@ -809,8 +813,17 @@ export function StructureWorkout({
   };
 
   const updateExercise = (blockIdx: number, exerciseIdx: number, updates: Partial<Exercise>, supersetIdx?: number) => {
+    // DEBUG: Log incoming updates
+    console.log('[StructureWorkout] updateExercise:', {
+      blockIdx,
+      exerciseIdx,
+      supersetIdx,
+      warmup_sets: updates.warmup_sets,
+      warmup_reps: updates.warmup_reps,
+    });
+
     const newWorkout = cloneWorkout(workoutWithIds);
-    
+
     if (supersetIdx !== undefined) {
       // Update exercise in superset
       const exercise = newWorkout.blocks[blockIdx].supersets?.[supersetIdx]?.exercises?.[exerciseIdx];
@@ -824,7 +837,7 @@ export function StructureWorkout({
         newWorkout.blocks[blockIdx].exercises[exerciseIdx] = { ...exercise, ...updates };
       }
     }
-    
+
     onWorkoutChange(newWorkout);
     // Note: Don't close dialog here - let EditExerciseDialog manage its own state
   };

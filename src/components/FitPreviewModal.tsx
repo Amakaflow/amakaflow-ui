@@ -26,6 +26,8 @@ interface BackendPreviewStep {
   rest_seconds?: number;
   repeat_count?: number;
   duration_step?: number; // For repeat steps - which step to repeat from
+  intensity?: string;     // AMA-94: 'warmup' or 'active'
+  is_warmup_set?: boolean; // AMA-94: Flag for warm-up sets (exercise-specific)
 }
 
 // Group flat steps into nested structure like Garmin Connect shows
@@ -242,24 +244,25 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
                             <div key={childIdx}>
                               {step.type === 'exercise' && (
                                 <div style={{
-                                  borderLeft: '3px solid #3b82f6',
+                                  borderLeft: step.is_warmup_set ? '3px solid #f59e0b' : '3px solid #3b82f6',
                                   paddingLeft: '12px',
                                   marginBottom: '8px',
-                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                  backgroundColor: step.is_warmup_set ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
                                   borderRadius: '0 8px 8px 0',
                                   padding: '6px 8px 6px 12px'
                                 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Dumbbell style={{ width: '14px', height: '14px', color: '#60a5fa' }} />
-                                    <span style={{ color: '#93c5fd', fontSize: '13px', fontWeight: 500 }}>{step.display_name}</span>
+                                    <Dumbbell style={{ width: '14px', height: '14px', color: step.is_warmup_set ? '#f59e0b' : '#60a5fa' }} />
+                                    <span style={{ color: step.is_warmup_set ? '#fbbf24' : '#93c5fd', fontSize: '13px', fontWeight: 500 }}>{step.display_name}</span>
                                   </div>
                                   {step.duration_display && (
                                     <div style={{ marginTop: '4px', marginLeft: '22px' }}>
                                       <span style={{
-                                        backgroundColor: step.duration_type === 'distance' ? '#059669' :
+                                        backgroundColor: step.is_warmup_set ? '#78350f' :
+                                                       step.duration_type === 'distance' ? '#059669' :
                                                        step.duration_type === 'time' ? '#7c3aed' :
                                                        step.duration_type === 'lap_button' ? '#78350f' : '#1d4ed8',
-                                        color: step.duration_type === 'lap_button' ? '#fbbf24' : 'white',
+                                        color: step.is_warmup_set || step.duration_type === 'lap_button' ? '#fbbf24' : 'white',
                                         padding: '2px 6px',
                                         borderRadius: '4px',
                                         fontSize: '10px'
@@ -364,26 +367,28 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
                   }
 
                   // Exercise step (standalone, not in repeat)
+                  // AMA-94: Use amber styling for warm-up sets
                   return (
                     <div key={groupIdx} style={{
-                      borderLeft: '3px solid #3b82f6',
+                      borderLeft: step.is_warmup_set ? '3px solid #f59e0b' : '3px solid #3b82f6',
                       paddingLeft: '12px',
                       marginBottom: '8px',
-                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      backgroundColor: step.is_warmup_set ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
                       borderRadius: '0 8px 8px 0',
                       padding: '6px 8px 6px 12px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Dumbbell style={{ width: '14px', height: '14px', color: '#60a5fa' }} />
-                        <span style={{ color: '#93c5fd', fontSize: '13px', fontWeight: 500 }}>{step.display_name}</span>
+                        <Dumbbell style={{ width: '14px', height: '14px', color: step.is_warmup_set ? '#f59e0b' : '#60a5fa' }} />
+                        <span style={{ color: step.is_warmup_set ? '#fbbf24' : '#93c5fd', fontSize: '13px', fontWeight: 500 }}>{step.display_name}</span>
                       </div>
                       {step.duration_display && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', marginLeft: '22px', fontSize: '11px' }}>
                           <span style={{
-                            backgroundColor: step.duration_type === 'distance' ? '#059669' :
+                            backgroundColor: step.is_warmup_set ? '#78350f' :
+                                           step.duration_type === 'distance' ? '#059669' :
                                            step.duration_type === 'time' ? '#7c3aed' :
                                            step.duration_type === 'lap_button' ? '#78350f' : '#1d4ed8',
-                            color: step.duration_type === 'lap_button' ? '#fbbf24' : 'white',
+                            color: step.is_warmup_set || step.duration_type === 'lap_button' ? '#fbbf24' : 'white',
                             padding: '2px 6px',
                             borderRadius: '4px',
                             fontSize: '10px'
@@ -423,6 +428,10 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
           <div className="flex items-center gap-1">
             <PlayCircle className="w-3 h-3 text-amber-500" />
             <span>Warmup</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Dumbbell className="w-3 h-3 text-amber-500" />
+            <span>Warm-Up Set</span>
           </div>
           <div className="flex items-center gap-1">
             <Dumbbell className="w-3 h-3 text-blue-500" />

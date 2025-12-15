@@ -20,6 +20,11 @@ export interface Exercise {
   followAlongUrl?: string | null; // Instagram, TikTok, YouTube, or any video URL for this exercise
   notes?: string | null;
   addedAt?: number; // Timestamp when exercise was added (can be used upstream to seed initial order)
+
+  // Warm-up sets configuration (AMA-94)
+  // Warm-up sets are lighter preparatory sets performed before working sets
+  warmup_sets?: number | null;      // Number of warm-up sets (e.g., 1, 2, 3)
+  warmup_reps?: number | null;      // Reps per warm-up set (may differ from working reps)
 }
 
 export type WorkoutStructureType = 

@@ -4,10 +4,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Slider } from './ui/slider';
+import { Switch } from './ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { X } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Exercise, RestType } from '../types/workout';
 
 interface EditExerciseDialogProps {
@@ -68,6 +69,12 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
   const [restType, setRestType] = useState<RestType>('timed');
   const [notes, setNotes] = useState('');
 
+  // Warm-up sets state (AMA-94)
+  const [warmupEnabled, setWarmupEnabled] = useState(false);
+  const [warmupSets, setWarmupSets] = useState(2);
+  const [warmupReps, setWarmupReps] = useState(12);
+  const [showWarmupSection, setShowWarmupSection] = useState(false);
+
   // Sync internal open state with prop - only open when prop becomes true, never close from prop
   useEffect(() => {
     if (open && !hasOpenedRef.current) {
@@ -99,6 +106,13 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       setRestType(exercise.rest_type || 'timed');
       setNotes(exercise.notes || '');
       setExerciseType(getInitialType());
+
+      // Warm-up sets initialization (AMA-94)
+      const hasWarmup = (exercise.warmup_sets !== null && exercise.warmup_sets !== undefined && exercise.warmup_sets > 0);
+      setWarmupEnabled(hasWarmup);
+      setWarmupSets(exercise.warmup_sets ?? 2);
+      setWarmupReps(exercise.warmup_reps ?? 12);
+      setShowWarmupSection(hasWarmup); // Auto-expand if warmup is configured
     }
   }, [exercise]);
 
@@ -115,6 +129,9 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     restType?: RestType;
     notes?: string;
     exerciseType?: ExerciseType;
+    warmupEnabled?: boolean;
+    warmupSets?: number;
+    warmupReps?: number;
   }) => {
     if (!exercise) return;
 
@@ -129,12 +146,18 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     const currentRestType = overrides?.restType ?? restType;
     const currentNotes = overrides?.notes ?? notes;
     const currentExerciseType = overrides?.exerciseType ?? exerciseType;
+    const currentWarmupEnabled = overrides?.warmupEnabled ?? warmupEnabled;
+    const currentWarmupSets = overrides?.warmupSets ?? warmupSets;
+    const currentWarmupReps = overrides?.warmupReps ?? warmupReps;
 
     const updates: Partial<Exercise> = {
       name: currentName,
       rest_sec: currentRestType === 'button' ? null : currentRestSec, // No duration needed for lap button
       rest_type: currentRestType,
       notes: currentNotes || null,
+      // Warm-up sets (AMA-94): Only save if enabled
+      warmup_sets: currentWarmupEnabled ? currentWarmupSets : null,
+      warmup_reps: currentWarmupEnabled ? currentWarmupReps : null,
     };
 
     // Clear fields from other types and set relevant fields
@@ -152,6 +175,9 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.reps_range = null;
       updates.distance_m = null;
       updates.distance_range = null;
+      // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
+      updates.warmup_sets = null;
+      updates.warmup_reps = null;
     } else if (currentExerciseType === 'distance') {
       // Allow 0 as a valid distance value
       updates.distance_m = currentDistanceRange ? null : (currentDistanceM !== null && currentDistanceM !== undefined ? currentDistanceM : null);
@@ -160,10 +186,20 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.reps = null;
       updates.reps_range = null;
       updates.duration_sec = null;
+      // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
+      updates.warmup_sets = null;
+      updates.warmup_reps = null;
     }
 
+    // DEBUG: Log warmup data being saved
+    console.log('[EditExerciseDialog] Saving updates:', {
+      warmup_sets: updates.warmup_sets,
+      warmup_reps: updates.warmup_reps,
+      exerciseType: currentExerciseType,
+      warmupEnabled: currentWarmupEnabled,
+    });
     onSave(updates);
-  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, restSec, restType, notes, onSave]);
+  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, restSec, restType, notes, warmupEnabled, warmupSets, warmupReps, onSave]);
 
   // Handle tab change - clear other fields immediately
   const handleTabChange = (newType: ExerciseType) => {
@@ -319,6 +355,140 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
                   <p className="text-xs text-muted-foreground">
                     Use this instead of Reps for ranges like "8-10"
                   </p>
+                </div>
+
+                {/* Warm-Up Sets Section (AMA-94) */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={warmupEnabled}
+                        onCheckedChange={(checked) => {
+                          setWarmupEnabled(checked);
+                          if (checked) setShowWarmupSection(true);
+                          updateExerciseImmediately({ warmupEnabled: checked });
+                        }}
+                      />
+                      <span
+                        className="text-sm font-medium cursor-pointer select-none"
+                        onClick={() => setShowWarmupSection(!showWarmupSection)}
+                      >
+                        Warm-Up Sets
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowWarmupSection(!showWarmupSection)}
+                      className="p-1 hover:bg-muted rounded"
+                    >
+                      {showWarmupSection ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
+
+                  {showWarmupSection && (
+                    <div className="p-3 pt-0 space-y-4 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Add lighter preparatory sets before working sets
+                      </p>
+
+                      {/* Warm-up Sets Count */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Warm-Up Sets</Label>
+                          <span className="text-sm font-medium">{warmupSets}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-muted-foreground w-8">1</span>
+                          <Slider
+                            value={[warmupSets]}
+                            onValueChange={(values) => {
+                              const newValue = values[0];
+                              setWarmupSets(newValue);
+                              if (warmupEnabled) {
+                                updateExerciseImmediately({ warmupSets: newValue });
+                              }
+                            }}
+                            min={1}
+                            max={5}
+                            step={1}
+                            className="flex-1"
+                            disabled={!warmupEnabled}
+                          />
+                          <span className="text-xs text-muted-foreground w-8 text-right">5</span>
+                          <Input
+                            type="number"
+                            value={warmupSets}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              const clampedVal = Math.max(1, Math.min(5, val));
+                              setWarmupSets(clampedVal);
+                              if (warmupEnabled) {
+                                updateExerciseImmediately({ warmupSets: clampedVal });
+                              }
+                            }}
+                            className="w-16 h-9 text-center"
+                            min={1}
+                            max={5}
+                            disabled={!warmupEnabled}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Warm-up Reps */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Warm-Up Reps</Label>
+                          <span className="text-sm font-medium">{warmupReps}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-muted-foreground w-8">1</span>
+                          <Slider
+                            value={[warmupReps]}
+                            onValueChange={(values) => {
+                              const newValue = values[0];
+                              setWarmupReps(newValue);
+                              if (warmupEnabled) {
+                                updateExerciseImmediately({ warmupReps: newValue });
+                              }
+                            }}
+                            min={1}
+                            max={20}
+                            step={1}
+                            className="flex-1"
+                            disabled={!warmupEnabled}
+                          />
+                          <span className="text-xs text-muted-foreground w-8 text-right">20</span>
+                          <Input
+                            type="number"
+                            value={warmupReps}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              const clampedVal = Math.max(1, Math.min(50, val));
+                              setWarmupReps(clampedVal);
+                              if (warmupEnabled) {
+                                updateExerciseImmediately({ warmupReps: clampedVal });
+                              }
+                            }}
+                            className="w-16 h-9 text-center"
+                            min={1}
+                            max={50}
+                            disabled={!warmupEnabled}
+                          />
+                        </div>
+                      </div>
+
+                      {warmupEnabled && (
+                        <p className="text-xs text-muted-foreground bg-amber-500/10 p-2 rounded border border-amber-500/20">
+                          <span className="font-medium text-amber-500">Preview:</span>{' '}
+                          {warmupSets} warm-up × {warmupReps} reps → {sets} working × {repsRange || reps} reps
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
