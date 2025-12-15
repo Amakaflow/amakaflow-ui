@@ -348,11 +348,7 @@ export function EditBlockDialog({ open, block, onSave, onClose }: EditBlockDialo
 
           {/* Warm-Up Configuration (collapsible) */}
           <div className="border rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowWarmup(!showWarmup)}
-              className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
-            >
+            <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Switch
                   checked={warmupEnabled}
@@ -360,16 +356,26 @@ export function EditBlockDialog({ open, block, onSave, onClose }: EditBlockDialo
                     setWarmupEnabled(checked);
                     if (checked) setShowWarmup(true);
                   }}
-                  onClick={(e) => e.stopPropagation()}
                 />
-                <Label className="text-sm font-medium cursor-pointer">Include Warm-Up</Label>
+                <span
+                  className="text-sm font-medium cursor-pointer select-none"
+                  onClick={() => setShowWarmup(!showWarmup)}
+                >
+                  Include Warm-Up
+                </span>
               </div>
-              {showWarmup ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowWarmup(!showWarmup)}
+                className="p-1 hover:bg-muted rounded"
+              >
+                {showWarmup ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
 
             {showWarmup && (
               <div className="p-3 pt-0 space-y-4 border-t">
