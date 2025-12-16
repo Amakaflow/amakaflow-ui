@@ -269,6 +269,11 @@ export function ViewWorkout({ workout, onClose }: Props) {
                                 <div className="flex-1">
                                   <h4 className="font-medium">{exercise.name}</h4>
                                   <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                                    {exercise.warmup_sets && exercise.warmup_sets > 0 && exercise.warmup_reps && (
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                                        🔥 {exercise.warmup_sets}×{exercise.warmup_reps} warmup
+                                      </Badge>
+                                    )}
                                     {exercise.sets && (
                                       <Badge variant="outline">{exercise.sets} sets</Badge>
                                     )}
@@ -342,6 +347,11 @@ export function ViewWorkout({ workout, onClose }: Props) {
                                             <h4 className="font-medium">{exercise.name}</h4>
                                           </div>
                                           <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground ml-5">
+                                            {exercise.warmup_sets && exercise.warmup_sets > 0 && exercise.warmup_reps && (
+                                              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                                                🔥 {exercise.warmup_sets}×{exercise.warmup_reps} warmup
+                                              </Badge>
+                                            )}
                                             {exercise.sets && (
                                               <Badge variant="outline">{exercise.sets} sets</Badge>
                                             )}
