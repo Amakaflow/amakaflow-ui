@@ -566,8 +566,9 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
     first_block = blocks[0] if blocks else None
     if not first_block or not first_block.get('warmup_enabled'):
         # Default warmup: lap button press
+        # Format: warmup: {cardio: lap} not warmup: [{cardio: lap}]
         workout_steps.append({
-            "warmup": [{"cardio": "lap"}]
+            "warmup": {"cardio": "lap"}
         })
 
     # Warmup activity mapping to YAML activity names
@@ -590,14 +591,14 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
             yaml_activity = WARMUP_ACTIVITY_YAML.get(warmup_activity, 'cardio')
 
             if warmup_duration and warmup_duration > 0:
-                # Timed warmup
+                # Timed warmup - format: warmup: {cardio: 300s}
                 workout_steps.append({
-                    "warmup": [{yaml_activity: f"{warmup_duration}s"}]
+                    "warmup": {yaml_activity: f"{warmup_duration}s"}
                 })
             else:
-                # Lap button warmup
+                # Lap button warmup - format: warmup: {cardio: lap}
                 workout_steps.append({
-                    "warmup": [{yaml_activity: "lap"}]
+                    "warmup": {yaml_activity: "lap"}
                 })
 
         label = block.get("label", "")
@@ -614,7 +615,10 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
             distance_m = ex.get("distance_m")
             duration_sec = ex.get("duration_sec")
             rest_sec = ex.get("rest_sec")
-            
+            # Warm-up sets (AMA-94)
+            warmup_sets = ex.get("warmup_sets")
+            warmup_reps = ex.get("warmup_reps")
+
             garmin_name, description, mapping_info = map_exercise_to_garmin(ex_name, ex_reps=reps, ex_distance_m=None)  # Ignore distance
             
             # Add category to exercise name
@@ -671,13 +675,38 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                         original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
                         ex_entry[garmin_name_with_category] = f"{original_clean} x{upper_reps} ({reason})"
                 else:
-                    # Default fallback - use "lap" (lap button press) when no reps available
-                    # This is standard for cardio/running exercises like "Indoor Track Run"
+                    # No reps specified - use "lap" (press lap button when done)
+                    # This is valid for both cardio AND strength exercises
                     ex_entry[garmin_name_with_category] = "lap"
 
                 # Get rest settings for this exercise
                 ex_rest_type = ex.get('rest_type')
                 ex_rest_sec = ex.get('rest_sec')
+
+                # Warm-up sets handling (AMA-94)
+                # Add warm-up sets BEFORE working sets
+                if warmup_sets and warmup_sets > 0 and warmup_reps and warmup_reps > 0:
+                    # Create warmup exercise entry
+                    warmup_entry = {f"{garmin_name_with_category}": f"x{warmup_reps}"}
+
+                    if warmup_sets > 1:
+                        # Multiple warmup sets - wrap in repeat
+                        warmup_steps = [warmup_entry]
+                        # Add rest between warmup sets (use same rest settings as exercise)
+                        if ex_rest_type == 'button':
+                            warmup_steps.append({"rest": "lap"})
+                        elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                            warmup_steps.append({"rest": f"{ex_rest_sec}s"})
+                        exercises_list.append({f"repeat({warmup_sets})": warmup_steps})
+                    else:
+                        # Single warmup set
+                        exercises_list.append(warmup_entry)
+
+                    # Rest between warmup and working sets
+                    if ex_rest_type == 'button':
+                        exercises_list.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        exercises_list.append({"rest": f"{ex_rest_sec}s"})
 
                 # If exercise has multiple sets, wrap in repeat block with rest between sets
                 if sets and sets > 1:
@@ -723,7 +752,10 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                 reps = ex.get("reps")
                 reps_range = ex.get("reps_range")  # e.g., "6-8", "8-10"
                 distance_m = ex.get("distance_m")
-                
+                # Warm-up sets (AMA-94)
+                warmup_sets = ex.get("warmup_sets")
+                warmup_reps = ex.get("warmup_reps")
+
                 garmin_name, description, mapping_info = map_exercise_to_garmin(ex_name, ex_reps=reps, ex_distance_m=None)  # Ignore distance
                 
                 # Add category to exercise name
@@ -763,17 +795,38 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                         original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
                         ex_entry[garmin_name_with_category] = f"{original_clean} x{upper_reps} ({reason})"
                 else:
-                    # Default fallback
-                    if not reason:
-                        # Already a valid Garmin name - use "lap" as default
-                        ex_entry[garmin_name_with_category] = "lap"
-                    else:
-                        original_clean = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
-                        ex_entry[garmin_name_with_category] = f"{original_clean} ({reason})"
+                    # No reps specified - use "lap" (press lap button when done)
+                    # This is valid for both cardio AND strength exercises
+                    ex_entry[garmin_name_with_category] = "lap"
 
                 # Get rest settings for this exercise
                 ex_rest_type = ex.get('rest_type')
                 ex_rest_sec = ex.get('rest_sec')
+
+                # Warm-up sets handling for superset exercises (AMA-94)
+                # Add warm-up sets BEFORE working sets
+                if warmup_sets and warmup_sets > 0 and warmup_reps and warmup_reps > 0:
+                    # Create warmup exercise entry
+                    warmup_entry = {f"{garmin_name_with_category}": f"x{warmup_reps}"}
+
+                    if warmup_sets > 1:
+                        # Multiple warmup sets - wrap in repeat
+                        warmup_steps = [warmup_entry]
+                        # Add rest between warmup sets (use same rest settings as exercise)
+                        if ex_rest_type == 'button':
+                            warmup_steps.append({"rest": "lap"})
+                        elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                            warmup_steps.append({"rest": f"{ex_rest_sec}s"})
+                        exercises.append({f"repeat({warmup_sets})": warmup_steps})
+                    else:
+                        # Single warmup set
+                        exercises.append(warmup_entry)
+
+                    # Rest between warmup and working sets
+                    if ex_rest_type == 'button':
+                        exercises.append({"rest": "lap"})
+                    elif ex_rest_type == 'timed' and ex_rest_sec and ex_rest_sec > 0:
+                        exercises.append({"rest": f"{ex_rest_sec}s"})
 
                 # If exercise has multiple sets, wrap in repeat block with rest between sets
                 if sets and sets > 1:

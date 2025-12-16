@@ -425,11 +425,13 @@ def blocks_to_steps(blocks_json, use_lap_button=False):
                         steps.append(_create_rest_step(rest_between_sets, rest_type_block))
 
                 # Repeat step for warmup sets (if warmup_sets > 1)
+                # NOTE: repeat_count is the TOTAL number of sets, not additional repeats
+                # Confirmed by analyzing Garmin activity FIT files where repeat_steps=3 means 3 total sets
                 if warmup_sets > 1:
                     steps.append({
                         'type': 'repeat',
                         'duration_step': warmup_start_index,
-                        'repeat_count': warmup_sets - 1,
+                        'repeat_count': warmup_sets,
                     })
 
                 # Rest between warmup and working sets
@@ -471,11 +473,13 @@ def blocks_to_steps(blocks_json, use_lap_button=False):
                     steps.append(_create_rest_step(rest_between_sets, rest_type_block))
 
             # Repeat step for working sets (if sets > 1)
+            # NOTE: repeat_count is the TOTAL number of sets, not additional repeats
+            # Confirmed by analyzing Garmin activity FIT files where repeat_steps=3 means 3 total sets
             if sets > 1:
                 steps.append({
                     'type': 'repeat',
                     'duration_step': start_index,
-                    'repeat_count': sets - 1,
+                    'repeat_count': sets,
                 })
 
             # Check if this is the last exercise overall in the block
@@ -702,20 +706,25 @@ def to_fit(blocks_json, force_sport_type=None, use_lap_button=False):
     data += struct.pack('<BBB', 7, 1, 0x00)    # intensity
 
     # === workout_step for repeat (local 5, global 27) ===
+    # FIT SDK repeat step fields:
+    #   2 = duration_value (step index to repeat back to)
+    #   4 = target_value (repeat count / number of sets)
+    #   1 = duration_type (6 = REPEAT_UNTIL_STEPS_CMPLT)
+    # NOTE: Field 3 is target_type, NOT duration_step! Previous bug had step index in wrong field.
     data += struct.pack('<BBBHB', 0x45, 0, 0, 27, 4)
     data += struct.pack('<BBB', 254, 2, 0x84)  # message_index
-    data += struct.pack('<BBB', 3, 4, 0x86)    # duration_step (field 3)
-    data += struct.pack('<BBB', 4, 4, 0x86)    # repeat_steps (field 4)
+    data += struct.pack('<BBB', 2, 4, 0x86)    # duration_value (step index to repeat back to)
+    data += struct.pack('<BBB', 4, 4, 0x86)    # target_value (repeat count)
     data += struct.pack('<BBB', 1, 1, 0x00)    # duration_type
 
     # Write workout steps
     for i, step in enumerate(steps):
         if step['type'] == 'repeat':
             data += struct.pack('<B', 0x05)  # local 5
-            data += struct.pack('<H', i)
-            data += struct.pack('<I', step['duration_step'])
-            data += struct.pack('<I', step['repeat_count'])
-            data += struct.pack('<B', 6)     # repeat_until_steps_cmplt
+            data += struct.pack('<H', i)                        # message_index
+            data += struct.pack('<I', step['duration_step'])    # duration_value (step index to repeat back to)
+            data += struct.pack('<I', step['repeat_count'])     # target_value (number of sets)
+            data += struct.pack('<B', 6)                        # duration_type: REPEAT_UNTIL_STEPS_CMPLT
         elif step['type'] == 'rest':
             data += struct.pack('<B', 0x04)  # local 4 (rest - no category)
             data += struct.pack('<H', i)
