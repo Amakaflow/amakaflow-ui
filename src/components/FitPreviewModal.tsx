@@ -60,8 +60,8 @@ function groupStepsForDisplay(steps: BackendPreviewStep[]): GroupedStep[] {
       // Check if next step is a repeat
       if (j < steps.length && steps[j].type === 'repeat') {
         const repeatStep = steps[j];
-        // repeat_count is the number of additional repeats, so total sets = repeat_count + 1
-        const totalSets = (repeatStep.repeat_count || 0) + 1;
+        // repeat_count is the TOTAL number of sets (confirmed by analyzing Garmin activity FIT files)
+        const totalSets = repeatStep.repeat_count || 1;
         grouped.push({
           type: 'repeat-group',
           repeatCount: totalSets,
