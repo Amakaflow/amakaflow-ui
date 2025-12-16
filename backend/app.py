@@ -536,17 +536,17 @@ class SaveWorkoutRequest(BaseModel):
     workout_data: dict
     sources: list[str] = []
     device: str
-    exports: dict = None
-    validation: dict = None
-    title: str = None
-    description: str = None
-    workout_id: str = None  # Optional: for explicit updates to existing workouts
+    exports: dict | None = None
+    validation: dict | None = None
+    title: str | None = None
+    description: str | None = None
+    workout_id: str | None = None  # Optional: for explicit updates to existing workouts
 
 
 class UpdateWorkoutExportRequest(BaseModel):
     profile_id: str
     is_exported: bool = True
-    exported_to_device: str = None
+    exported_to_device: str | None = None
 
 
 @app.post("/workouts/save")
