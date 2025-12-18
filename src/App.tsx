@@ -17,6 +17,7 @@ import { WelcomeGuide } from './components/WelcomeGuide';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
+import { MobileCompanion } from './components/MobileCompanion';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
@@ -40,7 +41,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion';
 
 export default function App() {
   // Clerk authentication
@@ -1494,6 +1495,7 @@ export default function App() {
                 }
               }
             }}
+            onNavigateToMobileCompanion={() => setCurrentView('mobile-companion')}
           />
         )}
 
@@ -1543,6 +1545,13 @@ export default function App() {
               // Delete is handled internally by UnifiedWorkouts
               console.log('Workout deleted:', id);
             }}
+          />
+        )}
+
+        {currentView === 'mobile-companion' && (
+          <MobileCompanion
+            userId={user.id}
+            onBack={() => setCurrentView('settings')}
           />
         )}
       </div>

@@ -45,11 +45,12 @@ type Props = {
   onAccountsChange?: () => void;
   onAccountDeleted?: () => void;
   onUserUpdate?: (updates: { selectedDevices?: DeviceId[], address?: string, city?: string, state?: string, zipCode?: string }) => void;
+  onNavigateToMobileCompanion?: () => void;
 };
 
 type SettingsSection = 'general' | 'account' | 'devices' | 'notifications' | 'security' | 'connected-apps';
 
-export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate }: Props) {
+export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion }: Props) {
   const { user: clerkUser } = useClerkUser();
   const { signOut } = useClerkAuth();
   const [name, setName] = useState(user.name);
@@ -884,6 +885,44 @@ Block: Warm-Up
                   )}
 
                   <Button onClick={handleSave}>Save Destinations</Button>
+                </CardContent>
+              </Card>
+
+              {/* iOS Companion App */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="w-5 h-5" />
+                    iOS Companion App
+                  </CardTitle>
+                  <CardDescription>
+                    Connect your iPhone to view and sync workouts on the go
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📱</span>
+                      <div>
+                        <p className="font-medium">Pair iOS Device</p>
+                        <p className="text-sm text-muted-foreground">
+                          Scan a QR code or enter a pairing code to connect
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        console.log('Set Up clicked, onNavigateToMobileCompanion:', !!onNavigateToMobileCompanion);
+                        onNavigateToMobileCompanion?.();
+                      }}
+                    >
+                      Set Up
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The iOS Companion app allows you to view workouts, log exercises during gym sessions, and sync with Apple Watch.
+                  </p>
                 </CardContent>
               </Card>
             </div>
