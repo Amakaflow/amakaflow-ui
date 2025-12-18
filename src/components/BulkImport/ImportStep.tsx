@@ -29,6 +29,7 @@ interface ImportStepProps {
   onViewCalendar?: () => void;
   onViewPrograms?: () => void;
   onReset: () => void;
+  onStartImport?: () => void;
 }
 
 // Result status config
@@ -38,7 +39,7 @@ const resultStatusConfig: Record<ImportResultStatus, { icon: typeof CheckCircle;
   skipped: { icon: AlertTriangle, label: 'Skipped', color: 'text-amber-400', bg: 'bg-amber-500/10' },
 };
 
-export function ImportStep({ userId, onViewCalendar, onViewPrograms, onReset }: ImportStepProps) {
+export function ImportStep({ userId, onViewCalendar, onViewPrograms, onReset, onStartImport }: ImportStepProps) {
   const { state, dispatch } = useBulkImport();
 
   // Calculate result counts
@@ -51,6 +52,7 @@ export function ImportStep({ userId, onViewCalendar, onViewPrograms, onReset }: 
   }, [state.import.results]);
 
   // Is import in progress
+  const isIdle = state.import.status === 'idle';
   const isRunning = state.import.status === 'running';
   const isComplete = state.import.status === 'complete';
   const isFailed = state.import.status === 'failed';
@@ -58,6 +60,36 @@ export function ImportStep({ userId, onViewCalendar, onViewPrograms, onReset }: 
 
   return (
     <div className="space-y-6">
+      {/* Idle State - Ready to start import */}
+      {isIdle && (
+        <div className="space-y-6">
+          <div className="text-center py-8">
+            <div className="relative inline-flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-primary/10 border-4 border-primary/20 flex items-center justify-center">
+                <Download className="w-10 h-10 text-primary" />
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold mt-6 mb-2">Ready to Import</h3>
+            <p className="text-muted-foreground">
+              {state.preview.stats.totalSelected} workout{state.preview.stats.totalSelected !== 1 ? 's' : ''} ready to be imported
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={() => dispatch({ type: 'SET_STEP', step: 'preview' })}>
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+            {onStartImport && (
+              <Button onClick={onStartImport} className="h-12">
+                <Download className="w-5 h-5 mr-2" />
+                Start Import
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Progress Section (during import) */}
       {isRunning && (
         <div className="space-y-6">

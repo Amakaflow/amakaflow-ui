@@ -158,6 +158,7 @@ function BulkImportContent({
               onViewCalendar={onViewCalendar}
               onViewPrograms={onViewPrograms}
               onReset={handleReset}
+              onStartImport={handleStartImport}
             />
           )}
         </CardContent>
