@@ -7,10 +7,12 @@
  * This is a placeholder component - UI will be implemented in AMA-105.
  */
 
+import { useRef, useState } from 'react';
 import { BulkImportProvider, useBulkImport } from '../../context/BulkImportContext';
+import { useBulkImportApi } from '../../hooks/useBulkImportApi';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { ArrowLeft, ArrowRight, Upload, Link, Image, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, Link, Image, FileSpreadsheet, CheckCircle, Loader2 } from 'lucide-react';
 
 interface BulkImportProps {
   userId: string;
@@ -76,6 +78,9 @@ function BulkImportStepper() {
  */
 function BulkImportContent({ userId, onBack }: BulkImportProps) {
   const { state, goNext, goBack, canGoNext, canGoBack, setInputType, reset } = useBulkImport();
+  const { detectFromFiles } = useBulkImportApi({ userId });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const inputTypeIcons = {
     file: FileSpreadsheet,
@@ -84,6 +89,19 @@ function BulkImportContent({ userId, onBack }: BulkImportProps) {
   };
 
   const InputIcon = inputTypeIcons[state.inputType];
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (selectedFile) {
+      await detectFromFiles([selectedFile]);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -161,15 +179,73 @@ function BulkImportContent({ userId, onBack }: BulkImportProps) {
                     <span className="text-xs text-muted-foreground">OCR scan</span>
                   </Button>
                 </div>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Drag and drop {state.inputType === 'file' ? 'files' : state.inputType === 'urls' ? 'or paste URLs' : 'images'} here
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    (UI coming in AMA-105)
-                  </p>
-                </div>
+
+                {/* File Upload Area */}
+                {state.inputType === 'file' && (
+                  <div className="space-y-4">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv,.json,.txt"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <div
+                      className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      {selectedFile ? (
+                        <div>
+                          <p className="font-medium">{selectedFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(selectedFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          Click to select a file (Excel, CSV, JSON, or Text)
+                        </p>
+                      )}
+                    </div>
+
+                    {selectedFile && (
+                      <Button
+                        onClick={handleUpload}
+                        disabled={state.loading}
+                        className="w-full"
+                      >
+                        {state.loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload & Detect
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {state.error && (
+                      <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
+                        {state.error}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Placeholder for URLs and Images */}
+                {state.inputType !== 'file' && (
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      {state.inputType === 'urls' ? 'URL import' : 'Image import'} coming in AMA-105
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
