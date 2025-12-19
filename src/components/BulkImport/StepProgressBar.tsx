@@ -53,14 +53,13 @@ export function StepProgressBar({ className }: StepProgressBarProps) {
                 !isClickable && 'cursor-default'
               )}
             >
-              {/* Circle with number */}
+              {/* Circle with number - using inline styles for guaranteed visibility */}
               <span
-                className={cn(
-                  'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold',
-                  isActive && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
-                  isCompleted && 'bg-emerald-500 text-white',
-                  isPending && 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
-                )}
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: isActive ? '#27272a' : isCompleted ? '#10b981' : '#e4e4e7',
+                  color: isActive ? '#ffffff' : isCompleted ? '#ffffff' : '#71717a',
+                }}
               >
                 {isCompleted ? (
                   <Check className="w-3.5 h-3.5" strokeWidth={3} />
@@ -71,12 +70,10 @@ export function StepProgressBar({ className }: StepProgressBarProps) {
 
               {/* Label */}
               <span
-                className={cn(
-                  'text-sm font-medium',
-                  isActive && 'text-zinc-900 dark:text-zinc-100',
-                  isCompleted && 'text-emerald-600 dark:text-emerald-500',
-                  isPending && 'text-zinc-400 dark:text-zinc-500'
-                )}
+                className="text-sm font-medium"
+                style={{
+                  color: isActive ? '#18181b' : isCompleted ? '#059669' : '#a1a1aa',
+                }}
               >
                 {config.label}
               </span>
@@ -85,10 +82,10 @@ export function StepProgressBar({ className }: StepProgressBarProps) {
             {/* Chevron */}
             {index < state.activeSteps.length - 1 && (
               <ChevronRight
-                className={cn(
-                  'w-4 h-4 mx-3 flex-shrink-0',
-                  index < currentIndex ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'
-                )}
+                className="w-4 h-4 mx-3 flex-shrink-0"
+                style={{
+                  color: index < currentIndex ? '#10b981' : '#d4d4d8',
+                }}
               />
             )}
           </div>
