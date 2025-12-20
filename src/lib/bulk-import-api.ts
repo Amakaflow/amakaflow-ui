@@ -140,10 +140,20 @@ class BulkImportApiClient {
     profileId: string,
     columnMappings: ColumnMapping[]
   ): Promise<BulkMapResponse> {
-    const request: BulkMapRequest = {
+    // Transform camelCase to snake_case for backend
+    const snakeCaseMappings = columnMappings.map(m => ({
+      source_column: m.sourceColumn,
+      source_column_index: m.sourceColumnIndex,
+      target_field: m.targetField,
+      confidence: m.confidence,
+      user_override: m.userOverride,
+      sample_values: m.sampleValues,
+    }));
+
+    const request = {
       job_id: jobId,
       profile_id: profileId,
-      column_mappings: columnMappings,
+      column_mappings: snakeCaseMappings,
     };
 
     return this.request<BulkMapResponse>('/import/map', {
@@ -240,6 +250,31 @@ class BulkImportApiClient {
       }
     );
   }
+
+  /**
+   * Search Garmin exercise database
+   * Used for manual exercise matching
+   */
+  async searchExercises(query: string, limit: number = 10): Promise<ExerciseSearchResponse> {
+    return this.request<ExerciseSearchResponse>(
+      `/import/exercises/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+      {
+        method: 'GET',
+      }
+    );
+  }
+}
+
+// Response type for exercise search
+export interface ExerciseSearchResult {
+  name: string;
+  score: number;
+}
+
+export interface ExerciseSearchResponse {
+  query: string;
+  results: ExerciseSearchResult[];
+  total: number;
 }
 
 // ============================================================================

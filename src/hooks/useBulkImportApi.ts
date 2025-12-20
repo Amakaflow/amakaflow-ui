@@ -75,6 +75,10 @@ export function useBulkImportApi({
     }
   }, [userId]);
 
+  // Session validation disabled - was causing issues with fresh imports
+  // The execute endpoint now validates the session and returns a clear error
+  // if the session is expired, which is handled in executeImport
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -153,11 +157,12 @@ export function useBulkImportApi({
         // Extract column mappings from detected items for file imports
         const firstItem = response.items[0];
         if (firstItem?.raw_data?.column_info) {
+          // Backend ColumnInfo model: { index, name, detected_type, confidence, sample_values }
           const columnMappings: ColumnMapping[] = firstItem.raw_data.column_info.map(
-            (col: { source_column: string; source_column_index: number; target_field: string; confidence: number; sample_values?: string[] }, idx: number) => ({
-              sourceColumn: col.source_column || `Column ${idx + 1}`,
-              sourceColumnIndex: col.source_column_index ?? idx,
-              targetField: col.target_field || 'ignore',
+            (col: { name: string; index: number; detected_type: string | null; confidence: number; sample_values?: string[] }, idx: number) => ({
+              sourceColumn: col.name || `Column ${idx + 1}`,
+              sourceColumnIndex: col.index ?? idx,
+              targetField: col.detected_type || 'ignore',
               confidence: col.confidence || 0,
               userOverride: false,
               sampleValues: col.sample_values || [],
@@ -284,9 +289,22 @@ export function useBulkImportApi({
           userMappings
         );
 
+        // Transform snake_case to camelCase for frontend
+        const transformedExercises = response.exercises.map((e: Record<string, unknown>) => ({
+          id: e.id,
+          originalName: e.original_name || e.originalName || '',
+          matchedGarminName: e.matched_garmin_name || e.matchedGarminName || null,
+          confidence: (e.confidence as number) || 0,
+          suggestions: (e.suggestions as Array<{ name: string; confidence: number }>) || [],
+          status: e.status || 'unmapped',
+          userSelection: e.user_selection || e.userSelection || undefined,
+          sourceWorkoutIds: e.source_workout_ids || e.sourceWorkoutIds || [],
+          occurrenceCount: e.occurrence_count || e.occurrenceCount || 1,
+        }));
+
         dispatch({
           type: 'SET_EXERCISE_MATCHES',
-          exercises: response.exercises,
+          exercises: transformedExercises,
         });
         dispatch({ type: 'SET_LOADING', loading: false });
 
@@ -337,10 +355,42 @@ export function useBulkImportApi({
         state.detected.selectedIds
       );
 
+      // Transform snake_case to camelCase for workouts
+      const transformedWorkouts = (response.workouts || []).map((w: Record<string, unknown>) => ({
+        id: w.id,
+        detectedItemId: w.detected_item_id || w.detectedItemId || '',
+        title: w.title || 'Untitled Workout',
+        description: w.description,
+        exerciseCount: w.exercise_count ?? w.exerciseCount ?? 0,
+        blockCount: w.block_count ?? w.blockCount ?? 0,
+        estimatedDuration: w.estimated_duration ?? w.estimatedDuration,
+        validationIssues: (w.validation_issues || w.validationIssues || []) as Array<{ severity: string; message: string; suggestion?: string }>,
+        workout: w.workout || {},
+        selected: w.selected !== false,
+        isDuplicate: w.is_duplicate || w.isDuplicate || false,
+        duplicateOf: w.duplicate_of || w.duplicateOf,
+      }));
+
+      // Transform snake_case to camelCase for stats
+      const rawStats = (response.stats || {}) as Record<string, unknown>;
+      const transformedStats = {
+        totalDetected: rawStats.total_detected ?? rawStats.totalDetected ?? 0,
+        totalSelected: rawStats.total_selected ?? rawStats.totalSelected ?? 0,
+        totalSkipped: rawStats.total_skipped ?? rawStats.totalSkipped ?? 0,
+        exercisesMatched: rawStats.exercises_matched ?? rawStats.exercisesMatched ?? 0,
+        exercisesNeedingReview: rawStats.exercises_needing_review ?? rawStats.exercisesNeedingReview ?? 0,
+        exercisesUnmapped: rawStats.exercises_unmapped ?? rawStats.exercisesUnmapped ?? 0,
+        newExercisesToCreate: rawStats.new_exercises_to_create ?? rawStats.newExercisesToCreate ?? 0,
+        estimatedDuration: rawStats.estimated_duration ?? rawStats.estimatedDuration ?? 0,
+        duplicatesFound: rawStats.duplicates_found ?? rawStats.duplicatesFound ?? 0,
+        validationErrors: rawStats.validation_errors ?? rawStats.validationErrors ?? 0,
+        validationWarnings: rawStats.validation_warnings ?? rawStats.validationWarnings ?? 0,
+      };
+
       dispatch({
         type: 'SET_PREVIEW_WORKOUTS',
-        workouts: response.workouts,
-        stats: response.stats,
+        workouts: transformedWorkouts,
+        stats: transformedStats,
       });
       dispatch({ type: 'SET_LOADING', loading: false });
       goNext();
@@ -360,18 +410,23 @@ export function useBulkImportApi({
   // Step 5: Import
   // ============================================================================
 
-  const startPolling = useCallback(() => {
+  const startPolling = useCallback((jobId: string) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
+    if (!jobId) {
+      console.error('startPolling called without jobId');
+      return;
+    }
+
+    console.log('Starting polling for job:', jobId);
     isPollingRef.current = true;
 
     pollingRef.current = setInterval(async () => {
-      if (!state.import.jobId) return;
-
       try {
-        const status = await bulkImportApi.getStatus(state.import.jobId, userId);
+        console.log('Polling status for job:', jobId);
+        const status = await bulkImportApi.getStatus(jobId, userId);
 
         dispatch({
           type: 'UPDATE_IMPORT_PROGRESS',
@@ -390,11 +445,13 @@ export function useBulkImportApi({
             pollingRef.current = null;
           }
           isPollingRef.current = false;
-        } else if (status.status === 'failed' || status.status === 'cancelled') {
+        } else if (status.status === 'failed' || status.status === 'cancelled' || status.status === 'not_found') {
           dispatch({
             type: 'SET_IMPORT_STATUS',
-            status: status.status,
-            error: status.error,
+            status: 'failed',
+            error: status.status === 'not_found'
+              ? 'Import session expired. Please start a new import.'
+              : status.error,
           });
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
@@ -407,7 +464,7 @@ export function useBulkImportApi({
         // Don't stop polling on transient errors
       }
     }, pollingInterval);
-  }, [state.import.jobId, pollingInterval, dispatch]);
+  }, [pollingInterval, userId, dispatch]);
 
   const executeImport = useCallback(
     async (device: string, asyncMode: boolean = true) => {
@@ -416,9 +473,10 @@ export function useBulkImportApi({
         return;
       }
 
+      // Use detectedItemId, not the preview id - backend looks up by detected item ID
       const selectedWorkoutIds = state.preview.workouts
         .filter(w => w.selected)
-        .map(w => w.id);
+        .map(w => w.detectedItemId);
 
       if (selectedWorkoutIds.length === 0) {
         handleError(new Error('No workouts selected for import'));
@@ -436,11 +494,18 @@ export function useBulkImportApi({
           asyncMode
         );
 
+        // Check if execute was successful
+        if (!response.success || response.status === 'not_found') {
+          handleError(new Error(response.message || 'Import session expired. Please start a new import.'));
+          return;
+        }
+
         dispatch({ type: 'START_IMPORT', jobId: response.job_id });
         dispatch({ type: 'SET_LOADING', loading: false });
 
         if (asyncMode) {
-          startPolling();
+          // Pass jobId directly since state won't be updated yet
+          startPolling(response.job_id);
         }
       } catch (error) {
         handleError(error);

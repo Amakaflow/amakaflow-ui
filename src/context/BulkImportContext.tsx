@@ -281,6 +281,7 @@ function bulkImportReducer(
     case 'START_IMPORT':
       return {
         ...state,
+        step: 'import',  // Advance to import step to show progress
         import: {
           ...state.import,
           status: 'running',
@@ -420,6 +421,14 @@ const BulkImportContext = createContext<BulkImportContextValue | null>(null);
 // ============================================================================
 
 const STORAGE_KEY = 'bulk_import_state';
+const STORAGE_VERSION = 13; // Increment to clear all old sessions - v13: exercise type inference
+const SESSION_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes - auto-clear stale sessions (backend cache can expire)
+
+interface PersistedState {
+  state: Partial<BulkImportState>;
+  savedAt: number;
+  version: number;
+}
 
 function saveStateToStorage(state: BulkImportState): void {
   try {
@@ -428,7 +437,12 @@ function saveStateToStorage(state: BulkImportState): void {
       ...state,
       inputSources: state.inputType === 'file' ? [] : state.inputSources,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
+    const persisted: PersistedState = {
+      state: stateToPersist,
+      savedAt: Date.now(),
+      version: STORAGE_VERSION,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch (error) {
     console.warn('Failed to save bulk import state to localStorage:', error);
   }
@@ -438,7 +452,30 @@ function loadStateFromStorage(): Partial<BulkImportState> | null {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+
+      // Check version - clear outdated state
+      if (!parsed.version || parsed.version < STORAGE_VERSION) {
+        console.log('Bulk import state version outdated, clearing');
+        clearStateFromStorage();
+        return null;
+      }
+
+      // Handle new format with timestamp
+      if (parsed.savedAt && parsed.state) {
+        const age = Date.now() - parsed.savedAt;
+        if (age > SESSION_EXPIRY_MS) {
+          console.log('Bulk import session expired, clearing state');
+          clearStateFromStorage();
+          return null;
+        }
+        return parsed.state;
+      }
+
+      // Handle legacy format (no timestamp) - clear it
+      console.log('Legacy bulk import state found, clearing');
+      clearStateFromStorage();
+      return null;
     }
   } catch (error) {
     console.warn('Failed to load bulk import state from localStorage:', error);
@@ -474,7 +511,21 @@ export function BulkImportProvider({
     if (autoRestore) {
       const savedState = loadStateFromStorage();
       if (savedState && savedState.jobId) {
-        // Only restore if there's an active job
+        // Don't restore if we're in a terminal import state (failed, cancelled, complete)
+        // or if we're on the import step - these states require a fresh session
+        const importStatus = (savedState as BulkImportState).import?.status;
+        const savedStep = (savedState as BulkImportState).step;
+
+        if (savedStep === 'import' ||
+            importStatus === 'failed' ||
+            importStatus === 'cancelled' ||
+            importStatus === 'complete') {
+          console.log('Clearing stale import session - was in terminal state');
+          clearStateFromStorage();
+          return;
+        }
+
+        // Only restore if there's an active job on an early step
         dispatch({ type: 'RESTORE_STATE', state: savedState });
       }
     }

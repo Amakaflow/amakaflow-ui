@@ -5,8 +5,9 @@
  * Shows workout list with validation issues and allows selection.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useBulkImport } from '../../context/BulkImportContext';
+import { useBulkImportApi } from '../../hooks/useBulkImportApi';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -39,8 +40,16 @@ const severityConfig: Record<ValidationIssueSeverity, { icon: typeof AlertCircle
 
 export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
   const { state, dispatch } = useBulkImport();
+  const { generatePreview } = useBulkImportApi({ userId });
 
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+
+  // Auto-load preview data when component mounts and workouts are empty
+  useEffect(() => {
+    if (state.preview.workouts.length === 0 && !state.loading && state.jobId) {
+      generatePreview();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle workout expansion
   const toggleExpanded = useCallback((id: string) => {
@@ -81,7 +90,7 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
     if (selected.length === 0) return false;
 
     const hasErrors = selected.some(w =>
-      w.validationIssues.some(i => i.severity === 'error')
+      (w.validationIssues || []).some(i => i.severity === 'error')
     );
     return !hasErrors;
   }, [state.preview.workouts]);
@@ -146,8 +155,9 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
       <div className="space-y-2">
         {state.preview.workouts.map(workout => {
           const isExpanded = expandedWorkouts.has(workout.id);
-          const hasErrors = workout.validationIssues.some(i => i.severity === 'error');
-          const hasWarnings = workout.validationIssues.some(i => i.severity === 'warning');
+          const validationIssues = workout.validationIssues || [];
+          const hasErrors = validationIssues.some(i => i.severity === 'error');
+          const hasWarnings = validationIssues.some(i => i.severity === 'warning');
 
           return (
             <div
@@ -211,13 +221,13 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                   {hasErrors && (
                     <Badge variant="secondary" className="bg-red-500/10 text-red-400">
                       <AlertCircle className="w-3 h-3 mr-1" />
-                      {workout.validationIssues.filter(i => i.severity === 'error').length}
+                      {validationIssues.filter(i => i.severity === 'error').length}
                     </Badge>
                   )}
                   {hasWarnings && !hasErrors && (
                     <Badge variant="secondary" className="bg-amber-500/10 text-amber-400">
                       <AlertTriangle className="w-3 h-3 mr-1" />
-                      {workout.validationIssues.filter(i => i.severity === 'warning').length}
+                      {validationIssues.filter(i => i.severity === 'warning').length}
                     </Badge>
                   )}
                   {!hasErrors && !hasWarnings && (
@@ -234,11 +244,11 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                 <div className="px-4 pb-4 pt-0 border-t border-white/5">
                   <div className="pt-4 space-y-4">
                     {/* Validation Issues */}
-                    {workout.validationIssues.length > 0 && (
+                    {validationIssues.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-muted-foreground">Issues</p>
                         <div className="space-y-1">
-                          {workout.validationIssues.map((issue, index) => {
+                          {validationIssues.map((issue, index) => {
                             const config = severityConfig[issue.severity];
                             const IconComponent = config.icon;
 
@@ -267,8 +277,29 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Exercises</p>
                       <div className="grid gap-1">
+                        {/* Handle direct exercises from CSV imports */}
+                        {workout.workout.exercises?.slice(0, 5).map((exercise, exIndex) => (
+                          <div
+                            key={`direct-${exIndex}`}
+                            className="flex items-center justify-between p-2 rounded bg-white/5 text-sm"
+                          >
+                            <span className="truncate">{exercise.name || exercise.raw_name || 'Unknown'}</span>
+                            <span className="text-muted-foreground flex-shrink-0 ml-2">
+                              {exercise.sets && `${exercise.sets}×`}
+                              {exercise.reps || exercise.reps_range || ''}
+                              {exercise.duration_sec && `${exercise.duration_sec}s`}
+                            </span>
+                          </div>
+                        ))}
+                        {(workout.workout.exercises?.length || 0) > 5 && (
+                          <p className="text-xs text-muted-foreground pl-2">
+                            +{(workout.workout.exercises?.length || 0) - 5} more exercises
+                          </p>
+                        )}
+
+                        {/* Handle blocks structure from URL/image imports */}
                         {workout.workout.blocks?.slice(0, 2).map((block, blockIndex) => (
-                          <div key={blockIndex} className="space-y-1">
+                          <div key={`block-${blockIndex}`} className="space-y-1">
                             {block.label && (
                               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                                 {block.label}
@@ -298,6 +329,11 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                           <p className="text-xs text-muted-foreground">
                             +{(workout.workout.blocks?.length || 0) - 2} more blocks
                           </p>
+                        )}
+
+                        {/* Empty state if no exercises found */}
+                        {!workout.workout.exercises?.length && !workout.workout.blocks?.length && (
+                          <p className="text-xs text-muted-foreground italic">No exercises detected</p>
                         )}
                       </div>
                     </div>

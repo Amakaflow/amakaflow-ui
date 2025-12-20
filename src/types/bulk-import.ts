@@ -142,6 +142,48 @@ export interface ValidationIssue {
 }
 
 /**
+ * Flexible workout data structure for preview
+ * Can contain either blocks (from URL/image) or direct exercises (from CSV)
+ */
+export interface PreviewWorkoutData {
+  title?: string;
+  name?: string;
+  description?: string;
+  blocks?: Array<{
+    label?: string;
+    exercises?: Array<{
+      name: string;
+      sets?: number;
+      reps?: string | number;
+      reps_range?: string;
+      duration_sec?: number;
+    }>;
+    supersets?: Array<{
+      exercises?: Array<{
+        name: string;
+        sets?: number;
+        reps?: string | number;
+      }>;
+    }>;
+  }>;
+  exercises?: Array<{
+    name?: string;
+    raw_name?: string;
+    sets?: number;
+    reps?: string | number;
+    reps_range?: string;
+    duration_sec?: number;
+  }>;
+  workouts?: Array<{
+    name?: string;
+    exercises?: Array<{
+      name?: string;
+      raw_name?: string;
+    }>;
+  }>;
+}
+
+/**
  * Preview workout before import
  */
 export interface PreviewWorkout {
@@ -153,7 +195,7 @@ export interface PreviewWorkout {
   blockCount: number;
   estimatedDuration?: number; // minutes
   validationIssues: ValidationIssue[];
-  workout: WorkoutStructure;
+  workout: PreviewWorkoutData;
   selected: boolean;
   isDuplicate: boolean;
   duplicateOf?: string; // ID of existing workout if duplicate

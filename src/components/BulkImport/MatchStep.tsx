@@ -6,9 +6,10 @@
  * Shows confidence scores and allows user to confirm/change matches.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useBulkImport } from '../../context/BulkImportContext';
 import { useBulkImportApi } from '../../hooks/useBulkImportApi';
+import { bulkImportApi, ExerciseSearchResult } from '../../lib/bulk-import-api';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -32,6 +33,13 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { ExerciseMatch, ExerciseMatchStatus } from '../../types/bulk-import';
+
+// State for exercise search
+interface ExerciseSearchState {
+  query: string;
+  results: ExerciseSearchResult[];
+  isLoading: boolean;
+}
 
 interface MatchStepProps {
   userId: string;
@@ -61,12 +69,75 @@ export function MatchStep({ userId }: MatchStepProps) {
   const [filterStatus, setFilterStatus] = useState<ExerciseMatchStatus | 'all'>('all');
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set());
 
+  // Per-exercise search state
+  const [exerciseSearches, setExerciseSearches] = useState<Record<string, ExerciseSearchState>>({});
+  const searchTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+
   // Trigger matching on mount if not already done
   useEffect(() => {
     if (state.matches.exercises.length === 0 && !state.loading) {
       matchExercises();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(searchTimeoutRef.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  // Handle exercise search with debounce
+  const handleExerciseSearch = useCallback((exerciseId: string, query: string) => {
+    // Update search query immediately
+    setExerciseSearches(prev => ({
+      ...prev,
+      [exerciseId]: {
+        query,
+        results: prev[exerciseId]?.results || [],
+        isLoading: query.length >= 2,
+      },
+    }));
+
+    // Clear existing timeout
+    if (searchTimeoutRef.current[exerciseId]) {
+      clearTimeout(searchTimeoutRef.current[exerciseId]);
+    }
+
+    // Don't search for very short queries
+    if (query.length < 2) {
+      setExerciseSearches(prev => ({
+        ...prev,
+        [exerciseId]: { query, results: [], isLoading: false },
+      }));
+      return;
+    }
+
+    // Debounce the API call
+    searchTimeoutRef.current[exerciseId] = setTimeout(async () => {
+      try {
+        const response = await bulkImportApi.searchExercises(query, 10);
+        setExerciseSearches(prev => ({
+          ...prev,
+          [exerciseId]: {
+            query,
+            results: response.results,
+            isLoading: false,
+          },
+        }));
+      } catch (error) {
+        console.error('Exercise search failed:', error);
+        setExerciseSearches(prev => ({
+          ...prev,
+          [exerciseId]: {
+            query,
+            results: [],
+            isLoading: false,
+          },
+        }));
+      }
+    }, 300);
+  }, []);
 
   // Filter exercises
   const filteredExercises = useMemo(() => {
@@ -327,57 +398,125 @@ export function MatchStep({ userId }: MatchStepProps) {
               {/* Expanded Content */}
               {isExpanded && (
                 <div className="px-4 pb-4 pt-0 border-t border-white/5">
-                  <div className="pt-4 space-y-3">
-                    <p className="text-sm text-muted-foreground">Select a match:</p>
-                    <div className="grid gap-2">
-                      {exercise.suggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleSelectSuggestion(exercise.id, suggestion.name)}
-                          className={cn(
-                            'flex items-center justify-between p-3 rounded-lg border transition-all text-left',
-                            exercise.userSelection === suggestion.name
-                              ? 'border-primary bg-primary/10'
-                              : 'border-white/10 hover:border-white/20 hover:bg-white/5'
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            {exercise.userSelection === suggestion.name ? (
-                              <CheckCircle className="w-4 h-4 text-primary" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border-2 border-white/20" />
-                            )}
-                            <span className="font-medium">{suggestion.name}</span>
-                          </div>
-                          <span className={cn('text-sm font-medium', getConfidenceColor(suggestion.confidence * 100))}>
-                            {Math.round(suggestion.confidence * 100)}%
-                          </span>
-                        </button>
-                      ))}
-
-                      {/* Create New Option */}
-                      <button
-                        onClick={() => handleMarkAsNew(exercise.id)}
-                        className={cn(
-                          'flex items-center justify-between p-3 rounded-lg border transition-all text-left',
-                          exercise.status === 'new'
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                  <div className="pt-4 space-y-4">
+                    {/* Search for exercises */}
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Search Garmin exercises:</p>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Type to search (e.g., 'run', 'squat')..."
+                          value={exerciseSearches[exercise.id]?.query || ''}
+                          onChange={(e) => handleExerciseSearch(exercise.id, e.target.value)}
+                          className="pl-10"
+                        />
+                        {exerciseSearches[exercise.id]?.isLoading && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                         )}
-                      >
-                        <div className="flex items-center gap-3">
-                          {exercise.status === 'new' ? (
-                            <CheckCircle className="w-4 h-4 text-blue-400" />
-                          ) : (
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                          )}
-                          <span className="font-medium">Create as new exercise</span>
+                      </div>
+
+                      {/* Search Results */}
+                      {exerciseSearches[exercise.id]?.results.length > 0 && (
+                        <div className="grid gap-1 max-h-48 overflow-y-auto">
+                          {exerciseSearches[exercise.id].results.map((result, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                handleSelectSuggestion(exercise.id, result.name);
+                                // Clear search after selection
+                                setExerciseSearches(prev => ({
+                                  ...prev,
+                                  [exercise.id]: { query: '', results: [], isLoading: false },
+                                }));
+                              }}
+                              className={cn(
+                                'flex items-center justify-between p-2 rounded-lg border transition-all text-left text-sm',
+                                exercise.userSelection === result.name
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                {exercise.userSelection === result.name ? (
+                                  <CheckCircle className="w-3 h-3 text-primary" />
+                                ) : (
+                                  <div className="w-3 h-3 rounded-full border-2 border-white/20" />
+                                )}
+                                <span>{result.name}</span>
+                              </div>
+                              <span className={cn('text-xs', getConfidenceColor(result.score))}>
+                                {Math.round(result.score)}%
+                              </span>
+                            </button>
+                          ))}
                         </div>
-                        <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
-                          New
-                        </Badge>
-                      </button>
+                      )}
+
+                      {/* No results message */}
+                      {exerciseSearches[exercise.id]?.query.length >= 2 &&
+                        !exerciseSearches[exercise.id]?.isLoading &&
+                        exerciseSearches[exercise.id]?.results.length === 0 && (
+                        <p className="text-xs text-muted-foreground py-2">
+                          No matching exercises found for &quot;{exerciseSearches[exercise.id]?.query}&quot;
+                        </p>
+                      )}
                     </div>
+
+                    {/* Suggestions */}
+                    {exercise.suggestions.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">Suggested matches:</p>
+                        <div className="grid gap-2">
+                          {exercise.suggestions.map((suggestion, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleSelectSuggestion(exercise.id, suggestion.name)}
+                              className={cn(
+                                'flex items-center justify-between p-3 rounded-lg border transition-all text-left',
+                                exercise.userSelection === suggestion.name
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                {exercise.userSelection === suggestion.name ? (
+                                  <CheckCircle className="w-4 h-4 text-primary" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full border-2 border-white/20" />
+                                )}
+                                <span className="font-medium">{suggestion.name}</span>
+                              </div>
+                              <span className={cn('text-sm font-medium', getConfidenceColor(suggestion.confidence * 100))}>
+                                {Math.round(suggestion.confidence * 100)}%
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Create New Option */}
+                    <button
+                      onClick={() => handleMarkAsNew(exercise.id)}
+                      className={cn(
+                        'w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left',
+                        exercise.status === 'new'
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        {exercise.status === 'new' ? (
+                          <CheckCircle className="w-4 h-4 text-blue-400" />
+                        ) : (
+                          <Plus className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="font-medium">Create as new exercise</span>
+                      </div>
+                      <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
+                        New
+                      </Badge>
+                    </button>
                   </div>
                 </div>
               )}

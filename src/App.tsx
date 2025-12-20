@@ -1606,17 +1606,23 @@ export default function App() {
           <UnifiedWorkouts
             profileId={user.id}
             onEditWorkout={(item) => {
-              // Load the workout and go to workflow
-              setWorkout(item.workout);
+              // Load the workout and go to workflow for editing
+              const normalizedWorkout = normalizeWorkoutStructure(item.workout);
+              setWorkout(normalizedWorkout);
               setValidation(item.validation || null);
+              setExports(item.exports || null);
               setSources(item.sources || []);
               setSelectedDevice(item.device as any);
+              setIsEditingFromHistory(true);
+              setEditingWorkoutId(item.id);
+              setWorkoutSaved(true); // Initially saved (from history), will be marked unsaved when modified
               setCurrentView('workflow');
               setCurrentStep('structure');
             }}
             onLoadWorkout={(item) => {
-              // Load the workout and go directly to export
-              setWorkout(item.workout);
+              // Load the workout for export/push
+              const normalizedWorkout = normalizeWorkoutStructure(item.workout);
+              setWorkout(normalizedWorkout);
               setValidation(item.validation || null);
               setExports(item.exports || null);
               setSources(item.sources || []);
@@ -1624,7 +1630,15 @@ export default function App() {
               setIsEditingFromHistory(true);
               setEditingWorkoutId(item.id);
               setCurrentView('workflow');
-              setCurrentStep('export');
+
+              // If workout has exports, go to export step directly
+              // Otherwise, go to structure step so user can validate first
+              if (item.exports) {
+                setCurrentStep('export');
+              } else {
+                setCurrentStep('structure');
+                toast.info('This workout needs validation before export. Click "Validate Mapping" to proceed.');
+              }
             }}
             onDeleteWorkout={(id) => {
               // Delete is handled internally by UnifiedWorkouts
