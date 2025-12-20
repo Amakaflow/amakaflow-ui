@@ -1,6 +1,9 @@
 """Export service for converting workouts to various formats."""
+import csv
+import io
 import re
-from typing import Optional
+from datetime import datetime
+from typing import Optional, List, Literal
 from workout_ingestor_api.models import Workout
 from workout_ingestor_api.utils import upper_from_range
 
@@ -276,4 +279,289 @@ class ExportService:
                         ))
 
         return ffb.build(file_type=FileType.WORKOUT)
+
+    @staticmethod
+    def render_csv_strong(
+        workout: Workout,
+        workout_date: Optional[datetime] = None,
+        duration_minutes: Optional[int] = None,
+        workout_notes: Optional[str] = None,
+    ) -> bytes:
+        """
+        Render workout as Strong-compatible CSV format.
+
+        This format can be imported directly into Hevy and HeavySet.
+
+        Args:
+            workout: Workout to render
+            workout_date: Optional workout date (defaults to now)
+            duration_minutes: Optional workout duration in minutes
+            workout_notes: Optional overall workout notes
+
+        Returns:
+            CSV file bytes with UTF-8 BOM for Excel compatibility
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Strong CSV headers
+        writer.writerow([
+            "Date", "Workout Name", "Duration", "Exercise Name",
+            "Set Order", "Weight", "Reps", "Distance", "Seconds",
+            "Notes", "Workout Notes", "RPE"
+        ])
+
+        # Format date as YYYY-MM-DD HH:MM:SS
+        date = workout_date or datetime.now()
+        date_str = date.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Format duration as MM:SS
+        duration_str = f"{duration_minutes or 0}:00"
+
+        workout_name = workout.title or "Workout"
+        notes_str = workout_notes or ""
+
+        # Flatten workout structure to individual sets
+        for block in workout.blocks:
+            # Handle supersets (legacy format)
+            for superset in block.supersets:
+                for exercise in superset.exercises:
+                    ExportService._write_exercise_sets(
+                        writer, exercise, date_str, workout_name,
+                        duration_str, notes_str, block
+                    )
+
+            # Handle exercises
+            for exercise in block.exercises:
+                ExportService._write_exercise_sets(
+                    writer, exercise, date_str, workout_name,
+                    duration_str, notes_str, block
+                )
+
+        # UTF-8 BOM for Excel compatibility
+        return b'\xef\xbb\xbf' + output.getvalue().encode('utf-8')
+
+    @staticmethod
+    def _write_exercise_sets(
+        writer,
+        exercise,
+        date_str: str,
+        workout_name: str,
+        duration_str: str,
+        workout_notes: str,
+        block,
+    ) -> None:
+        """Write individual sets for an exercise to CSV."""
+        sets, reps = ExportService._infer_sets_reps(exercise)
+
+        # Duration-based exercises
+        duration_sec = exercise.duration_sec or block.time_work_sec or 0
+
+        # Distance for cardio exercises
+        distance = exercise.distance_m or 0
+
+        # Exercise notes
+        exercise_notes = exercise.notes or ""
+
+        for set_order in range(1, sets + 1):
+            writer.writerow([
+                date_str,
+                workout_name,
+                duration_str,
+                exercise.name,
+                set_order,
+                0,  # Weight - not stored in current model
+                reps if not duration_sec else 0,
+                distance,
+                duration_sec,
+                exercise_notes if set_order == sets else "",  # Notes on last set
+                workout_notes if set_order == 1 else "",  # Workout notes on first set
+                ""  # RPE - not stored in current model
+            ])
+
+    @staticmethod
+    def render_csv_extended(
+        workout: Workout,
+        workout_date: Optional[datetime] = None,
+        source_url: Optional[str] = None,
+        creator: Optional[str] = None,
+    ) -> bytes:
+        """
+        Render workout as AmakaFlow extended CSV format.
+
+        Includes additional metadata not supported by Strong format.
+
+        Args:
+            workout: Workout to render
+            workout_date: Optional workout date (defaults to now)
+            source_url: Optional source URL
+            creator: Optional creator name
+
+        Returns:
+            CSV file bytes with UTF-8 BOM for Excel compatibility
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Extended CSV headers
+        writer.writerow([
+            "Workout", "Date", "Source", "Creator", "Block", "Exercise",
+            "Set", "Type", "Reps", "Duration (sec)", "Distance (m)",
+            "Rest (sec)", "Notes"
+        ])
+
+        # Format date
+        date = workout_date or datetime.now()
+        date_str = date.strftime("%Y-%m-%d")
+
+        workout_name = workout.title or "Workout"
+        source = source_url or workout.source or ""
+        creator_str = creator or ""
+
+        for block in workout.blocks:
+            block_label = block.label or ""
+            structure = block.structure or "regular"
+            rest_sec = block.rest_between_sec or block.rest_between_rounds_sec or ""
+
+            # Handle supersets (legacy format)
+            for superset in block.supersets:
+                for exercise in superset.exercises:
+                    ExportService._write_exercise_extended(
+                        writer, exercise, workout_name, date_str,
+                        source, creator_str, block_label, structure, rest_sec
+                    )
+
+            # Handle exercises
+            for exercise in block.exercises:
+                ExportService._write_exercise_extended(
+                    writer, exercise, workout_name, date_str,
+                    source, creator_str, block_label, structure, rest_sec
+                )
+
+        # UTF-8 BOM for Excel compatibility
+        return b'\xef\xbb\xbf' + output.getvalue().encode('utf-8')
+
+    @staticmethod
+    def _write_exercise_extended(
+        writer,
+        exercise,
+        workout_name: str,
+        date_str: str,
+        source: str,
+        creator: str,
+        block_label: str,
+        structure: str,
+        rest_sec,
+    ) -> None:
+        """Write individual sets for an exercise to extended CSV."""
+        sets, reps = ExportService._infer_sets_reps(exercise)
+        duration_sec = exercise.duration_sec or ""
+        distance = exercise.distance_m or ""
+        exercise_rest = exercise.rest_sec or rest_sec or ""
+        notes = exercise.notes or ""
+
+        # Determine set type based on warmup
+        warmup_sets = exercise.warmup_sets or 0
+
+        for set_order in range(1, sets + 1):
+            set_type = "warmup" if set_order <= warmup_sets else "working"
+
+            writer.writerow([
+                workout_name,
+                date_str,
+                source,
+                creator,
+                block_label,
+                exercise.name,
+                set_order,
+                set_type,
+                reps if not duration_sec else "",
+                duration_sec,
+                distance,
+                exercise_rest,
+                notes if set_order == sets else ""  # Notes on last set
+            ])
+
+    @staticmethod
+    def render_csv_bulk(
+        workouts: List[Workout],
+        style: Literal["strong", "extended"] = "strong",
+        workout_dates: Optional[List[datetime]] = None,
+    ) -> bytes:
+        """
+        Export multiple workouts to a single CSV file.
+
+        Args:
+            workouts: List of workouts to export
+            style: CSV format style ("strong" or "extended")
+            workout_dates: Optional list of dates for each workout
+
+        Returns:
+            CSV file bytes with UTF-8 BOM for Excel compatibility
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        if style == "strong":
+            # Strong CSV headers
+            writer.writerow([
+                "Date", "Workout Name", "Duration", "Exercise Name",
+                "Set Order", "Weight", "Reps", "Distance", "Seconds",
+                "Notes", "Workout Notes", "RPE"
+            ])
+
+            for i, workout in enumerate(workouts):
+                date = (workout_dates[i] if workout_dates and i < len(workout_dates)
+                        else datetime.now())
+                date_str = date.strftime("%Y-%m-%d %H:%M:%S")
+                workout_name = workout.title or f"Workout {i + 1}"
+
+                for block in workout.blocks:
+                    for superset in block.supersets:
+                        for exercise in superset.exercises:
+                            ExportService._write_exercise_sets(
+                                writer, exercise, date_str, workout_name,
+                                "0:00", "", block
+                            )
+
+                    for exercise in block.exercises:
+                        ExportService._write_exercise_sets(
+                            writer, exercise, date_str, workout_name,
+                            "0:00", "", block
+                        )
+        else:
+            # Extended CSV headers
+            writer.writerow([
+                "Workout", "Date", "Source", "Creator", "Block", "Exercise",
+                "Set", "Type", "Reps", "Duration (sec)", "Distance (m)",
+                "Rest (sec)", "Notes"
+            ])
+
+            for i, workout in enumerate(workouts):
+                date = (workout_dates[i] if workout_dates and i < len(workout_dates)
+                        else datetime.now())
+                date_str = date.strftime("%Y-%m-%d")
+                workout_name = workout.title or f"Workout {i + 1}"
+                source = workout.source or ""
+
+                for block in workout.blocks:
+                    block_label = block.label or ""
+                    structure = block.structure or "regular"
+                    rest_sec = block.rest_between_sec or ""
+
+                    for superset in block.supersets:
+                        for exercise in superset.exercises:
+                            ExportService._write_exercise_extended(
+                                writer, exercise, workout_name, date_str,
+                                source, "", block_label, structure, rest_sec
+                            )
+
+                    for exercise in block.exercises:
+                        ExportService._write_exercise_extended(
+                            writer, exercise, workout_name, date_str,
+                            source, "", block_label, structure, rest_sec
+                        )
+
+        # UTF-8 BOM for Excel compatibility
+        return b'\xef\xbb\xbf' + output.getvalue().encode('utf-8')
 

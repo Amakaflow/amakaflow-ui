@@ -780,6 +780,68 @@ async def export_fit(workout: Workout):
     )
 
 
+@router.post("/export/csv")
+async def export_csv(
+    workout: Workout,
+    style: str = "strong",
+):
+    """
+    Export workout as CSV format.
+
+    Args:
+        workout: Workout data to export
+        style: CSV format style
+            - "strong": Strong-compatible format for Hevy/HeavySet import (default)
+            - "extended": AmakaFlow extended format with additional metadata
+
+    Returns:
+        CSV file download
+    """
+    try:
+        if style == "extended":
+            csv_bytes = ExportService.render_csv_extended(workout)
+            filename = "workout_extended.csv"
+        else:
+            csv_bytes = ExportService.render_csv_strong(workout)
+            filename = "workout_strong.csv"
+
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/export/csv/bulk")
+async def export_csv_bulk(
+    workouts: list[Workout],
+    style: str = "strong",
+):
+    """
+    Export multiple workouts as a single CSV file.
+
+    Args:
+        workouts: List of workout data to export
+        style: CSV format style ("strong" or "extended")
+
+    Returns:
+        CSV file download with all workouts merged
+    """
+    try:
+        csv_bytes = ExportService.render_csv_bulk(workouts, style=style)
+        filename = f"workouts_{style}.csv"
+
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 # YouTube ingest – NEW logic
 # ---------------------------------------------------------------------------
