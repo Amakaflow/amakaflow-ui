@@ -2,10 +2,10 @@
  * Video API client for workout-ingestor-api
  *
  * Handles video URL detection, oEmbed fetching, and caching
- * for multi-platform video workouts (YouTube, Instagram, TikTok)
+ * for multi-platform video workouts (YouTube, Instagram, TikTok, Pinterest)
  */
 
-export type VideoPlatform = 'youtube' | 'instagram' | 'tiktok' | 'unknown';
+export type VideoPlatform = 'youtube' | 'instagram' | 'tiktok' | 'pinterest' | 'unknown';
 
 export interface VideoDetectResponse {
   platform: VideoPlatform;
@@ -189,11 +189,11 @@ export async function getVideoCacheStats(): Promise<CacheStatsResponse> {
 
 /**
  * Helper to determine if a platform supports auto-extraction
- * YouTube and TikTok use AI/vision extraction
+ * YouTube, TikTok, and Pinterest use AI/vision extraction
  * Instagram uses manual entry with oEmbed preview
  */
 export function supportsAutoExtraction(platform: VideoPlatform): boolean {
-  return platform === 'youtube' || platform === 'tiktok';
+  return platform === 'youtube' || platform === 'tiktok' || platform === 'pinterest';
 }
 
 /**
@@ -207,6 +207,8 @@ export function getPlatformDisplayName(platform: VideoPlatform): string {
       return 'Instagram';
     case 'tiktok':
       return 'TikTok';
+    case 'pinterest':
+      return 'Pinterest';
     default:
       return 'Unknown';
   }

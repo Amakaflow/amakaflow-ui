@@ -53,11 +53,18 @@ const statusConfig: Record<ExerciseMatchStatus, { icon: typeof CheckCircle; labe
   new: { icon: Plus, label: 'New', color: 'text-blue-400', bg: 'bg-blue-500/10' },
 };
 
-// Confidence color helper
+// Normalize confidence to 0-100 range
+const normalizeConfidence = (confidence: number): number => {
+  // If confidence is between 0-1, multiply by 100
+  return confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+};
+
+// Confidence color helper (expects 0-100)
 const getConfidenceColor = (confidence: number) => {
-  if (confidence >= 90) return 'text-emerald-400';
-  if (confidence >= 70) return 'text-amber-400';
-  if (confidence >= 50) return 'text-orange-400';
+  const normalized = confidence <= 1 ? confidence * 100 : confidence;
+  if (normalized >= 90) return 'text-emerald-400';
+  if (normalized >= 70) return 'text-amber-400';
+  if (normalized >= 50) return 'text-orange-400';
   return 'text-red-400';
 };
 
@@ -210,10 +217,11 @@ export function MatchStep({ userId }: MatchStepProps) {
     dispatch({ type: 'ADD_NEW_EXERCISE', exerciseName: exerciseId });
   }, [dispatch]);
 
-  // Accept all high-confidence matches
+  // Accept all suggested matches (regardless of confidence for needs_review items)
   const handleAcceptAll = useCallback(() => {
     state.matches.exercises.forEach(exercise => {
-      if (exercise.status === 'needs_review' && exercise.confidence >= 70 && exercise.matchedGarminName) {
+      // Accept any needs_review item that has a suggested match
+      if (exercise.status === 'needs_review' && exercise.matchedGarminName) {
         dispatch({
           type: 'UPDATE_EXERCISE_MATCH',
           id: exercise.id,
@@ -386,7 +394,7 @@ export function MatchStep({ userId }: MatchStepProps) {
                 <div className="flex items-center gap-2">
                   {exercise.status !== 'new' && (
                     <span className={cn('text-sm font-medium', getConfidenceColor(exercise.confidence))}>
-                      {exercise.confidence}%
+                      {normalizeConfidence(exercise.confidence)}%
                     </span>
                   )}
                   <Badge variant="secondary" className={cn('text-xs', config.bg, config.color)}>

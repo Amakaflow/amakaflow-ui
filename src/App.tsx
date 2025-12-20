@@ -25,6 +25,7 @@ import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
 import { BulkImport } from './components/BulkImport';
+import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
@@ -77,6 +78,18 @@ export default function App() {
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [bulkImportType, setBulkImportType] = useState<BulkInputType | undefined>(undefined);
+  // Pinterest bulk import modal state
+  const [pinterestBulkModal, setPinterestBulkModal] = useState<{
+    open: boolean;
+    workouts: WorkoutStructure[];
+    originalTitle: string;
+    sourceUrl: string;
+  }>({
+    open: false,
+    workouts: [],
+    originalTitle: '',
+    sourceUrl: '',
+  });
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     title: string;
@@ -582,10 +595,48 @@ export default function App() {
       
       // Only proceed if we haven't returned above
       console.log('✅ OCR quality acceptable or Vision API used, proceeding to structure page');
-      
+
       // Quality is acceptable OR Vision API was used - proceed to structure page
       // IMPORTANT: This code should NOT execute if quality was poor (we returned above)
       setGenerationProgress('Complete!');
+
+      // Check for bulk workouts (Pinterest multi-day plans, boards)
+      const bulkWorkouts = structure._bulkWorkouts;
+      if (bulkWorkouts && bulkWorkouts.length > 1) {
+        const originalTitle = (structure._provenance?.original_title as string) || structure.title;
+        const workoutLabels = structure._provenance?.workout_labels as string[] || [];
+
+        console.log(`[Bulk Import] Detected ${bulkWorkouts.length} workouts:`, workoutLabels);
+
+        // Show error toast and redirect to Bulk Import
+        clearInterval(progressInterval);
+        setLoading(false);
+        setGenerationProgress(null);
+        setGenerationAbortController(null);
+        toast.dismiss('generate-structure');
+
+        toast.error(
+          `"${originalTitle}" contains ${bulkWorkouts.length} separate workouts (${workoutLabels.slice(0, 3).join(', ')}${workoutLabels.length > 3 ? '...' : ''}). Please use Bulk Import to import all workouts at once.`,
+          {
+            duration: 15000,
+            id: 'pinterest-bulk-error',
+            action: {
+              label: 'Go to Bulk Import',
+              onClick: () => {
+                // Navigate to Bulk Import with URLs mode
+                clearWorkflowState();
+                setBulkImportType('urls');
+                setCurrentView('bulk-import');
+                toast.info(`Paste your Pinterest URL in the Bulk Import to import all ${bulkWorkouts.length} workouts.`);
+              },
+            },
+          }
+        );
+
+        // Don't proceed to structure page
+        return;
+      }
+
       setWorkout(structure);
       setSources(newSources);
       setCurrentStep('structure');
@@ -630,6 +681,57 @@ export default function App() {
       generationAbortController.abort();
       setGenerationAbortController(null);
     }
+  };
+
+  // Pinterest bulk import handlers
+  const handlePinterestBulkImport = async (workouts: WorkoutStructure[]) => {
+    // Import all selected workouts to My Workouts
+    const { saveWorkoutToAPI } = await import('./lib/workout-api');
+
+    // Get profile ID from user
+    const profileId = user?.id || 'dev-user';
+
+    for (const workout of workouts) {
+      try {
+        // Normalize workout before saving
+        const normalized = normalizeWorkoutStructure(workout);
+        await saveWorkoutToAPI({
+          profile_id: profileId,
+          workout_data: normalized,
+          sources: [workout.source || pinterestBulkModal.sourceUrl],
+          device: selectedDevice,
+          title: workout.title,
+        });
+      } catch (error) {
+        console.error('Failed to save workout:', workout.title, error);
+        throw error;
+      }
+    }
+
+    // Refresh workout history
+    const history = await getWorkoutHistory();
+    setWorkoutHistoryList(history);
+  };
+
+  const handlePinterestEditSingle = (workout: WorkoutStructure) => {
+    // Load single workout for editing in the structure step
+    const normalized = normalizeWorkoutStructure(workout);
+    setWorkout(normalized);
+    setSources([]);
+    setCurrentStep('structure');
+    setWorkoutSaved(false);
+    setIsCreatingFromScratch(false);
+    setIsEditingFromHistory(false);
+    toast.success(`Editing: ${workout.title}`);
+  };
+
+  const handlePinterestBulkClose = () => {
+    setPinterestBulkModal({
+      open: false,
+      workouts: [],
+      originalTitle: '',
+      sourceUrl: '',
+    });
   };
 
   const handleLoadTemplate = (template: WorkoutStructure) => {
@@ -1713,6 +1815,17 @@ export default function App() {
         onConfirm={confirmDialog.onConfirm}
         confirmText="Continue"
         cancelText="Cancel"
+      />
+
+      {/* Pinterest Bulk Import Modal */}
+      <PinterestBulkImportModal
+        open={pinterestBulkModal.open}
+        onClose={handlePinterestBulkClose}
+        workouts={pinterestBulkModal.workouts}
+        originalTitle={pinterestBulkModal.originalTitle}
+        sourceUrl={pinterestBulkModal.sourceUrl}
+        onImportSelected={handlePinterestBulkImport}
+        onEditSingle={handlePinterestEditSingle}
       />
 
       {/* Dev-only build info badge (hidden in production) */}

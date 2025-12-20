@@ -116,6 +116,26 @@ export interface WorkoutStructure {
   source: string;
   settings?: WorkoutSettings;  // Workout-level defaults (AMA-96)
   blocks: Block[];
+  // For bulk imports (e.g., Pinterest multi-day plans)
+  _bulkWorkouts?: WorkoutStructure[];
+  _provenance?: {
+    mode?: string;
+    original_title?: string;
+    split_reason?: string;
+    workout_labels?: string[];
+    [key: string]: unknown;
+  };
+}
+
+// Bulk workout response from API (Pinterest boards, multi-workout plans)
+export interface BulkWorkoutResponse {
+  workouts: WorkoutStructure[];
+  total: number;
+  source_url: string;
+  _provenance?: {
+    mode: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface BlocksJson {
@@ -215,7 +235,7 @@ export interface MappingLookupResponse {
 }
 
 // Source Types (for UI)
-export type SourceType = 'instagram' | 'youtube' | 'tiktok' | 'image' | 'ai-text';
+export type SourceType = 'instagram' | 'youtube' | 'tiktok' | 'pinterest' | 'image' | 'ai-text';
 
 export interface Source {
   id: string;

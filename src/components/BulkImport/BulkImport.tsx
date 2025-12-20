@@ -58,6 +58,34 @@ const stepDescriptions: Record<string, { title: string; description: string }> =
 };
 
 /**
+ * Get contextual loading message based on current step and input type
+ */
+function getLoadingMessage(step: string, inputType: BulkInputType | null): string {
+  if (step === 'detect') {
+    switch (inputType) {
+      case 'urls':
+        return 'Extracting workouts from URLs (this may take a minute for Pinterest)...';
+      case 'images':
+        return 'Analyzing images with AI vision...';
+      case 'file':
+        return 'Parsing file contents...';
+      default:
+        return 'Processing...';
+    }
+  }
+  if (step === 'match') {
+    return 'Matching exercises to Garmin database...';
+  }
+  if (step === 'preview') {
+    return 'Generating workout preview...';
+  }
+  if (step === 'import') {
+    return 'Importing workouts to your account...';
+  }
+  return 'Processing...';
+}
+
+/**
  * Main content component (uses context)
  */
 function BulkImportContent({
@@ -118,7 +146,7 @@ function BulkImportContent({
               )}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {state.loading ? 'Processing...' : stepInfo.description}
+              {state.loading ? getLoadingMessage(state.step, state.inputType) : stepInfo.description}
             </p>
           </div>
         </div>

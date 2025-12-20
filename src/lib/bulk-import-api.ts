@@ -317,7 +317,7 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * Check if URL is a supported video platform
+ * Check if URL is a supported video/image platform
  */
 export function isSupportedVideoUrl(url: string): boolean {
   const supportedDomains = [
@@ -325,6 +325,8 @@ export function isSupportedVideoUrl(url: string): boolean {
     'youtu.be',
     'instagram.com',
     'tiktok.com',
+    'pinterest.com',
+    'pin.it',
   ];
 
   try {

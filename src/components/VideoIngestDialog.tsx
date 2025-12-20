@@ -136,6 +136,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'youtube';
     if (lowerUrl.includes('tiktok.com') || lowerUrl.includes('vm.tiktok.com')) return 'tiktok';
     if (lowerUrl.includes('instagram.com') || lowerUrl.includes('instagr.am')) return 'instagram';
+    if (lowerUrl.includes('pinterest.com') || lowerUrl.includes('pin.it')) return 'pinterest';
     return 'unknown';
   };
 
@@ -157,7 +158,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     const clientPlatform = detectPlatformFromUrl(normalizedVideoUrl);
 
     if (clientPlatform === 'unknown') {
-      setError('Could not detect video platform. Supported: YouTube, TikTok, Instagram');
+      setError('Could not detect video platform. Supported: YouTube, TikTok, Instagram, Pinterest');
       setStep('url');
       setIsLoading(false);
       return;

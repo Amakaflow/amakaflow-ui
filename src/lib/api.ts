@@ -1,4 +1,4 @@
-import { WorkoutStructure, SourceType, Block, Superset, Exercise } from '../types/workout';
+import { WorkoutStructure, SourceType, Block, Superset, Exercise, BulkWorkoutResponse } from '../types/workout';
 
 // API base URL - defaults to localhost:8004 (workout-ingestor-api)
 const API_BASE_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
@@ -352,6 +352,41 @@ export async function generateWorkoutStructure(
       );
 
       workout = resp;
+      break;
+    }
+
+    if (source.type === 'pinterest') {
+      // Pinterest can return either a single workout or bulk workouts
+      const resp = await apiCall<WorkoutStructure | BulkWorkoutResponse>(
+        '/ingest/pinterest',
+        {
+          method: 'POST',
+          body: JSON.stringify({ url: source.content }),
+        },
+        signal,
+      );
+
+      // Check if this is a bulk response (multi-workout plan or board)
+      if ('workouts' in resp && Array.isArray(resp.workouts) && resp.workouts.length > 0) {
+        const bulkResp = resp as BulkWorkoutResponse;
+        console.log(`[Pinterest] Bulk import detected: ${bulkResp.total} workouts`);
+
+        // Return the first workout with all bulk workouts attached for selection
+        const firstWorkout = bulkResp.workouts[0];
+        workout = {
+          ...firstWorkout,
+          _bulkWorkouts: bulkResp.workouts,
+          _provenance: {
+            ...firstWorkout._provenance,
+            ...bulkResp._provenance,
+            bulk_import: true,
+            total_workouts: bulkResp.total,
+          },
+        };
+      } else {
+        // Single workout response
+        workout = resp as WorkoutStructure;
+      }
       break;
     }
 

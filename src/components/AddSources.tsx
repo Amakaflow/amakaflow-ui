@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Youtube, Image, Sparkles, Plus, Trash2, Loader2, Upload, X, Eye, Sparkles as VisionIcon, XCircle, Copy, Check, Music2, Video, Instagram } from 'lucide-react';
+import { Youtube, Image, Sparkles, Plus, Trash2, Loader2, Upload, X, Eye, Sparkles as VisionIcon, XCircle, Copy, Check, Music2, Video, Instagram, ImageIcon } from 'lucide-react';
 import { Source, SourceType, WorkoutStructure } from '../types/workout';
 import { Textarea } from './ui/textarea';
 import { WorkoutTemplates } from './WorkoutTemplates';
@@ -19,7 +19,7 @@ import type { FollowAlongWorkout } from '../types/follow-along';
 import { toast } from 'sonner';
 
 // Helper to detect video platform from URL
-type VideoPlatform = 'youtube' | 'tiktok' | 'instagram' | 'unknown';
+type VideoPlatform = 'youtube' | 'tiktok' | 'instagram' | 'pinterest' | 'unknown';
 
 function detectVideoPlatform(url: string): VideoPlatform {
   if (!url) return 'unknown';
@@ -27,6 +27,7 @@ function detectVideoPlatform(url: string): VideoPlatform {
   if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'youtube';
   if (lowerUrl.includes('tiktok.com') || lowerUrl.includes('vm.tiktok.com')) return 'tiktok';
   if (lowerUrl.includes('instagram.com') || lowerUrl.includes('instagr.am')) return 'instagram';
+  if (lowerUrl.includes('pinterest.com') || lowerUrl.includes('pin.it')) return 'pinterest';
   return 'unknown';
 }
 
@@ -102,6 +103,23 @@ function VideoInputSection({ currentInput, setCurrentInput, onAddSource }: Video
           ],
           alertText: 'Instagram videos require manual exercise entry. oEmbed provides thumbnail and creator info when available.',
         };
+      case 'pinterest':
+        return {
+          icon: <ImageIcon className="w-4 h-4 text-red-500" />,
+          name: 'Pinterest',
+          method: 'Vision AI Workout Extraction',
+          detail: 'GPT-4o-mini extracts exercises from infographic images',
+          badge: 'AI Vision',
+          badgeColor: 'bg-red-500',
+          alertColor: 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800',
+          alertIconColor: 'text-red-500 dark:text-red-400',
+          alertTextColor: 'text-red-800 dark:text-red-200',
+          steps: [
+            { label: 'Step 1', text: 'Image downloaded from Pinterest pin or board' },
+            { label: 'Step 2', text: 'GPT-4o Vision analyzes workout infographic to extract exercises' },
+          ],
+          alertText: 'Works best with workout infographics. Boards process up to 20 pins automatically.',
+        };
       default:
         return null;
     }
@@ -136,14 +154,15 @@ function VideoInputSection({ currentInput, setCurrentInput, onAddSource }: Video
                 Paste a video URL to get started
               </p>
               <p className="text-xs text-muted-foreground">
-                Supports YouTube, TikTok, and Instagram
+                Supports YouTube, TikTok, Instagram, and Pinterest
               </p>
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             <Badge variant="outline" className="text-xs"><Youtube className="w-3 h-3 mr-1" />YouTube</Badge>
             <Badge variant="outline" className="text-xs"><Music2 className="w-3 h-3 mr-1" />TikTok</Badge>
             <Badge variant="outline" className="text-xs"><Instagram className="w-3 h-3 mr-1" />Instagram</Badge>
+            <Badge variant="outline" className="text-xs"><ImageIcon className="w-3 h-3 mr-1" />Pinterest</Badge>
           </div>
         </div>
       )}
@@ -152,7 +171,7 @@ function VideoInputSection({ currentInput, setCurrentInput, onAddSource }: Video
         <Label>Video URL</Label>
         <div className="flex gap-2">
           <Input
-            placeholder="https://youtube.com/watch?v=... or instagram.com/reel/... or tiktok.com/..."
+            placeholder="Paste YouTube, TikTok, Instagram, or Pinterest URL..."
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onAddSource()}

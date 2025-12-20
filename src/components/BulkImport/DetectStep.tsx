@@ -4,7 +4,7 @@
  * Step 1 of bulk import: Input selection and detection.
  * Supports three input types:
  * - File (Excel, CSV, JSON, Text)
- * - URLs (YouTube, Instagram, TikTok)
+ * - URLs (YouTube, Instagram, TikTok, Pinterest)
  * - Images (workout screenshots)
  */
 
@@ -46,6 +46,8 @@ const platformConfig = {
   youtube: { icon: Film, label: 'YouTube', color: 'text-red-400', bg: 'bg-red-500/10' },
   instagram: { icon: Image, label: 'Instagram', color: 'text-pink-400', bg: 'bg-pink-500/10' },
   tiktok: { icon: Film, label: 'TikTok', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  pinterest: { icon: Image, label: 'Pinterest', color: 'text-red-500', bg: 'bg-red-500/10' },
+  pinterest_board: { icon: Image, label: 'Pinterest Board', color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 
 export function DetectStep({ userId }: DetectStepProps) {
@@ -131,6 +133,7 @@ export function DetectStep({ userId }: DetectStepProps) {
     if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
     if (url.includes('instagram.com')) return 'instagram';
     if (url.includes('tiktok.com')) return 'tiktok';
+    if (url.includes('pinterest.com') || url.includes('pin.it')) return 'pinterest';
     return null;
   };
 
@@ -196,7 +199,7 @@ export function DetectStep({ userId }: DetectStepProps) {
         >
           <Link className={cn('w-8 h-8', state.inputType === 'urls' ? 'text-primary' : 'text-muted-foreground')} />
           <span className={cn('font-medium', state.inputType === 'urls' ? 'text-primary' : 'text-foreground')}>URLs</span>
-          <span className="text-xs text-muted-foreground text-center">YouTube, TikTok</span>
+          <span className="text-xs text-muted-foreground text-center">YouTube, TikTok, Pinterest</span>
         </button>
 
         <button
@@ -300,7 +303,7 @@ export function DetectStep({ userId }: DetectStepProps) {
             <Textarea
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder={`https://youtube.com/watch?v=abc123\nhttps://instagram.com/reel/xyz789\nhttps://tiktok.com/@user/video/123`}
+              placeholder={`https://youtube.com/watch?v=abc123\nhttps://instagram.com/reel/xyz789\nhttps://tiktok.com/@user/video/123\nhttps://pinterest.com/pin/123456789`}
               rows={6}
               className="font-mono text-sm"
             />
@@ -446,7 +449,11 @@ export function DetectStep({ userId }: DetectStepProps) {
         {state.loading ? (
           <>
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Processing...
+            {state.inputType === 'urls'
+              ? 'Extracting workouts (may take a minute)...'
+              : state.inputType === 'images'
+              ? 'Analyzing with AI vision...'
+              : 'Processing...'}
           </>
         ) : (
           <>
