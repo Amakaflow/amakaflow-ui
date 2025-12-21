@@ -842,6 +842,130 @@ async def export_csv_bulk(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/export/json")
+async def export_json(
+    workout: Workout,
+    include_metadata: bool = True,
+    pretty: bool = True,
+):
+    """
+    Export workout as JSON format.
+
+    Args:
+        workout: Workout data to export
+        include_metadata: Include export metadata (timestamp, version)
+        pretty: Pretty-print with indentation
+
+    Returns:
+        JSON file download
+    """
+    try:
+        json_bytes = ExportService.render_json(
+            workout,
+            include_metadata=include_metadata,
+            pretty=pretty,
+        )
+        return Response(
+            content=json_bytes,
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="workout.json"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/export/json/bulk")
+async def export_json_bulk(
+    workouts: list[Workout],
+    include_metadata: bool = True,
+    pretty: bool = True,
+):
+    """
+    Export multiple workouts as a single JSON file.
+
+    Args:
+        workouts: List of workout data to export
+        include_metadata: Include export metadata
+        pretty: Pretty-print with indentation
+
+    Returns:
+        JSON file download with all workouts
+    """
+    try:
+        json_bytes = ExportService.render_json_bulk(
+            workouts,
+            include_metadata=include_metadata,
+            pretty=pretty,
+        )
+        return Response(
+            content=json_bytes,
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="workouts.json"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/export/pdf")
+async def export_pdf(workout: Workout):
+    """
+    Export workout as PDF format.
+
+    Requires reportlab to be installed.
+
+    Returns:
+        PDF file download
+    """
+    try:
+        pdf_bytes = ExportService.render_pdf(workout)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="workout.pdf"'},
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/export/bulk/zip")
+async def export_bulk_zip(
+    workouts: list[Workout],
+    formats: list[str] = None,
+    csv_style: str = "strong",
+):
+    """
+    Export multiple workouts as a ZIP archive.
+
+    Args:
+        workouts: List of workout data to export
+        formats: List of formats to include (default: json, csv, text)
+                 Options: json, csv, tcx, text, fit, pdf
+        csv_style: CSV format style ('strong' or 'extended')
+
+    Returns:
+        ZIP file download with all workouts in specified formats
+    """
+    try:
+        # Default formats if not specified
+        if formats is None:
+            formats = ["json", "csv", "text"]
+
+        zip_bytes = ExportService.render_bulk_zip(
+            workouts,
+            formats=formats,
+            csv_style=csv_style,
+        )
+        return Response(
+            content=zip_bytes,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="workouts.zip"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 # YouTube ingest – NEW logic
 # ---------------------------------------------------------------------------
