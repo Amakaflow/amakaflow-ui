@@ -224,3 +224,373 @@ export async function deleteWorkoutFromAPI(workoutId: string, profileId: string)
   }
 }
 
+
+// =============================================================================
+// Favorites & Usage Tracking (AMA-122)
+// =============================================================================
+
+/**
+ * Toggle favorite status for a workout
+ */
+export async function toggleWorkoutFavorite(
+  workoutId: string,
+  profileId: string,
+  isFavorite: boolean
+): Promise<SavedWorkout | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; workout?: SavedWorkout; message: string }>(
+      `/workouts/${workoutId}/favorite`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ profile_id: profileId, is_favorite: isFavorite }),
+      }
+    );
+
+    return response.success ? response.workout || null : null;
+  } catch (err) {
+    console.error('[toggleWorkoutFavorite] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Track workout usage (update last_used_at and increment times_completed)
+ */
+export async function trackWorkoutUsage(
+  workoutId: string,
+  profileId: string
+): Promise<SavedWorkout | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; workout?: SavedWorkout; message: string }>(
+      `/workouts/${workoutId}/used`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ profile_id: profileId }),
+      }
+    );
+
+    return response.success ? response.workout || null : null;
+  } catch (err) {
+    console.error('[trackWorkoutUsage] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Update tags for a workout
+ */
+export async function updateWorkoutTags(
+  workoutId: string,
+  profileId: string,
+  tags: string[]
+): Promise<SavedWorkout | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; workout?: SavedWorkout; message: string }>(
+      `/workouts/${workoutId}/tags`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ profile_id: profileId, tags }),
+      }
+    );
+
+    return response.success ? response.workout || null : null;
+  } catch (err) {
+    console.error('[updateWorkoutTags] Error:', err);
+    return null;
+  }
+}
+
+
+// =============================================================================
+// Programs (AMA-122)
+// =============================================================================
+
+export interface WorkoutProgram {
+  id: string;
+  profile_id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  current_day_index: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  members?: ProgramMember[];
+}
+
+export interface ProgramMember {
+  id: string;
+  program_id: string;
+  workout_id?: string;
+  follow_along_id?: string;
+  day_order: number;
+  created_at: string;
+}
+
+export interface CreateProgramRequest {
+  profile_id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface UpdateProgramRequest {
+  profile_id: string;
+  name?: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  is_active?: boolean;
+  current_day_index?: number;
+}
+
+/**
+ * Create a new workout program
+ */
+export async function createProgram(request: CreateProgramRequest): Promise<WorkoutProgram | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; program?: WorkoutProgram; message: string }>(
+      '/programs',
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    );
+
+    return response.success ? response.program || null : null;
+  } catch (err) {
+    console.error('[createProgram] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Get all programs for a user
+ */
+export async function getPrograms(
+  profileId: string,
+  includeInactive: boolean = false
+): Promise<WorkoutProgram[]> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+      include_inactive: includeInactive.toString(),
+    });
+
+    const response = await workoutApiCall<{ success: boolean; programs: WorkoutProgram[]; count: number }>(
+      `/programs?${queryParams.toString()}`
+    );
+
+    return response.programs || [];
+  } catch (err) {
+    console.error('[getPrograms] Error:', err);
+    return [];
+  }
+}
+
+/**
+ * Get a single program with its members
+ */
+export async function getProgram(programId: string, profileId: string): Promise<WorkoutProgram | null> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
+
+    const response = await workoutApiCall<{ success: boolean; program?: WorkoutProgram; message?: string }>(
+      `/programs/${programId}?${queryParams.toString()}`
+    );
+
+    return response.success ? response.program || null : null;
+  } catch (err) {
+    console.error('[getProgram] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Update a program
+ */
+export async function updateProgram(
+  programId: string,
+  request: UpdateProgramRequest
+): Promise<WorkoutProgram | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; program?: WorkoutProgram; message: string }>(
+      `/programs/${programId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(request),
+      }
+    );
+
+    return response.success ? response.program || null : null;
+  } catch (err) {
+    console.error('[updateProgram] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete a program
+ */
+export async function deleteProgram(programId: string, profileId: string): Promise<boolean> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
+
+    const response = await workoutApiCall<{ success: boolean; message: string }>(
+      `/programs/${programId}?${queryParams.toString()}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    return response.success;
+  } catch (err) {
+    console.error('[deleteProgram] Error:', err);
+    return false;
+  }
+}
+
+/**
+ * Add a workout or follow-along to a program
+ */
+export async function addToProgram(
+  programId: string,
+  profileId: string,
+  workoutId?: string,
+  followAlongId?: string,
+  dayOrder?: number
+): Promise<ProgramMember | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; member?: ProgramMember; message: string }>(
+      `/programs/${programId}/members`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          profile_id: profileId,
+          workout_id: workoutId,
+          follow_along_id: followAlongId,
+          day_order: dayOrder,
+        }),
+      }
+    );
+
+    return response.success ? response.member || null : null;
+  } catch (err) {
+    console.error('[addToProgram] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Remove a workout from a program
+ */
+export async function removeFromProgram(
+  programId: string,
+  memberId: string,
+  profileId: string
+): Promise<boolean> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
+
+    const response = await workoutApiCall<{ success: boolean; message: string }>(
+      `/programs/${programId}/members/${memberId}?${queryParams.toString()}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    return response.success;
+  } catch (err) {
+    console.error('[removeFromProgram] Error:', err);
+    return false;
+  }
+}
+
+
+// =============================================================================
+// User Tags (AMA-122)
+// =============================================================================
+
+export interface UserTag {
+  id: string;
+  profile_id: string;
+  name: string;
+  color?: string;
+  created_at: string;
+}
+
+/**
+ * Get all tags for a user
+ */
+export async function getUserTags(profileId: string): Promise<UserTag[]> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
+
+    const response = await workoutApiCall<{ success: boolean; tags: UserTag[]; count: number }>(
+      `/tags?${queryParams.toString()}`
+    );
+
+    return response.tags || [];
+  } catch (err) {
+    console.error('[getUserTags] Error:', err);
+    return [];
+  }
+}
+
+/**
+ * Create a new user tag
+ */
+export async function createUserTag(
+  profileId: string,
+  name: string,
+  color?: string
+): Promise<UserTag | null> {
+  try {
+    const response = await workoutApiCall<{ success: boolean; tag?: UserTag; message: string }>(
+      '/tags',
+      {
+        method: 'POST',
+        body: JSON.stringify({ profile_id: profileId, name, color }),
+      }
+    );
+
+    return response.success ? response.tag || null : null;
+  } catch (err) {
+    console.error('[createUserTag] Error:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete a user tag
+ */
+export async function deleteUserTag(tagId: string, profileId: string): Promise<boolean> {
+  try {
+    const queryParams = new URLSearchParams({
+      profile_id: profileId,
+    });
+
+    const response = await workoutApiCall<{ success: boolean; message: string }>(
+      `/tags/${tagId}?${queryParams.toString()}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    return response.success;
+  } catch (err) {
+    console.error('[deleteUserTag] Error:', err);
+    return false;
+  }
+}
+

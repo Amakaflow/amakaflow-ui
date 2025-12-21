@@ -368,6 +368,14 @@ export function normalizeHistoryWorkout(item: WorkoutHistoryItem): UnifiedWorkou
       data: item,
     },
     searchableText,
+    // AMA-122: Favorites, usage tracking, tags, programs
+    isFavorite: (item as any).isFavorite ?? false,
+    favoriteOrder: (item as any).favoriteOrder,
+    lastUsedAt: (item as any).lastUsedAt,
+    timesCompleted: (item as any).timesCompleted ?? 0,
+    tags: (item as any).tags ?? [],
+    programId: (item as any).programId,
+    programDayOrder: (item as any).programDayOrder,
   };
 }
 
@@ -435,6 +443,14 @@ export function normalizeFollowAlongWorkout(item: FollowAlongWorkout): UnifiedWo
       data: item,
     },
     searchableText,
+    // AMA-122: Favorites, usage tracking, tags, programs
+    isFavorite: (item as any).isFavorite ?? false,
+    favoriteOrder: (item as any).favoriteOrder,
+    lastUsedAt: (item as any).lastUsedAt,
+    timesCompleted: (item as any).timesCompleted ?? 0,
+    tags: (item as any).tags ?? [],
+    programId: (item as any).programId,
+    programDayOrder: (item as any).programDayOrder,
   };
 }
 

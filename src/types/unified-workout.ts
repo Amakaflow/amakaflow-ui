@@ -157,6 +157,128 @@ export interface UnifiedWorkout {
    * creator, platform names, etc. for fast search filtering.
    */
   searchableText: string;
+
+  // ---------------------------------------------------------------------------
+  // Favorites & Usage (AMA-122)
+  // ---------------------------------------------------------------------------
+
+  /** Whether this workout is marked as favorite */
+  isFavorite: boolean;
+
+  /** Order within favorites list (lower = higher priority) */
+  favoriteOrder?: number;
+
+  /** When the workout was last used/completed */
+  lastUsedAt?: string;
+
+  /** Number of times the workout has been completed */
+  timesCompleted: number;
+
+  // ---------------------------------------------------------------------------
+  // Tags (AMA-122)
+  // ---------------------------------------------------------------------------
+
+  /** User-assigned tags */
+  tags: string[];
+
+  // ---------------------------------------------------------------------------
+  // Program Membership (AMA-122)
+  // ---------------------------------------------------------------------------
+
+  /** Program ID if workout belongs to a program */
+  programId?: string;
+
+  /** Order within the program (day number) */
+  programDayOrder?: number;
+}
+
+// =============================================================================
+// Program Types (AMA-122)
+// =============================================================================
+
+/**
+ * Workout program - a collection of workouts organized by day order.
+ */
+export interface WorkoutProgram {
+  /** Unique identifier */
+  id: string;
+
+  /** User's profile ID */
+  profileId: string;
+
+  /** Program name */
+  name: string;
+
+  /** Program description */
+  description?: string;
+
+  /** Color for UI display (hex) */
+  color?: string;
+
+  /** Icon identifier */
+  icon?: string;
+
+  /** Current day index in the program (0-based) */
+  currentDayIndex: number;
+
+  /** Whether the program is currently active */
+  isActive: boolean;
+
+  /** When the program was created */
+  createdAt: string;
+
+  /** When the program was last updated */
+  updatedAt: string;
+
+  /** Program members (loaded separately) */
+  members?: ProgramMember[];
+}
+
+/**
+ * A workout's membership in a program.
+ */
+export interface ProgramMember {
+  /** Unique identifier */
+  id: string;
+
+  /** Program ID */
+  programId: string;
+
+  /** Workout ID (if regular workout) */
+  workoutId?: string;
+
+  /** Follow-along workout ID (if follow-along) */
+  followAlongId?: string;
+
+  /** Day order within program (1-indexed) */
+  dayOrder: number;
+
+  /** When added to program */
+  createdAt: string;
+}
+
+// =============================================================================
+// User Tag Types (AMA-122)
+// =============================================================================
+
+/**
+ * User-created tag for organizing workouts.
+ */
+export interface UserTag {
+  /** Unique identifier */
+  id: string;
+
+  /** User's profile ID */
+  profileId: string;
+
+  /** Tag name */
+  name: string;
+
+  /** Color for UI display (hex) */
+  color?: string;
+
+  /** When the tag was created */
+  createdAt: string;
 }
 
 // =============================================================================

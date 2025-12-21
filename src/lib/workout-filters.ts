@@ -455,3 +455,211 @@ export function getSyncStatusLabel(status: SyncStatusFilter): string {
       return 'Not Synced';
   }
 }
+
+
+// =============================================================================
+// Sorting (AMA-122)
+// =============================================================================
+
+export type SortOption =
+  | 'recently-added'
+  | 'recently-used'
+  | 'alphabetical-asc'
+  | 'alphabetical-desc'
+  | 'shortest-duration'
+  | 'longest-duration'
+  | 'fewest-exercises'
+  | 'most-exercises';
+
+export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'recently-added', label: 'Recently Added' },
+  { value: 'recently-used', label: 'Recently Used' },
+  { value: 'alphabetical-asc', label: 'Alphabetical (A-Z)' },
+  { value: 'alphabetical-desc', label: 'Alphabetical (Z-A)' },
+  { value: 'shortest-duration', label: 'Shortest Duration' },
+  { value: 'longest-duration', label: 'Longest Duration' },
+  { value: 'fewest-exercises', label: 'Fewest Exercises' },
+  { value: 'most-exercises', label: 'Most Exercises' },
+];
+
+/**
+ * Sort workouts based on selected sort option
+ */
+export function sortWorkouts(
+  workouts: UnifiedWorkout[],
+  sortOption: SortOption
+): UnifiedWorkout[] {
+  const sorted = [...workouts];
+
+  switch (sortOption) {
+    case 'recently-added':
+      return sorted.sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return bTime - aTime;
+      });
+
+    case 'recently-used':
+      return sorted.sort((a, b) => {
+        // Workouts with lastUsedAt come first, sorted by most recent
+        // Workouts without lastUsedAt come last, sorted by createdAt
+        const aUsed = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+        const bUsed = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+
+        if (aUsed && bUsed) return bUsed - aUsed;
+        if (aUsed) return -1;
+        if (bUsed) return 1;
+
+        // Fall back to createdAt for never-used workouts
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+    case 'alphabetical-asc':
+      return sorted.sort((a, b) =>
+        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      );
+
+    case 'alphabetical-desc':
+      return sorted.sort((a, b) =>
+        b.title.toLowerCase().localeCompare(a.title.toLowerCase())
+      );
+
+    case 'shortest-duration':
+      return sorted.sort((a, b) => a.durationSec - b.durationSec);
+
+    case 'longest-duration':
+      return sorted.sort((a, b) => b.durationSec - a.durationSec);
+
+    case 'fewest-exercises':
+      return sorted.sort((a, b) => a.exerciseCount - b.exerciseCount);
+
+    case 'most-exercises':
+      return sorted.sort((a, b) => b.exerciseCount - a.exerciseCount);
+
+    default:
+      return sorted;
+  }
+}
+
+
+// =============================================================================
+// Enhanced Filters (AMA-122)
+// =============================================================================
+
+export type DurationPreset = 'any' | 'quick' | 'medium' | 'long' | 'extended';
+
+export const DURATION_PRESETS: { value: DurationPreset; label: string; minSec?: number; maxSec?: number }[] = [
+  { value: 'any', label: 'Any Duration' },
+  { value: 'quick', label: 'Quick (<20 min)', maxSec: 20 * 60 },
+  { value: 'medium', label: 'Medium (20-45 min)', minSec: 20 * 60, maxSec: 45 * 60 },
+  { value: 'long', label: 'Long (45-60 min)', minSec: 45 * 60, maxSec: 60 * 60 },
+  { value: 'extended', label: 'Extended (60+ min)', minSec: 60 * 60 },
+];
+
+/**
+ * Check if workout matches duration filter
+ */
+export function matchesDuration(workout: UnifiedWorkout, preset: DurationPreset): boolean {
+  if (preset === 'any') return true;
+
+  const presetConfig = DURATION_PRESETS.find(p => p.value === preset);
+  if (!presetConfig) return true;
+
+  const duration = workout.durationSec;
+
+  if (presetConfig.minSec !== undefined && duration < presetConfig.minSec) return false;
+  if (presetConfig.maxSec !== undefined && duration >= presetConfig.maxSec) return false;
+
+  return true;
+}
+
+/**
+ * Check if workout matches favorites filter
+ */
+export function matchesFavoritesOnly(workout: UnifiedWorkout, favoritesOnly: boolean): boolean {
+  if (!favoritesOnly) return true;
+  return workout.isFavorite;
+}
+
+/**
+ * Check if workout matches tags filter
+ */
+export function matchesTags(workout: UnifiedWorkout, tags: string[]): boolean {
+  if (tags.length === 0) return true;
+  // Workout must have at least one of the selected tags
+  return tags.some(tag => workout.tags.includes(tag));
+}
+
+/**
+ * Check if workout matches creator filter
+ */
+export function matchesCreator(workout: UnifiedWorkout, creators: string[]): boolean {
+  if (creators.length === 0) return true;
+  if (!workout.creator) return false;
+  return creators.includes(workout.creator);
+}
+
+/**
+ * Extended filter function with new AMA-122 filters
+ */
+export function filterWorkoutsExtended(
+  workouts: UnifiedWorkout[],
+  filters: WorkoutFilters & {
+    durationPreset?: DurationPreset;
+    favoritesOnly?: boolean;
+    tags?: string[];
+    creators?: string[];
+  }
+): UnifiedWorkout[] {
+  // First apply base filters
+  let filtered = filterWorkouts(workouts, filters);
+
+  // Then apply extended filters
+  if (filters.durationPreset) {
+    filtered = filtered.filter(w => matchesDuration(w, filters.durationPreset!));
+  }
+
+  if (filters.favoritesOnly) {
+    filtered = filtered.filter(w => matchesFavoritesOnly(w, filters.favoritesOnly!));
+  }
+
+  if (filters.tags && filters.tags.length > 0) {
+    filtered = filtered.filter(w => matchesTags(w, filters.tags!));
+  }
+
+  if (filters.creators && filters.creators.length > 0) {
+    filtered = filtered.filter(w => matchesCreator(w, filters.creators!));
+  }
+
+  return filtered;
+}
+
+/**
+ * Extract unique creators from workout list
+ */
+export function extractCreators(workouts: UnifiedWorkout[]): string[] {
+  const creators = new Set<string>();
+
+  for (const workout of workouts) {
+    if (workout.creator) {
+      creators.add(workout.creator);
+    }
+  }
+
+  return Array.from(creators).sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Extract unique tags from workout list
+ */
+export function extractTags(workouts: UnifiedWorkout[]): string[] {
+  const tags = new Set<string>();
+
+  for (const workout of workouts) {
+    for (const tag of workout.tags) {
+      tags.add(tag);
+    }
+  }
+
+  return Array.from(tags).sort((a, b) => a.localeCompare(b));
+}

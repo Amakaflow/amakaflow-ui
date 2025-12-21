@@ -29,6 +29,9 @@ import {
   FileSpreadsheet,
   FileText,
   Activity,
+  Star,
+  Tag,
+  Settings2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -55,14 +58,17 @@ import {
 import { exportAndDownload, CsvStyle, ExportFormat } from '../lib/export-api';
 
 import type { UnifiedWorkout } from '../types/unified-workout';
-import type { WorkoutFilters } from '../lib/workout-filters';
+import type { WorkoutFilters, SortOption } from '../lib/workout-filters';
 import {
   DEFAULT_FILTERS,
   filterWorkouts,
   hasActiveFilters,
+  sortWorkouts,
+  SORT_OPTIONS,
 } from '../lib/workout-filters';
 import { fetchAllWorkouts } from '../lib/unified-workouts';
 import { deleteWorkoutFromHistory } from '../lib/workout-history';
+import { toggleWorkoutFavorite } from '../lib/workout-api';
 import { deleteFollowAlong } from '../lib/follow-along-api';
 import {
   isHistoryWorkout,
@@ -73,6 +79,12 @@ import {
 import type { WorkoutHistoryItem } from '../lib/workout-history';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { ViewWorkout } from './ViewWorkout';
+import { ProgramsSection } from './ProgramsSection';
+import { TagPill } from './TagPill';
+import { TagManagementModal } from './TagManagementModal';
+import { WorkoutTagsEditor } from './WorkoutTagsEditor';
+import { getUserTags, updateWorkoutTags } from '../lib/workout-api';
+import type { UserTag } from '../types/unified-workout';
 
 // =============================================================================
 // Types
@@ -171,6 +183,7 @@ export function UnifiedWorkouts({
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [syncFilter, setSyncFilter] = useState<'all' | 'synced' | 'not-synced'>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('recently-added');
   const [pageIndex, setPageIndex] = useState(0);
   const PAGE_SIZE = 10;
 
@@ -183,6 +196,11 @@ export function UnifiedWorkouts({
 
   // View workout modal state
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
+
+  // Tag state
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
+  const [showTagManagement, setShowTagManagement] = useState(false);
 
   // Fetch workouts
   const loadWorkouts = useCallback(async () => {
@@ -207,6 +225,20 @@ export function UnifiedWorkouts({
   useEffect(() => {
     loadWorkouts();
   }, [loadWorkouts]);
+
+  // Load user tags
+  const loadTags = useCallback(async () => {
+    try {
+      const tags = await getUserTags(profileId);
+      setAvailableTags(tags);
+    } catch (err) {
+      console.error('[UnifiedWorkouts] Error loading tags:', err);
+    }
+  }, [profileId]);
+
+  useEffect(() => {
+    loadTags();
+  }, [loadTags]);
 
   // Derive available platforms from data
   const availablePlatforms = useMemo(() => {
@@ -279,8 +311,18 @@ export function UnifiedWorkouts({
       );
     }
 
+    // Tag filter
+    if (tagFilter.length > 0) {
+      filtered = filtered.filter((w) =>
+        tagFilter.some((tag) => w.tags.includes(tag))
+      );
+    }
+
+    // Apply sorting
+    filtered = sortWorkouts(filtered, sortOption);
+
     return filtered;
-  }, [allWorkouts, sourceFilter, platformFilter, categoryFilter, syncFilter, searchQuery]);
+  }, [allWorkouts, sourceFilter, platformFilter, categoryFilter, syncFilter, searchQuery, sortOption, tagFilter]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredWorkouts.length / PAGE_SIZE));
@@ -373,6 +415,44 @@ export function UnifiedWorkouts({
 
   const handleDeleteCancel = () => {
     setConfirmDeleteId(null);
+  };
+
+  // Favorite toggle handler
+  const handleFavoriteToggle = async (workout: UnifiedWorkout, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const newFavoriteState = !workout.isFavorite;
+
+    // Optimistic update
+    setAllWorkouts((prev) =>
+      prev.map((w) =>
+        w.id === workout.id ? { ...w, isFavorite: newFavoriteState } : w
+      )
+    );
+
+    // Only call API for history workouts (follow-along favorites handled separately)
+    if (isHistoryWorkout(workout)) {
+      try {
+        await toggleWorkoutFavorite(workout.id, profileId, newFavoriteState);
+      } catch (err) {
+        console.error('[handleFavoriteToggle] Error:', err);
+        // Revert on error
+        setAllWorkouts((prev) =>
+          prev.map((w) =>
+            w.id === workout.id ? { ...w, isFavorite: !newFavoriteState } : w
+          )
+        );
+      }
+    }
+  };
+
+  // Tags update handler - updates local state
+  const handleTagsUpdate = (workoutId: string, newTags: string[]) => {
+    setAllWorkouts((prev) =>
+      prev.map((w) =>
+        w.id === workoutId ? { ...w, tags: newTags } : w
+      )
+    );
   };
 
   // Edit handler - converts unified workout back to original type
@@ -563,6 +643,47 @@ export function UnifiedWorkouts({
     );
   }
 
+  // Handle loading a unified workout (converts to WorkoutHistoryItem for parent)
+  const handleLoadUnified = (workout: UnifiedWorkout) => {
+    if (isHistoryWorkout(workout)) {
+      onLoadWorkout(workout._original.data);
+    } else if (isFollowAlongWorkout(workout)) {
+      // Convert follow-along to history-like format for loading
+      const followAlong = workout._original.data as FollowAlongWorkout;
+      const historyItem: WorkoutHistoryItem = {
+        id: followAlong.id,
+        workout: {
+          title: followAlong.title,
+          source: followAlong.source,
+          blocks: [
+            {
+              label: 'Follow Along',
+              structure: 'regular',
+              exercises: followAlong.steps.map((step) => ({
+                id: step.id,
+                name: step.label,
+                sets: null,
+                reps: step.targetReps || null,
+                reps_range: null,
+                duration_sec: step.durationSec || null,
+                rest_sec: null,
+                distance_m: null,
+                distance_range: null,
+                type: 'strength',
+                notes: step.notes,
+              })),
+            },
+          ],
+        },
+        sources: [followAlong.sourceUrl],
+        device: 'garmin',
+        createdAt: followAlong.createdAt,
+        updatedAt: followAlong.updatedAt,
+      };
+      onLoadWorkout(historyItem);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Delete Confirmation Modal */}
@@ -709,7 +830,81 @@ export function UnifiedWorkouts({
             <option value="synced">Synced</option>
             <option value="not-synced">Not synced</option>
           </select>
-          {(sourceFilter !== 'all' || platformFilter !== 'all' || categoryFilter !== 'all' || syncFilter !== 'all' || searchQuery) && (
+          {/* Tag filter dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-8 gap-1.5 ${tagFilter.length > 0 ? 'border-primary text-primary' : ''}`}
+              >
+                <Tag className="w-4 h-4" />
+                Tags
+                {tagFilter.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                    {tagFilter.length}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Filter by Tags</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {availableTags.length === 0 ? (
+                <div className="px-2 py-3 text-center text-sm text-muted-foreground">
+                  No tags yet
+                </div>
+              ) : (
+                availableTags.map((tag) => (
+                  <DropdownMenuItem
+                    key={tag.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setTagFilter((prev) =>
+                        prev.includes(tag.name)
+                          ? prev.filter((t) => t !== tag.name)
+                          : [...prev, tag.name]
+                      );
+                      setPageIndex(0);
+                    }}
+                    className="gap-2"
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        tagFilter.includes(tag.name) ? 'bg-primary border-primary' : ''
+                      }`}
+                    >
+                      {tagFilter.includes(tag.name) && (
+                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                      )}
+                    </div>
+                    <TagPill name={tag.name} color={tag.color} size="sm" />
+                  </DropdownMenuItem>
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowTagManagement(true)}>
+                <Settings2 className="w-4 h-4 mr-2" />
+                Manage Tags
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="h-4 border-l mx-1" /> {/* Divider */}
+          <select
+            value={sortOption}
+            onChange={(e) => {
+              setSortOption(e.target.value as SortOption);
+              setPageIndex(0);
+            }}
+            className="h-8 rounded-md border px-2 text-sm bg-background"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {(sourceFilter !== 'all' || platformFilter !== 'all' || categoryFilter !== 'all' || syncFilter !== 'all' || tagFilter.length > 0 || searchQuery || sortOption !== 'recently-added') && (
             <Button
               variant="ghost"
               size="sm"
@@ -718,7 +913,9 @@ export function UnifiedWorkouts({
                 setPlatformFilter('all');
                 setCategoryFilter('all');
                 setSyncFilter('all');
+                setTagFilter([]);
                 setSearchQuery('');
+                setSortOption('recently-added');
                 setPageIndex(0);
               }}
               className="h-8 text-xs text-muted-foreground"
@@ -728,6 +925,13 @@ export function UnifiedWorkouts({
           )}
         </div>
       </div>
+
+      {/* Programs Section */}
+      <ProgramsSection
+        profileId={profileId}
+        workouts={allWorkouts}
+        onLoadWorkout={handleLoadUnified}
+      />
 
       {/* Workout List */}
       <ScrollArea className="h-[calc(100vh-280px)]">
@@ -795,9 +999,52 @@ export function UnifiedWorkouts({
                       <Badge variant="outline" className="text-xs px-1.5 py-0">
                         {CATEGORY_DISPLAY_NAMES[workout.category]}
                       </Badge>
+                      {/* Tags */}
+                      {workout.tags.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          {workout.tags.slice(0, 3).map((tagName) => {
+                            const tag = availableTags.find((t) => t.name === tagName);
+                            return (
+                              <TagPill
+                                key={tagName}
+                                name={tagName}
+                                color={tag?.color}
+                                size="sm"
+                              />
+                            );
+                          })}
+                          {workout.tags.length > 3 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{workout.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Tag editor */}
+                    <WorkoutTagsEditor
+                      workoutId={workout.id}
+                      profileId={profileId}
+                      currentTags={workout.tags}
+                      onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleFavoriteToggle(workout, e)}
+                      className="h-8 w-8 p-0"
+                      title={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Star
+                        className={`w-4 h-4 ${
+                          workout.isFavorite
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-muted-foreground hover:text-yellow-400'
+                        }`}
+                      />
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -943,6 +1190,27 @@ export function UnifiedWorkouts({
                           </div>
                         )}
                       </div>
+                      {/* Tags */}
+                      {workout.tags.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-2">
+                          {workout.tags.slice(0, 5).map((tagName) => {
+                            const tag = availableTags.find((t) => t.name === tagName);
+                            return (
+                              <TagPill
+                                key={tagName}
+                                name={tagName}
+                                color={tag?.color}
+                                size="sm"
+                              />
+                            );
+                          })}
+                          {workout.tags.length > 5 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{workout.tags.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-shrink-0">
                       {isVideo ? (
@@ -964,6 +1232,27 @@ export function UnifiedWorkouts({
                 <CardContent className="px-4 pb-4 pt-0 border-t bg-muted/20">
                   <div className="flex items-center justify-between gap-3 pt-3">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => handleFavoriteToggle(workout, e)}
+                        className="h-9 w-9 p-0"
+                        title={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <Star
+                          className={`w-5 h-5 ${
+                            workout.isFavorite
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-muted-foreground hover:text-yellow-400'
+                          }`}
+                        />
+                      </Button>
+                      <WorkoutTagsEditor
+                        workoutId={workout.id}
+                        profileId={profileId}
+                        currentTags={workout.tags}
+                        onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
+                      />
                       <Button
                         size="sm"
                         variant="outline"
@@ -1123,6 +1412,14 @@ export function UnifiedWorkouts({
           onClose={() => setViewingWorkout(null)}
         />
       )}
+
+      {/* Tag Management Modal */}
+      <TagManagementModal
+        isOpen={showTagManagement}
+        onClose={() => setShowTagManagement(false)}
+        profileId={profileId}
+        onTagsChange={loadTags}
+      />
     </div>
   );
 }
