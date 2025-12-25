@@ -1109,7 +1109,7 @@ export default function App() {
               <img
                 src="/logo.png"
                 alt="AmakaFlow"
-                className="w-16 h-16 rounded-xl object-contain"
+                className="w-24 h-24 rounded-xl object-contain"
               />
             </div>
             <div>
@@ -1170,7 +1170,7 @@ export default function App() {
                 <img
                   src="/logo.png"
                   alt="AmakaFlow"
-                  className="w-16 h-16 rounded-xl object-contain"
+                  className="w-24 h-24 rounded-xl object-contain"
                 />
               </div>
               <div>
