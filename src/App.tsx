@@ -1165,9 +1165,11 @@ export default function App() {
           <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
             <div className="w-full max-w-md space-y-4 text-center">
               <div className="flex justify-center">
-                <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
-                  <Dumbbell className="w-8 h-8 text-primary-foreground" />
-                </div>
+                <img
+                  src="/logo.png"
+                  alt="AmakaFlow"
+                  className="w-16 h-16 rounded-xl object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-3xl font-bold">AmakaFlow</h1>
