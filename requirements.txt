@@ -13,3 +13,4 @@ requests
 
 # Local packages (installed via pip install -e)
 # amakaflow-fitfiletool - installed from ../amakaflow-fitfiletool
+amakaflow-fitfiletool>=0.2.3
