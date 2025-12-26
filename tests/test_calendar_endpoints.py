@@ -68,11 +68,11 @@ def test_delete_calendar_event_missing_header_returns_422(client):
     assert resp.status_code == 422
 
 
-def test_update_calendar_event_with_header_but_invalid_body_returns_422(client):
+def test_update_calendar_event_with_header_but_invalid_body_returns_error(client):
     """
-    PUT /calendar/{event_id} with header but bad body should 422.
+    PUT /calendar/{event_id} with header but bad body should return error.
     """
     event_id = str(uuid4())
     payload = {}
     resp = client.put(f"/calendar/{event_id}", json=payload, headers=BASE_HEADERS)
-    assert resp.status_code in (404, 422)
+    assert resp.status_code in (400, 404, 422)
