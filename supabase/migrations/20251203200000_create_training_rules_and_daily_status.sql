@@ -71,6 +71,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_sync_anchor_status ON workout_events;
+
 CREATE TRIGGER trigger_sync_anchor_status
 BEFORE INSERT OR UPDATE ON workout_events
 FOR EACH ROW
@@ -81,8 +83,8 @@ CREATE INDEX idx_training_rules_category ON training_rules(category);
 CREATE INDEX idx_training_rules_type ON training_rules(type);
 CREATE INDEX idx_training_rules_enabled ON training_rules(enabled) WHERE enabled = TRUE;
 CREATE INDEX idx_daily_status_user_date ON daily_status(user_id, date);
-CREATE INDEX idx_workout_events_block_type ON workout_events(block_type);
-CREATE INDEX idx_workout_events_anchor_type ON workout_events(anchor_type);
+CREATE INDEX IF NOT EXISTS idx_workout_events_block_type ON workout_events(block_type);
+CREATE INDEX IF NOT EXISTS idx_workout_events_anchor_type ON workout_events(anchor_type);
 
 -- RLS Policies
 ALTER TABLE training_rules ENABLE ROW LEVEL SECURITY;
