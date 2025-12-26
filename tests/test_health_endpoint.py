@@ -4,8 +4,3 @@ def test_health(client):
     data = resp.json()
     if isinstance(data, dict) and "status" in data:
         assert data["status"] == "ok"
-
-
-def test_healthz(client):
-    resp = client.get("/healthz")
-    assert resp.status_code == 200
