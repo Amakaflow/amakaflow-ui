@@ -27,5 +27,6 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v
         env:
+          PYTHONPATH: ${{ github.workspace }}
           DATABASE_URL: sqlite:///./test.db
           OPENAI_API_KEY: test-key
