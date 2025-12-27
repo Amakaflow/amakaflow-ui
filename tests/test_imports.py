@@ -13,7 +13,7 @@ def test_core_module_imports():
 def test_api_imports():
     """Import API route modules."""
     import workout_ingestor_api.api.routes
-    import workout_ingestor_api.api.routes_additions
+    # Note: routes_additions.py is a code snippet file, not a standalone module
     import workout_ingestor_api.api.bulk_import_routes
     import workout_ingestor_api.api.youtube_ingest
 
