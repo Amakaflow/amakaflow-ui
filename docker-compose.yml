@@ -38,8 +38,12 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - MAPPER_API_URL=http://mapper:8001
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
     networks:
       - amakaflow
+    depends_on:
+      - mapper
 
   # Mapper
   mapper:
@@ -59,6 +63,7 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - INGESTOR_URL=http://workout-ingestor:8004
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
     networks:
       - amakaflow
 
@@ -77,6 +82,7 @@ services:
       - PYTHONUNBUFFERED=1
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
     networks:
       - amakaflow
 
@@ -95,6 +101,7 @@ services:
       - PYTHONUNBUFFERED=1
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
     networks:
       - amakaflow
 
