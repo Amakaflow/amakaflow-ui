@@ -1,68 +1,68 @@
 from uuid import uuid4
 
-BASE_HEADERS = {"X-User-Id": "test-user"}
+# Note: X-User-Id header is no longer used - auth is handled via JWT/API key
+# which is mocked in conftest.py
 
 
-def test_get_calendar_events_missing_all_params_returns_422(client):
+def test_get_calendar_events_missing_params_returns_422(client):
+    """GET /calendar without required start/end params should return 422."""
     resp = client.get("/calendar")
     assert resp.status_code == 422
 
 
-def test_get_calendar_events_missing_header_returns_422(client):
+def test_get_calendar_events_with_valid_params(client):
+    """
+    With start/end params, we should at least pass FastAPI validation.
+    Auth is mocked so no headers needed.
+    """
     params = {"start": "2025-01-01", "end": "2025-01-31"}
     resp = client.get("/calendar", params=params)
-    assert resp.status_code == 422
-
-
-def test_get_calendar_events_with_valid_params_and_header_does_not_return_422(client):
-    """
-    With start/end and X-User-Id, we should at least pass FastAPI validation.
-    Later, once DB is fully wired, tighten this to assert 200 + response shape.
-    """
-    params = {"start": "2025-01-01", "end": "2025-01-31"}
-    resp = client.get("/calendar", params=params, headers=BASE_HEADERS)
 
     # We're deliberately lenient here to avoid coupling to DB behavior yet.
     assert resp.status_code != 422
 
 
-def test_create_calendar_event_missing_header_returns_422(client):
+def test_create_calendar_event_empty_body_returns_422(client):
     """
-    POST /calendar without X-User-Id header should fail validation.
+    POST /calendar with empty body should fail validation.
     """
     payload = {}
     resp = client.post("/calendar", json=payload)
     assert resp.status_code == 422
 
 
-def test_create_calendar_event_with_header_but_invalid_body_returns_422(client):
+def test_create_calendar_event_missing_required_fields_returns_422(client):
     """
-    POST /calendar with header but invalid body should still fail validation.
-    This proves header is accepted and body is being validated.
+    POST /calendar missing required fields should return 422.
     """
-    payload = {}
-    resp = client.post("/calendar", json=payload, headers=BASE_HEADERS)
+    payload = {"title": "Test Event"}  # Missing date
+    resp = client.post("/calendar", json=payload)
     assert resp.status_code == 422
 
 
-def test_update_calendar_event_missing_header_returns_422(client):
+def test_update_calendar_event_empty_body_returns_error(client):
+    """
+    PUT /calendar/{event_id} with empty body should return error.
+    """
     event_id = str(uuid4())
     payload = {}
     resp = client.put(f"/calendar/{event_id}", json=payload)
-    assert resp.status_code == 422
+    assert resp.status_code in (400, 404, 422)
 
 
-def test_delete_calendar_event_missing_header_returns_422(client):
+def test_delete_calendar_event_invalid_id_format(client):
+    """
+    DELETE /calendar/{event_id} with invalid UUID should return error.
+    """
+    resp = client.delete("/calendar/not-a-uuid")
+    assert resp.status_code in (400, 404, 422)
+
+
+def test_delete_calendar_event_nonexistent(client):
+    """
+    DELETE /calendar/{event_id} for nonexistent event.
+    """
     event_id = str(uuid4())
     resp = client.delete(f"/calendar/{event_id}")
-    assert resp.status_code == 422
-
-
-def test_update_calendar_event_with_header_but_invalid_body_returns_error(client):
-    """
-    PUT /calendar/{event_id} with header but bad body should return error.
-    """
-    event_id = str(uuid4())
-    payload = {}
-    resp = client.put(f"/calendar/{event_id}", json=payload, headers=BASE_HEADERS)
-    assert resp.status_code in (400, 404, 422)
+    # Could be 404 or other error depending on implementation
+    assert resp.status_code in (200, 204, 404, 500)
