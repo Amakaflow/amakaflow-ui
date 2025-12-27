@@ -8,9 +8,10 @@ from typing import List, Optional
 from uuid import UUID
 import json
 
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, HTTPException, Header, Query, Depends
 import httpx
 
+from ..auth import get_current_user
 from ..schemas import (
     WorkoutEvent, WorkoutEventCreate, WorkoutEventUpdate,
     ConnectedCalendar, ConnectedCalendarCreate, ConnectedCalendarUpdate
@@ -30,7 +31,7 @@ router = APIRouter()
 async def get_calendar_events(
     start: str = Query(..., description="Start date (YYYY-MM-DD)"),
     end: str = Query(..., description="End date (YYYY-MM-DD)"),
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """
     Get workout events for the authenticated user within a date range.
@@ -69,7 +70,7 @@ async def get_calendar_events(
                     OR (recurrence_rule IS NOT NULL AND date <= %s)
                 )
                 ORDER BY date, start_time
-            """, (x_user_id, start_date, end_date, end_date))
+            """, (user_id, start_date, end_date, end_date))
 
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
@@ -112,7 +113,7 @@ async def get_calendar_events(
 @router.post("", response_model=WorkoutEvent, status_code=201)
 async def create_calendar_event(
     event: WorkoutEventCreate,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Create a new workout event."""
     with get_db_connection() as conn:
@@ -133,7 +134,7 @@ async def create_calendar_event(
                     external_event_url, recurrence_rule, json_payload,
                     created_at, updated_at
             """, (
-                x_user_id,
+                user_id,
                 event.title,
                 event.source,
                 event.date,
@@ -175,7 +176,7 @@ async def create_calendar_event(
 
 @router.get("/connected-calendars", response_model=List[ConnectedCalendar])
 async def get_connected_calendars(
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Get all connected calendars for the user."""
     with get_db_connection() as conn:
@@ -189,7 +190,7 @@ async def get_connected_calendars(
                 FROM connected_calendars
                 WHERE user_id = %s
                 ORDER BY created_at DESC
-            """, (x_user_id,))
+            """, (user_id,))
             
             rows = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
@@ -211,7 +212,7 @@ async def get_connected_calendars(
 @router.post("/connected-calendars", response_model=ConnectedCalendar, status_code=201)
 async def create_connected_calendar(
     calendar: ConnectedCalendarCreate,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Create a new connected calendar."""
     with get_db_connection() as conn:
@@ -227,7 +228,7 @@ async def create_connected_calendar(
                     sync_error_message, color, workouts_this_week,
                     created_at, updated_at
             """, (
-                x_user_id,
+                user_id,
                 calendar.name,
                 calendar.type,
                 calendar.integration_type,
@@ -253,14 +254,14 @@ async def create_connected_calendar(
 @router.delete("/connected-calendars/{calendar_id}")
 async def delete_connected_calendar(
     calendar_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Delete a connected calendar."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM connected_calendars WHERE id = %s AND user_id = %s RETURNING id",
-                (str(calendar_id), x_user_id)
+                (str(calendar_id), user_id)
             )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Calendar not found")
@@ -271,7 +272,7 @@ async def delete_connected_calendar(
 @router.post("/connected-calendars/{calendar_id}/sync")
 async def sync_connected_calendar(
     calendar_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """
     Sync a connected calendar by fetching and parsing its ICS feed.
@@ -283,7 +284,7 @@ async def sync_connected_calendar(
             cur.execute(
                 """SELECT id, ics_url, type FROM connected_calendars
                    WHERE id = %s AND user_id = %s""",
-                (str(calendar_id), x_user_id)
+                (str(calendar_id), user_id)
             )
             calendar_row = cur.fetchone()
 
@@ -343,7 +344,7 @@ async def sync_connected_calendar(
                 workout_event = convert_to_workout_event(
                     ics_event,
                     str(calendar_id),
-                    x_user_id
+                    user_id
                 )
 
                 # Check if event already exists by external ics_uid
@@ -354,7 +355,7 @@ async def sync_connected_calendar(
                        WHERE user_id = %s
                        AND connected_calendar_id = %s
                        AND json_payload->>'ics_uid' = %s""",
-                    (x_user_id, str(calendar_id), ics_uid)
+                    (user_id, str(calendar_id), ics_uid)
                 )
                 existing = cur.fetchone()
 
@@ -393,7 +394,7 @@ async def sync_connected_calendar(
                             external_event_url, json_payload
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
-                        x_user_id,
+                        user_id,
                         workout_event['title'],
                         workout_event['source'],
                         workout_event['date'],
@@ -435,7 +436,7 @@ async def sync_connected_calendar(
 @router.get("/{event_id}", response_model=WorkoutEvent)
 async def get_calendar_event(
     event_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Get a single workout event by ID."""
     with get_db_connection() as conn:
@@ -449,7 +450,7 @@ async def get_calendar_event(
                     created_at, updated_at
                 FROM workout_events
                 WHERE id = %s AND user_id = %s
-            """, (str(event_id), x_user_id))
+            """, (str(event_id), user_id))
 
             row = cur.fetchone()
             if not row:
@@ -474,7 +475,7 @@ async def get_calendar_event(
 async def update_calendar_event(
     event_id: UUID,
     event_update: WorkoutEventUpdate,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Update an existing workout event."""
     # Build dynamic UPDATE query
@@ -534,14 +535,14 @@ async def update_calendar_event(
     update_fields.append("updated_at = NOW()")
 
     # Add WHERE clause values
-    values.extend([str(event_id), x_user_id])
+    values.extend([str(event_id), user_id])
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # Check ownership first
             cur.execute(
                 "SELECT id FROM workout_events WHERE id = %s AND user_id = %s",
-                (str(event_id), x_user_id)
+                (str(event_id), user_id)
             )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Event not found")
@@ -578,14 +579,14 @@ async def update_calendar_event(
 @router.delete("/{event_id}")
 async def delete_calendar_event(
     event_id: UUID,
-    x_user_id: str = Header(..., alias="X-User-Id", description="Authenticated user ID"),
+    user_id: str = Depends(get_current_user),
 ):
     """Delete a workout event."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM workout_events WHERE id = %s AND user_id = %s RETURNING id",
-                (str(event_id), x_user_id)
+                (str(event_id), user_id)
             )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Event not found")

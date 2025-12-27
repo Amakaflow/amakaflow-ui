@@ -3,11 +3,12 @@ Smart Planner API Routes
 Generates AI-powered workout suggestions based on rules engine.
 """
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import date, datetime, timedelta
 from ..db import get_db_connection
+from ..auth import get_current_user
 from ..rules import RulesEngine, build_context_from_events, LLMRulesAdvisor
 
 router = APIRouter()
@@ -99,7 +100,7 @@ def _get_user_preferences(user_id: str) -> Dict[str, Any]:
 @router.post("/smart-plan", response_model=SmartPlanResponse)
 async def generate_smart_plan(
     request: SmartPlanRequest,
-    x_user_id: str = Header(..., alias="X-User-Id")
+    user_id: str = Depends(get_current_user)
 ):
     """
     Generate a smart workout plan for the week.
@@ -124,13 +125,13 @@ async def generate_smart_plan(
         
         # Get user's events
         events = _get_user_events(
-            x_user_id, 
-            str(context_start), 
+            user_id,
+            str(context_start),
             str(week_end)
         )
-        
+
         # Get user preferences
-        user_prefs = _get_user_preferences(x_user_id)
+        user_prefs = _get_user_preferences(user_id)
         
         # Separate anchors
         hard_anchors = [e for e in events if e.get('anchor_type') == 'hard']
@@ -256,25 +257,25 @@ async def generate_smart_plan(
 async def check_workout_allowed(
     workout: Dict[str, Any],
     target_date: str,
-    x_user_id: str = Header(..., alias="X-User-Id")
+    user_id: str = Depends(get_current_user)
 ):
     """
     Check if a proposed workout is allowed on a given date.
-    
+
     Returns whether the workout violates any rules and
     suggests alternatives if not allowed.
     """
     try:
         target = date.fromisoformat(target_date)
         context_start = target - timedelta(days=7)
-        
+
         # Load rules
         rules_data = _load_rules_from_db()
         rules_engine.load_rules(rules_data)
-        
+
         # Get events for context
         events = _get_user_events(
-            x_user_id,
+            user_id,
             str(context_start),
             str(target)
         )
