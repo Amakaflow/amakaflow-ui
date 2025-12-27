@@ -105,7 +105,7 @@ class TikTokIngestRequest(BaseModel):
     use_vision: bool = True  # Use GPT-4o Vision by default
     vision_provider: str = "openai"
     vision_model: Optional[str] = "gpt-4o-mini"
-    mode: str = "auto"  # "auto" | "hybrid" | "audio_only" | "vision_only"
+    mode: str = "oembed"  # "oembed" (default) | "auto" | "hybrid" | "audio_only" | "vision_only"
 
 
 class PinterestIngestRequest(BaseModel):
@@ -1143,7 +1143,8 @@ async def ingest_tiktok(payload: TikTokIngestRequest):
     Ingest workout from TikTok video.
 
     Modes:
-    - "auto" (default): Audio transcription first, vision fallback if no exercises found
+    - "oembed" (default): Parse workout from oEmbed title/description (no video download)
+    - "auto": Audio transcription first, vision fallback if no exercises found
     - "hybrid": Run both audio AND vision, merge results (best for on-screen text + narration)
     - "audio_only": Only use audio transcription
     - "vision_only": Only use vision frame analysis
@@ -1157,16 +1158,82 @@ async def ingest_tiktok(payload: TikTokIngestRequest):
     if not TikTokService.is_tiktok_url(url):
         raise HTTPException(status_code=400, detail="Invalid TikTok URL")
 
+    # Get metadata via oEmbed (works for all modes)
+    try:
+        metadata = TikTokService.extract_metadata(url)
+    except TikTokServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    # --- oEmbed mode: Parse title text without video download ---
+    if ingest_mode == "oembed":
+        workout_text = TikTokService.extract_text_from_description(metadata)
+
+        if not workout_text or len(workout_text) < 20:
+            raise HTTPException(
+                status_code=400,
+                detail="TikTok description doesn't contain enough workout information. Try mode='auto' for video analysis."
+            )
+
+        # Parse with LLM
+        title = metadata.title.split('#')[0].strip() if metadata.title else "TikTok Workout"
+        workout_dict = _parse_with_openai(workout_text, title[:80])
+
+        # If LLM didn't find exercises and we have a thumbnail, try vision on thumbnail
+        def has_exercises(wd):
+            if not wd or not wd.get("blocks"):
+                return False
+            for block in wd.get("blocks", []):
+                if block.get("exercises") and len(block.get("exercises", [])) > 0:
+                    return True
+            return False
+
+        mode = "tiktok_oembed"
+
+        if not has_exercises(workout_dict) and metadata.thumbnail_url and payload.use_vision:
+            # Try vision on thumbnail as fallback
+            tmpdir = tempfile.mkdtemp(prefix="tiktok_thumb_")
+            try:
+                thumb_path = TikTokService.download_thumbnail(
+                    metadata.thumbnail_url, tmpdir, metadata.video_id
+                )
+                if thumb_path:
+                    vision_dict = VisionService.extract_and_structure_workout_openai(
+                        [thumb_path], model=payload.vision_model or "gpt-4o-mini", api_key=api_key
+                    )
+                    if has_exercises(vision_dict):
+                        workout_dict = vision_dict
+                        mode = "tiktok_oembed_vision"
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+        # Post-process
+        for block in workout_dict.get("blocks", []):
+            block["structure"] = block.get("structure") or "regular"
+            for ex in block.get("exercises", []):
+                ex["type"] = ex.get("type") or "strength"
+
+        workout_dict["title"] = workout_dict.get("title") or title or "TikTok Workout"
+        workout = Workout(**workout_dict)
+        workout.source = url
+
+        response = workout.convert_to_new_structure().model_dump()
+        response["_provenance"] = {
+            "mode": mode,
+            "video_id": metadata.video_id,
+            "author": metadata.author_name,
+        }
+        return JSONResponse(response)
+
+    # --- Video-based modes (auto, hybrid, audio_only, vision_only) ---
     tmpdir = tempfile.mkdtemp(prefix="tiktok_ingest_")
 
     try:
-        metadata = TikTokService.extract_metadata(url)
-
         video_path = TikTokService.download_video(url, tmpdir)
         if not video_path:
-            raise HTTPException(status_code=400, detail="Could not download video")
+            raise HTTPException(status_code=400, detail="Could not download video. Try mode='oembed' instead.")
 
-        api_key = os.getenv("OPENAI_API_KEY")
         audio_dict = None
         vision_dict = None
         mode = "tiktok_vision"
