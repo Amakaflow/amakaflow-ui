@@ -1,0 +1,67 @@
+# Automated Supabase Migration for Staging
+# Runs migrations automatically when changes are pushed to the migrations folder
+#
+# Required secrets:
+#   - SUPABASE_ACCESS_TOKEN: Personal access token from supabase.com/dashboard/account/tokens
+#   - SUPABASE_DB_PASSWORD: Database password for staging project
+#
+# Setup:
+#   1. Get your access token: https://supabase.com/dashboard/account/tokens
+#   2. Add secrets to repo: Settings > Secrets > Actions
+#   3. Link project (run once locally): supabase link --project-ref <project-id>
+
+name: Migrate Staging Database
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify secrets are configured
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "❌ SUPABASE_ACCESS_TOKEN secret is not set"
+            echo "Please add it in: Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "❌ SUPABASE_DB_PASSWORD secret is not set"
+            echo "Please add it in: Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          echo "✅ Required secrets are configured"
+
+      - name: Link Supabase project
+        run: |
+          supabase link --project-ref ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Push migrations to staging
+        run: |
+          echo "📦 Pushing migrations to staging database..."
+          supabase db push
+          echo "✅ Migrations applied successfully"
+
+      - name: Show migration status
+        run: |
+          echo "📋 Current migration status:"
+          supabase migration list
