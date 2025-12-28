@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Upload, Link, Image, FileSpreadsheet } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1272,9 +1272,9 @@ export default function App() {
                         });
                       }}
                     >
-                      <Link className="w-4 h-4 mr-2" />
-                      From URL
-                      <span className="ml-auto text-xs text-muted-foreground">Single</span>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Single Import
+                      <span className="ml-auto text-xs text-muted-foreground">URL, Image, Text</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
@@ -1285,35 +1285,9 @@ export default function App() {
                         });
                       }}
                     >
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      From File
-                      <span className="ml-auto text-xs text-muted-foreground">Excel, CSV</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        checkUnsavedChanges(() => {
-                          clearWorkflowState();
-                          setBulkImportType('urls');
-                          setCurrentView('bulk-import');
-                        });
-                      }}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Bulk URLs
-                      <span className="ml-auto text-xs text-muted-foreground">Multiple</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        checkUnsavedChanges(() => {
-                          clearWorkflowState();
-                          setBulkImportType('images');
-                          setCurrentView('bulk-import');
-                        });
-                      }}
-                    >
-                      <Image className="w-4 h-4 mr-2" />
-                      From Images
-                      <span className="ml-auto text-xs text-muted-foreground">OCR</span>
+                      <Layers className="w-4 h-4 mr-2" />
+                      Bulk Import
+                      <span className="ml-auto text-xs text-muted-foreground">Files, URLs, Images</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
