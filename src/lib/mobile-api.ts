@@ -47,7 +47,14 @@ export async function generatePairingToken(
     throw new Error(error.detail || `Failed to generate pairing token: ${response.status}`);
   }
 
-  return response.json();
+  // Backend returns snake_case, transform to camelCase for frontend
+  const data = await response.json();
+  return {
+    token: data.token,
+    shortCode: data.short_code,
+    qrData: data.qr_data,
+    expiresAt: data.expires_at,
+  };
 }
 
 /**
