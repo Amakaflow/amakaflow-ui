@@ -16,12 +16,17 @@ import {
   ExternalLink,
   ArrowLeft,
   QrCode,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   generatePairingToken,
   checkPairingStatus,
+  getPairedDevices,
+  revokeDevice,
   GeneratePairingResponse,
+  PairedDevice,
 } from '../lib/mobile-api';
 
 interface MobileCompanionProps {
@@ -37,6 +42,47 @@ export function MobileCompanion({ userId, onBack }: MobileCompanionProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Paired devices state (AMA-184)
+  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+
+  // Fetch paired devices on mount (AMA-184)
+  const fetchPairedDevices = useCallback(async () => {
+    try {
+      setDevicesLoading(true);
+      const devices = await getPairedDevices();
+      setPairedDevices(devices);
+    } catch (err) {
+      console.error('Failed to fetch paired devices:', err);
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPairedDevices();
+  }, [fetchPairedDevices]);
+
+  // Handle revoking a device (AMA-184)
+  const handleRevokeDevice = async (deviceId: string) => {
+    setRevokingDeviceId(deviceId);
+    try {
+      const result = await revokeDevice(deviceId);
+      if (result.success) {
+        setPairedDevices((prev) => prev.filter((d) => d.id !== deviceId));
+        toast.success('Device access revoked');
+      } else {
+        toast.error(result.message || 'Failed to revoke device');
+      }
+    } catch (err: any) {
+      console.error('Failed to revoke device:', err);
+      toast.error(err.message || 'Failed to revoke device');
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
 
   // Generate a new pairing token
   const handleGenerate = useCallback(async () => {
@@ -125,6 +171,34 @@ export function MobileCompanion({ userId, onBack }: MobileCompanionProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Format date for display (AMA-184)
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return 'Unknown';
+    }
+  };
+
+  // Get device display name (AMA-184)
+  const getDeviceDisplayName = (device: PairedDevice): string => {
+    return device.deviceInfo?.device || 'Unknown Device';
+  };
+
+  // Get device OS info (AMA-184)
+  const getDeviceOsInfo = (device: PairedDevice): string => {
+    const os = device.deviceInfo?.os;
+    const version = device.deviceInfo?.app_version;
+    if (os && version) return `${os} • App v${version}`;
+    if (os) return os;
+    return '';
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
@@ -139,6 +213,72 @@ export function MobileCompanion({ userId, onBack }: MobileCompanionProps) {
           </p>
         </div>
       </div>
+
+      {/* Paired Devices Card (AMA-184) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5" />
+            Paired Devices
+          </CardTitle>
+          <CardDescription>
+            iOS devices that can access your AmakaFlow account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {devicesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : pairedDevices.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                <Smartphone className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground text-sm">
+                No devices paired yet. Generate a pairing code below to connect your iPhone.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pairedDevices.map((device) => (
+                <div
+                  key={device.id}
+                  className="flex items-center justify-between p-4 rounded-lg border bg-card"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Smartphone className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{getDeviceDisplayName(device)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getDeviceOsInfo(device)}
+                        {getDeviceOsInfo(device) && ' • '}
+                        Paired {formatDate(device.pairedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevokeDevice(device.id)}
+                    disabled={revokingDeviceId === device.id}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    {revokingDeviceId === device.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Revoke</span>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Main Pairing Card */}
       <Card>

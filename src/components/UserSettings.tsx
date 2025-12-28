@@ -25,6 +25,7 @@ import { LinkedAccounts } from './LinkedAccounts';
 import { useClerkUser, useClerkAuth, updateUserProfileFromClerk } from '../lib/clerk-auth';
 import { cn } from './ui/utils';
 import { getPreferences, savePreferences, ImageProcessingMethod, getImageProcessingMethod, setImageProcessingMethod } from '../lib/preferences';
+import { getPairedDevices } from '../lib/mobile-api';
 import { Alert, AlertDescription } from './ui/alert';
 import { ENABLE_GARMIN_USB_EXPORT } from '../lib/env';
 
@@ -73,6 +74,16 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [state, setState] = useState(user.state || '');
   const [zipCode, setZipCode] = useState(user.zipCode || '');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
+
+  // Paired iOS devices count (AMA-184)
+  const [pairedDeviceCount, setPairedDeviceCount] = useState<number>(0);
+
+  // Fetch paired device count on mount (AMA-184)
+  useEffect(() => {
+    getPairedDevices()
+      .then((devices) => setPairedDeviceCount(devices.length))
+      .catch((err) => console.error('Failed to fetch paired devices:', err));
+  }, []);
 
   useEffect(() => {
     // Load linked OAuth providers from Clerk user
@@ -894,6 +905,11 @@ Block: Warm-Up
                   <CardTitle className="flex items-center gap-2">
                     <Smartphone className="w-5 h-5" />
                     iOS Companion App
+                    {pairedDeviceCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {pairedDeviceCount} {pairedDeviceCount === 1 ? 'device' : 'devices'}
+                      </Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>
                     Connect your iPhone to view and sync workouts on the go
@@ -904,9 +920,13 @@ Block: Warm-Up
                     <div className="flex items-center gap-3">
                       <span className="text-xl">📱</span>
                       <div>
-                        <p className="font-medium">Pair iOS Device</p>
+                        <p className="font-medium">
+                          {pairedDeviceCount > 0 ? 'Manage iOS Devices' : 'Pair iOS Device'}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          Scan a QR code or enter a pairing code to connect
+                          {pairedDeviceCount > 0
+                            ? 'View paired devices or add a new one'
+                            : 'Scan a QR code or enter a pairing code to connect'}
                         </p>
                       </div>
                     </div>
@@ -917,7 +937,7 @@ Block: Warm-Up
                         onNavigateToMobileCompanion?.();
                       }}
                     >
-                      Set Up
+                      {pairedDeviceCount > 0 ? 'Manage' : 'Set Up'}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
