@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { Search, Dumbbell, Loader2 } from 'lucide-react';
 import { DeviceId } from '../lib/devices';
+import { API_URLS } from '../lib/config';
 
 type Props = {
   onSelect: (exerciseName: string) => void;
@@ -92,7 +93,8 @@ export function ExerciseSearch({ onSelect, onClose, device }: Props) {
     const fetchExercises = async () => {
       try {
         setLoading(true);
-        const API_BASE_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
+        // Use centralized API config
+        const API_BASE_URL = API_URLS.INGESTOR;
         const response = await fetch(`${API_BASE_URL}/exercises/wger`);
         
         if (!response.ok) {

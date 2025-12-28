@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URLS } from '../lib/config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -234,7 +235,8 @@ export function FollowAlongSetup({ workout, userId, sourceUrl }: FollowAlongSetu
   const [animationPreviewExercise, setAnimationPreviewExercise] = useState<string | null>(null);
   const exerciseAnimation = EXERCISE_ANIMATION_DATA;
 
-  const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+  // Use centralized API config
+  const MAPPER_API_BASE_URL = API_URLS.MAPPER;
 
   // Load voices when component mounts (needed for some browsers)
   useEffect(() => {

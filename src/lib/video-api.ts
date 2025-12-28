@@ -6,6 +6,7 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
 export type VideoPlatform = 'youtube' | 'instagram' | 'tiktok' | 'pinterest' | 'unknown';
 
@@ -76,7 +77,8 @@ export interface WorkoutData {
   source_link?: string;
 }
 
-const WORKOUT_INGESTOR_API_URL = import.meta.env.VITE_WORKOUT_INGESTOR_API_URL || 'http://localhost:8004';
+// Use centralized API config
+const WORKOUT_INGESTOR_API_URL = API_URLS.INGESTOR;
 
 /**
  * Detect video platform and extract video ID from URL

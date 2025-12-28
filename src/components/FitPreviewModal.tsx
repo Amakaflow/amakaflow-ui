@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Repeat, Timer, Dumbbell, Eye, Loader2, PlayCircle, Coffee } from 'lucide-react';
 import { WorkoutStructure, ValidationResponse } from '../types/workout';
 import { applyValidationMappings } from '../lib/workout-utils';
+import { API_URLS } from '../lib/config';
 
 interface FitPreviewModalProps {
   workout: WorkoutStructure;
@@ -108,7 +109,8 @@ export function FitPreviewModal({ workout, validation, trigger, useLapButton = f
       setError(null);
 
       try {
-        const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+        // Use centralized API config
+        const MAPPER_API_BASE_URL = API_URLS.MAPPER;
         // Apply validation mappings to use user-confirmed Garmin names
         const mappedWorkout = applyValidationMappings(workout, validation);
 

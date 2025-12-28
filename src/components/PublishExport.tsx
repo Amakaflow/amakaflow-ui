@@ -1,4 +1,5 @@
 import { FitPreviewModal } from "./FitPreviewModal";
+import { API_URLS } from '../lib/config';
 import { TrainerDistribution } from './TrainerDistribution';
 import { Switch } from './ui/switch';
 import { useState, useEffect } from 'react';
@@ -104,7 +105,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
       if (!workout) return;
 
       try {
-        const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+        const MAPPER_API_BASE_URL = API_URLS.MAPPER;
         // Apply validation mappings to use user-confirmed Garmin names
         const mappedWorkout = applyValidationMappings(workout, validation);
         const res = await fetch(`${MAPPER_API_BASE_URL}/map/fit-metadata?use_lap_button=${useLapButton}`, {
@@ -144,7 +145,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
     }
 
     try {
-      const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+      const MAPPER_API_BASE_URL = API_URLS.MAPPER;
       const mappedWorkout = applyValidationMappings(workout, validation);
 
       const res = await fetch(`${MAPPER_API_BASE_URL}/map/auto-map`, {
@@ -332,7 +333,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
           description: 'Importing workout to Garmin Connect'
         });
 
-        const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+        const MAPPER_API_BASE_URL = API_URLS.MAPPER;
         
         const syncResponse = await fetch(`${MAPPER_API_BASE_URL}/workout/sync/garmin`, {
           method: 'POST',
@@ -395,7 +396,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         (workout && (workout.title || (workout as any).name)) ||
         'AmakaFlow Workout';
 
-      const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+      const MAPPER_API_BASE_URL = API_URLS.MAPPER;
       // Apply validation mappings to use user-confirmed Garmin names
       const mappedWorkout = applyValidationMappings(workout, validation);
       const res = await fetch(`${MAPPER_API_BASE_URL}/map/to-fit?use_lap_button=${useLapButton}`, {

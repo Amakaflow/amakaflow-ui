@@ -6,8 +6,10 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-const WORKOUT_INGESTOR_API_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
+// Use centralized API config
+const WORKOUT_INGESTOR_API_URL = API_URLS.INGESTOR;
 
 export type CsvStyle = 'strong' | 'extended';
 export type ExportFormat = 'csv' | 'fit' | 'tcx' | 'text' | 'json' | 'pdf';

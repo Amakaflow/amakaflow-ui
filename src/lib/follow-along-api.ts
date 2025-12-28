@@ -1,5 +1,6 @@
 import { ENABLE_GARMIN_DEBUG } from './env';
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 import type {
   FollowAlongWorkout,
   IngestFollowAlongRequest,
@@ -12,7 +13,8 @@ import type {
   VideoPlatform,
 } from "../types/follow-along";
 
-const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || "http://localhost:8001";
+// Use centralized API config
+const MAPPER_API_BASE_URL = API_URLS.MAPPER;
 
 /**
  * Ingest a follow-along workout from Instagram URL

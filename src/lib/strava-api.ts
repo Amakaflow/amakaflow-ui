@@ -5,8 +5,10 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-const STRAVA_API_BASE_URL = import.meta.env.VITE_STRAVA_API_URL || 'http://localhost:8000';
+// Use centralized API config
+const STRAVA_API_BASE_URL = API_URLS.STRAVA;
 
 export interface StravaActivity {
   id: number;

@@ -6,8 +6,10 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+// Use centralized API config
+const MAPPER_API_BASE_URL = API_URLS.MAPPER;
 
 export interface SavedWorkout {
   id: string;

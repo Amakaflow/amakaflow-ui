@@ -1,8 +1,9 @@
 import { WorkoutStructure, SourceType, Block, Superset, Exercise, BulkWorkoutResponse } from '../types/workout';
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-// API base URL - defaults to localhost:8004 (workout-ingestor-api)
-const API_BASE_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
+// Use centralized API config
+const API_BASE_URL = API_URLS.INGESTOR;
 
 // API timeout in milliseconds (2 minutes for structure generation)
 const API_TIMEOUT = 120000;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getApiHealthEndpoints } from "../lib/config";
 
 type ServiceConfig = {
   name: string;
@@ -11,13 +12,8 @@ type ServiceState = ServiceConfig & {
   data?: any;
 };
 
-const SERVICES: ServiceConfig[] = [
-  { name: "Workout Ingestor API", url: "http://localhost:8004/version" },
-  { name: "Mapper API", url: "http://localhost:8001/mappings" }, // Use existing endpoint to check if API is up
-  { name: "Strava Sync API", url: "http://localhost:8000/health" },
-  { name: "Garmin Sync API (UNOFFICIAL – TEST ONLY)", url: "http://localhost:8002/health" },
-  { name: "Calendar API", url: "http://localhost:8003/health" },
-];
+// Use centralized API config for health endpoints
+const SERVICES: ServiceConfig[] = getApiHealthEndpoints();
 
 export function DevSystemStatus() {
   // Don't show anything in production

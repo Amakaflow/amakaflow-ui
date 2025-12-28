@@ -8,9 +8,10 @@ import {
 import { DeviceId } from './devices';
 import { applyValidationMappings } from './workout-utils';
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-// API base URL - defaults to localhost:8001 (mapper-api)
-const MAPPER_API_BASE_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8001';
+// Use centralized API config
+const MAPPER_API_BASE_URL = API_URLS.MAPPER;
 
 /**
  * Generic API call function for mapper-api

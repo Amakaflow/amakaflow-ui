@@ -6,6 +6,7 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 import {
   BulkInputType,
   BulkDetectRequest,
@@ -22,8 +23,8 @@ import {
   ColumnMapping,
 } from '../types/bulk-import';
 
-// API base URL - defaults to localhost:8004 (workout-ingestor-api)
-const INGESTOR_API_BASE_URL = import.meta.env.VITE_INGESTOR_API_URL || 'http://localhost:8004';
+// Use centralized API config
+const INGESTOR_API_BASE_URL = API_URLS.INGESTOR;
 
 // ============================================================================
 // API Client Class

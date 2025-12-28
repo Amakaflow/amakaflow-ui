@@ -4,8 +4,10 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
+import { API_URLS } from './config';
 
-const API_BASE_URL = import.meta.env.VITE_CALENDAR_API_URL || 'http://127.0.0.1:8000';
+// Use centralized API config
+const API_BASE_URL = API_URLS.CALENDAR;
 
 // Types matching the API schemas
 export interface WorkoutEvent {

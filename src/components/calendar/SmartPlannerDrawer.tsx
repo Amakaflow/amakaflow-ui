@@ -105,8 +105,9 @@ const BADGE_LABELS: Record<WorkoutBadgeType, string> = {
   'optional': 'Optional',
 };
 
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_CALENDAR_API_URL || 'http://localhost:8003';
+// Use centralized API config
+import { API_URLS } from '../../lib/config';
+const API_BASE_URL = API_URLS.CALENDAR;
 
 // Format time helper
 function formatTime(time: string): string {
