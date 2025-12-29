@@ -320,9 +320,14 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
         skip_cache: If True, bypass cache lookup (still saves to cache)
     """
 
+    import time
+    start_time = time.time()
+
     video_url = video_url.strip()
     if not video_url:
         raise HTTPException(status_code=400, detail="URL is required")
+
+    logger.info(f"YouTube ingest started: url={video_url[:100]}, user_id={user_id}, skip_cache={skip_cache}")
 
     # Use the new URL normalizer for consistent video ID extraction
     video_id, normalized_url, original_url = parse_youtube_url(video_url)
@@ -379,28 +384,63 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
             detail="Transcript API token not configured (set YT_TRANSCRIPT_API_TOKEN)",
         )
 
-    # Fetch transcript
-    try:
-        resp = requests.post(
-            "https://www.youtube-transcript.io/api/transcripts",
-            headers={
-                "Authorization": f"Basic {api_token}",
-                "Content-Type": "application/json",
-            },
-            json={"ids": [video_id]},
-            timeout=15,
-        )
-    except requests.RequestException as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Transcript API request failed: {exc}",
-        ) from exc
+    # Fetch transcript with retry logic
+    TRANSCRIPT_API_URL = "https://www.youtube-transcript.io/api/transcripts"
+    TRANSCRIPT_API_TIMEOUT = 30  # seconds (increased from 15 for reliability)
+    MAX_RETRIES = 2
+
+    logger.info(f"Fetching transcript for video_id: {video_id}")
+
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            logger.debug(f"Transcript API attempt {attempt + 1}/{MAX_RETRIES} for video_id: {video_id}")
+            resp = requests.post(
+                TRANSCRIPT_API_URL,
+                headers={
+                    "Authorization": f"Basic {api_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"ids": [video_id]},
+                timeout=TRANSCRIPT_API_TIMEOUT,
+            )
+            # Success - break out of retry loop
+            break
+        except requests.Timeout as exc:
+            last_error = exc
+            logger.warning(
+                f"Transcript API timeout (attempt {attempt + 1}/{MAX_RETRIES}) "
+                f"for video_id: {video_id}, timeout: {TRANSCRIPT_API_TIMEOUT}s"
+            )
+            if attempt < MAX_RETRIES - 1:
+                import time
+                time.sleep(2)  # Brief delay before retry
+                continue
+            logger.error(f"Transcript API timeout after {MAX_RETRIES} attempts for video_id: {video_id}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Transcript API timed out after {MAX_RETRIES} attempts ({TRANSCRIPT_API_TIMEOUT}s each). "
+                       f"The youtube-transcript.io service may be slow or unavailable.",
+            ) from exc
+        except requests.RequestException as exc:
+            last_error = exc
+            logger.error(f"Transcript API request failed for video_id: {video_id}: {exc}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Transcript API request failed: {exc}",
+            ) from exc
+
+    # Log response status for debugging
+    logger.info(f"Transcript API response status: {resp.status_code} for video_id: {video_id}")
 
     if resp.status_code == 401:
+        logger.error(f"Transcript API token rejected (401) for video_id: {video_id}")
         raise HTTPException(status_code=500, detail="Transcript API token rejected (401)")
     if resp.status_code == 404:
+        logger.warning(f"Transcript not found (404) for video_id: {video_id}")
         raise HTTPException(status_code=404, detail="Transcript not found for provided video")
     if resp.status_code >= 400:
+        logger.error(f"Transcript API error ({resp.status_code}) for video_id: {video_id}: {resp.text[:500]}")
         raise HTTPException(
             status_code=502,
             detail=f"Transcript API error ({resp.status_code}): {resp.text}",
@@ -523,24 +563,34 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
     workout_dict = None
     llm_error = None
 
+    logger.info(f"Starting LLM parsing for video_id: {video_id}, transcript_length: {len(transcript_text)}")
+
     # Try OpenAI first if available
     if os.getenv("OPENAI_API_KEY"):
         try:
+            logger.debug(f"Attempting OpenAI parsing for video_id: {video_id}")
+            llm_start = time.time()
             workout_dict = _parse_with_openai(transcript_text, title, video_duration_sec, chapter_info)
             llm_provider = "openai"
+            logger.info(f"OpenAI parsing successful for video_id: {video_id} in {time.time() - llm_start:.2f}s")
         except Exception as e:
             llm_error = f"OpenAI: {str(e)}"
+            logger.warning(f"OpenAI parsing failed for video_id: {video_id}: {e}")
 
     # Fall back to Anthropic if OpenAI failed or not configured
     if workout_dict is None and os.getenv("ANTHROPIC_API_KEY"):
         try:
+            logger.debug(f"Attempting Anthropic parsing for video_id: {video_id}")
+            llm_start = time.time()
             workout_dict = _parse_with_anthropic(transcript_text, title, video_duration_sec, chapter_info)
             llm_provider = "anthropic"
+            logger.info(f"Anthropic parsing successful for video_id: {video_id} in {time.time() - llm_start:.2f}s")
         except Exception as e:
             if llm_error:
                 llm_error += f"; Anthropic: {str(e)}"
             else:
                 llm_error = f"Anthropic: {str(e)}"
+            logger.warning(f"Anthropic parsing failed for video_id: {video_id}: {e}")
 
     # If no LLM available, fall back to basic parsing
     if workout_dict is None:
@@ -636,5 +686,14 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
         except Exception as e:
             # Cache save failure should not fail the request
             logger.warning(f"Failed to cache workout for video_id {video_id}: {e}")
+
+    # Log completion with timing
+    total_time = time.time() - start_time
+    exercise_count = sum(len(block.get("exercises", [])) for block in response_payload.get("blocks", []))
+    logger.info(
+        f"YouTube ingest completed: video_id={video_id}, "
+        f"exercises={exercise_count}, llm={llm_provider}, "
+        f"duration={total_time:.2f}s"
+    )
 
     return JSONResponse(response_payload)
