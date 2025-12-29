@@ -69,6 +69,9 @@ from backend.database import (
     get_user_tags,
     create_user_tag,
     delete_user_tag,
+    # AMA-199: iOS Companion App Sync
+    update_workout_ios_companion_sync,
+    get_ios_companion_pending_workouts,
 )
 from backend.follow_along_database import (
     save_follow_along_workout,
@@ -925,12 +928,77 @@ def push_workout_to_ios_companion_endpoint(
         "sourceUrl": None,
         "intervals": intervals
     }
-    
+
+    # Mark workout as synced to iOS Companion (AMA-199)
+    update_workout_ios_companion_sync(workout_id, user_id)
+
     return {
         "success": True,
         "status": "success",
         "iosCompanionWorkoutId": workout_id,
         "payload": payload
+    }
+
+
+@app.get("/ios-companion/pending")
+def get_ios_companion_pending_endpoint(
+    user_id: str = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of workouts")
+):
+    """
+    Get workouts that have been pushed to iOS Companion App.
+
+    This endpoint is called by the iOS Companion App to discover workouts
+    that are ready to be synced to Apple Watch. Returns workouts where
+    ios_companion_synced_at is set, ordered by most recently pushed.
+
+    The iOS app authenticates using a Mobile JWT obtained through pairing.
+    """
+    workouts = get_ios_companion_pending_workouts(user_id, limit=limit)
+
+    # Transform each workout to iOS companion format
+    transformed = []
+    for workout_record in workouts:
+        workout_data = workout_record.get("workout_data", {})
+        title = workout_record.get("title") or workout_data.get("title", "Workout")
+        blocks = workout_data.get("blocks", [])
+
+        # Detect sport type
+        sport = "strength"
+        for block in blocks:
+            structure = block.get("structure", "")
+            if structure in ["tabata", "hiit", "circuit", "emom", "amrap"]:
+                sport = "cardio"
+                break
+
+        # Build intervals and calculate duration
+        intervals = []
+        total_duration = 0
+        for block in blocks:
+            exercises = block.get("exercises", [])
+            rounds = block.get("rounds", 1) or 1
+            for exercise in exercises:
+                interval = convert_exercise_to_interval(exercise)
+                intervals.append(interval)
+                duration = (exercise.get("duration_sec", 0) or 0) + (exercise.get("rest_sec", 0) or 0)
+                total_duration += duration * rounds
+
+        transformed.append({
+            "id": workout_record.get("id"),
+            "name": title,
+            "sport": sport,
+            "duration": total_duration,
+            "source": "amakaflow",
+            "sourceUrl": None,
+            "intervals": intervals,
+            "pushedAt": workout_record.get("ios_companion_synced_at"),
+            "createdAt": workout_record.get("created_at"),
+        })
+
+    return {
+        "success": True,
+        "workouts": transformed,
+        "count": len(transformed)
     }
 
 
