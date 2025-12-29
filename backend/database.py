@@ -779,3 +779,75 @@ def delete_user_tag(tag_id: str, profile_id: str) -> bool:
         logger.error(f"Failed to delete tag {tag_id}: {e}")
         return False
 
+
+# =============================================================================
+# iOS Companion App Sync (AMA-199)
+# =============================================================================
+
+def update_workout_ios_companion_sync(workout_id: str, profile_id: str) -> bool:
+    """
+    Mark a workout as synced to iOS Companion App.
+
+    Sets ios_companion_synced_at to current timestamp.
+
+    Args:
+        workout_id: Workout UUID
+        profile_id: User profile ID (for security)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+
+    try:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+
+        result = supabase.table("workouts").update({
+            "ios_companion_synced_at": now,
+            "updated_at": now,
+        }).eq("id", workout_id).eq("profile_id", profile_id).execute()
+
+        if result.data and len(result.data) > 0:
+            logger.info(f"Workout {workout_id} marked as synced to iOS Companion")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to update iOS companion sync for workout {workout_id}: {e}")
+        return False
+
+
+def get_ios_companion_pending_workouts(profile_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Get workouts that have been pushed to iOS Companion App.
+
+    Returns workouts where ios_companion_synced_at is not null,
+    ordered by most recently synced.
+
+    Args:
+        profile_id: User profile ID
+        limit: Maximum number of workouts to return
+
+    Returns:
+        List of workout records with iOS companion sync data
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return []
+
+    try:
+        result = supabase.table("workouts") \
+            .select("id, title, description, workout_data, device, ios_companion_synced_at, created_at") \
+            .eq("profile_id", profile_id) \
+            .not_.is_("ios_companion_synced_at", "null") \
+            .order("ios_companion_synced_at", desc=True) \
+            .limit(limit) \
+            .execute()
+
+        return result.data if result.data else []
+    except Exception as e:
+        logger.error(f"Failed to get iOS companion pending workouts for {profile_id}: {e}")
+        return []
+
