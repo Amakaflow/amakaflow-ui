@@ -78,14 +78,14 @@ export const AVAILABLE_DEVICES: Device[] = [
   {
     id: 'apple',
     name: 'Apple Watch',
-    description: 'Send to Apple Workout app',
+    description: 'Send to iOS Companion App',
     category: 'watch',
     format: 'WorkoutKit',
     icon: '⌚',
     popular: true,
-    exportMethod: 'coming_soon',
+    exportMethod: 'api',
     requiresMapping: false,
-    setupInstructions: 'Requires AmakaFlow iOS app (coming soon)',
+    setupInstructions: 'Pair your iPhone with the AmakaFlow iOS Companion App in Settings',
   },
   {
     id: 'hevy',

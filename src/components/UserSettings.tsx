@@ -842,18 +842,17 @@ Block: Warm-Up
                     </div>
 
                     {/* Apple Watch */}
-                    <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <span className="text-xl">⌚</span>
                         <div>
                           <p className="font-medium">Apple Watch</p>
-                          <p className="text-sm text-muted-foreground">Coming soon - requires iOS app</p>
+                          <p className="text-sm text-muted-foreground">Send to iOS Companion App</p>
                         </div>
                       </div>
                       <Switch
                         checked={selectedDevices.includes('apple')}
                         onCheckedChange={() => toggleDevice('apple')}
-                        disabled
                       />
                     </div>
 
