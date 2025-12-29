@@ -56,6 +56,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { createStravaActivity, checkAndRefreshStravaToken, StravaTokenExpiredError, StravaUnauthorizedError } from '../lib/strava-api';
 import { formatWorkoutForStrava, applyValidationMappings } from '../lib/workout-utils';
 import { isAccountConnected } from '../lib/linked-accounts';
+import { authenticatedFetch } from '../lib/authenticated-fetch';
 
 interface FitMetadata {
   detected_sport: string;
@@ -334,7 +335,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         });
 
         const MAPPER_API_BASE_URL = API_URLS.MAPPER;
-        
+
         const syncResponse = await fetch(`${MAPPER_API_BASE_URL}/workout/sync/garmin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -368,10 +369,65 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
       return;
     }
 
-    toast.success(`Syncing to ${platform}...`, {
-      description: platform === 'Garmin' 
-        ? 'Using Unofficial API to sync to Garmin Connect'
-        : 'This feature is coming soon'
+    // Apple Watch sync via iOS Companion App
+    if (platform === 'Apple Watch' && workout && profileId) {
+      try {
+        // Ensure workout is saved first
+        let workoutIdToSync = savedWorkoutId;
+        if (!workoutIdToSync) {
+          toast.info('Saving workout...', { description: 'Preparing for Apple Watch sync' });
+          const request: SaveWorkoutRequest = {
+            profile_id: profileId,
+            workout_data: workout,
+            sources: sources,
+            device: selectedDevice,
+            exports: exports,
+            validation: validation,
+            title: workout.title || `Workout ${new Date().toLocaleDateString()}`,
+          };
+          const savedWorkout = await saveWorkoutToAPI(request);
+          workoutIdToSync = savedWorkout.id;
+          setSavedWorkoutId(savedWorkout.id);
+        }
+
+        toast.info('Syncing to Apple Watch...', {
+          description: 'Sending workout to iOS Companion App'
+        });
+
+        const MAPPER_API_BASE_URL = API_URLS.MAPPER;
+
+        const syncResponse = await authenticatedFetch(`${MAPPER_API_BASE_URL}/workouts/${workoutIdToSync}/push/ios-companion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+
+        if (!syncResponse.ok) {
+          const error = await syncResponse.json().catch(() => ({ detail: syncResponse.statusText }));
+          throw new Error(error.detail || `Failed to sync: ${syncResponse.statusText}`);
+        }
+
+        const syncResult = await syncResponse.json();
+
+        if (!syncResult.success) {
+          throw new Error(syncResult.message || 'Failed to sync to iOS Companion');
+        }
+
+        toast.success('Workout sent to iOS Companion App!', {
+          description: 'Open the AmakaFlow app on your iPhone to start the workout on Apple Watch'
+        });
+      } catch (error: any) {
+        console.error('Failed to sync to Apple Watch:', error);
+        toast.error(`Failed to sync to Apple Watch: ${error.message || 'Unknown error'}`, {
+          description: 'Make sure you have paired your iPhone in Settings'
+        });
+      }
+      return;
+    }
+
+    // Fallback for platforms without implementation
+    toast.info(`Syncing to ${platform}...`, {
+      description: 'This export method is not yet implemented'
     });
   };
 
