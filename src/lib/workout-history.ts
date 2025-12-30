@@ -122,7 +122,7 @@ function normalizeApiWorkoutItem(item: SavedWorkout): WorkoutHistoryItem {
  * Save workout to history
  *
  * Two calling patterns:
- * 1) saveWorkoutToHistory(profileId, workout, device, exports?, sources?, validation?)
+ * 1) saveWorkoutToHistory(profileId, workout, device, exports?, sources?, validation?, workoutId?)
  * 2) saveWorkoutToHistory({ workout, sources, device, exports })
  */
 export async function saveWorkoutToHistory(
@@ -138,7 +138,8 @@ export async function saveWorkoutToHistory(
   device?: DeviceId,
   exports?: ExportFormats,
   sources?: string[],
-  validation?: any
+  validation?: any,
+  workoutId?: string  // AMA-206: Pass workout ID for explicit updates
 ): Promise<WorkoutHistoryItem> {
   // Pattern 2: local-only save
   if (typeof profileIdOrData !== 'string') {
@@ -160,6 +161,11 @@ export async function saveWorkoutToHistory(
       warmup_reps: e?.warmup_reps
     }))));
 
+  // AMA-206: Log if updating existing workout
+  if (workoutId) {
+    console.log('[saveWorkoutToHistory] Updating existing workout:', workoutId);
+  }
+
   try {
     const { saveWorkoutToAPI } = await import('./workout-api');
     const saved = await saveWorkoutToAPI({
@@ -170,6 +176,7 @@ export async function saveWorkoutToHistory(
       exports,
       validation,
       title: workout.title || `Workout ${new Date().toLocaleDateString()}`,
+      workout_id: workoutId,  // AMA-206: Pass workout ID for explicit updates
     });
 
     return normalizeApiWorkoutItem(saved);

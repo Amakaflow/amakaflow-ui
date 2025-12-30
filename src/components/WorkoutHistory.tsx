@@ -715,6 +715,28 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
                           </div>
                         )}
                       </div>
+                      {/* Workout Settings Badges */}
+                      {(item.workout?.settings?.workoutWarmup?.enabled || item.workout?.settings?.defaultRestType) && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {item.workout?.settings?.workoutWarmup?.enabled && (
+                            <Badge variant="outline" className="text-xs">
+                              Warm-up: {item.workout.settings.workoutWarmup.activity === 'custom'
+                                ? 'Custom'
+                                : `${Math.floor((item.workout.settings.workoutWarmup.durationSec || 300) / 60)}min`}
+                            </Badge>
+                          )}
+                          {item.workout?.settings?.defaultRestType && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              Rest: {item.workout.settings.defaultRestType === 'button'
+                                ? 'Lap Button'
+                                : item.workout.settings.defaultRestSec
+                                  ? `${item.workout.settings.defaultRestSec}s`
+                                  : 'Timed'}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-shrink-0">
                       {(item as any).isExported ? (

@@ -186,6 +186,28 @@ export function ViewWorkout({ workout, onClose }: Props) {
                   )}
                 </div>
               </div>
+              {/* Workout Settings Badges */}
+              {(workoutData?.settings?.workoutWarmup?.enabled || workoutData?.settings?.defaultRestType) && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {workoutData?.settings?.workoutWarmup?.enabled && (
+                    <Badge variant="outline" className="text-xs">
+                      Warm-up: {workoutData.settings.workoutWarmup.activity === 'custom'
+                        ? 'Custom'
+                        : `${Math.floor((workoutData.settings.workoutWarmup.durationSec || 300) / 60)}min ${workoutData.settings.workoutWarmup.activity || 'stretching'}`}
+                    </Badge>
+                  )}
+                  {workoutData?.settings?.defaultRestType && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Clock className="w-3 h-3" />
+                      Rest: {workoutData.settings.defaultRestType === 'button'
+                        ? 'Lap Button'  // TODO: Make device-aware (AMA-212)
+                        : workoutData.settings.defaultRestSec
+                          ? `${workoutData.settings.defaultRestSec}s`
+                          : 'Timed'}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Button

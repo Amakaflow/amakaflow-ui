@@ -91,6 +91,9 @@ function DraggableExercise({
   supersetIdx,
   onEdit,
   onDelete,
+  effectiveRestType,
+  effectiveRestSec,
+  isInSuperset = false,
 }: {
   exercise: Exercise;
   blockIdx: number;
@@ -98,6 +101,9 @@ function DraggableExercise({
   supersetIdx?: number;
   onEdit: () => void;
   onDelete: () => void;
+  effectiveRestType?: string;  // From workout/block settings
+  effectiveRestSec?: number;   // From workout/block settings
+  isInSuperset?: boolean;      // If true, rest happens after superset, not each set
 }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.EXERCISE,
@@ -133,11 +139,33 @@ function DraggableExercise({
     }
     if (exercise.distance_m) parts.push(`${exercise.distance_m}m`);
     if (exercise.distance_range) parts.push(`${exercise.distance_range}`);
-    // Show rest info: "Lap Button" for button type, "Xs" for timed (only if > 0)
-    if (exercise.rest_type === 'button') {
-      parts.push(`Rest: Lap Button`);
-    } else if (exercise.rest_sec && exercise.rest_sec > 0) {
-      parts.push(`Rest: ${exercise.rest_sec}s`);
+
+    // Show rest info - only if explicitly configured on exercise, block, or workout
+    // For supersets: rest happens after the superset, not after each set within
+    if (!isInSuperset) {
+      // Check if exercise has explicit rest settings
+      const hasExerciseRest = exercise.rest_type || exercise.rest_sec;
+      // Check if block/workout has configured rest
+      const hasEffectiveRest = effectiveRestType || effectiveRestSec;
+
+      if (hasExerciseRest || hasEffectiveRest) {
+        const restType = exercise.rest_type || effectiveRestType;
+        const restSec = exercise.rest_sec ?? effectiveRestSec;
+
+        if (restType === 'button') {
+          parts.push(`⏱️ Lap Button rest`);
+        } else if (restSec && restSec > 0) {
+          const mins = Math.floor(restSec / 60);
+          const secs = restSec % 60;
+          if (mins > 0 && secs > 0) {
+            parts.push(`⏱️ ${mins}m ${secs}s rest`);
+          } else if (mins > 0) {
+            parts.push(`⏱️ ${mins}m rest`);
+          } else {
+            parts.push(`⏱️ ${restSec}s rest`);
+          }
+        }
+      }
     }
     return parts.length > 0 ? parts.join(' • ') : null;
   };
@@ -184,6 +212,9 @@ function ExerciseDropZone({
   onDelete,
   label,
   supersetIdx,
+  effectiveRestType,
+  effectiveRestSec,
+  isInSuperset = false,
 }: {
   blockIdx: number;
   exercises: Exercise[];
@@ -192,6 +223,9 @@ function ExerciseDropZone({
   onDelete: (exerciseIdx: number) => void;
   label?: string;
   supersetIdx?: number;
+  effectiveRestType?: string;
+  effectiveRestSec?: number;
+  isInSuperset?: boolean;
 }) {
   const [{ isOver }, drop] = useDrop(
     () => ({
@@ -237,6 +271,9 @@ function ExerciseDropZone({
           supersetIdx={supersetIdx}
           onEdit={() => onEdit(idx)}
           onDelete={() => onDelete(idx)}
+          effectiveRestType={effectiveRestType}
+          effectiveRestSec={effectiveRestSec}
+          isInSuperset={isInSuperset}
         />
       ))}
     </div>
@@ -336,6 +373,16 @@ function DraggableBlock({
   );
   const totalExerciseCount = blockExercises + supersetExercises;
 
+  // Calculate effective rest settings (block override > workout default)
+  // This is passed to exercise cards so they show the correct rest indicator
+  // Only set values if explicitly configured - don't default to anything
+  const effectiveRestType = block.restOverride?.enabled
+    ? block.restOverride.restType
+    : workoutSettings?.defaultRestType;  // No default - only show if configured
+  const effectiveRestSec = block.restOverride?.enabled
+    ? block.restOverride.restSec
+    : workoutSettings?.defaultRestSec;
+
   // Get structure-specific display info
   const getStructureInfo = () => {
     const parts: string[] = [];
@@ -410,31 +457,43 @@ function DraggableBlock({
                 {block.structure && (
                   <Badge variant="outline">{getStructureDisplayName(block.structure)}</Badge>
                 )}
-                {/* Rest indicator - shows effective rest (override or workout default) */}
-                <Badge variant={block.restOverride?.enabled ? "secondary" : "outline"} className="text-xs gap-1">
-                  <Clock className="w-3 h-3" />
-                  {(() => {
-                    // Use block override if enabled, otherwise workout default
-                    const restType = block.restOverride?.enabled
-                      ? block.restOverride.restType
-                      : workoutSettings?.defaultRestType || 'button';
-                    const restSec = block.restOverride?.enabled
-                      ? block.restOverride.restSec
-                      : workoutSettings?.defaultRestSec;
+                {/* Rest indicator - only show if explicitly configured (block override or workout default) */}
+                {(() => {
+                  // Only show if rest is explicitly configured
+                  const hasBlockOverride = block.restOverride?.enabled;
+                  const hasWorkoutDefault = workoutSettings?.defaultRestType;
 
-                    if (restType === 'button') {
-                      return 'Lap Button';
-                    }
-                    if (restSec) {
-                      const mins = Math.floor(restSec / 60);
-                      const secs = restSec % 60;
-                      if (mins > 0 && secs > 0) return `${mins}m ${secs}s rest`;
-                      if (mins > 0) return `${mins}m rest`;
-                      return `${secs}s rest`;
-                    }
-                    return 'Lap Button';
-                  })()}
-                </Badge>
+                  if (!hasBlockOverride && !hasWorkoutDefault) {
+                    return null;  // Not configured - don't show
+                  }
+
+                  const restType = hasBlockOverride
+                    ? block.restOverride?.restType
+                    : workoutSettings?.defaultRestType;
+                  const restSec = hasBlockOverride
+                    ? block.restOverride?.restSec
+                    : workoutSettings?.defaultRestSec;
+
+                  let label: string;
+                  if (restType === 'button') {
+                    label = 'Rest: Lap Button';  // TODO: Make device-aware
+                  } else if (restSec) {
+                    const mins = Math.floor(restSec / 60);
+                    const secs = restSec % 60;
+                    if (mins > 0 && secs > 0) label = `Rest: ${mins}m ${secs}s`;
+                    else if (mins > 0) label = `Rest: ${mins}m`;
+                    else label = `Rest: ${secs}s`;
+                  } else {
+                    return null;  // No valid rest config
+                  }
+
+                  return (
+                    <Badge variant={hasBlockOverride ? "secondary" : "outline"} className="text-xs gap-1">
+                      <Clock className="w-3 h-3" />
+                      {label}
+                    </Badge>
+                  );
+                })()}
               </div>
             </div>
             {!isCollapsed && getStructureInfo().length > 0 && (
@@ -461,6 +520,9 @@ function DraggableBlock({
                     onDelete={(idx) => onDeleteExercise(0)}
                     label={(block.exercises || []).length > 0 ? "Exercises" : undefined}
                     supersetIdx={undefined}
+                    effectiveRestType={effectiveRestType}
+                    effectiveRestSec={effectiveRestSec}
+                    isInSuperset={false}
                   />
                 </div>
               )}
@@ -479,6 +541,9 @@ function DraggableBlock({
                     onDelete={() => {}}
                     label={undefined}
                     supersetIdx={undefined}
+                    effectiveRestType={effectiveRestType}
+                    effectiveRestSec={effectiveRestSec}
+                    isInSuperset={false}
                   />
                 </div>
               )}
@@ -596,6 +661,9 @@ function DraggableBlock({
                               }}
                               label={`Superset ${supersetIdx + 1} Exercises`}
                               supersetIdx={supersetIdx}
+                              effectiveRestType={effectiveRestType}
+                              effectiveRestSec={effectiveRestSec}
+                              isInSuperset={true}  // Rest happens after superset, not after each set
                             />
                             <Button
                               variant="outline"
@@ -671,6 +739,9 @@ function DraggableBlock({
                       : undefined
                   }
                   supersetIdx={undefined}
+                  effectiveRestType={effectiveRestType}
+                  effectiveRestSec={effectiveRestSec}
+                  isInSuperset={false}
                 />
               </div>
 
@@ -1090,20 +1161,24 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
-  // Helper to format rest settings for display
-  const getRestSettingsLabel = () => {
+  // Helper to format rest settings for display - returns null if not configured
+  const getRestSettingsLabel = (): string | null => {
     const settings = workoutWithIds.settings;
-    if (!settings || settings.defaultRestType === 'button') {
-      return 'Lap Button';
+    // Only show if explicitly configured
+    if (!settings?.defaultRestType) {
+      return null;  // Not configured - don't show
+    }
+    if (settings.defaultRestType === 'button') {
+      return 'Rest: Lap Button';  // TODO: Make device-aware (Garmin = Lap, Apple = Action, etc.)
     }
     if (settings.defaultRestType === 'timed' && settings.defaultRestSec) {
       const mins = Math.floor(settings.defaultRestSec / 60);
       const secs = settings.defaultRestSec % 60;
-      if (mins > 0 && secs > 0) return `${mins}m ${secs}s rest`;
-      if (mins > 0) return `${mins}m rest`;
-      return `${secs}s rest`;
+      if (mins > 0 && secs > 0) return `Rest: ${mins}m ${secs}s`;
+      if (mins > 0) return `Rest: ${mins}m`;
+      return `Rest: ${secs}s`;
     }
-    return 'Lap Button';
+    return null;
   };
 
   return (
@@ -1119,12 +1194,14 @@ export function StructureWorkout({
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 </div>
-                {/* Workout Settings Badges */}
+                {/* Workout Settings Badges - only show if configured */}
                 <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <Clock className="w-3 h-3" />
-                    {getRestSettingsLabel()}
-                  </Badge>
+                  {getRestSettingsLabel() && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Clock className="w-3 h-3" />
+                      {getRestSettingsLabel()}
+                    </Badge>
+                  )}
                   {workoutWithIds.settings?.workoutWarmup?.enabled && (
                     <Badge variant="outline" className="text-xs">
                       Warm-up: {workoutWithIds.settings.workoutWarmup.activity === 'custom'

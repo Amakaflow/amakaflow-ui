@@ -1,4 +1,5 @@
 // ui/src/lib/__tests__/workout-history.test.ts
+import { vi } from 'vitest';
 import {
   saveWorkoutToHistory,
   getWorkoutHistory,
@@ -181,6 +182,103 @@ describe('workout-history', () => {
       expect(stats.thisWeek).toBe(0);
       expect(stats.deviceCounts).toEqual({});
       expect(stats.avgExercisesPerWorkout).toBe(0);
+    });
+  });
+
+  // AMA-206: Test that workoutId parameter is passed to API for updates
+  describe('saveWorkoutToHistory with workoutId (AMA-206)', () => {
+    it('should pass workoutId to API for explicit updates', async () => {
+      // Mock the workout-api module using Vitest
+      const mockSaveWorkoutToAPI = vi.fn().mockResolvedValue({
+        id: 'existing-workout-123',
+        workout_data: { title: 'Updated Workout', blocks: [] },
+        sources: ['text:test'],
+        device: 'garmin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      // Use vi.doMock to mock the module before importing
+      vi.doMock('../workout-api', () => ({
+        saveWorkoutToAPI: mockSaveWorkoutToAPI,
+      }));
+
+      // Clear the module cache to pick up the mock
+      vi.resetModules();
+
+      // Re-import the function to use the mocked version
+      const { saveWorkoutToHistory: saveWithMock } = await import('../workout-history');
+
+      // Call with workoutId parameter
+      await saveWithMock(
+        'user-123',
+        { title: 'Updated Workout', blocks: [] } as any,
+        'garmin',
+        undefined, // exports
+        ['text:test'], // sources
+        undefined, // validation
+        'existing-workout-123' // workoutId - this is the key fix for AMA-206
+      );
+
+      // Verify saveWorkoutToAPI was called with workout_id
+      expect(mockSaveWorkoutToAPI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profile_id: 'user-123',
+          workout_data: expect.objectContaining({ title: 'Updated Workout' }),
+          device: 'garmin',
+          workout_id: 'existing-workout-123', // This is the critical assertion
+        })
+      );
+
+      // Clean up mock
+      vi.doUnmock('../workout-api');
+      vi.resetModules();
+    });
+
+    it('should not pass workoutId when not provided (new workout)', async () => {
+      const mockSaveWorkoutToAPI = vi.fn().mockResolvedValue({
+        id: 'new-workout-456',
+        workout_data: { title: 'New Workout', blocks: [] },
+        sources: ['text:test'],
+        device: 'garmin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      vi.doMock('../workout-api', () => ({
+        saveWorkoutToAPI: mockSaveWorkoutToAPI,
+      }));
+
+      vi.resetModules();
+
+      const { saveWorkoutToHistory: saveWithMock } = await import('../workout-history');
+
+      // Call without workoutId parameter
+      await saveWithMock(
+        'user-123',
+        { title: 'New Workout', blocks: [] } as any,
+        'garmin',
+        undefined,
+        ['text:test'],
+        undefined
+        // No workoutId - this is a new workout
+      );
+
+      // Verify saveWorkoutToAPI was called without workout_id (or with undefined)
+      expect(mockSaveWorkoutToAPI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profile_id: 'user-123',
+          workout_data: expect.objectContaining({ title: 'New Workout' }),
+          device: 'garmin',
+        })
+      );
+
+      // The workout_id should be undefined for new workouts
+      const callArg = mockSaveWorkoutToAPI.mock.calls[0][0];
+      expect(callArg.workout_id).toBeUndefined();
+
+      vi.doUnmock('../workout-api');
+      vi.resetModules();
     });
   });
 });

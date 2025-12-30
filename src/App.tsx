@@ -785,10 +785,19 @@ export default function App() {
       
       // Save to history
       if (user) {
-        await saveWorkoutToHistory(user.id, workout, selectedDevice, exports, sources.map(s => `${s.type}:${s.content}`));
+        // AMA-206: Pass editingWorkoutId when editing from history
+        await saveWorkoutToHistory(
+          user.id,
+          workout,
+          selectedDevice,
+          exports,
+          sources.map((s: Source) => `${s.type}:${s.content}`),
+          undefined, // validation
+          editingWorkoutId || undefined
+        );
         setWorkoutSaved(true); // Mark as saved
       }
-      
+
       setCurrentStep('export');
       toast.success('Workout auto-mapped and ready to export!');
       
@@ -935,8 +944,17 @@ export default function App() {
       // Save to history
       if (user) {
         // Convert sources from Source[] to string[]
-        const sourcesAsStrings = sources.map(s => `${s.type}:${s.content}`);
-        await saveWorkoutToHistory(user.id, updatedWorkout, selectedDevice, exportFormats, sourcesAsStrings, validationResult);
+        const sourcesAsStrings = sources.map((s: Source) => `${s.type}:${s.content}`);
+        // AMA-206: Pass editingWorkoutId when editing from history
+        await saveWorkoutToHistory(
+          user.id,
+          updatedWorkout,
+          selectedDevice,
+          exportFormats,
+          sourcesAsStrings,
+          validationResult,
+          editingWorkoutId || undefined
+        );
         setWorkoutSaved(true); // Mark as saved
         try {
           const history = await getWorkoutHistory(user.id);
@@ -1522,13 +1540,15 @@ export default function App() {
               setLoading(true);
               try {
                 const { saveWorkoutToHistory } = await import('./lib/workout-history');
+                // AMA-206: Pass editingWorkoutId to ensure updates go to the correct workout
                 await saveWorkoutToHistory(
                   user.id,
                   workout,
                   selectedDevice,
                   exports || undefined,
                   sources.map(s => `${s.type}:${s.content}`),
-                  validation || undefined
+                  validation || undefined,
+                  editingWorkoutId || undefined  // Pass workout ID for explicit updates
                 );
                 toast.success('Workout saved!');
                 setWorkoutSaved(true); // Mark as saved
