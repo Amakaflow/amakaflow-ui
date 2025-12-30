@@ -39,6 +39,8 @@ The workout text may contain:
 Extract and structure this into a JSON format matching:
 {
   "title": "workout title",
+  "workout_type": "strength | circuit | hiit | cardio | follow_along | mixed",
+  "workout_type_confidence": 0.0-1.0,
   "blocks": [
     {
       "label": "block name (e.g., 'Warm-up', 'Strength', 'Conditioning')",
@@ -65,6 +67,20 @@ Extract and structure this into a JSON format matching:
     }
   ]
 }
+
+Workout Type Detection:
+- "strength": Weight training, bodybuilding, powerlifting (barbell/dumbbell exercises with sets/reps)
+- "circuit": Timed circuits, rounds of exercises with minimal rest between
+- "hiit": High-intensity interval training (work/rest intervals, Tabata, etc.)
+- "cardio": Running, cycling, rowing, swimming focused
+- "follow_along": Video-based workouts, along-with-me style
+- "mixed": Combination of multiple types or unclear
+
+Set workout_type_confidence between 0.0 and 1.0:
+- 0.9-1.0: Very clear workout type (e.g., "5x5 Strength Training")
+- 0.7-0.9: Likely workout type based on exercise selection
+- 0.5-0.7: Mixed signals, moderate confidence
+- Below 0.5: Unclear or ambiguous workout type
 
 Focus on accuracy:
 - Prefer OCR-extracted numbers for reps/weights/times (they're more accurate)

@@ -72,6 +72,8 @@ CRITICAL: Extract reps from exercise names when they appear at the start:
 Extract and structure this into a JSON format matching:
 {
   "title": "workout title",
+  "workout_type": "strength | circuit | hiit | cardio | follow_along | mixed",
+  "workout_type_confidence": 0.0-1.0,
   "blocks": [
     {
       "label": "block name (e.g., 'Warm-up', 'Strength', 'Conditioning')",
@@ -100,6 +102,16 @@ Extract and structure this into a JSON format matching:
   ]
 }
 
+Workout Type Detection:
+- "strength": Weight training, bodybuilding (barbell/dumbbell exercises with sets/reps)
+- "circuit": Timed circuits, rounds of exercises with minimal rest between
+- "hiit": High-intensity interval training (work/rest intervals, Tabata)
+- "cardio": Running, cycling, rowing focused
+- "follow_along": Video-based workouts
+- "mixed": Combination or unclear
+
+Set workout_type_confidence (0.0-1.0) based on clarity of workout type.
+
 CRITICAL INSTRUCTIONS:
 - Use ONLY the text that was extracted from the images - do NOT invent, guess, or make up exercises
 - Use exercise names EXACTLY as extracted (if "BS" was extracted, use "BS" not "Back Squat")
@@ -124,6 +136,8 @@ REPS EXTRACTION RULES:
 If the images contain no readable workout text, return:
 {
   "title": null,
+  "workout_type": null,
+  "workout_type_confidence": null,
   "blocks": []
 }
 

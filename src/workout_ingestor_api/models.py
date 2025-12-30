@@ -2,6 +2,9 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 
+# AMA-213: Workout type detection
+WorkoutType = Literal['strength', 'circuit', 'hiit', 'cardio', 'follow_along', 'mixed']
+
 
 class Exercise(BaseModel):
     """Represents a single exercise."""
@@ -91,7 +94,10 @@ class Workout(BaseModel):
     title: str = "Imported Workout"
     source: Optional[str] = None
     blocks: List[Block] = Field(default_factory=list)
-    
+    # AMA-213: Workout type detection
+    workout_type: Optional[WorkoutType] = None
+    workout_type_confidence: Optional[float] = None
+
     class Config:
         extra = "ignore"  # Ignore extra fields from UI
     
@@ -145,5 +151,8 @@ class Workout(BaseModel):
         return Workout(
             title=self.title,
             source=self.source,
-            blocks=converted_blocks
+            blocks=converted_blocks,
+            # AMA-213: Preserve workout type detection
+            workout_type=self.workout_type,
+            workout_type_confidence=self.workout_type_confidence,
         )

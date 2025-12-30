@@ -108,6 +108,8 @@ Transcript from video titled "{title}":
 Return ONLY a valid JSON object with this exact structure:
 {{
   "title": "{title}",
+  "workout_type": "strength | circuit | hiit | cardio | follow_along | mixed",
+  "workout_type_confidence": 0.0-1.0,
   "video_duration_sec": {video_duration_sec if video_duration_sec else 'null'},
   "blocks": [
     {{
@@ -131,6 +133,16 @@ Return ONLY a valid JSON object with this exact structure:
     }}
   ]
 }}
+
+Workout Type Detection:
+- "strength": Weight training, bodybuilding, powerlifting (barbell/dumbbell with sets/reps)
+- "circuit": Timed circuits, rounds with minimal rest
+- "hiit": High-intensity intervals (work/rest, Tabata)
+- "cardio": Running, cycling, rowing focused
+- "follow_along": Video workouts to follow along
+- "mixed": Combination or unclear
+
+Set workout_type_confidence (0.0-1.0) based on clarity.
 
 Rules:
 - Only include actual exercises mentioned, not random sentences
@@ -218,6 +230,8 @@ Transcript from video titled "{title}":
 Return ONLY a valid JSON object with this exact structure:
 {{
   "title": "{title}",
+  "workout_type": "strength | circuit | hiit | cardio | follow_along | mixed",
+  "workout_type_confidence": 0.0-1.0,
   "video_duration_sec": {video_duration_sec if video_duration_sec else 'null'},
   "blocks": [
     {{
@@ -241,6 +255,16 @@ Return ONLY a valid JSON object with this exact structure:
     }}
   ]
 }}
+
+Workout Type Detection:
+- "strength": Weight training, bodybuilding, powerlifting (barbell/dumbbell with sets/reps)
+- "circuit": Timed circuits, rounds with minimal rest
+- "hiit": High-intensity intervals (work/rest, Tabata)
+- "cardio": Running, cycling, rowing focused
+- "follow_along": Video workouts to follow along
+- "mixed": Combination or unclear
+
+Set workout_type_confidence (0.0-1.0) based on clarity.
 
 Rules:
 - Only include actual exercises mentioned, not random sentences
