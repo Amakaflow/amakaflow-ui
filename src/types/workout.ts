@@ -1,5 +1,13 @@
 // API Request/Response Types matching the actual backend
 
+// AMA-213: Workout type detection
+export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'follow_along' | 'mixed';
+
+export interface WorkoutTypeDetection {
+  type: WorkoutType;
+  confidence: number; // 0.0 - 1.0
+}
+
 // Rest type determines how rest periods work on the device
 export type RestType = 'timed' | 'button';
 // - 'timed': Countdown timer (e.g., 30s, 60s)
@@ -116,6 +124,9 @@ export interface WorkoutStructure {
   source: string;
   settings?: WorkoutSettings;  // Workout-level defaults (AMA-96)
   blocks: Block[];
+  // AMA-213: Workout type detection from LLM
+  workout_type?: WorkoutType | null;
+  workout_type_confidence?: number | null;
   // For bulk imports (e.g., Pinterest multi-day plans)
   _bulkWorkouts?: WorkoutStructure[];
   _provenance?: {

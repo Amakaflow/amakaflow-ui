@@ -89,6 +89,9 @@ export function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStr
     blocks: normalizedBlocks,
     title: workout.title || 'Imported Workout',
     source: workout.source || 'unknown',
+    // AMA-213: Preserve workout type detection from API
+    workout_type: workout.workout_type,
+    workout_type_confidence: workout.workout_type_confidence,
   };
 }
 

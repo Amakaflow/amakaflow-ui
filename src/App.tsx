@@ -21,6 +21,7 @@ import { StravaEnhance } from './components/StravaEnhance';
 import { ProfileCompletion } from './components/ProfileCompletion';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { WorkoutTypeConfirmDialog } from './components/WorkoutTypeConfirmDialog';
 import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
@@ -28,7 +29,7 @@ import { BulkImport } from './components/BulkImport';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
-import { WorkoutStructure, ExportFormats, ValidationResponse } from './types/workout';
+import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from './types/workout';
 import { generateWorkoutStructure as generateWorkoutStructureReal, checkApiHealth, normalizeWorkoutStructure } from './lib/api';
 import { generateWorkoutStructure as generateWorkoutStructureMock } from './lib/mock-api';
 import { 
@@ -39,6 +40,7 @@ import {
 } from './lib/mapper-api';
 import { DeviceId, getDeviceById } from './lib/devices';
 import { saveWorkoutToHistory, getWorkoutHistory, getWorkoutHistoryFromLocalStorage } from './lib/workout-history';
+import { applyWorkoutTypeDefaults } from './lib/workoutTypeDefaults';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
 import { User } from './types/auth';
 import { isAccountConnectedSync, isAccountConnected } from './lib/linked-accounts';
@@ -100,6 +102,18 @@ export default function App() {
     title: '',
     description: '',
     onConfirm: () => {},
+  });
+  // AMA-213: Workout type detection dialog state
+  const [workoutTypeDialog, setWorkoutTypeDialog] = useState<{
+    open: boolean;
+    detectedType: WorkoutType;
+    confidence: number;
+    pendingWorkout: WorkoutStructure | null;
+  }>({
+    open: false,
+    detectedType: 'mixed',
+    confidence: 0,
+    pendingWorkout: null,
   });
   
   // Build timestamp - shows when app was loaded/updated
@@ -600,6 +614,12 @@ export default function App() {
       // IMPORTANT: This code should NOT execute if quality was poor (we returned above)
       setGenerationProgress('Complete!');
 
+      // AMA-213: Check for workout type detection
+      const detectedType = structure.workout_type as WorkoutType | undefined;
+      const typeConfidence = structure.workout_type_confidence ?? 0;
+
+      console.log('[AMA-213] Workout type detection:', { detectedType, typeConfidence });
+
       // Check for bulk workouts (Pinterest multi-day plans, boards)
       const bulkWorkouts = structure._bulkWorkouts;
       if (bulkWorkouts && bulkWorkouts.length > 1) {
@@ -637,6 +657,48 @@ export default function App() {
         return;
       }
 
+      // AMA-213: Handle workout type detection
+      // If type detected with confidence < 90%, show dialog for user confirmation
+      // If type detected with confidence >= 90%, auto-apply defaults
+      // If no type detected, proceed without defaults
+      if (detectedType && typeConfidence > 0) {
+        if (typeConfidence >= 0.9) {
+          // High confidence - auto-apply defaults
+          console.log('[AMA-213] High confidence, auto-applying defaults for:', detectedType);
+          const workoutWithDefaults = applyWorkoutTypeDefaults(structure, detectedType);
+          setWorkout(workoutWithDefaults);
+          setSources(newSources);
+          setCurrentStep('structure');
+          setWorkoutSaved(false);
+          clearInterval(progressInterval);
+          setLoading(false);
+          setGenerationProgress(null);
+          setGenerationAbortController(null);
+          toast.dismiss('generate-structure');
+          toast.success(`Workout structure generated! (${detectedType} workout - settings applied)`);
+          return;
+        } else {
+          // Lower confidence - show dialog for user confirmation
+          console.log('[AMA-213] Lower confidence, showing dialog for:', detectedType, typeConfidence);
+          clearInterval(progressInterval);
+          setLoading(false);
+          setGenerationProgress(null);
+          setGenerationAbortController(null);
+          toast.dismiss('generate-structure');
+
+          // Store the pending workout and show dialog
+          setWorkoutTypeDialog({
+            open: true,
+            detectedType: detectedType,
+            confidence: typeConfidence,
+            pendingWorkout: structure,
+          });
+          setSources(newSources); // Save sources for later
+          return;
+        }
+      }
+
+      // No workout type detected - proceed without defaults
       setWorkout(structure);
       setSources(newSources);
       setCurrentStep('structure');
@@ -681,6 +743,52 @@ export default function App() {
       generationAbortController.abort();
       setGenerationAbortController(null);
     }
+  };
+
+  // AMA-213: Handle workout type confirmation dialog
+  const handleWorkoutTypeConfirm = (selectedType: WorkoutType, applyDefaults: boolean) => {
+    const pendingWorkout = workoutTypeDialog.pendingWorkout;
+    if (!pendingWorkout) return;
+
+    let finalWorkout: WorkoutStructure;
+    if (applyDefaults) {
+      finalWorkout = applyWorkoutTypeDefaults(pendingWorkout, selectedType);
+      toast.success(`Workout type set to ${selectedType}. Settings applied!`);
+    } else {
+      // Just set the workout type without defaults
+      finalWorkout = {
+        ...pendingWorkout,
+        workout_type: selectedType,
+      };
+      toast.success('Workout structure generated!');
+    }
+
+    setWorkout(finalWorkout);
+    setCurrentStep('structure');
+    setWorkoutSaved(false);
+    setWorkoutTypeDialog({
+      open: false,
+      detectedType: 'mixed',
+      confidence: 0,
+      pendingWorkout: null,
+    });
+  };
+
+  const handleWorkoutTypeSkip = () => {
+    const pendingWorkout = workoutTypeDialog.pendingWorkout;
+    if (!pendingWorkout) return;
+
+    // Proceed without applying any defaults
+    setWorkout(pendingWorkout);
+    setCurrentStep('structure');
+    setWorkoutSaved(false);
+    setWorkoutTypeDialog({
+      open: false,
+      detectedType: 'mixed',
+      confidence: 0,
+      pendingWorkout: null,
+    });
+    toast.success('Workout structure generated!');
   };
 
   // Pinterest bulk import handlers
@@ -1815,6 +1923,15 @@ export default function App() {
         onConfirm={confirmDialog.onConfirm}
         confirmText="Continue"
         cancelText="Cancel"
+      />
+
+      {/* AMA-213: Workout Type Confirmation Dialog */}
+      <WorkoutTypeConfirmDialog
+        open={workoutTypeDialog.open}
+        detectedType={workoutTypeDialog.detectedType}
+        confidence={workoutTypeDialog.confidence}
+        onConfirm={handleWorkoutTypeConfirm}
+        onSkip={handleWorkoutTypeSkip}
       />
 
       {/* Pinterest Bulk Import Modal */}
