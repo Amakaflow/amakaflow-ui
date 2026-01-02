@@ -312,27 +312,27 @@ The AmakaFlow Watch app guides you through workouts with on-wrist prompts and ha
 
 ---
 
-### Starting a Workout
+### Opening the Watch App
 
-**From iPhone:**
-1. Open the AmakaFlow iOS app
-2. Select a workout
-3. Tap **Start on Watch**
-4. The workout begins automatically on your Watch
-
-**From Apple Watch:**
-
-Find AmakaFlow in your Watch app list.
+Find **AmakaFlow-Watch** in your Watch app list.
 
 ![Watch app in list](/help/watch-app-list.png)
 
-The app shows your synced workouts. Scroll through and tap to see details.
+When you open the app, you'll see the home screen. If no workout is active, you'll see options to Refresh or run a Demo.
 
-![Native watch app](/help/watch-native-app.png)
+![Watch home screen](/help/remote-disconnected.png)
 
-Tap **Start** to begin with a countdown.
+---
 
-![Workout countdown](/help/watch-countdown.png)
+### Starting a Workout
+
+**From iPhone (Recommended):**
+1. Open the AmakaFlow iOS app
+2. Select a workout
+3. Tap **Quick Start** or **Start on Watch**
+4. The workout begins automatically on your Watch
+
+Once a workout starts, the Watch displays the current exercise.
 
 ---
 
@@ -340,33 +340,34 @@ Tap **Start** to begin with a countdown.
 
 #### Exercise Screen
 
-The watch shows your current exercise with timer.
+The watch shows your current exercise with timer and progress.
 
-![Watch showing warmup](/help/watch-warmup.png)
+![Exercise screen](/help/remote-exercise.png)
+
+![Warmup display](/help/remote-warmup.png)
 
 - **Exercise name** at the top
 - **Sets/Reps** or **Duration** in the center
-- **Progress indicator** showing completion
-- Timer counting your exercise time
+- **Progress indicator** (e.g., 2/21 exercises)
+- Navigation buttons to skip forward/back
 
-#### Navigation
-- **Swipe right** → Previous exercise
-- **Swipe left** → Next exercise
-- **Tap** → Mark set complete (strength mode)
-- **Crown** → Scroll through details
+#### Rest Periods
 
-#### Rest Timer
-Between exercises you'll see:
-- Countdown timer showing rest remaining
-- Next exercise preview
-- Tap to skip rest early
+Between exercises you'll see rest screens:
 
-#### Haptic Feedback
-Your watch vibrates to notify you:
-- Exercise starting
-- Rest period ending
-- Set complete
-- Workout complete
+![Rest screen](/help/remote-pause.png)
+
+- Tap **Continue** when ready to proceed
+- Or wait for the timer to complete
+
+#### Pause/End Controls
+
+Swipe or tap to access workout controls:
+
+![End workout screen](/help/remote-end.png)
+
+- **Pause** - Temporarily stop the workout
+- **End Workout** - Finish and save your progress
 
 ---
 
@@ -374,10 +375,9 @@ Your watch vibrates to notify you:
 
 #### Strength Mode
 Best for weight training and bodyweight exercises.
-- Exercises show **Sets × Reps** (e.g., "3 sets × 10 reps")
+- Exercises show **Sets × Reps** (e.g., "3 sets × 12 reps")
 - Tap to mark each set complete
 - Rest timer between sets
-- Move to next exercise after all sets done
 
 #### Timed Mode
 Best for HIIT, circuits, yoga, and cardio.
@@ -386,27 +386,17 @@ Best for HIIT, circuits, yoga, and cardio.
 - Auto-advances to next exercise
 - Haptic alert when time's up
 
-AmakaFlow auto-detects the best mode, but you can override in workout settings.
+AmakaFlow auto-detects the best mode based on the workout type.
 
 ---
 
-### Watch Remote Features
+### Haptic Feedback
 
-The Watch can also act as a remote display:
-
-![Remote exercise screen](/help/remote-exercise.png)
-
-![Remote warmup display](/help/remote-warmup.png)
-
-**Pause/End Controls:**
-
-![Pause screen](/help/remote-pause.png)
-
-![End workout screen](/help/remote-end.png)
-
-If the watch loses connection to iPhone, you'll see a disconnected indicator but can continue the workout.
-
-![Disconnected indicator](/help/remote-disconnected.png)
+Your watch vibrates to notify you:
+- Exercise starting
+- Rest period ending
+- Set complete
+- Workout complete
 
 ---
 
@@ -415,12 +405,11 @@ If the watch loses connection to iPhone, you'll see a disconnected indicator but
 When finished:
 1. Summary screen shows total time and exercises
 2. Heart rate data (if available)
-3. Tap **Done** to save
+3. Workout is saved to your activity history
 
 **Ending Early:**
-1. Use the pause/end controls
-2. Tap **End Workout**
-3. Partial workout is saved
+1. Tap **End Workout** from the controls
+2. Partial workout is saved
     `,
     screenshots: [],
   },
