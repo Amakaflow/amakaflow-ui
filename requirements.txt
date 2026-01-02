@@ -8,3 +8,6 @@ httpx>=0.25.0
 python-dateutil>=2.8.2
 PyJWT>=2.8.0
 cryptography
+
+# Error tracking (AMA-225)
+sentry-sdk[fastapi]>=2.0.0
