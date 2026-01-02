@@ -50,6 +50,7 @@ from workout_ingestor_api.services.pinterest_service import (
 from workout_ingestor_api.services.vision_service import VisionService
 from workout_ingestor_api.services.llm_service import LLMService
 from workout_ingestor_api.services.feedback_service import FeedbackService
+from workout_ingestor_api.services.voice_parsing_service import VoiceParsingService
 from workout_ingestor_api.api.youtube_ingest import ingest_youtube_impl
 # ---------------------------------------------------------------------------
 # Build / git metadata
@@ -124,6 +125,12 @@ class NotWorkoutFeedback(BaseModel):
 class JunkPatternFeedback(BaseModel):
     text: str
     reason: Optional[str] = None
+
+
+class ParseVoiceRequest(BaseModel):
+    """Request model for voice workout parsing (AMA-5)."""
+    transcription: str
+    sport_hint: Optional[str] = None  # "running" | "cycling" | "strength" | "mobility" | "swimming" | "cardio"
 
 
 # ---------------------------------------------------------------------------
@@ -1734,3 +1741,82 @@ async def get_pinterest_metadata(url: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Voice-to-Workout Transcription (AMA-5)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/workouts/parse-voice")
+async def parse_voice_workout(payload: ParseVoiceRequest):
+    """
+    Parse natural language workout description into structured workout.
+
+    This endpoint receives transcribed text (from on-device speech recognition)
+    and uses Claude to parse it into a structured workout with intervals.
+
+    Supports:
+    - Running/cardio: intervals, distances, paces, tempo runs
+    - Strength: exercises with sets, reps, weights
+    - HIIT: work/rest intervals, Tabata, circuits
+    - Mixed workouts
+
+    Args:
+        payload.transcription: The transcribed text from voice input
+        payload.sport_hint: Optional hint about sport type to improve parsing
+
+    Returns:
+        Structured workout with intervals, confidence score, and suggestions
+
+    Example request:
+        {
+            "transcription": "5 minute warmup, then 4x400m at 5k pace with 90 seconds rest, 10 minute cooldown",
+            "sport_hint": "running"
+        }
+
+    Example response:
+        {
+            "success": true,
+            "workout": {
+                "id": "uuid",
+                "name": "4x400m Interval Workout",
+                "sport": "running",
+                "duration": 2100,
+                "description": "400m repeats at 5K pace",
+                "source": "ai",
+                "sourceUrl": null,
+                "intervals": [...]
+            },
+            "confidence": 0.92,
+            "suggestions": ["Consider specifying exact pace targets"]
+        }
+    """
+    result = VoiceParsingService.parse_voice_workout(
+        transcription=payload.transcription,
+        sport_hint=payload.sport_hint
+    )
+
+    if not result.success:
+        # Return 422 for validation errors (couldn't parse workout)
+        if result.error == "Could not understand workout description":
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "success": False,
+                    "error": result.error,
+                    "message": result.message or "The transcription was too vague to create a structured workout"
+                }
+            )
+        # Return 500 for service errors
+        raise HTTPException(
+            status_code=500,
+            detail=result.error or "Failed to parse voice workout"
+        )
+
+    return JSONResponse({
+        "success": True,
+        "workout": result.workout,
+        "confidence": result.confidence,
+        "suggestions": result.suggestions
+    })

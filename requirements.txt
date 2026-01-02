@@ -31,6 +31,7 @@ instaloader>=4.14.2
 easyocr>=1.7.0  # EasyOCR - better for social media content (recommended for Instagram)
 # instagrapi>=2.0.0  # Experimental: Optional Instagram API wrapper for higher quality images (uncomment to try)
 openai>=1.0.0  # OpenAI API for vision models (GPT-4o-mini/GPT-4o Vision)
+anthropic>=0.40.0  # Anthropic Claude API for voice workout parsing (AMA-5)
 supabase>=2.0.0  # Supabase client for YouTube workout caching
 reportlab>=4.0.0  # PDF generation for workout export
 PyJWT>=2.8.0  # JWT validation for Clerk authentication

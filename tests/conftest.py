@@ -449,5 +449,6 @@ def mock_video_service():
 def mock_env_vars(monkeypatch):
     """Set mock environment variables for tests."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
     monkeypatch.setenv("SUPABASE_KEY", "test-supabase-key")
