@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,7 @@ import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
 import { BulkImport } from './components/BulkImport';
+import { HelpPage } from './components/help/HelpPage';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
@@ -52,7 +53,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help';
 
 export default function App() {
   // Clerk authentication
@@ -1494,6 +1495,20 @@ export default function App() {
             
             <div className="flex items-center gap-2">
               <Button
+                variant={currentView === 'help' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => {
+                  checkUnsavedChanges(() => {
+                    clearWorkflowState();
+                    setCurrentView('help');
+                  });
+                }}
+                className="gap-2"
+              >
+                <HelpCircle className="w-4 h-4" />
+                Help
+              </Button>
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
@@ -1792,6 +1807,10 @@ export default function App() {
             }}
             onNavigateToMobileCompanion={() => setCurrentView('mobile-companion')}
           />
+        )}
+
+        {currentView === 'help' && (
+          <HelpPage onBack={() => setCurrentView('home')} />
         )}
 
         {currentView === 'strava-enhance' && (
