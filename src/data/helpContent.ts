@@ -336,33 +336,6 @@ Once a workout starts, the Watch displays the current exercise.
 
 ---
 
-### Native Watch Workouts (No iPhone Required)
-
-If you prefer to run workouts directly on your Watch without using your iPhone, you can use the native workout feature. When workouts sync to your Watch, they appear in the standard Workouts app.
-
-**To find your synced workouts:**
-1. Open the **Workout** app on your Watch
-2. Scroll to find **Traditional Strength Training** or your workout type
-3. Your AmakaFlow workouts will appear here
-
-![Native watch app](/help/watch-native-app.png)
-
-**Starting the workout:**
-
-Tap **Start** and you'll see a countdown before the workout begins.
-
-![Workout countdown](/help/watch-countdown.png)
-
-**During the workout:**
-
-The Watch guides you through each exercise with timers and prompts.
-
-![Watch showing warmup](/help/watch-warmup.png)
-
-This method works completely offline and doesn't require your iPhone nearby.
-
----
-
 ### During a Workout
 
 #### Exercise Screen
@@ -395,6 +368,33 @@ Swipe or tap to access workout controls:
 
 - **Pause** - Temporarily stop the workout
 - **End Workout** - Finish and save your progress
+
+---
+
+### Native Watch Workouts (No iPhone Required)
+
+If you prefer to run workouts directly on your Watch without using your iPhone, you can use the native workout feature. When workouts sync to your Watch, they appear in the standard Workouts app.
+
+**To find your synced workouts:**
+1. Open the **Workout** app on your Watch
+2. Scroll to find **Traditional Strength Training** or your workout type
+3. Your AmakaFlow workouts will appear here
+
+![Native watch app](/help/watch-native-app.png)
+
+**Starting the workout:**
+
+Tap **Start** and you'll see a countdown before the workout begins.
+
+![Workout countdown](/help/watch-countdown.png)
+
+**During the workout:**
+
+The Watch guides you through each exercise with timers and prompts.
+
+![Watch showing warmup](/help/watch-warmup.png)
+
+This method works completely offline and doesn't require your iPhone nearby.
 
 ---
 
