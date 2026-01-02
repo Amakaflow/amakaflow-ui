@@ -128,6 +128,10 @@ export const HelpSection = forwardRef<HTMLElement, HelpSectionProps>(
                   {children}
                 </a>
               ),
+              // Inline Images
+              img: ({ src, alt }) => (
+                <InlineScreenshot src={src || ""} alt={alt || ""} />
+              ),
               // Strong/Bold
               strong: ({ children }) => (
                 <strong className="font-semibold text-zinc-100">
@@ -144,19 +148,6 @@ export const HelpSection = forwardRef<HTMLElement, HelpSectionProps>(
           </ReactMarkdown>
         </div>
 
-        {/* Screenshots */}
-        {section.screenshots.length > 0 && (
-          <div className="mt-8">
-            <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-              Screenshots
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {section.screenshots.map((filename) => (
-                <ScreenshotImage key={filename} filename={filename} />
-              ))}
-            </div>
-          </div>
-        )}
       </section>
     );
   }
@@ -164,7 +155,7 @@ export const HelpSection = forwardRef<HTMLElement, HelpSectionProps>(
 
 HelpSection.displayName = "HelpSection";
 
-// Screenshot image component with fallback
+// Screenshot image component with fallback (for grid display)
 function ScreenshotImage({ filename }: { filename: string }) {
   const [error, setError] = useState(false);
   const imagePath = `/help/${filename}`;
@@ -182,5 +173,37 @@ function ScreenshotImage({ filename }: { filename: string }) {
         onError={() => setError(true)}
       />
     </div>
+  );
+}
+
+// Inline screenshot component for markdown images
+function InlineScreenshot({ src, alt }: { src: string; alt: string }) {
+  const [error, setError] = useState(false);
+
+  if (error) {
+    const filename = src.split("/").pop() || src;
+    return (
+      <div className="my-6">
+        <ScreenshotPlaceholder filename={filename} />
+      </div>
+    );
+  }
+
+  return (
+    <figure className="my-6">
+      <div className="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900 max-w-2xl">
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-auto"
+          onError={() => setError(true)}
+        />
+      </div>
+      {alt && (
+        <figcaption className="mt-2 text-sm text-zinc-500 italic">
+          {alt}
+        </figcaption>
+      )}
+    </figure>
   );
 }

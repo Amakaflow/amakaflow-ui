@@ -71,13 +71,25 @@ The AmakaFlow web app at **amakaflow.com** is where you import, edit, and manage
 
 #### How to Import
 
-**Single Import:**
-1. From the home screen, click **Import** in the sidebar
-2. You'll see the import screen - click **Add URL**
-3. Paste a YouTube, TikTok, or Instagram workout URL
-4. The URL appears in your sources list
-5. Click **Extract Workout** and wait for AI analysis (30-60 seconds)
-6. Review the extracted workout with all exercises
+**Step 1:** From the home screen, click **Import** in the sidebar
+
+![Home screen with Import selected](/help/web-homescreen-import.png)
+
+**Step 2:** You'll see the import screen - click **Add URL** to add a video
+
+![Import start screen](/help/web-import-start.png)
+
+**Step 3:** Paste a YouTube, TikTok, or Instagram workout URL
+
+![Adding a YouTube URL](/help/web-import-add-url.png)
+
+**Step 4:** The URL appears in your sources list - click **Extract Workout**
+
+![URL added to sources](/help/web-import-url-added.png)
+
+**Step 5:** Review the extracted workout with all exercises detected by AI
+
+![Successfully imported workout](/help/web-import-success.png)
 
 **Bulk Import:**
 1. Go to **Import** > **Bulk Import**
@@ -101,26 +113,29 @@ Access your workouts from **My Workouts** in the sidebar:
 - **Recent** - Recently imported or edited
 - **Activity History** - View completed workout history
 
+![My Workouts page](/help/web-my-workouts.png)
+
+![Activity History tab](/help/web-activity-history.png)
+
 ---
 
 ### Editing a Workout
 
-Click any workout to open the editor:
+Click any workout to open the editor.
 
-**Workout Settings:**
-- Edit the workout name and description
-- Set default rest period between exercises
-- Configure warm-up options for strength exercises
+**Workout Settings:** Edit the workout name, default rest period, and warm-up options.
 
-**Exercise Settings:**
-- Edit exercise name
-- Set sets and reps (strength) or duration (timed)
-- Configure rest periods between exercises
-- Set distance for cardio exercises
+![Edit workout settings](/help/web-edit-workout.png)
 
-**Adding Exercises:**
-- Click **Add Exercise** to add new exercises
-- Search the wger exercise database for exercises with instructions
+**Exercise Settings:** Edit exercise name, sets/reps, rest periods, or duration.
+
+![Edit exercise details](/help/web-edit-exercise.png)
+
+![Edit exercise duration](/help/web-edit-duration.png)
+
+**Adding Exercises:** Click **Add Exercise** to add new exercises from the wger database.
+
+![Add exercise from wger](/help/web-add-exercise.png)
 
 ---
 
@@ -128,12 +143,25 @@ Click any workout to open the editor:
 
 #### Apple Watch (via iPhone)
 
-1. Click **Export** on your completed workout
-2. Go to **Settings** > **Manage iOS Devices**
-3. Click **Generate Pairing Code** to show a QR code
-4. Scan the QR code with the AmakaFlow iPhone app
-5. Once paired, you'll see a success confirmation
-6. Your workouts now sync automatically to paired devices
+**Step 1:** Once your workout is complete, click **Export**
+
+![Workout ready to sync](/help/web-sync-ready.png)
+
+**Step 2:** Go to **Settings** > **Manage iOS Devices**
+
+![Manage iOS devices](/help/web-manage-devices.png)
+
+**Step 3:** Click **Generate Pairing Code** to show a QR code
+
+![QR code for pairing](/help/web-qr-pairing.png)
+
+**Step 4:** Scan the QR code with the AmakaFlow iPhone app
+
+![Successful pairing](/help/web-pairing-success.png)
+
+**Step 5:** Your workouts now sync automatically to paired devices
+
+![Export destinations](/help/web-export-destinations.png)
 
 #### Garmin Connect
 
@@ -149,24 +177,7 @@ For devices without cloud sync:
 2. Connect your Garmin via USB
 3. Copy the .FIT file to \`GARMIN/WORKOUTS\` folder
     `,
-    screenshots: [
-      "web-homescreen-import.png",
-      "web-import-start.png",
-      "web-import-add-url.png",
-      "web-import-url-added.png",
-      "web-import-success.png",
-      "web-my-workouts.png",
-      "web-activity-history.png",
-      "web-edit-workout.png",
-      "web-edit-exercise.png",
-      "web-edit-duration.png",
-      "web-add-exercise.png",
-      "web-sync-ready.png",
-      "web-manage-devices.png",
-      "web-qr-pairing.png",
-      "web-pairing-success.png",
-      "web-export-destinations.png",
-    ],
+    screenshots: [],
   },
   {
     id: "iphone-app",
@@ -184,17 +195,22 @@ The AmakaFlow iOS app is your companion for browsing workouts and controlling yo
 AmakaFlow for iOS is currently in beta via Apple's TestFlight.
 
 **Step 1: Get the Invitation**
-- You'll receive an email invitation to join the beta
-- Click the **View in TestFlight** link in the email
+
+You'll receive an email invitation to join the beta. Click the **View in TestFlight** link.
+
+![TestFlight invitation email](/help/testflight-email.png)
 
 **Step 2: Install TestFlight**
-1. If you don't have TestFlight, the App Store will open
-2. Tap **Get** to install TestFlight
+
+If you don't have TestFlight, the App Store will open. Tap **Get** to install.
+
+![TestFlight in App Store](/help/testflight-install.png)
 
 **Step 3: Install AmakaFlow**
-1. Open **TestFlight** from the invitation link
-2. Find **AmakaFlow** in the available apps
-3. Tap **Install** to download the app
+
+Open TestFlight, find AmakaFlow, and tap **Install**.
+
+![Install AmakaFlow in TestFlight](/help/testflight-amakaflow.png)
 
 **Getting Updates:**
 - TestFlight notifies you when updates are available
@@ -206,12 +222,17 @@ AmakaFlow for iOS is currently in beta via Apple's TestFlight.
 
 To sync workouts from amakaflow.com:
 
-1. Open the AmakaFlow iOS app
-2. Go to **Settings** tab
-3. Tap **Pair with Web**
-4. Your iPhone camera opens to scan the QR code
-5. Scan the QR code shown on the web app (Settings > Manage iOS Devices)
-6. You'll see the connection details once paired successfully
+**Step 1:** Open the AmakaFlow iOS app and go to **Settings**
+
+**Step 2:** Tap **Pair with Web** - your camera opens to scan
+
+![QR code scanner](/help/ios-qr-scan.png)
+
+**Step 3:** Scan the QR code shown on the web app (Settings > Manage iOS Devices)
+
+**Step 4:** You'll see the connection details once paired successfully
+
+![Connection details](/help/ios-connection-details.png)
 
 Once paired, your devices stay connected and workouts sync automatically.
 
@@ -220,62 +241,65 @@ Once paired, your devices stay connected and workouts sync automatically.
 ### App Features
 
 #### Home Screen
-- View all synced workouts
-- Quick-start recent workouts with the play button
-- Search your library
+
+View all synced workouts and quick-start recent workouts with the play button.
+
+![iPhone home screen](/help/ios-home.png)
 
 #### Workout Preview
-- Tap any workout to see all exercises
-- View sets, reps, and durations
-- See the full workout breakdown before starting
-- Tap **Start on Watch** to begin
+
+Tap any workout to see all exercises before starting.
+
+![Workout preview](/help/ios-workout-preview.png)
+
+Tap **Quick Start** to begin on your Apple Watch.
+
+![Quick start pressed](/help/ios-quickstart.png)
 
 #### Activity History
-- View completed workouts in the Activity tab
-- See all your past workout sessions
-- Tap any session to view detailed workout stats
-- Track your progress over time
+
+View completed workouts in the Activity tab.
+
+![Activity history list](/help/ios-activity-list.png)
+
+Tap any session to view detailed workout stats.
+
+![Workout details](/help/ios-workout-details.png)
 
 ---
 
 ### Apple Watch Connection
 
 #### Setting Up Your Watch
-- Go to **Settings** in the iOS app
-- The Apple Watch section shows your connection status
-- Ensure your Watch is paired with your iPhone
-- Workouts sync automatically to your Watch
+
+Go to **Settings** in the iOS app. The Apple Watch section shows your connection status.
+
+![Watch settings](/help/ios-watch-settings.png)
 
 #### Starting a Workout
+
 1. Select a workout from the iOS app
 2. Tap **Quick Start** or **Start on Watch**
 3. The workout launches on your Apple Watch
 4. Your iPhone shows the "waiting for watch" screen
 
+![Waiting for watch](/help/ios-waiting-watch.png)
+
 #### Remote Control
+
 During a workout on Apple Watch, your iPhone becomes a remote control:
+
+![Remote showing warmup](/help/ios-remote-warmup.png)
+
+![Remote showing rest period](/help/ios-remote-rest.png)
+
 - See the current exercise and timer
 - View warm-up and rest periods
 - Skip to next/previous exercise
 - Pause and resume the workout
 - End workout early if needed
     `,
-    screenshots: [
-      "testflight-email.png",
-      "testflight-install.png",
-      "testflight-amakaflow.png",
-      "ios-qr-scan.png",
-      "ios-connection-details.png",
-      "ios-home.png",
-      "ios-workout-preview.png",
-      "ios-quickstart.png",
-      "ios-activity-list.png",
-      "ios-workout-details.png",
-      "ios-watch-settings.png",
-      "ios-waiting-watch.png",
-      "ios-remote-warmup.png",
-      "ios-remote-rest.png",
-    ],
+    screenshots: [],
   },
   {
     id: "apple-watch",
@@ -297,16 +321,29 @@ The AmakaFlow Watch app guides you through workouts with on-wrist prompts and ha
 4. The workout begins automatically on your Watch
 
 **From Apple Watch:**
-1. Open **AmakaFlow** on your Watch (find it in your app list)
-2. The app shows your synced workouts
-3. Scroll through and tap a workout to see details
-4. Tap **Start** to begin with a countdown
+
+Find AmakaFlow in your Watch app list.
+
+![Watch app in list](/help/watch-app-list.png)
+
+The app shows your synced workouts. Scroll through and tap to see details.
+
+![Native watch app](/help/watch-native-app.png)
+
+Tap **Start** to begin with a countdown.
+
+![Workout countdown](/help/watch-countdown.png)
 
 ---
 
 ### During a Workout
 
 #### Exercise Screen
+
+The watch shows your current exercise with timer.
+
+![Watch showing warmup](/help/watch-warmup.png)
+
 - **Exercise name** at the top
 - **Sets/Reps** or **Duration** in the center
 - **Progress indicator** showing completion
@@ -355,12 +392,21 @@ AmakaFlow auto-detects the best mode, but you can override in workout settings.
 
 ### Watch Remote Features
 
-The Watch can also act as a remote display showing:
-- Current exercise details
-- Pause/End workout controls
-- Exercise progress even when disconnected from iPhone
+The Watch can also act as a remote display:
+
+![Remote exercise screen](/help/remote-exercise.png)
+
+![Remote warmup display](/help/remote-warmup.png)
+
+**Pause/End Controls:**
+
+![Pause screen](/help/remote-pause.png)
+
+![End workout screen](/help/remote-end.png)
 
 If the watch loses connection to iPhone, you'll see a disconnected indicator but can continue the workout.
+
+![Disconnected indicator](/help/remote-disconnected.png)
 
 ---
 
@@ -376,17 +422,7 @@ When finished:
 2. Tap **End Workout**
 3. Partial workout is saved
     `,
-    screenshots: [
-      "watch-app-list.png",
-      "watch-native-app.png",
-      "watch-countdown.png",
-      "watch-warmup.png",
-      "remote-exercise.png",
-      "remote-warmup.png",
-      "remote-pause.png",
-      "remote-end.png",
-      "remote-disconnected.png",
-    ],
+    screenshots: [],
   },
   {
     id: "garmin",
