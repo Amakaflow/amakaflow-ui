@@ -1,8 +1,21 @@
 """Main FastAPI application."""
+import os
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from workout_ingestor_api.api.routes import router
 from workout_ingestor_api.api.bulk_import_routes import router as bulk_import_router
+
+# Initialize Sentry for error tracking (AMA-225)
+sentry_dsn = os.getenv("SENTRY_DSN")
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv("ENVIRONMENT", "development"),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        enable_tracing=True,
+    )
 
 app = FastAPI(title="Workout Ingestor API")
 
