@@ -1,10 +1,23 @@
 """
 FastAPI application for Calendar API.
 """
+import os
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes.calendar import router as calendar_router
 from .routes.smart_planner import router as smart_planner_router
+
+# Initialize Sentry for error tracking (AMA-225)
+sentry_dsn = os.getenv("SENTRY_DSN")
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv("ENVIRONMENT", "development"),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        enable_tracing=True,
+    )
 
 app = FastAPI(
     title="AmakaFlow Calendar API",
