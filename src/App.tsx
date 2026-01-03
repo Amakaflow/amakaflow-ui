@@ -40,7 +40,7 @@ import {
   checkMapperApiHealth 
 } from './lib/mapper-api';
 import { DeviceId, getDeviceById } from './lib/devices';
-import { saveWorkoutToHistory, getWorkoutHistory, getWorkoutHistoryFromLocalStorage } from './lib/workout-history';
+import { saveWorkoutToHistory, getWorkoutHistory, getWorkoutHistoryFromLocalStorage, setCurrentProfileId } from './lib/workout-history';
 import { applyWorkoutTypeDefaults } from './lib/workoutTypeDefaults';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
 import { User } from './types/auth';
@@ -175,6 +175,7 @@ export default function App() {
           mode: 'individual',
         };
         setUser(defaultUser);
+        setCurrentProfileId('dev-user'); // Scope localStorage to dev user
         setAuthLoading(false);
         return;
       }
@@ -197,6 +198,7 @@ export default function App() {
               avatar: clerkUser.imageUrl,
               mode: 'individual' as const,
             });
+            setCurrentProfileId(profile.id); // Scope localStorage to this user
           } else {
             // Profile creation failed, but we still have Clerk user
             // Create a temporary user object
@@ -216,6 +218,7 @@ export default function App() {
               avatar: clerkUser.imageUrl,
             };
             setUser(tempUser);
+            setCurrentProfileId(clerkUser.id); // Scope localStorage to this user
           }
           // Check Strava connection status from Supabase
           if (clerkUser?.id) {
@@ -232,6 +235,7 @@ export default function App() {
         } else {
           // No Clerk user, clear app user
           setUser(null);
+          setCurrentProfileId(null); // Clear localStorage scope
           setStravaConnected(false);
         }
       } catch (error: any) {
@@ -1781,7 +1785,9 @@ export default function App() {
             onAccountDeleted={() => {
               // Account was deleted, sign out and reset state
               setUser(null);
-              toast.success('Your account has been deleted');
+              setCurrentProfileId(null); // Clear localStorage scope
+              setCurrentView('home'); // Reset view
+              // Clerk signOut is called in UserSettings, this just cleans up local state
             }}
             onUserUpdate={(updates) => {
               // Update local user state with all updates

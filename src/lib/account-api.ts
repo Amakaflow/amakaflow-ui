@@ -5,8 +5,7 @@
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
-
-const MAPPER_API_URL = import.meta.env.VITE_MAPPER_API_URL || 'http://localhost:8002';
+import { API_URLS } from './config';
 
 // Types
 export interface DeletionPreview {
@@ -29,10 +28,33 @@ export interface DeletionPreview {
  * Get a preview of all user data that will be deleted when account is deleted.
  */
 export async function getDeletionPreview(): Promise<DeletionPreview> {
-  const response = await authenticatedFetch(`${MAPPER_API_URL}/account/deletion-preview`);
+  const response = await authenticatedFetch(`${API_URLS.MAPPER}/account/deletion-preview`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch deletion preview: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export interface DeletionResult {
+  success: boolean;
+  deleted?: Record<string, number>;
+  error?: string;
+}
+
+/**
+ * Delete user account and all associated data from the database.
+ * Note: This does NOT delete the Clerk user - that should be done separately.
+ */
+export async function deleteAccountData(): Promise<DeletionResult> {
+  const response = await authenticatedFetch(`${API_URLS.MAPPER}/account`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || `Failed to delete account: ${response.statusText}`);
   }
 
   return response.json();

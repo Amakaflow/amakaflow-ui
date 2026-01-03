@@ -16,8 +16,31 @@ export type WorkoutHistoryItem = {
   stravaActivityId?: string;
 };
 
-const HISTORY_KEY = 'amakaflow_workout_history';
+const LEGACY_HISTORY_KEY = 'amakaflow_workout_history';
+const HISTORY_KEY_PREFIX = 'amakaflow_workout_history_';
 const MAX_HISTORY_ITEMS = 50;
+
+// Current user's profile ID for scoped localStorage (set by setCurrentProfileId)
+let currentProfileId: string | null = null;
+
+/**
+ * Set the current profile ID for scoped localStorage operations.
+ * Must be called when user logs in.
+ */
+export function setCurrentProfileId(profileId: string | null) {
+  currentProfileId = profileId;
+}
+
+/**
+ * Get the localStorage key for the current user.
+ * Falls back to legacy key if no profile ID is set.
+ */
+function getHistoryKey(): string {
+  if (currentProfileId) {
+    return `${HISTORY_KEY_PREFIX}${currentProfileId}`;
+  }
+  return LEGACY_HISTORY_KEY;
+}
 
 // -----------------------------------------------------------------------------
 // LocalStorage helpers
@@ -25,7 +48,7 @@ const MAX_HISTORY_ITEMS = 50;
 
 function readHistoryFromLocalStorage(): WorkoutHistoryItem[] {
   try {
-    const stored = localStorage.getItem(HISTORY_KEY);
+    const stored = localStorage.getItem(getHistoryKey());
     if (!stored) return [];
 
     const parsed = JSON.parse(stored);
@@ -41,7 +64,7 @@ function readHistoryFromLocalStorage(): WorkoutHistoryItem[] {
 
 function writeHistoryToLocalStorage(history: WorkoutHistoryItem[]) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    localStorage.setItem(getHistoryKey(), JSON.stringify(history));
   } catch (err) {
     console.error('Failed to save workout history to localStorage:', err);
   }

@@ -38,8 +38,7 @@ import {
   PROVIDER_INFO,
   ACCENT_OPTIONS,
 } from '../lib/voice-api';
-import { DeletionPreview, getDeletionPreview } from '../lib/account-api';
-import { deleteAccount } from '../lib/auth';
+import { DeletionPreview, getDeletionPreview, deleteAccountData } from '../lib/account-api';
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
@@ -379,8 +378,11 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
         throw new Error('User not authenticated');
       }
 
-      // Call the actual delete account function
-      await deleteAccount();
+      // Delete all user data from the database via mapper-api
+      await deleteAccountData();
+
+      // Sign out from Clerk
+      await signOut();
 
       toast.success('Your account has been deleted.');
       setDeleteDialogOpen(false);
