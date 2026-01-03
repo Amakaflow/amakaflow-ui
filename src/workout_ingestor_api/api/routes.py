@@ -51,6 +51,12 @@ from workout_ingestor_api.services.vision_service import VisionService
 from workout_ingestor_api.services.llm_service import LLMService
 from workout_ingestor_api.services.feedback_service import FeedbackService
 from workout_ingestor_api.services.voice_parsing_service import VoiceParsingService
+from workout_ingestor_api.services.cloud_transcription_service import CloudTranscriptionService
+from workout_ingestor_api.services.voice_dictionary_service import (
+    VoiceDictionaryService,
+    DictionaryEntry,
+    VoiceSettings,
+)
 from workout_ingestor_api.api.youtube_ingest import ingest_youtube_impl
 # ---------------------------------------------------------------------------
 # Build / git metadata
@@ -1820,3 +1826,306 @@ async def parse_voice_workout(payload: ParseVoiceRequest):
         "confidence": result.confidence,
         "suggestions": result.suggestions
     })
+
+
+# ---------------------------------------------------------------------------
+# Cloud Transcription Endpoints (AMA-229)
+# ---------------------------------------------------------------------------
+
+
+class TranscribeRequest(BaseModel):
+    """Request model for cloud transcription (AMA-229)."""
+    audio_base64: str  # Base64-encoded audio data
+    provider: str = "deepgram"  # "deepgram" or "assemblyai"
+    language: str = "en-US"
+    keywords: Optional[List[str]] = None  # Additional keywords for boosting
+
+
+class SyncDictionaryRequest(BaseModel):
+    """Request model for syncing personal dictionary (AMA-229)."""
+    corrections: List[DictionaryEntry]
+
+
+class DeleteCorrectionRequest(BaseModel):
+    """Request model for deleting a correction (AMA-229)."""
+    misheard: str
+
+
+@router.post("/voice/transcribe")
+async def transcribe_audio(
+    payload: TranscribeRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Transcribe audio using cloud provider (Deepgram or AssemblyAI).
+
+    API keys are stored server-side for security - never exposed to clients.
+    Supports fitness vocabulary boosting for better recognition.
+
+    Args:
+        payload.audio_base64: Base64-encoded audio data (WAV format preferred)
+        payload.provider: "deepgram" or "assemblyai"
+        payload.language: Language code (en-US, en-GB, en-AU, etc.)
+        payload.keywords: Optional additional keywords for boosting
+
+    Returns:
+        Transcription result with text, confidence, and word timings
+
+    Example request:
+        {
+            "audio_base64": "UklGRi4A...",
+            "provider": "deepgram",
+            "language": "en-US",
+            "keywords": ["custom term"]
+        }
+
+    Example response:
+        {
+            "success": true,
+            "text": "4 sets of 8 RDLs at 135 pounds",
+            "confidence": 0.95,
+            "provider": "deepgram",
+            "duration_seconds": 3.2,
+            "words": [...]
+        }
+    """
+    import base64
+
+    # Validate provider
+    if payload.provider not in ["deepgram", "assemblyai"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid provider: {payload.provider}. Use 'deepgram' or 'assemblyai'."
+        )
+
+    # Decode base64 audio
+    try:
+        audio_data = base64.b64decode(payload.audio_base64)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid base64 audio data: {str(e)}"
+        )
+
+    if len(audio_data) < 1000:
+        raise HTTPException(
+            status_code=400,
+            detail="Audio data too short. Please provide a longer recording."
+        )
+
+    # Transcribe with cloud provider
+    result = CloudTranscriptionService.transcribe(
+        audio_data=audio_data,
+        provider=payload.provider,
+        language=payload.language,
+        keywords=payload.keywords,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=500,
+            detail=result.error or "Transcription failed"
+        )
+
+    # Apply user's personal corrections
+    corrected_text = VoiceDictionaryService.apply_corrections(result.text, user_id)
+
+    return JSONResponse({
+        "success": True,
+        "text": corrected_text,
+        "original_text": result.text if corrected_text != result.text else None,
+        "confidence": result.confidence,
+        "provider": result.provider,
+        "language": result.language,
+        "duration_seconds": result.duration_seconds,
+        "words": [
+            {
+                "word": w.word,
+                "start": w.start,
+                "end": w.end,
+                "confidence": w.confidence,
+            }
+            for w in result.words
+        ],
+    })
+
+
+@router.get("/voice/fitness-vocab")
+async def get_fitness_vocabulary():
+    """
+    Get the fitness vocabulary dictionary for keyword boosting.
+
+    Returns 500+ fitness terms organized by category for use with
+    cloud transcription providers.
+
+    Returns:
+        Fitness vocabulary with categories and flat list
+
+    Example response:
+        {
+            "version": "1.0.0",
+            "total_terms": 520,
+            "categories": {
+                "exercises": ["deadlift", "squat", ...],
+                "equipment": ["barbell", "dumbbell", ...],
+                ...
+            },
+            "flat_list": ["deadlift", "squat", ...]
+        }
+    """
+    return JSONResponse(VoiceDictionaryService.get_fitness_vocabulary_response())
+
+
+@router.get("/voice/dictionary")
+async def get_user_dictionary(user_id: str = Depends(get_current_user)):
+    """
+    Get user's personal correction dictionary.
+
+    Returns corrections the user has made to transcriptions,
+    which are automatically applied to future transcriptions.
+
+    Returns:
+        Dictionary with corrections list and count
+
+    Example response:
+        {
+            "corrections": [
+                {"misheard": "are deal", "corrected": "RDL", "frequency": 5},
+                {"misheard": "am wrap", "corrected": "AMRAP", "frequency": 3}
+            ],
+            "count": 2
+        }
+    """
+    return JSONResponse(VoiceDictionaryService.get_user_dictionary(user_id))
+
+
+@router.post("/voice/dictionary")
+async def sync_user_dictionary(
+    payload: SyncDictionaryRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Sync/upsert user corrections to their personal dictionary.
+
+    Used by iOS app to sync corrections made on-device to the cloud.
+    Corrections are applied automatically to future transcriptions.
+
+    Args:
+        payload.corrections: List of correction entries to sync
+
+    Returns:
+        Sync result with count of synced entries
+
+    Example request:
+        {
+            "corrections": [
+                {"misheard": "are deal", "corrected": "RDL", "frequency": 1}
+            ]
+        }
+
+    Example response:
+        {
+            "success": true,
+            "synced": 1
+        }
+    """
+    result = VoiceDictionaryService.sync_user_dictionary(user_id, payload.corrections)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=result.get("error", "Failed to sync dictionary")
+        )
+    return JSONResponse(result)
+
+
+@router.delete("/voice/dictionary")
+async def delete_correction(
+    payload: DeleteCorrectionRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Delete a single correction from user's personal dictionary.
+
+    Args:
+        payload.misheard: The misheard text to remove
+
+    Returns:
+        Deletion result
+
+    Example request:
+        {"misheard": "are deal"}
+
+    Example response:
+        {"success": true, "deleted": 1}
+    """
+    result = VoiceDictionaryService.delete_correction(user_id, payload.misheard)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=result.get("error", "Failed to delete correction")
+        )
+    return JSONResponse(result)
+
+
+@router.get("/voice/settings")
+async def get_voice_settings(user_id: str = Depends(get_current_user)):
+    """
+    Get user's voice transcription settings.
+
+    Returns:
+        Voice settings (provider, fallback, accent)
+
+    Example response:
+        {
+            "provider": "smart",
+            "cloud_fallback_enabled": true,
+            "accent_region": "en-US"
+        }
+    """
+    return JSONResponse(VoiceDictionaryService.get_user_settings(user_id))
+
+
+@router.put("/voice/settings")
+async def update_voice_settings(
+    settings: VoiceSettings,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Update user's voice transcription settings.
+
+    Args:
+        settings.provider: "whisperkit", "deepgram", "assemblyai", or "smart"
+        settings.cloud_fallback_enabled: Enable cloud fallback for low confidence
+        settings.accent_region: Language/accent code (en-US, en-GB, en-AU, etc.)
+
+    Returns:
+        Updated settings
+
+    Example request:
+        {
+            "provider": "smart",
+            "cloud_fallback_enabled": true,
+            "accent_region": "en-AU"
+        }
+
+    Example response:
+        {
+            "success": true,
+            "settings": {...}
+        }
+    """
+    # Validate provider
+    valid_providers = ["whisperkit", "deepgram", "assemblyai", "smart"]
+    if settings.provider not in valid_providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid provider: {settings.provider}. Use one of: {valid_providers}"
+        )
+
+    result = VoiceDictionaryService.update_user_settings(user_id, settings)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=result.get("error", "Failed to update settings")
+        )
+    return JSONResponse(result)
