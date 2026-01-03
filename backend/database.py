@@ -851,3 +851,302 @@ def get_ios_companion_pending_workouts(profile_id: str, limit: int = 50) -> List
         logger.error(f"Failed to get iOS companion pending workouts for {profile_id}: {e}")
         return []
 
+
+# =============================================================================
+# Account Deletion Preview (AMA-200)
+# =============================================================================
+
+def get_account_deletion_preview(profile_id: str) -> Dict[str, Any]:
+    """
+    Get a preview of all user data that will be deleted when account is deleted.
+
+    This helps users understand what they're losing before confirming deletion.
+    Counts items across all user-related tables.
+
+    Args:
+        profile_id: User profile ID (Clerk user ID)
+
+    Returns:
+        Dict with counts and details of data to be deleted
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return {"error": "Database not available"}
+
+    preview = {
+        "workouts": 0,
+        "workout_completions": 0,
+        "programs": 0,
+        "tags": 0,
+        "follow_along_workouts": 0,
+        "paired_devices": 0,
+        "voice_settings": False,
+        "voice_corrections": 0,
+        "strava_connection": False,
+        "garmin_connection": False,
+    }
+
+    try:
+        # Count workouts
+        workouts_result = supabase.table("workouts") \
+            .select("id", count="exact") \
+            .eq("profile_id", profile_id) \
+            .execute()
+        preview["workouts"] = workouts_result.count or 0
+
+        # Count workout completions
+        try:
+            completions_result = supabase.table("workout_completions") \
+                .select("id", count="exact") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["workout_completions"] = completions_result.count or 0
+        except Exception:
+            pass  # Table might not exist yet
+
+        # Count programs
+        try:
+            programs_result = supabase.table("workout_programs") \
+                .select("id", count="exact") \
+                .eq("profile_id", profile_id) \
+                .execute()
+            preview["programs"] = programs_result.count or 0
+        except Exception:
+            pass  # Table might not exist yet
+
+        # Count tags
+        try:
+            tags_result = supabase.table("user_tags") \
+                .select("id", count="exact") \
+                .eq("profile_id", profile_id) \
+                .execute()
+            preview["tags"] = tags_result.count or 0
+        except Exception:
+            pass  # Table might not exist yet
+
+        # Count follow-along workouts
+        try:
+            follow_along_result = supabase.table("follow_along_workouts") \
+                .select("id", count="exact") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["follow_along_workouts"] = follow_along_result.count or 0
+        except Exception:
+            pass  # Table might not exist yet
+
+        # Count paired devices (used pairing tokens)
+        try:
+            devices_result = supabase.table("mobile_pairing_tokens") \
+                .select("id", count="exact") \
+                .eq("clerk_user_id", profile_id) \
+                .not_.is_("used_at", "null") \
+                .execute()
+            preview["paired_devices"] = devices_result.count or 0
+        except Exception:
+            pass  # Table might not exist yet
+
+        # Check voice settings
+        try:
+            voice_settings_result = supabase.table("user_voice_settings") \
+                .select("id") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["voice_settings"] = bool(voice_settings_result.data)
+        except Exception:
+            pass  # Table might not exist
+
+        # Count voice corrections
+        try:
+            voice_corrections_result = supabase.table("user_voice_corrections") \
+                .select("id", count="exact") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["voice_corrections"] = voice_corrections_result.count or 0
+        except Exception:
+            pass  # Table might not exist
+
+        # Check Strava connection
+        try:
+            strava_result = supabase.table("strava_tokens") \
+                .select("id") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["strava_connection"] = bool(strava_result.data)
+        except Exception:
+            pass  # Table might not exist
+
+        # Check Garmin connection
+        try:
+            garmin_result = supabase.table("garmin_tokens") \
+                .select("id") \
+                .eq("user_id", profile_id) \
+                .execute()
+            preview["garmin_connection"] = bool(garmin_result.data)
+        except Exception:
+            pass  # Table might not exist
+
+        # Calculate totals
+        preview["total_items"] = (
+            preview["workouts"] +
+            preview["workout_completions"] +
+            preview["programs"] +
+            preview["tags"] +
+            preview["follow_along_workouts"] +
+            preview["voice_corrections"]
+        )
+
+        preview["has_ios_devices"] = preview["paired_devices"] > 0
+        preview["has_external_connections"] = (
+            preview["strava_connection"] or preview["garmin_connection"]
+        )
+
+        return preview
+
+    except Exception as e:
+        logger.error(f"Failed to get account deletion preview: {e}")
+        return {"error": str(e)}
+
+
+def delete_user_account(profile_id: str) -> Dict[str, Any]:
+    """
+    Delete all user data from the database.
+
+    This permanently removes all user data across all tables.
+    Should only be called after user confirmation.
+
+    Args:
+        profile_id: User profile ID (Clerk user ID)
+
+    Returns:
+        Dict with deletion results
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return {"success": False, "error": "Database not available"}
+
+    deleted_counts = {}
+
+    try:
+        # Delete workouts
+        try:
+            result = supabase.table("workouts").delete().eq("profile_id", profile_id).execute()
+            deleted_counts["workouts"] = len(result.data) if result.data else 0
+        except Exception as e:
+            logger.warning(f"Error deleting workouts: {e}")
+            deleted_counts["workouts"] = 0
+
+        # Delete workout completions
+        try:
+            result = supabase.table("workout_completions").delete().eq("user_id", profile_id).execute()
+            deleted_counts["workout_completions"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["workout_completions"] = 0
+
+        # Delete workout programs
+        try:
+            result = supabase.table("workout_programs").delete().eq("profile_id", profile_id).execute()
+            deleted_counts["programs"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["programs"] = 0
+
+        # Delete user tags
+        try:
+            result = supabase.table("user_tags").delete().eq("profile_id", profile_id).execute()
+            deleted_counts["tags"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["tags"] = 0
+
+        # Delete follow-along workouts
+        try:
+            result = supabase.table("follow_along_workouts").delete().eq("user_id", profile_id).execute()
+            deleted_counts["follow_along_workouts"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["follow_along_workouts"] = 0
+
+        # Delete mobile pairing tokens
+        try:
+            result = supabase.table("mobile_pairing_tokens").delete().eq("clerk_user_id", profile_id).execute()
+            deleted_counts["paired_devices"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["paired_devices"] = 0
+
+        # Delete voice settings
+        try:
+            result = supabase.table("user_voice_settings").delete().eq("user_id", profile_id).execute()
+            deleted_counts["voice_settings"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["voice_settings"] = 0
+
+        # Delete voice corrections
+        try:
+            result = supabase.table("user_voice_corrections").delete().eq("user_id", profile_id).execute()
+            deleted_counts["voice_corrections"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["voice_corrections"] = 0
+
+        # Delete Strava tokens
+        try:
+            result = supabase.table("strava_tokens").delete().eq("user_id", profile_id).execute()
+            deleted_counts["strava_tokens"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["strava_tokens"] = 0
+
+        # Delete Garmin tokens
+        try:
+            result = supabase.table("garmin_tokens").delete().eq("user_id", profile_id).execute()
+            deleted_counts["garmin_tokens"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["garmin_tokens"] = 0
+
+        # Delete workout events (calendar)
+        try:
+            result = supabase.table("workout_events").delete().eq("user_id", profile_id).execute()
+            deleted_counts["workout_events"] = len(result.data) if result.data else 0
+        except Exception:
+            deleted_counts["workout_events"] = 0
+
+        # Finally delete the profile itself
+        try:
+            result = supabase.table("profiles").delete().eq("id", profile_id).execute()
+            deleted_counts["profile"] = 1 if result.data else 0
+        except Exception as e:
+            logger.error(f"Error deleting profile: {e}")
+            deleted_counts["profile"] = 0
+
+        # Delete the Clerk user account
+        clerk_deleted = False
+        clerk_secret_key = os.getenv("CLERK_SECRET_KEY")
+        if clerk_secret_key:
+            try:
+                import httpx
+                response = httpx.delete(
+                    f"https://api.clerk.com/v1/users/{profile_id}",
+                    headers={
+                        "Authorization": f"Bearer {clerk_secret_key}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=10.0,
+                )
+                if response.status_code in (200, 204):
+                    clerk_deleted = True
+                    logger.info(f"Deleted Clerk user {profile_id}")
+                elif response.status_code == 404:
+                    # User doesn't exist in Clerk, that's fine
+                    clerk_deleted = True
+                    logger.info(f"Clerk user {profile_id} not found (already deleted)")
+                else:
+                    logger.error(f"Failed to delete Clerk user {profile_id}: {response.status_code} {response.text}")
+            except Exception as e:
+                logger.error(f"Error deleting Clerk user {profile_id}: {e}")
+        else:
+            logger.warning("CLERK_SECRET_KEY not configured, skipping Clerk user deletion")
+
+        deleted_counts["clerk_user"] = 1 if clerk_deleted else 0
+
+        logger.info(f"Deleted user account {profile_id}: {deleted_counts}")
+        return {"success": True, "deleted": deleted_counts}
+
+    except Exception as e:
+        logger.error(f"Failed to delete user account {profile_id}: {e}")
+        return {"success": False, "error": str(e)}
+
