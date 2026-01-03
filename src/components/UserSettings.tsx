@@ -18,7 +18,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './ui/alert-dialog';
-import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin } from 'lucide-react';
+import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin, Mic, Plus, Trash2, Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import {
+  VoiceSettings,
+  DictionaryCorrection,
+  TranscriptionProvider,
+  getVoiceSettings,
+  updateVoiceSettings,
+  getPersonalDictionary,
+  syncDictionary,
+  deleteCorrection,
+  PROVIDER_INFO,
+  ACCENT_OPTIONS,
+} from '../lib/voice-api';
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
@@ -49,7 +68,7 @@ type Props = {
   onNavigateToMobileCompanion?: () => void;
 };
 
-type SettingsSection = 'general' | 'account' | 'devices' | 'notifications' | 'security' | 'connected-apps';
+type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps';
 
 export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion }: Props) {
   const { user: clerkUser } = useClerkUser();
@@ -78,12 +97,56 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   // Paired iOS devices count (AMA-184)
   const [pairedDeviceCount, setPairedDeviceCount] = useState<number>(0);
 
+  // Voice transcription settings (AMA-229)
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings | null>(null);
+  const [voiceSettingsLoading, setVoiceSettingsLoading] = useState(false);
+  const [voiceSettingsSaving, setVoiceSettingsSaving] = useState(false);
+  const [dictionary, setDictionary] = useState<DictionaryCorrection[]>([]);
+  const [dictionaryLoading, setDictionaryLoading] = useState(false);
+  const [dictionaryLoaded, setDictionaryLoaded] = useState(false);
+  const [newMisheard, setNewMisheard] = useState('');
+  const [newCorrected, setNewCorrected] = useState('');
+  const [addingCorrection, setAddingCorrection] = useState(false);
+
   // Fetch paired device count on mount (AMA-184)
   useEffect(() => {
     getPairedDevices()
       .then((devices) => setPairedDeviceCount(devices.length))
       .catch((err) => console.error('Failed to fetch paired devices:', err));
   }, []);
+
+  // Fetch voice settings when voice section is active (AMA-229)
+  useEffect(() => {
+    if (activeSection === 'voice' && !voiceSettings && !voiceSettingsLoading) {
+      setVoiceSettingsLoading(true);
+      getVoiceSettings()
+        .then((settings) => setVoiceSettings(settings))
+        .catch((err) => {
+          console.error('Failed to fetch voice settings:', err);
+          // Set defaults if fetch fails
+          setVoiceSettings({
+            provider: 'smart',
+            cloud_fallback_enabled: true,
+            accent_region: 'en-US',
+          });
+        })
+        .finally(() => setVoiceSettingsLoading(false));
+    }
+  }, [activeSection, voiceSettings, voiceSettingsLoading]);
+
+  // Fetch personal dictionary when voice section is active (AMA-229)
+  useEffect(() => {
+    if (activeSection === 'voice' && !dictionaryLoaded && !dictionaryLoading) {
+      setDictionaryLoading(true);
+      getPersonalDictionary()
+        .then((result) => setDictionary(result.corrections))
+        .catch((err) => console.error('Failed to fetch dictionary:', err))
+        .finally(() => {
+          setDictionaryLoading(false);
+          setDictionaryLoaded(true);
+        });
+    }
+  }, [activeSection, dictionaryLoaded, dictionaryLoading]);
 
   useEffect(() => {
     // Load linked OAuth providers from Clerk user
@@ -161,6 +224,104 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
     toast.success(`Image processing method set to ${method === 'vision' ? 'Vision Model' : 'OCR'}`);
   };
 
+  // Voice settings handlers (AMA-229)
+  const handleVoiceProviderChange = async (provider: TranscriptionProvider) => {
+    if (!voiceSettings) return;
+
+    const newSettings = { ...voiceSettings, provider };
+    setVoiceSettings(newSettings);
+    setVoiceSettingsSaving(true);
+
+    try {
+      await updateVoiceSettings(newSettings);
+      toast.success(`Transcription provider set to ${PROVIDER_INFO[provider].name}`);
+    } catch (err) {
+      console.error('Failed to update voice settings:', err);
+      toast.error('Failed to save voice settings');
+      // Revert on failure
+      setVoiceSettings(voiceSettings);
+    } finally {
+      setVoiceSettingsSaving(false);
+    }
+  };
+
+  const handleCloudFallbackChange = async (enabled: boolean) => {
+    if (!voiceSettings) return;
+
+    const newSettings = { ...voiceSettings, cloud_fallback_enabled: enabled };
+    setVoiceSettings(newSettings);
+    setVoiceSettingsSaving(true);
+
+    try {
+      await updateVoiceSettings(newSettings);
+      toast.success(enabled ? 'Cloud fallback enabled' : 'Cloud fallback disabled');
+    } catch (err) {
+      console.error('Failed to update voice settings:', err);
+      toast.error('Failed to save voice settings');
+      setVoiceSettings(voiceSettings);
+    } finally {
+      setVoiceSettingsSaving(false);
+    }
+  };
+
+  const handleAccentChange = async (accent: string) => {
+    if (!voiceSettings) return;
+
+    const newSettings = { ...voiceSettings, accent_region: accent };
+    setVoiceSettings(newSettings);
+    setVoiceSettingsSaving(true);
+
+    try {
+      await updateVoiceSettings(newSettings);
+      const accentLabel = ACCENT_OPTIONS.find(a => a.value === accent)?.label || accent;
+      toast.success(`Accent set to ${accentLabel}`);
+    } catch (err) {
+      console.error('Failed to update voice settings:', err);
+      toast.error('Failed to save voice settings');
+      setVoiceSettings(voiceSettings);
+    } finally {
+      setVoiceSettingsSaving(false);
+    }
+  };
+
+  const handleAddCorrection = async () => {
+    if (!newMisheard.trim() || !newCorrected.trim()) {
+      toast.error('Both fields are required');
+      return;
+    }
+
+    setAddingCorrection(true);
+    const newCorrection: DictionaryCorrection = {
+      misheard: newMisheard.trim().toLowerCase(),
+      corrected: newCorrected.trim(),
+      frequency: 1,
+    };
+
+    try {
+      await syncDictionary([...dictionary, newCorrection]);
+      setDictionary([...dictionary, newCorrection]);
+      setNewMisheard('');
+      setNewCorrected('');
+      toast.success('Correction added');
+    } catch (err) {
+      console.error('Failed to add correction:', err);
+      toast.error('Failed to add correction');
+    } finally {
+      setAddingCorrection(false);
+    }
+  };
+
+  const handleDeleteCorrection = async (misheard: string) => {
+    try {
+      await deleteCorrection(misheard);
+      setDictionary(dictionary.filter(c => c.misheard !== misheard));
+      toast.success('Correction removed');
+    } catch (err) {
+      console.error('Failed to delete correction:', err);
+      toast.error('Failed to remove correction');
+    }
+  };
+
   const toggleDevice = (device: DeviceId) => {
     if (selectedDevices.includes(device)) {
       setSelectedDevices(selectedDevices.filter(d => d !== device));
@@ -207,6 +368,7 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
       items: [
         { id: 'general' as SettingsSection, label: 'General settings', icon: SettingsIcon },
         { id: 'account' as SettingsSection, label: 'Account', icon: User },
+        { id: 'voice' as SettingsSection, label: 'Voice transcription', icon: Mic },
       ],
     },
     {
@@ -761,6 +923,247 @@ Block: Warm-Up
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* Voice Transcription Settings (AMA-229) */}
+          {activeSection === 'voice' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold mb-1">Voice Transcription</h1>
+                <p className="text-muted-foreground text-sm">
+                  Configure how voice input is transcribed for workout creation
+                </p>
+              </div>
+
+              {voiceSettingsLoading ? (
+                <Card>
+                  <CardContent className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading settings...</span>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Provider Selection */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Mic className="w-5 h-5" />
+                        Transcription Provider
+                      </CardTitle>
+                      <CardDescription>
+                        Choose how your voice is converted to text
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        {(Object.keys(PROVIDER_INFO) as TranscriptionProvider[]).map((provider) => {
+                          const info = PROVIDER_INFO[provider];
+                          return (
+                            <div
+                              key={provider}
+                              className={cn(
+                                "flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors",
+                                voiceSettings?.provider === provider
+                                  ? "bg-primary/5 border-primary"
+                                  : "hover:bg-muted/50"
+                              )}
+                              onClick={() => handleVoiceProviderChange(provider)}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-base font-medium cursor-pointer">
+                                    {info.name}
+                                  </Label>
+                                  {info.badge && (
+                                    <Badge
+                                      variant={
+                                        info.badge === 'Recommended' ? 'default' :
+                                        info.badge === 'Premium' ? 'default' :
+                                        info.badge === 'Free' ? 'secondary' : 'outline'
+                                      }
+                                      className={cn(
+                                        info.badge === 'Recommended' && 'bg-emerald-600',
+                                        info.badge === 'Premium' && 'bg-blue-600',
+                                        info.badge === 'Budget' && 'bg-amber-600'
+                                      )}
+                                    >
+                                      {info.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {info.description}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Cost: {info.cost}
+                                </p>
+                              </div>
+                              <Switch
+                                checked={voiceSettings?.provider === provider}
+                                onCheckedChange={() => handleVoiceProviderChange(provider)}
+                                onClick={(e) => e.stopPropagation()}
+                                disabled={voiceSettingsSaving}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Cloud Fallback & Accent Settings */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Advanced Settings</CardTitle>
+                      <CardDescription>
+                        Fine-tune transcription for better accuracy
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Cloud Fallback Toggle */}
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex-1">
+                          <Label className="text-base font-medium">Cloud Fallback</Label>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Automatically use cloud transcription when on-device confidence is low
+                          </p>
+                        </div>
+                        <Switch
+                          checked={voiceSettings?.cloud_fallback_enabled ?? true}
+                          onCheckedChange={handleCloudFallbackChange}
+                          disabled={voiceSettingsSaving || voiceSettings?.provider === 'deepgram' || voiceSettings?.provider === 'assemblyai'}
+                        />
+                      </div>
+
+                      {/* Accent Region Selector */}
+                      <div className="space-y-2">
+                        <Label className="text-base font-medium">Accent Region</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Select your English accent for better cloud transcription accuracy
+                        </p>
+                        <Select
+                          value={voiceSettings?.accent_region || 'en-US'}
+                          onValueChange={handleAccentChange}
+                          disabled={voiceSettingsSaving}
+                        >
+                          <SelectTrigger className="w-full md:w-[280px]">
+                            <SelectValue placeholder="Select accent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ACCENT_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Personal Dictionary */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Personal Dictionary</CardTitle>
+                      <CardDescription>
+                        Add corrections for words that are frequently misheard
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Add new correction */}
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Label htmlFor="misheard" className="text-sm">Misheard word</Label>
+                          <Input
+                            id="misheard"
+                            placeholder="e.g., dead lift"
+                            value={newMisheard}
+                            onChange={(e) => setNewMisheard(e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label htmlFor="corrected" className="text-sm">Correct word</Label>
+                          <Input
+                            id="corrected"
+                            placeholder="e.g., deadlift"
+                            value={newCorrected}
+                            onChange={(e) => setNewCorrected(e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleAddCorrection}
+                          disabled={addingCorrection || !newMisheard.trim() || !newCorrected.trim()}
+                          size="icon"
+                        >
+                          {addingCorrection ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+
+                      <Separator />
+
+                      {/* Existing corrections */}
+                      {dictionaryLoading ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-sm text-muted-foreground">Loading dictionary...</span>
+                        </div>
+                      ) : dictionary.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-6">
+                          No corrections yet. Add words that are frequently misheard.
+                        </p>
+                      ) : (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {dictionary.map((correction) => (
+                            <div
+                              key={correction.misheard}
+                              className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                            >
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm text-muted-foreground line-through">
+                                  {correction.misheard}
+                                </span>
+                                <span className="text-muted-foreground">→</span>
+                                <span className="text-sm font-medium">
+                                  {correction.corrected}
+                                </span>
+                                {correction.frequency > 1 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    ×{correction.frequency}
+                                  </Badge>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteCorrection(correction.misheard)}
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <AlertDescription className="text-xs text-blue-800 dark:text-blue-200">
+                          Corrections sync across all your devices. The iOS app will automatically
+                          apply these corrections during voice transcription.
+                        </AlertDescription>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 
