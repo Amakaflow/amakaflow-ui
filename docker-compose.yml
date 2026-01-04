@@ -71,6 +71,7 @@ services:
       - API_KEYS=sk_test_dev_key
       - SENTRY_DSN=${SENTRY_DSN_API}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      - TEST_AUTH_SECRET=${TEST_AUTH_SECRET:-e2e-test-secret-dev-only}
     networks:
       - amakaflow
 
