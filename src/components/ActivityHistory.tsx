@@ -21,6 +21,7 @@ interface ActivityHistoryProps {
   loading: boolean;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  onCompletionClick?: (completionId: string) => void;
 }
 
 // =============================================================================
@@ -138,9 +139,18 @@ function EmptyState() {
   );
 }
 
-function CompletionCard({ completion }: { completion: WorkoutCompletion }) {
+function CompletionCard({
+  completion,
+  onClick
+}: {
+  completion: WorkoutCompletion;
+  onClick?: () => void;
+}) {
   return (
-    <Card className="hover:bg-muted/50 transition-colors">
+    <Card
+      className={`hover:bg-muted/50 transition-colors ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-4">
         <div className="flex flex-col gap-3">
           {/* Top row: Workout name, source, and date */}
@@ -235,6 +245,7 @@ export function ActivityHistory({
   loading,
   onLoadMore,
   hasMore = false,
+  onCompletionClick,
 }: ActivityHistoryProps) {
   if (loading && completions.length === 0) {
     return <LoadingSkeleton />;
@@ -247,7 +258,11 @@ export function ActivityHistory({
   return (
     <div className="space-y-3">
       {completions.map((completion) => (
-        <CompletionCard key={completion.id} completion={completion} />
+        <CompletionCard
+          key={completion.id}
+          completion={completion}
+          onClick={onCompletionClick ? () => onCompletionClick(completion.id) : undefined}
+        />
       ))}
 
       {/* Load More button */}

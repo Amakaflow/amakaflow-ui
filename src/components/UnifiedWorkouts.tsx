@@ -86,6 +86,7 @@ import { WorkoutTagsEditor } from './WorkoutTagsEditor';
 import { getUserTags, updateWorkoutTags } from '../lib/workout-api';
 import type { UserTag } from '../types/unified-workout';
 import { ActivityHistory } from './ActivityHistory';
+import { CompletionDetailView } from './CompletionDetailView';
 import { fetchWorkoutCompletions, type WorkoutCompletion } from '../lib/completions-api';
 
 // =============================================================================
@@ -209,6 +210,7 @@ export function UnifiedWorkouts({
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
   const [completionsLoading, setCompletionsLoading] = useState(false);
   const [completionsTotal, setCompletionsTotal] = useState(0);
+  const [selectedCompletionId, setSelectedCompletionId] = useState<string | null>(null);
 
   // Fetch workouts
   const loadWorkouts = useCallback(async () => {
@@ -985,6 +987,7 @@ export function UnifiedWorkouts({
             loading={completionsLoading}
             onLoadMore={loadMoreCompletions}
             hasMore={completions.length < completionsTotal}
+            onCompletionClick={setSelectedCompletionId}
           />
         </div>
       ) : (
@@ -1495,6 +1498,14 @@ export function UnifiedWorkouts({
         <ViewWorkout
           workout={viewingWorkout}
           onClose={() => setViewingWorkout(null)}
+        />
+      )}
+
+      {/* Completion Detail Modal */}
+      {selectedCompletionId && (
+        <CompletionDetailView
+          completionId={selectedCompletionId}
+          onClose={() => setSelectedCompletionId(null)}
         />
       )}
 
