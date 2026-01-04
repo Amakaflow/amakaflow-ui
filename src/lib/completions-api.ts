@@ -18,13 +18,39 @@ export interface WorkoutCompletion {
   durationSeconds: number;
   avgHeartRate?: number;
   maxHeartRate?: number;
+  minHeartRate?: number;
   activeCalories?: number;
+  totalCalories?: number;
+  distanceMeters?: number;
+  steps?: number;
   source: string;
 }
 
 export interface WorkoutCompletionsResponse {
   completions: WorkoutCompletion[];
   total: number;
+}
+
+export interface IOSCompanionInterval {
+  kind: 'warmup' | 'cooldown' | 'time' | 'reps' | 'distance' | 'repeat';
+  seconds?: number;
+  target?: string;
+  reps?: number;
+  name?: string;
+  load?: string;
+  restSec?: number;
+  meters?: number;
+  intervals?: IOSCompanionInterval[];
+}
+
+export interface WorkoutCompletionDetail extends WorkoutCompletion {
+  endedAt: string;
+  durationFormatted: string;
+  sourceWorkoutId?: string;
+  deviceInfo?: Record<string, unknown>;
+  heartRateSamples?: Array<{ t: number; bpm: number }>;
+  intervals?: IOSCompanionInterval[];
+  createdAt: string;
 }
 
 /**
@@ -71,9 +97,68 @@ export async function fetchWorkoutCompletions(
       durationSeconds: c.duration_seconds,
       avgHeartRate: c.avg_heart_rate,
       maxHeartRate: c.max_heart_rate,
+      minHeartRate: c.min_heart_rate,
       activeCalories: c.active_calories,
+      totalCalories: c.total_calories,
+      distanceMeters: c.distance_meters,
+      steps: c.steps,
       source: c.source,
     })),
     total: data.total || 0,
+  };
+}
+
+/**
+ * Fetch a single workout completion with full details including intervals.
+ *
+ * @param completionId - The completion ID to fetch
+ */
+export async function fetchWorkoutCompletionById(
+  completionId: string
+): Promise<WorkoutCompletionDetail | null> {
+  const response = await authenticatedFetch(
+    `${MAPPER_API_BASE_URL}/workouts/completions/${completionId}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || `Failed to fetch completion: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.success || !data.completion) {
+    return null;
+  }
+
+  const c = data.completion;
+
+  // Transform snake_case from backend to camelCase for frontend
+  return {
+    id: c.id,
+    workoutName: c.workout_name,
+    startedAt: c.started_at,
+    endedAt: c.ended_at,
+    durationSeconds: c.duration_seconds,
+    durationFormatted: c.duration_formatted,
+    avgHeartRate: c.avg_heart_rate,
+    maxHeartRate: c.max_heart_rate,
+    minHeartRate: c.min_heart_rate,
+    activeCalories: c.active_calories,
+    totalCalories: c.total_calories,
+    distanceMeters: c.distance_meters,
+    steps: c.steps,
+    source: c.source,
+    sourceWorkoutId: c.source_workout_id,
+    deviceInfo: c.device_info,
+    heartRateSamples: c.heart_rate_samples,
+    intervals: c.intervals,
+    createdAt: c.created_at,
   };
 }
