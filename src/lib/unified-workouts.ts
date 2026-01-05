@@ -264,6 +264,8 @@ function mapDeviceIdToPlatform(deviceId: DeviceId): DevicePlatform {
       return 'garmin';
     case 'apple':
       return 'apple';
+    case 'android-companion':
+      return 'android-companion';
     case 'strava':
       return 'strava';
     case 'zwift':
