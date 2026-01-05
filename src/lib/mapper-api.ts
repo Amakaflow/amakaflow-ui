@@ -139,6 +139,20 @@ export async function exportWorkoutToDevice(
       return { plist, yaml: '' };
     }
 
+    case 'android-companion': {
+      // Android Companion uses the same interval-based format as iOS
+      // The actual push is handled by the /workouts/{id}/push/android-companion endpoint
+      // We use WorkoutKit format for consistency since both platforms use intervals
+      const result = await mapperApiCall<any>('/map/to-workoutkit', {
+        method: 'POST',
+        body: JSON.stringify({ blocks_json: mappedWorkout }),
+      });
+
+      // Return as JSON for Android Health Connect format
+      const json = JSON.stringify(result, null, 2);
+      return { yaml: json };
+    }
+
     case 'zwift': {
       // Call /map/to-zwo for Zwift
       // Auto-detect sport from workout content
