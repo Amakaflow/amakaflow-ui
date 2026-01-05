@@ -1411,13 +1411,18 @@ Block: Warm-Up
                     <div className="flex items-center gap-3">
                       <span className="text-xl">📱</span>
                       <div>
-                        <p className="font-medium">Android Companion App</p>
+                        <p className="font-medium">Pair Android Device</p>
                         <p className="text-sm text-muted-foreground">
-                          Download from Google Play and pair with your account
+                          Scan a QR code or enter a pairing code to connect
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline">Coming Soon</Badge>
+                    <Button
+                      variant="outline"
+                      onClick={() => onNavigateToMobileCompanion?.()}
+                    >
+                      Set Up
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     The Android Companion app allows you to view workouts, log exercises during gym sessions, and sync with Wear OS watches, Samsung Galaxy Watch, Garmin via Health Connect, and any Health Connect device.
