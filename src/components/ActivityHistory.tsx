@@ -70,7 +70,12 @@ function formatDate(dateString: string): string {
 function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'apple_watch':
-      return 'Apple Watch';
+    case 'ios_companion':
+    case 'ios-companion':
+      return 'iOS Companion';
+    case 'android_companion':
+    case 'android-companion':
+      return 'Android Companion';
     case 'garmin':
       return 'Garmin';
     case 'manual':
@@ -132,7 +137,7 @@ function EmptyState() {
         <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
         <h3 className="text-lg font-medium mb-2">No activity history yet</h3>
         <p className="text-muted-foreground">
-          Complete workouts with the iOS Companion App to see your activity history here.
+          Complete workouts with the iOS or Android Companion App to see your activity history here.
         </p>
       </CardContent>
     </Card>

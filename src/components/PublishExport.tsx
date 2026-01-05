@@ -369,13 +369,13 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
       return;
     }
 
-    // Apple Watch sync via iOS Companion App
-    if (platform === 'Apple Watch' && workout && profileId) {
+    // iOS Companion sync (Apple Watch, HealthKit devices)
+    if ((platform === 'iOS Companion' || platform === 'Apple Watch') && workout && profileId) {
       try {
         // Ensure workout is saved first
         let workoutIdToSync = savedWorkoutId;
         if (!workoutIdToSync) {
-          toast.info('Saving workout...', { description: 'Preparing for Apple Watch sync' });
+          toast.info('Saving workout...', { description: 'Preparing for iOS Companion sync' });
           const request: SaveWorkoutRequest = {
             profile_id: profileId,
             workout_data: workout,
@@ -390,7 +390,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
           setSavedWorkoutId(savedWorkout.id);
         }
 
-        toast.info('Syncing to Apple Watch...', {
+        toast.info('Syncing to iOS Companion...', {
           description: 'Sending workout to iOS Companion App'
         });
 
@@ -414,12 +414,68 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         }
 
         toast.success('Workout sent to iOS Companion App!', {
-          description: 'Open the AmakaFlow app on your iPhone to start the workout on Apple Watch'
+          description: 'Open the AmakaFlow app on your iPhone to start the workout'
         });
       } catch (error: any) {
-        console.error('Failed to sync to Apple Watch:', error);
-        toast.error(`Failed to sync to Apple Watch: ${error.message || 'Unknown error'}`, {
+        console.error('Failed to sync to iOS Companion:', error);
+        toast.error(`Failed to sync to iOS Companion: ${error.message || 'Unknown error'}`, {
           description: 'Make sure you have paired your iPhone in Settings'
+        });
+      }
+      return;
+    }
+
+    // Android Companion sync (Wear OS, Health Connect devices) - AMA-246
+    if (platform === 'Android Companion' && workout && profileId) {
+      try {
+        // Ensure workout is saved first
+        let workoutIdToSync = savedWorkoutId;
+        if (!workoutIdToSync) {
+          toast.info('Saving workout...', { description: 'Preparing for Android Companion sync' });
+          const request: SaveWorkoutRequest = {
+            profile_id: profileId,
+            workout_data: workout,
+            sources: sources,
+            device: selectedDevice,
+            exports: exports,
+            validation: validation,
+            title: workout.title || `Workout ${new Date().toLocaleDateString()}`,
+          };
+          const savedWorkout = await saveWorkoutToAPI(request);
+          workoutIdToSync = savedWorkout.id;
+          setSavedWorkoutId(savedWorkout.id);
+        }
+
+        toast.info('Syncing to Android Companion...', {
+          description: 'Sending workout to Android Companion App'
+        });
+
+        const MAPPER_API_BASE_URL = API_URLS.MAPPER;
+
+        const syncResponse = await authenticatedFetch(`${MAPPER_API_BASE_URL}/workouts/${workoutIdToSync}/push/android-companion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+
+        if (!syncResponse.ok) {
+          const error = await syncResponse.json().catch(() => ({ detail: syncResponse.statusText }));
+          throw new Error(error.detail || `Failed to sync: ${syncResponse.statusText}`);
+        }
+
+        const syncResult = await syncResponse.json();
+
+        if (!syncResult.success) {
+          throw new Error(syncResult.message || 'Failed to sync to Android Companion');
+        }
+
+        toast.success('Workout sent to Android Companion App!', {
+          description: 'Open the AmakaFlow app on your Android device to start the workout'
+        });
+      } catch (error: any) {
+        console.error('Failed to sync to Android Companion:', error);
+        toast.error(`Failed to sync to Android Companion: ${error.message || 'Unknown error'}`, {
+          description: 'Make sure you have paired your Android device in Settings'
         });
       }
       return;
@@ -643,7 +699,7 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
     });
   };
 
-  const supportsScheduling = selectedDevice === 'garmin' || selectedDevice === 'apple';
+  const supportsScheduling = selectedDevice === 'garmin' || selectedDevice === 'apple' || selectedDevice === 'android-companion';
 
   const getDeviceExport = () => {
     switch (selectedDevice) {
@@ -658,12 +714,21 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
         };
       case 'apple':
         return {
-          title: 'Apple Watch Export',
-          description: 'PLIST format for Apple Watch and Fitness app',
+          title: 'iOS Companion Export',
+          description: 'Sync via iOS Companion App (supports Apple Watch, HealthKit devices)',
           format: 'PLIST',
           content: exports.plist,
           filename: 'workout.plist',
-          deviceName: 'Apple Watch'
+          deviceName: 'iOS Companion'
+        };
+      case 'android-companion':
+        return {
+          title: 'Android Companion Export',
+          description: 'Sync via Android Companion App (supports Wear OS, Health Connect devices)',
+          format: 'HealthConnect',
+          content: exports.yaml,  // Fallback to YAML for now
+          filename: 'workout.json',
+          deviceName: 'Android Companion'
         };
       case 'zwift':
         return {

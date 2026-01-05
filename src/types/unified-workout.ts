@@ -17,7 +17,7 @@ import type { WorkoutStructure, Block, Exercise } from './workout';
 export type WorkoutSourceType = 'device' | 'video' | 'manual' | 'ai';
 
 /** Device platforms for synced workouts */
-export type DevicePlatform = 'garmin' | 'apple' | 'strava' | 'zwift' | 'manual';
+export type DevicePlatform = 'garmin' | 'apple' | 'android-companion' | 'strava' | 'zwift' | 'manual';
 
 // Re-export VideoPlatform from follow-along types
 export type { VideoPlatform };
@@ -52,6 +52,7 @@ export interface SyncStatusEntry {
 export interface SyncStatus {
   garmin?: SyncStatusEntry;
   apple?: SyncStatusEntry;
+  android?: SyncStatusEntry;
   strava?: SyncStatusEntry;
   ios?: SyncStatusEntry;
 }
@@ -343,7 +344,8 @@ export const SOURCE_TYPE_DISPLAY_NAMES: Record<WorkoutSourceType, string> = {
 /** Display names for device platforms */
 export const DEVICE_PLATFORM_DISPLAY_NAMES: Record<DevicePlatform, string> = {
   garmin: 'Garmin',
-  apple: 'Apple Watch',
+  apple: 'iOS Companion',
+  'android-companion': 'Android Companion',
   strava: 'Strava',
   zwift: 'Zwift',
   manual: 'Manual',

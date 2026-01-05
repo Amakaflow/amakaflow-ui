@@ -22,7 +22,7 @@ describe('devices', () => {
         expect(device).toHaveProperty('category');
         expect(device).toHaveProperty('format');
         expect(device).toHaveProperty('icon');
-        expect(['watch', 'platform', 'equipment', 'tracker']).toContain(device.category);
+        expect(['watch', 'platform', 'equipment', 'tracker', 'app']).toContain(device.category);
       });
     });
 
@@ -38,7 +38,7 @@ describe('devices', () => {
       const device = getDeviceById('garmin');
       expect(device).toBeDefined();
       expect(device?.id).toBe('garmin');
-      expect(device?.name).toBe('Garmin');
+      expect(device?.name).toBe('Garmin Connect');
     });
 
     it('should return undefined for invalid ID', () => {
@@ -113,9 +113,35 @@ describe('devices', () => {
       });
     });
 
+    it('should return devices for app category', () => {
+      const devices = getDevicesByCategory('app');
+      expect(devices.length).toBeGreaterThan(0);
+      devices.forEach((device) => {
+        expect(device.category).toBe('app');
+      });
+    });
+
     it('should return empty array for non-existent category', () => {
       const devices = getDevicesByCategory('nonexistent' as any);
       expect(devices).toEqual([]);
+    });
+  });
+
+  describe('android-companion device', () => {
+    it('should have android-companion device defined', () => {
+      const device = getDeviceById('android-companion');
+      expect(device).toBeDefined();
+      expect(device?.id).toBe('android-companion');
+      expect(device?.name).toBe('Android Companion');
+      expect(device?.category).toBe('app');
+      expect(device?.exportMethod).toBe('api');
+    });
+
+    it('should include android-companion in companion apps', () => {
+      const devices = getDevicesByIds(['apple', 'android-companion']);
+      expect(devices.length).toBe(2);
+      expect(devices.map(d => d.id)).toContain('apple');
+      expect(devices.map(d => d.id)).toContain('android-companion');
     });
   });
 

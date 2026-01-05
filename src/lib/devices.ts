@@ -1,10 +1,11 @@
 // Export Destinations - renamed from "Connected Devices"
 // Each destination has an export method and whether it requires exercise mapping
 
-export type DeviceId = 
+export type DeviceId =
   | 'garmin'
   | 'garmin_usb'
-  | 'apple'
+  | 'apple'  // iOS Companion (kept as 'apple' for backward compatibility)
+  | 'android-companion'  // Android Companion (AMA-246)
   | 'hevy'
   | 'coros'
   | 'zwift'
@@ -77,15 +78,27 @@ export const AVAILABLE_DEVICES: Device[] = [
   },
   {
     id: 'apple',
-    name: 'Apple Watch',
-    description: 'Send to iOS Companion App',
-    category: 'watch',
+    name: 'iOS Companion',
+    description: 'Sync via iOS Companion App. Supports Apple Watch (native or remote mode), Garmin via Health sync, and any HealthKit-connected device.',
+    category: 'app',
     format: 'WorkoutKit',
-    icon: '⌚',
+    icon: '📱',
     popular: true,
     exportMethod: 'api',
     requiresMapping: false,
-    setupInstructions: 'Pair your iPhone with the AmakaFlow iOS Companion App in Settings',
+    setupInstructions: 'Download the AmakaFlow iOS Companion App and pair with your account',
+  },
+  {
+    id: 'android-companion',
+    name: 'Android Companion',
+    description: 'Sync via Android Companion App. Supports Wear OS, Samsung Galaxy Watch, Garmin via Health Connect, and any Health Connect device.',
+    category: 'app',
+    format: 'HealthConnect',
+    icon: '📱',
+    popular: true,
+    exportMethod: 'api',
+    requiresMapping: false,
+    setupInstructions: 'Download the AmakaFlow Android Companion App from Google Play and pair with your account',
   },
   {
     id: 'hevy',
@@ -272,6 +285,6 @@ export const isDeviceAvailable = (id: DeviceId): boolean => {
 
 // Get primary export destinations (shown prominently in UI)
 export const getPrimaryExportDestinations = (): Device[] => {
-  const primaryIds: DeviceId[] = ['garmin', 'garmin_usb', 'coros', 'apple', 'hevy', 'zwift', 'strava'];
+  const primaryIds: DeviceId[] = ['garmin', 'garmin_usb', 'coros', 'apple', 'android-companion', 'hevy', 'zwift', 'strava'];
   return primaryIds.map(id => getDeviceById(id)).filter(Boolean) as Device[];
 };

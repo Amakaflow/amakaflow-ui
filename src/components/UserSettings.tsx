@@ -1276,18 +1276,33 @@ Block: Warm-Up
                       />
                     </div>
 
-                    {/* Apple Watch */}
+                    {/* iOS Companion */}
                     <div className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">⌚</span>
+                        <span className="text-xl">📱</span>
                         <div>
-                          <p className="font-medium">Apple Watch</p>
-                          <p className="text-sm text-muted-foreground">Send to iOS Companion App</p>
+                          <p className="font-medium">iOS Companion</p>
+                          <p className="text-sm text-muted-foreground">Sync via iOS Companion App (Apple Watch, HealthKit devices)</p>
                         </div>
                       </div>
                       <Switch
                         checked={selectedDevices.includes('apple')}
                         onCheckedChange={() => toggleDevice('apple')}
+                      />
+                    </div>
+
+                    {/* Android Companion */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">📱</span>
+                        <div>
+                          <p className="font-medium">Android Companion</p>
+                          <p className="text-sm text-muted-foreground">Sync via Android Companion App (Wear OS, Health Connect)</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={selectedDevices.includes('android-companion')}
+                        onCheckedChange={() => toggleDevice('android-companion')}
                       />
                     </div>
 
@@ -1375,7 +1390,37 @@ Block: Warm-Up
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    The iOS Companion app allows you to view workouts, log exercises during gym sessions, and sync with Apple Watch.
+                    The iOS Companion app allows you to view workouts, log exercises during gym sessions, and sync with Apple Watch (native or remote mode), Garmin via HealthKit, and any HealthKit-connected device.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Android Companion App */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="w-5 h-5" />
+                    Android Companion App
+                  </CardTitle>
+                  <CardDescription>
+                    Connect your Android device to view and sync workouts on the go
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📱</span>
+                      <div>
+                        <p className="font-medium">Android Companion App</p>
+                        <p className="text-sm text-muted-foreground">
+                          Download from Google Play and pair with your account
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline">Coming Soon</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The Android Companion app allows you to view workouts, log exercises during gym sessions, and sync with Wear OS watches, Samsung Galaxy Watch, Garmin via Health Connect, and any Health Connect device.
                   </p>
                 </CardContent>
               </Card>
