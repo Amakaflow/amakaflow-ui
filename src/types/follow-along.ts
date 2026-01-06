@@ -98,7 +98,8 @@ export type IOSCompanionWorkoutPayload = {
 };
 
 export type IOSCompanionInterval = {
-  kind: 'warmup' | 'cooldown' | 'time' | 'reps' | 'distance' | 'repeat';
+  kind?: 'warmup' | 'cooldown' | 'time' | 'reps' | 'distance' | 'repeat' | 'rest';
+  type?: string;  // Android sends 'type' instead of 'kind'
   seconds?: number;
   target?: string;
   reps?: number;

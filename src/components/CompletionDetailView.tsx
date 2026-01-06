@@ -75,6 +75,8 @@ function getIntervalIcon(kind: string) {
       return <Route className="w-4 h-4 text-teal-500" />;
     case 'repeat':
       return <Repeat className="w-4 h-4 text-indigo-500" />;
+    case 'rest':
+      return <Timer className="w-4 h-4 text-gray-500" />;
     default:
       return <Timer className="w-4 h-4 text-muted-foreground" />;
   }
@@ -94,8 +96,10 @@ function getIntervalKindLabel(kind: string): string {
       return 'Distance';
     case 'repeat':
       return 'Repeat';
+    case 'rest':
+      return 'Rest';
     default:
-      return kind;
+      return kind || 'Exercise';
   }
 }
 
@@ -104,19 +108,21 @@ function getIntervalKindLabel(kind: string): string {
 // =============================================================================
 
 function IntervalCard({ interval, index }: { interval: IOSCompanionInterval; index: number }) {
-  const hasNestedIntervals = interval.kind === 'repeat' && interval.intervals && interval.intervals.length > 0;
+  // Support both 'kind' (iOS) and 'type' (Android) field names
+  const intervalKind = interval.kind || interval.type || 'time';
+  const hasNestedIntervals = intervalKind === 'repeat' && interval.intervals && interval.intervals.length > 0;
 
   return (
     <div className="border rounded-lg overflow-hidden">
       {/* Interval Header */}
       <div className="bg-muted px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {getIntervalIcon(interval.kind)}
+          {getIntervalIcon(intervalKind)}
           <span className="font-medium">
-            {interval.name || `${getIntervalKindLabel(interval.kind)} ${index + 1}`}
+            {interval.name || `${getIntervalKindLabel(intervalKind)} ${index + 1}`}
           </span>
           <Badge variant="outline" className="text-xs">
-            {getIntervalKindLabel(interval.kind)}
+            {getIntervalKindLabel(intervalKind)}
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -124,7 +130,7 @@ function IntervalCard({ interval, index }: { interval: IOSCompanionInterval; ind
             <span>{formatDuration(interval.seconds)}</span>
           )}
           {interval.reps && interval.reps > 0 && (
-            <span>{interval.reps} reps</span>
+            <span>{interval.reps} {intervalKind === 'repeat' ? 'sets' : 'reps'}</span>
           )}
           {interval.meters && interval.meters > 0 && (
             <span>{formatDistance(interval.meters)}</span>
@@ -150,22 +156,25 @@ function IntervalCard({ interval, index }: { interval: IOSCompanionInterval; ind
         {hasNestedIntervals && (
           <div className="mt-3 pl-4 border-l-2 border-primary/30 space-y-2">
             <p className="text-xs text-muted-foreground mb-2">Repeat intervals:</p>
-            {interval.intervals!.map((nested, nestedIdx) => (
-              <div
-                key={nestedIdx}
-                className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  {getIntervalIcon(nested.kind)}
-                  <span>{nested.name || getIntervalKindLabel(nested.kind)}</span>
+            {interval.intervals!.map((nested, nestedIdx) => {
+              const nestedKind = nested.kind || nested.type || 'time';
+              return (
+                <div
+                  key={nestedIdx}
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    {getIntervalIcon(nestedKind)}
+                    <span>{nested.name || getIntervalKindLabel(nestedKind)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    {nested.seconds && <span>{formatDuration(nested.seconds)}</span>}
+                    {nested.reps && <span>{nested.reps} reps</span>}
+                    {nested.meters && <span>{formatDistance(nested.meters)}</span>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  {nested.seconds && <span>{formatDuration(nested.seconds)}</span>}
-                  {nested.reps && <span>{nested.reps} reps</span>}
-                  {nested.meters && <span>{formatDistance(nested.meters)}</span>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
