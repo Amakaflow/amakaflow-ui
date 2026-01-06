@@ -1,5 +1,6 @@
 import { FitPreviewModal } from "./FitPreviewModal";
 import { AndroidPreviewModal } from "./AndroidPreviewModal";
+import { IOSPreviewModal } from "./iOSPreviewModal";
 import { API_URLS } from '../lib/config';
 import { TrainerDistribution } from './TrainerDistribution';
 import { Switch } from './ui/switch';
@@ -1029,7 +1030,10 @@ export function PublishExport({ exports, validation, sources, onStartNew, select
             {workout && selectedDevice === 'android-companion' && (
               <AndroidPreviewModal workout={workout} validation={validation} />
             )}
-            {workout && selectedDevice !== 'android-companion' && (
+            {workout && selectedDevice === 'apple' && (
+              <IOSPreviewModal workout={workout} validation={validation} />
+            )}
+            {workout && selectedDevice !== 'android-companion' && selectedDevice !== 'apple' && (
               <FitPreviewModal workout={workout} validation={validation} />
             )}
             <Button
