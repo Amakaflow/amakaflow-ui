@@ -72,6 +72,7 @@ services:
       - SENTRY_DSN=${SENTRY_DSN_API}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - TEST_AUTH_SECRET=${TEST_AUTH_SECRET:-e2e-test-secret-dev-only}
+      - TEST_RESET_SECRET=${TEST_RESET_SECRET:-e2e-reset-secret-dev-only}
     networks:
       - amakaflow
 
