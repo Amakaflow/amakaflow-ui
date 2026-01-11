@@ -343,6 +343,20 @@ export function normalizeHistoryWorkout(item: WorkoutHistoryItem): UnifiedWorkou
       id: item.stravaActivityId,
     };
   }
+  if (item.iosCompanionSyncedAt) {
+    syncStatus.ios = {
+      synced: true,
+      status: 'synced',
+      syncedAt: item.iosCompanionSyncedAt,
+    };
+  }
+  if (item.androidCompanionSyncedAt) {
+    syncStatus.android = {
+      synced: true,
+      status: 'synced',
+      syncedAt: item.androidCompanionSyncedAt,
+    };
+  }
 
   const searchableText = buildSearchableText(
     workout?.title || 'Untitled',

@@ -14,6 +14,8 @@ export type WorkoutHistoryItem = {
   updatedAt: string;
   syncedToStrava?: boolean;
   stravaActivityId?: string;
+  iosCompanionSyncedAt?: string;
+  androidCompanionSyncedAt?: string;
 };
 
 const LEGACY_HISTORY_KEY = 'amakaflow_workout_history';
@@ -134,6 +136,8 @@ function normalizeApiWorkoutItem(item: SavedWorkout): WorkoutHistoryItem {
     updatedAt: item.updated_at ?? new Date().toISOString(),
     syncedToStrava: item.synced_to_strava,
     stravaActivityId: item.strava_activity_id,
+    iosCompanionSyncedAt: item.ios_companion_synced_at,
+    androidCompanionSyncedAt: item.android_companion_synced_at,
   };
 }
 

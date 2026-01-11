@@ -26,6 +26,8 @@ export interface SavedWorkout {
   exported_to_device?: string;
   synced_to_strava?: boolean;
   strava_activity_id?: string;
+  ios_companion_synced_at?: string;
+  android_companion_synced_at?: string;
   created_at: string;
   updated_at: string;
 }
