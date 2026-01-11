@@ -68,11 +68,7 @@ export function ClearDataModal({ open, onOpenChange, onDataCleared }: ClearDataM
     setError(null);
 
     try {
-      // Get the test secret from environment - in dev this is typically set
-      // For now we'll use an empty string and let the API validate
-      const testSecret = import.meta.env.VITE_TEST_RESET_SECRET || '';
-
-      await clearUserData(testSecret);
+      await clearUserData();
 
       toast.success('All your data has been cleared successfully');
       onOpenChange(false);

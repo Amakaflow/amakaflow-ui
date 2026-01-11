@@ -70,15 +70,12 @@ export async function getDataSummary(): Promise<DeletionPreview> {
 
 /**
  * Clear all user data without deleting the account (AMA-306).
- * Requires X-Test-Secret header for security.
+ * Uses JWT authentication - no additional secret required.
  * Only available in dev/staging environments.
  */
-export async function clearUserData(testSecret: string): Promise<DeletionResult> {
+export async function clearUserData(): Promise<DeletionResult> {
   const response = await authenticatedFetch(`${API_URLS.MAPPER}/testing/reset-user-data`, {
     method: 'POST',
-    headers: {
-      'X-Test-Secret': testSecret,
-    },
   });
 
   if (!response.ok) {
