@@ -59,3 +59,32 @@ export async function deleteAccountData(): Promise<DeletionResult> {
 
   return response.json();
 }
+
+/**
+ * Get data summary counts for clear data preview (AMA-306).
+ * Uses the same endpoint as deletion preview since it returns the same counts.
+ */
+export async function getDataSummary(): Promise<DeletionPreview> {
+  return getDeletionPreview();
+}
+
+/**
+ * Clear all user data without deleting the account (AMA-306).
+ * Requires X-Test-Secret header for security.
+ * Only available in dev/staging environments.
+ */
+export async function clearUserData(testSecret: string): Promise<DeletionResult> {
+  const response = await authenticatedFetch(`${API_URLS.MAPPER}/testing/reset-user-data`, {
+    method: 'POST',
+    headers: {
+      'X-Test-Secret': testSecret,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || `Failed to clear user data: ${response.statusText}`);
+  }
+
+  return response.json();
+}

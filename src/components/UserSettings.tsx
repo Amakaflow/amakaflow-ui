@@ -39,6 +39,7 @@ import {
   ACCENT_OPTIONS,
 } from '../lib/voice-api';
 import { DeletionPreview, getDeletionPreview, deleteAccountData } from '../lib/account-api';
+import { ClearDataModal } from './settings/ClearDataModal';
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
@@ -114,6 +115,9 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [deletionPreview, setDeletionPreview] = useState<DeletionPreview | null>(null);
   const [deletionPreviewLoading, setDeletionPreviewLoading] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  // Clear user data state (AMA-306)
+  const [clearDataModalOpen, setClearDataModalOpen] = useState(false);
 
   // Fetch paired device count on mount (AMA-184)
   useEffect(() => {
@@ -1521,9 +1525,16 @@ Block: Warm-Up
                   <Button variant="outline" className="w-full justify-start">
                     Two-Factor Authentication
                   </Button>
-                  
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950"
+                    onClick={() => setClearDataModalOpen(true)}
+                  >
+                    Clear User Data
+                  </Button>
+
                   <Separator />
-                  
+
                   <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -1668,6 +1679,16 @@ Block: Warm-Up
                   </AlertDialog>
                 </CardContent>
               </Card>
+
+              {/* Clear Data Modal (AMA-306) */}
+              <ClearDataModal
+                open={clearDataModalOpen}
+                onOpenChange={setClearDataModalOpen}
+                onDataCleared={() => {
+                  // Refresh the page to show empty state
+                  window.location.href = '/';
+                }}
+              />
             </div>
           )}
 
