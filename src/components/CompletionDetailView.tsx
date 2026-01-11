@@ -1,16 +1,23 @@
 /**
- * CompletionDetailView Component
+ * CompletionDetailView Component (AMA-304)
  *
- * Modal view for workout completion details including health metrics
- * and workout breakdown (intervals).
+ * Modal view for workout completion details matching iOS design.
+ * Displays execution log data with per-set breakdown, completion ring,
+ * stats row, and heart rate graph.
  */
 
-import { useEffect, useState } from 'react';
-import { X, Clock, Heart, Flame, Watch, Footprints, Route, Loader2, Timer, Target, Repeat, Zap } from 'lucide-react';
-import { Card, CardContent } from './ui/card';
+import { useEffect, useState, useMemo } from 'react';
+import { X, Watch, Loader2, Check, ChevronRight, AlertCircle } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { fetchWorkoutCompletionById, WorkoutCompletionDetail, IOSCompanionInterval } from '../lib/completions-api';
+import {
+  fetchWorkoutCompletionById,
+  WorkoutCompletionDetail,
+  ExecutionLog,
+  IntervalLog,
+  SetLog,
+  SetStatus,
+} from '../lib/completions-api';
 import { formatDuration } from './ActivityHistory';
 
 // =============================================================================
@@ -37,12 +44,48 @@ function formatDate(dateString: string): string {
   }
 }
 
+function formatTimeRange(startedAt: string, endedAt: string): string {
+  if (!startedAt) return '';
+  try {
+    const start = new Date(startedAt);
+    const end = endedAt ? new Date(endedAt) : null;
+
+    const startTime = start.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    if (end && !isNaN(end.getTime())) {
+      const endTime = end.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+      return `${startTime} - ${endTime}`;
+    }
+
+    return startTime;
+  } catch {
+    return '';
+  }
+}
+
+function formatSetDuration(seconds: number | undefined): string {
+  if (!seconds) return '----';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'apple_watch':
       return 'Apple Watch';
     case 'garmin':
       return 'Garmin';
+    case 'ios_companion':
+      return 'iOS Companion';
+    case 'android_companion':
+      return 'Android Companion';
     case 'manual':
       return 'Manual';
     default:
@@ -50,144 +93,399 @@ function getSourceDisplayName(source: string): string {
   }
 }
 
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(2)} km`;
-  }
-  return `${Math.round(meters)} m`;
-}
-
-function formatSteps(steps: number): string {
-  return steps.toLocaleString();
-}
-
-function getIntervalIcon(kind: string) {
-  switch (kind) {
-    case 'warmup':
-      return <Zap className="w-4 h-4 text-orange-500" />;
-    case 'cooldown':
-      return <Zap className="w-4 h-4 text-blue-500" />;
-    case 'time':
-      return <Timer className="w-4 h-4 text-green-500" />;
-    case 'reps':
-      return <Target className="w-4 h-4 text-purple-500" />;
-    case 'distance':
-      return <Route className="w-4 h-4 text-teal-500" />;
-    case 'repeat':
-      return <Repeat className="w-4 h-4 text-indigo-500" />;
-    case 'rest':
-      return <Timer className="w-4 h-4 text-gray-500" />;
-    default:
-      return <Timer className="w-4 h-4 text-muted-foreground" />;
-  }
-}
-
-function getIntervalKindLabel(kind: string): string {
-  switch (kind) {
-    case 'warmup':
-      return 'Warm-up';
-    case 'cooldown':
-      return 'Cool-down';
-    case 'time':
-      return 'Time';
-    case 'reps':
-      return 'Reps';
-    case 'distance':
-      return 'Distance';
-    case 'repeat':
-      return 'Repeat';
-    case 'rest':
-      return 'Rest';
-    default:
-      return kind || 'Exercise';
-  }
-}
-
 // =============================================================================
-// Subcomponents
+// Completion Percentage Ring Component
 // =============================================================================
 
-function IntervalCard({ interval, index }: { interval: IOSCompanionInterval; index: number }) {
-  // Support both 'kind' (iOS) and 'type' (Android) field names
-  const intervalKind = interval.kind || interval.type || 'time';
-  const hasNestedIntervals = intervalKind === 'repeat' && interval.intervals && interval.intervals.length > 0;
+interface CompletionRingProps {
+  percentage: number;
+  size?: number;
+  strokeWidth?: number;
+}
+
+function CompletionRing({ percentage, size = 120, strokeWidth = 8 }: CompletionRingProps) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  // Color based on percentage
+  const getColor = () => {
+    if (percentage >= 80) return '#22c55e'; // green-500
+    if (percentage >= 50) return '#f59e0b'; // amber-500
+    return '#ef4444'; // red-500
+  };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      {/* Interval Header */}
-      <div className="bg-muted px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {getIntervalIcon(intervalKind)}
-          <span className="font-medium">
-            {interval.name || `${getIntervalKindLabel(intervalKind)} ${index + 1}`}
-          </span>
-          <Badge variant="outline" className="text-xs">
-            {getIntervalKindLabel(intervalKind)}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          {interval.seconds && interval.seconds > 0 && (
-            <span>{formatDuration(interval.seconds)}</span>
-          )}
-          {interval.reps && interval.reps > 0 && (
-            <span>{interval.reps} {intervalKind === 'repeat' ? 'sets' : 'reps'}</span>
-          )}
-          {interval.meters && interval.meters > 0 && (
-            <span>{formatDistance(interval.meters)}</span>
-          )}
-        </div>
-      </div>
-
-      {/* Interval Details */}
-      <div className="p-4 space-y-2">
-        <div className="flex flex-wrap gap-2 text-sm">
-          {interval.target && (
-            <Badge variant="secondary">Target: {interval.target}</Badge>
-          )}
-          {interval.load && (
-            <Badge variant="secondary">Load: {interval.load}</Badge>
-          )}
-          {interval.restSec && interval.restSec > 0 && (
-            <Badge variant="outline">Rest: {interval.restSec}s</Badge>
-          )}
-        </div>
-
-        {/* Nested intervals for repeat blocks */}
-        {hasNestedIntervals && (
-          <div className="mt-3 pl-4 border-l-2 border-primary/30 space-y-2">
-            <p className="text-xs text-muted-foreground mb-2">Repeat intervals:</p>
-            {interval.intervals!.map((nested, nestedIdx) => {
-              const nestedKind = nested.kind || nested.type || 'time';
-              return (
-                <div
-                  key={nestedIdx}
-                  className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    {getIntervalIcon(nestedKind)}
-                    <span>{nested.name || getIntervalKindLabel(nestedKind)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    {nested.seconds && <span>{formatDuration(nested.seconds)}</span>}
-                    {nested.reps && <span>{nested.reps} reps</span>}
-                    {nested.meters && <span>{formatDistance(nested.meters)}</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="transform -rotate-90"
+      >
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-muted/30"
+        />
+        {/* Progress circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={getColor()}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.5s ease-in-out' }}
+        />
+      </svg>
+      {/* Center text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold">{percentage}%</span>
+        <span className="text-xs text-muted-foreground">complete</span>
       </div>
     </div>
   );
 }
 
-function MetricItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+// =============================================================================
+// Heart Rate Graph Component
+// =============================================================================
+
+interface HeartRateGraphProps {
+  samples: Array<{ t: number; bpm: number }>;
+  avgHR?: number;
+  maxHR?: number;
+}
+
+function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
+  const { path } = useMemo(() => {
+    if (!samples || samples.length < 2) {
+      return { path: '' };
+    }
+
+    const sortedSamples = [...samples].sort((a, b) => a.t - b.t);
+    const bpmValues = sortedSamples.map((s) => s.bpm);
+    const minBpm = Math.min(...bpmValues) - 10;
+    const maxBpmVal = Math.max(...bpmValues) + 10;
+    const bpmRange = maxBpmVal - minBpm;
+
+    const width = 100;
+    const height = 60;
+    const timeRange = sortedSamples[sortedSamples.length - 1].t - sortedSamples[0].t;
+
+    const points = sortedSamples.map((sample, i) => {
+      const x = timeRange > 0
+        ? ((sample.t - sortedSamples[0].t) / timeRange) * width
+        : (i / (sortedSamples.length - 1)) * width;
+      const y = height - ((sample.bpm - minBpm) / bpmRange) * height;
+      return `${x},${y}`;
+    });
+
+    return {
+      path: `M ${points.join(' L ')}`,
+    };
+  }, [samples]);
+
+  if (!samples || samples.length < 2) {
+    return (
+      <div className="bg-slate-800 rounded-lg p-4 h-28 flex items-center justify-center">
+        <span className="text-slate-400 text-sm">No heart rate data</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg">
-      <div className="mb-2">{icon}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-sm text-muted-foreground">{label}</div>
+    <div className="bg-slate-800 rounded-lg p-4">
+      {/* Graph */}
+      <div className="h-16 mb-2">
+        <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="none">
+          <path
+            d={path}
+            fill="none"
+            stroke="#f97316"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+      {/* Stats */}
+      <div className="flex justify-between text-sm">
+        <span className="text-slate-300">
+          <span className="text-white font-semibold">{avgHR || '--'}</span>{' '}
+          <span className="text-slate-400">AVG</span>
+        </span>
+        <span className="text-slate-300">
+          <span className="text-white font-semibold">{maxHR || '--'}</span>{' '}
+          <span className="text-slate-400">MAX</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Stats Row Component
+// =============================================================================
+
+interface StatsRowProps {
+  sets?: number;
+  skipped?: number;
+  calories?: number;
+  avgHR?: number;
+}
+
+function StatsRow({ sets, skipped, calories, avgHR }: StatsRowProps) {
+  return (
+    <div className="flex items-center justify-between text-sm border-b pb-3 mb-3">
+      {sets !== undefined && (
+        <div className="text-center">
+          <span className="text-2xl font-bold text-foreground">{sets}</span>
+          <span className="text-muted-foreground ml-1">Sets</span>
+        </div>
+      )}
+      {skipped !== undefined && skipped > 0 && (
+        <div className="text-center border-l pl-4">
+          <span className="text-2xl font-bold text-amber-500">{skipped}</span>
+          <span className="text-muted-foreground ml-1">Skipped</span>
+        </div>
+      )}
+      {calories !== undefined && (
+        <div className="text-center border-l pl-4">
+          <span className="text-2xl font-bold text-foreground">{calories}</span>
+          <span className="text-muted-foreground ml-1">CAL</span>
+        </div>
+      )}
+      {avgHR !== undefined && (
+        <div className="text-center border-l pl-4">
+          <span className="text-2xl font-bold text-foreground">{avgHR}</span>
+          <span className="text-muted-foreground ml-1">°HR</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Set Status Icon Component
+// =============================================================================
+
+interface SetStatusIconProps {
+  status: SetStatus;
+  modified?: boolean;
+}
+
+function SetStatusIcon({ status, modified }: SetStatusIconProps) {
+  if (status === 'completed') {
+    if (modified) {
+      // Half-filled circle for modified
+      return (
+        <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+          <div className="w-3 h-3 rounded-full bg-amber-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+        </div>
+      );
+    }
+    // Green checkmark for completed
+    return (
+      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+        <Check className="w-4 h-4 text-white" />
+      </div>
+    );
+  }
+
+  if (status === 'skipped') {
+    // Orange question mark for skipped
+    return (
+      <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+        <span className="text-white text-sm font-bold">?</span>
+      </div>
+    );
+  }
+
+  // Gray chevron for not_reached
+  return (
+    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </div>
+  );
+}
+
+// =============================================================================
+// Exercise Row Component
+// =============================================================================
+
+interface ExerciseRowProps {
+  interval: IntervalLog;
+  exerciseNumber: number;
+}
+
+function ExerciseRow({ interval, exerciseNumber }: ExerciseRowProps) {
+  const sets = interval.sets || [];
+
+  return (
+    <div className="border-b last:border-b-0">
+      {/* Exercise Header */}
+      <div className="flex items-center gap-3 py-3 px-2">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <span className="text-primary font-semibold">{exerciseNumber}</span>
+        </div>
+        <span className="font-medium">{interval.planned_name}</span>
+      </div>
+
+      {/* Sets Table */}
+      {sets.length > 0 && (
+        <div className="pl-12 pr-2 pb-3">
+          {sets.map((set) => (
+            <div
+              key={set.set_number}
+              className="grid grid-cols-5 gap-2 py-2 text-sm items-center border-t first:border-t-0"
+            >
+              {/* Set Number */}
+              <div className="text-muted-foreground">
+                Set {set.set_number}
+              </div>
+
+              {/* Reps */}
+              <div className="text-center">
+                {set.status === 'completed' || set.status === 'skipped' ? (
+                  set.reps_completed !== undefined ? (
+                    <span>{set.reps_completed} reps</span>
+                  ) : (
+                    <span className="text-muted-foreground">----</span>
+                  )
+                ) : (
+                  <span className="text-muted-foreground">----</span>
+                )}
+              </div>
+
+              {/* Time */}
+              <div className="text-center text-muted-foreground">
+                {formatSetDuration(set.duration_seconds)}
+              </div>
+
+              {/* Weight */}
+              <div className="text-center">
+                {set.weight?.display_label || (
+                  <span className="text-muted-foreground">----</span>
+                )}
+              </div>
+
+              {/* Status Icon */}
+              <div className="flex justify-end">
+                <SetStatusIcon status={set.status} modified={set.modified} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Skip reason */}
+      {interval.status === 'skipped' && interval.skip_reason && (
+        <div className="pl-12 pb-3">
+          <span className="text-amber-500 text-sm flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            Skipped: {interval.skip_reason}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Exercises Table Component
+// =============================================================================
+
+interface ExercisesTableProps {
+  intervals: IntervalLog[];
+}
+
+function ExercisesTable({ intervals }: ExercisesTableProps) {
+  // Filter to only reps intervals (exercises with sets)
+  const exercises = intervals.filter((i) => i.planned_kind === 'reps' || i.sets?.length);
+
+  if (exercises.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-8">
+        <p>No exercise data available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      {/* Table Header */}
+      <div className="grid grid-cols-5 gap-2 py-2 px-2 bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
+        <div className="pl-12">Set # or LB</div>
+        <div className="text-center">Reps</div>
+        <div className="text-center">Time</div>
+        <div className="text-center">Weight</div>
+        <div></div>
+      </div>
+
+      {/* Exercise Rows */}
+      {exercises.map((interval, idx) => (
+        <ExerciseRow
+          key={interval.interval_index}
+          interval={interval}
+          exerciseNumber={idx + 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+// =============================================================================
+// Legacy Interval Display (for completions without execution_log)
+// =============================================================================
+
+interface LegacyIntervalDisplayProps {
+  intervals: Array<{
+    kind?: string;
+    type?: string;
+    seconds?: number;
+    target?: string;
+    reps?: number;
+    name?: string;
+    load?: string;
+    restSec?: number;
+    meters?: number;
+  }>;
+}
+
+function LegacyIntervalDisplay({ intervals }: LegacyIntervalDisplayProps) {
+  return (
+    <div className="space-y-2">
+      {intervals.map((interval, idx) => {
+        const kind = interval.kind || interval.type || 'time';
+        return (
+          <div key={idx} className="border rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{interval.name || `${kind} ${idx + 1}`}</span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {interval.seconds && <span>{formatDuration(interval.seconds)}</span>}
+                {interval.reps && <span>{interval.reps} reps</span>}
+              </div>
+            </div>
+            {(interval.target || interval.load) && (
+              <div className="mt-2 flex gap-2">
+                {interval.target && <Badge variant="secondary">Target: {interval.target}</Badge>}
+                {interval.load && <Badge variant="secondary">Load: {interval.load}</Badge>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -242,6 +540,17 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
     };
   }, []);
 
+  // Extract data from execution_log or fall back to completion fields
+  const executionLog = completion?.executionLog;
+  const summary = executionLog?.summary;
+
+  const completionPercentage = summary?.completion_percentage ?? 100;
+  const totalSets = summary?.total_sets ?? 0;
+  const setsSkipped = summary?.sets_skipped ?? 0;
+  const calories = summary?.calories ?? completion?.activeCalories ?? completion?.totalCalories;
+  const avgHR = summary?.avg_heart_rate ?? completion?.avgHeartRate;
+  const maxHR = summary?.max_heart_rate ?? completion?.maxHeartRate;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -287,96 +596,92 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
             <div className="border-b px-6 py-4 flex-shrink-0">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-semibold mb-2">
+                  <h2 className="text-2xl font-semibold mb-1">
                     {completion.workoutName}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span>{formatDate(completion.startedAt)}</span>
-                    <Badge variant="outline" className="text-xs">
-                      <Watch className="w-3 h-3 mr-1" />
-                      {getSourceDisplayName(completion.source)}
-                    </Badge>
+                  <div className="text-sm text-muted-foreground">
+                    {formatDate(completion.startedAt).split(' at ')[0]}
+                    {' '}
+                    {formatTimeRange(completion.startedAt, completion.endedAt)}
                   </div>
                 </div>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={onClose}
-                  className="h-9 w-9 flex-shrink-0"
-                  aria-label="Close"
+                  className="flex-shrink-0"
                 >
-                  <X className="w-4 h-4" />
+                  Done <X className="w-4 h-4 ml-1" />
                 </Button>
               </div>
             </div>
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4" style={{ minHeight: 0 }}>
-              {/* Health Metrics Summary */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium mb-3">Summary</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                  <MetricItem
-                    icon={<Clock className="w-6 h-6 text-muted-foreground" />}
-                    label="Duration"
-                    value={formatDuration(completion.durationSeconds)}
+              {/* Summary Section - 2 Column Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Left: Duration + Completion Ring */}
+                <div className="bg-muted/30 rounded-xl p-6 flex items-center justify-between">
+                  <div>
+                    <div className="text-5xl font-bold tracking-tight">
+                      {formatDuration(completion.durationSeconds)}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {Math.round(completion.durationSeconds / 60)} mins
+                    </div>
+                  </div>
+                  <CompletionRing percentage={completionPercentage} />
+                </div>
+
+                {/* Right: Stats + HR Graph */}
+                <div className="space-y-3">
+                  <StatsRow
+                    sets={totalSets}
+                    skipped={setsSkipped}
+                    calories={calories}
+                    avgHR={avgHR}
                   />
-                  {(completion.avgHeartRate || completion.maxHeartRate) && (
-                    <MetricItem
-                      icon={<Heart className="w-6 h-6 text-red-500" />}
-                      label="Heart Rate"
-                      value={completion.avgHeartRate
-                        ? `${completion.avgHeartRate}${completion.maxHeartRate ? `/${completion.maxHeartRate}` : ''}`
-                        : `${completion.maxHeartRate}`}
-                    />
-                  )}
-                  {(completion.activeCalories || completion.totalCalories) && (
-                    <MetricItem
-                      icon={<Flame className="w-6 h-6 text-orange-500" />}
-                      label="Calories"
-                      value={completion.activeCalories
-                        ? `${completion.activeCalories}${completion.totalCalories ? ` / ${completion.totalCalories}` : ''}`
-                        : `${completion.totalCalories}`}
-                    />
-                  )}
-                  {completion.distanceMeters != null && completion.distanceMeters > 0 && (
-                    <MetricItem
-                      icon={<Route className="w-6 h-6 text-green-500" />}
-                      label="Distance"
-                      value={formatDistance(completion.distanceMeters)}
-                    />
-                  )}
-                  {completion.steps != null && completion.steps > 0 && (
-                    <MetricItem
-                      icon={<Footprints className="w-6 h-6 text-blue-500" />}
-                      label="Steps"
-                      value={formatSteps(completion.steps)}
-                    />
-                  )}
+                  <HeartRateGraph
+                    samples={completion.heartRateSamples || []}
+                    avgHR={avgHR}
+                    maxHR={maxHR}
+                  />
                 </div>
               </div>
 
-              {/* Workout Breakdown */}
-              {completion.intervals && completion.intervals.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium mb-3">Workout Breakdown</h3>
-                  <div className="space-y-3">
-                    {completion.intervals.map((interval, idx) => (
-                      <IntervalCard key={idx} interval={interval} index={idx} />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Exercises Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Exercises</h3>
 
-              {/* No intervals message */}
-              {(!completion.intervals || completion.intervals.length === 0) && (
-                <div className="text-center text-muted-foreground py-8">
-                  <p>No workout breakdown available for this completion.</p>
-                  <p className="text-sm mt-1">
-                    Workout breakdown is available for workouts created in the app.
-                  </p>
+                {/* Use execution_log if available, otherwise fall back to legacy intervals */}
+                {executionLog && executionLog.intervals.length > 0 ? (
+                  <ExercisesTable intervals={executionLog.intervals} />
+                ) : completion.intervals && completion.intervals.length > 0 ? (
+                  <LegacyIntervalDisplay intervals={completion.intervals} />
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    <p>No workout breakdown available for this completion.</p>
+                    <p className="text-sm mt-1">
+                      Workout breakdown is available for workouts created in the app.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Source Footer */}
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Watch className="w-4 h-4" />
+                    <span>Source: {getSourceDisplayName(completion.source)}</span>
+                  </div>
+                  {completion.sourceWorkoutId && (
+                    <Badge variant="outline" className="text-xs">
+                      Synced
+                    </Badge>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </>
         )}

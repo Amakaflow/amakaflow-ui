@@ -44,6 +44,81 @@ export interface IOSCompanionInterval {
   intervals?: IOSCompanionInterval[];
 }
 
+// =============================================================================
+// ExecutionLog v2 Types (AMA-304)
+// =============================================================================
+
+export type IntervalStatus = 'completed' | 'skipped' | 'not_reached';
+export type SetStatus = IntervalStatus;
+export type SkipReason = 'fatigue' | 'injury' | 'time' | 'equipment' | 'other';
+export type IntervalKind = 'timed' | 'reps' | 'warmup' | 'rest';
+export type WeightSourceMethod = 'manual' | 'suggested' | 'previous';
+
+export interface WeightComponent {
+  source: string;
+  value?: number;
+  unit?: 'lbs' | 'kg';
+  modifier?: 'add' | 'assist';
+  label?: string;
+}
+
+export interface WeightEntry {
+  components: WeightComponent[];
+  display_label: string;
+}
+
+export interface SetLog {
+  set_number: number;
+  status: SetStatus;
+  duration_seconds?: number;
+  reps_planned?: number;
+  reps_completed?: number;
+  weight?: WeightEntry;
+  weight_source?: WeightSourceMethod;
+  rpe?: number;
+  rir?: number;
+  to_failure?: boolean;
+  modified?: boolean;
+  skip_reason?: SkipReason;
+}
+
+export interface IntervalLog {
+  interval_index: number;
+  planned_name: string;
+  exercise_id?: string;
+  exercise_match_confidence?: number;
+  planned_kind: IntervalKind;
+  status: IntervalStatus;
+  planned_duration_seconds?: number;
+  actual_duration_seconds?: number;
+  planned_sets?: number;
+  planned_reps?: number;
+  sets?: SetLog[];
+  skip_reason?: SkipReason;
+}
+
+export interface ExecutionSummary {
+  total_intervals: number;
+  completed: number;
+  skipped: number;
+  not_reached: number;
+  completion_percentage: number;
+  total_sets: number;
+  sets_completed: number;
+  sets_skipped: number;
+  total_duration_seconds: number;
+  active_duration_seconds: number;
+  calories?: number;
+  avg_heart_rate?: number;
+  max_heart_rate?: number;
+}
+
+export interface ExecutionLog {
+  version: number;
+  intervals: IntervalLog[];
+  summary: ExecutionSummary;
+}
+
 export interface WorkoutCompletionDetail extends WorkoutCompletion {
   endedAt: string;
   durationFormatted: string;
@@ -51,6 +126,7 @@ export interface WorkoutCompletionDetail extends WorkoutCompletion {
   deviceInfo?: Record<string, unknown>;
   heartRateSamples?: Array<{ t: number; bpm: number }>;
   intervals?: IOSCompanionInterval[];
+  executionLog?: ExecutionLog;  // AMA-304: v2 execution log data
   createdAt: string;
 }
 
@@ -160,6 +236,7 @@ export async function fetchWorkoutCompletionById(
     deviceInfo: c.device_info,
     heartRateSamples: c.heart_rate_samples,
     intervals: c.intervals,
+    executionLog: c.execution_log,  // AMA-304: v2 execution log
     createdAt: c.created_at,
   };
 }
