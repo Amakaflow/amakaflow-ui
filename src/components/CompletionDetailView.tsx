@@ -665,8 +665,8 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
   }, []);
 
   // Extract data from execution_log or fall back to mock data (AMA-292)
-  // TODO: Remove FORCE_MOCK after UI testing is complete
-  const FORCE_MOCK = true; // Force mock data for UI testing
+  // Set to true to force mock data for UI testing
+  const FORCE_MOCK = false;
   const hasRealExecutionLog = !FORCE_MOCK && completion?.executionLog?.intervals && completion.executionLog.intervals.length > 0;
   console.log('[CompletionDetailView] hasRealExecutionLog:', hasRealExecutionLog, 'FORCE_MOCK:', FORCE_MOCK);
   const executionLog = hasRealExecutionLog ? completion?.executionLog : MOCK_EXECUTION_LOG;
