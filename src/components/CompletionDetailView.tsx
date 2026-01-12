@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { X, Watch, Loader2, Check, ChevronRight, AlertCircle } from 'lucide-react';
+import { X, Watch, Loader2, Check, ChevronRight } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import {
@@ -17,6 +17,7 @@ import {
   IntervalLog,
   SetLog,
   SetStatus,
+  WeightEntry,
 } from '../lib/completions-api';
 import { formatDuration } from './ActivityHistory';
 
@@ -321,89 +322,24 @@ function SetStatusIcon({ status, modified }: SetStatusIconProps) {
 }
 
 // =============================================================================
-// Exercise Row Component
+// Exercise Badge Colors (matches target design)
 // =============================================================================
 
-interface ExerciseRowProps {
-  interval: IntervalLog;
-  exerciseNumber: number;
-}
-
-function ExerciseRow({ interval, exerciseNumber }: ExerciseRowProps) {
-  const sets = interval.sets || [];
-
-  return (
-    <div className="border-b last:border-b-0">
-      {/* Exercise Header */}
-      <div className="flex items-center gap-3 py-3 px-2">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <span className="text-primary font-semibold">{exerciseNumber}</span>
-        </div>
-        <span className="font-medium">{interval.planned_name}</span>
-      </div>
-
-      {/* Sets Table */}
-      {sets.length > 0 && (
-        <div className="pl-12 pr-2 pb-3">
-          {sets.map((set) => (
-            <div
-              key={set.set_number}
-              className="grid grid-cols-5 gap-2 py-2 text-sm items-center border-t first:border-t-0"
-            >
-              {/* Set Number */}
-              <div className="text-muted-foreground">
-                Set {set.set_number}
-              </div>
-
-              {/* Reps */}
-              <div className="text-center">
-                {set.status === 'completed' || set.status === 'skipped' ? (
-                  set.reps_completed !== undefined ? (
-                    <span>{set.reps_completed} reps</span>
-                  ) : (
-                    <span className="text-muted-foreground">----</span>
-                  )
-                ) : (
-                  <span className="text-muted-foreground">----</span>
-                )}
-              </div>
-
-              {/* Time */}
-              <div className="text-center text-muted-foreground">
-                {formatSetDuration(set.duration_seconds)}
-              </div>
-
-              {/* Weight */}
-              <div className="text-center">
-                {set.weight?.display_label || (
-                  <span className="text-muted-foreground">----</span>
-                )}
-              </div>
-
-              {/* Status Icon */}
-              <div className="flex justify-end">
-                <SetStatusIcon status={set.status} modified={set.modified} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Skip reason */}
-      {interval.status === 'skipped' && interval.skip_reason && (
-        <div className="pl-12 pb-3">
-          <span className="text-amber-500 text-sm flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Skipped: {interval.skip_reason}
-          </span>
-        </div>
-      )}
-    </div>
-  );
+function getExerciseBadgeColor(status: string): string {
+  switch (status) {
+    case 'completed':
+      return 'bg-blue-500';
+    case 'skipped':
+      return 'bg-amber-500';
+    case 'not_reached':
+      return 'bg-slate-400';
+    default:
+      return 'bg-blue-500';
+  }
 }
 
 // =============================================================================
-// Exercises Table Component
+// Exercises Table Component (Flat table matching target design)
 // =============================================================================
 
 interface ExercisesTableProps {
@@ -422,24 +358,97 @@ function ExercisesTable({ intervals }: ExercisesTableProps) {
     );
   }
 
+  // Flatten exercises into rows for the table
+  type TableRow = {
+    exerciseNumber?: number;
+    exerciseName?: string;
+    exerciseStatus?: string;
+    set: SetLog;
+    isFirstSet: boolean;
+    totalSets: number;
+  };
+
+  const rows: TableRow[] = [];
+  exercises.forEach((interval, idx) => {
+    const sets = interval.sets || [];
+    sets.forEach((set, setIdx) => {
+      rows.push({
+        exerciseNumber: setIdx === 0 ? idx + 1 : undefined,
+        exerciseName: setIdx === 0 ? interval.planned_name : undefined,
+        exerciseStatus: setIdx === 0 ? interval.status : undefined,
+        set,
+        isFirstSet: setIdx === 0,
+        totalSets: sets.length,
+      });
+    });
+  });
+
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-xl overflow-hidden">
       {/* Table Header */}
-      <div className="grid grid-cols-5 gap-2 py-2 px-2 bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
-        <div className="pl-12">Set # or LB</div>
-        <div className="text-center">Reps</div>
-        <div className="text-center">Time</div>
-        <div className="text-center">Weight</div>
-        <div></div>
+      <div className="flex items-center py-3 px-4 bg-muted/30 text-xs text-muted-foreground uppercase tracking-wider border-b">
+        <div style={{ width: 48 }}></div>
+        <div style={{ flex: 1 }}>SET # OLLB</div>
+        <div style={{ width: 70 }} className="text-center">SET</div>
+        <div style={{ width: 80 }} className="text-center">Reps</div>
+        <div style={{ width: 70 }} className="text-center">TIME</div>
+        <div style={{ width: 80 }} className="text-center">WEIGHT</div>
+        <div style={{ width: 40 }}></div>
       </div>
 
-      {/* Exercise Rows */}
-      {exercises.map((interval, idx) => (
-        <ExerciseRow
-          key={interval.interval_index}
-          interval={interval}
-          exerciseNumber={idx + 1}
-        />
+      {/* Table Rows */}
+      {rows.map((row, idx) => (
+        <div
+          key={idx}
+          className={`flex items-center py-3 px-4 text-sm ${
+            row.isFirstSet && idx > 0 ? 'border-t' : ''
+          }`}
+        >
+          {/* Exercise Number Badge */}
+          <div style={{ width: 48 }}>
+            {row.exerciseNumber && (
+              <div className={`w-8 h-8 rounded-full ${getExerciseBadgeColor(row.exerciseStatus || 'completed')} flex items-center justify-center`}>
+                <span className="text-white font-semibold text-sm">{row.exerciseNumber}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Exercise Name */}
+          <div style={{ flex: 1 }} className="font-medium">
+            {row.exerciseName || ''}
+          </div>
+
+          {/* Set Number */}
+          <div style={{ width: 70 }} className="text-center text-muted-foreground">
+            Set {row.set.set_number}
+          </div>
+
+          {/* Reps */}
+          <div style={{ width: 80 }} className="text-center font-medium">
+            {row.set.reps_completed !== undefined ? (
+              <span>{row.set.reps_completed} reps</span>
+            ) : (
+              <span className="text-muted-foreground">----</span>
+            )}
+          </div>
+
+          {/* Time */}
+          <div style={{ width: 70 }} className="text-center text-muted-foreground">
+            {formatSetDuration(row.set.duration_seconds)}
+          </div>
+
+          {/* Weight */}
+          <div style={{ width: 80 }} className="text-center font-medium">
+            {row.set.weight?.display_label || (
+              <span className="text-muted-foreground">----</span>
+            )}
+          </div>
+
+          {/* Status Icon */}
+          <div style={{ width: 40 }} className="flex justify-center">
+            <SetStatusIcon status={row.set.status} modified={row.set.modified} />
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -491,6 +500,121 @@ function LegacyIntervalDisplay({ intervals }: LegacyIntervalDisplayProps) {
 }
 
 // =============================================================================
+// Mock Data (for when no real execution log exists) - AMA-292
+// =============================================================================
+
+// Helper to create weight entry with required components
+const mockWeight = (label: string, value: number, unit: 'lbs' | 'kg' = 'lbs'): WeightEntry => ({
+  components: [{ source: 'manual', value, unit }],
+  display_label: label,
+});
+
+const MOCK_INTERVALS: IntervalLog[] = [
+  // Incline Smith Machine Press - 4 sets
+  {
+    interval_index: 0,
+    planned_kind: 'reps',
+    planned_name: 'Incline Smith Machine Press',
+    status: 'completed',
+    sets: [
+      { set_number: 1, status: 'completed', reps_completed: 12, duration_seconds: 69, weight: mockWeight('35 lbs', 35) },
+      { set_number: 2, status: 'completed', reps_completed: 12, duration_seconds: 51, weight: mockWeight('45 lbs', 45) },
+      { set_number: 3, status: 'completed', reps_completed: 10, duration_seconds: 88, weight: mockWeight('55 lbs', 55) },
+      { set_number: 4, status: 'completed', reps_completed: 8, duration_seconds: 85, weight: mockWeight('55 lbs', 55) },
+    ],
+  },
+  // Dumbbell Lateral Raise - 3 sets
+  {
+    interval_index: 1,
+    planned_kind: 'reps',
+    planned_name: 'Dumbbell Lateral Raise',
+    status: 'completed',
+    sets: [
+      { set_number: 1, status: 'completed', reps_completed: 15, duration_seconds: 45, weight: mockWeight('15 lbs', 15) },
+      { set_number: 2, status: 'completed', reps_completed: 15, duration_seconds: 45, weight: mockWeight('15 lbs', 15) },
+      { set_number: 3, status: 'completed', reps_completed: 12, duration_seconds: 28, weight: mockWeight('15 lbs', 15) },
+    ],
+  },
+  // Cable Fly - skipped
+  {
+    interval_index: 2,
+    planned_kind: 'reps',
+    planned_name: 'Cable Fly',
+    status: 'skipped',
+    skip_reason: 'equipment',
+    sets: [
+      { set_number: 1, status: 'skipped', weight: mockWeight('Body', 0) },
+    ],
+  },
+  // Bench Dip - 2 sets
+  {
+    interval_index: 3,
+    planned_kind: 'reps',
+    planned_name: 'Bench Dip',
+    status: 'completed',
+    sets: [
+      { set_number: 1, status: 'completed', reps_completed: 7, duration_seconds: 45, weight: mockWeight('Body', 0) },
+      { set_number: 2, status: 'completed', reps_completed: 8, duration_seconds: 44 },
+    ],
+  },
+  // Tricep Pushdown - not reached
+  {
+    interval_index: 4,
+    planned_kind: 'reps',
+    planned_name: 'Tricep Pushdown',
+    status: 'not_reached',
+    sets: [
+      { set_number: 1, status: 'not_reached' },
+      { set_number: 2, status: 'not_reached' },
+      { set_number: 3, status: 'not_reached' },
+    ],
+  },
+];
+
+const MOCK_SUMMARY = {
+  total_intervals: 5,
+  completed: 3,
+  skipped: 1,
+  not_reached: 1,
+  completion_percentage: 75,
+  total_sets: 13,
+  sets_completed: 9,
+  sets_skipped: 4,
+  total_duration_seconds: 2850,
+  active_duration_seconds: 2850,
+};
+
+const MOCK_EXECUTION_LOG: ExecutionLog = {
+  version: 2,
+  intervals: MOCK_INTERVALS,
+  summary: MOCK_SUMMARY,
+};
+
+// Mock heart rate samples for testing the graph
+const MOCK_HR_SAMPLES = [
+  { t: 0, bpm: 72 },
+  { t: 120, bpm: 85 },
+  { t: 240, bpm: 110 },
+  { t: 360, bpm: 125 },
+  { t: 480, bpm: 140 },
+  { t: 600, bpm: 135 },
+  { t: 720, bpm: 150 },
+  { t: 840, bpm: 158 },
+  { t: 960, bpm: 145 },
+  { t: 1080, bpm: 130 },
+  { t: 1200, bpm: 115 },
+  { t: 1320, bpm: 125 },
+  { t: 1440, bpm: 140 },
+  { t: 1560, bpm: 135 },
+  { t: 1680, bpm: 120 },
+  { t: 1800, bpm: 105 },
+  { t: 1920, bpm: 95 },
+  { t: 2040, bpm: 88 },
+  { t: 2160, bpm: 82 },
+  { t: 2280, bpm: 78 },
+];
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
@@ -540,16 +664,20 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
     };
   }, []);
 
-  // Extract data from execution_log or fall back to completion fields
-  const executionLog = completion?.executionLog;
+  // Extract data from execution_log or fall back to mock data (AMA-292)
+  // Set to true to force mock data for UI testing
+  const FORCE_MOCK = false;
+  const hasRealExecutionLog = !FORCE_MOCK && completion?.executionLog?.intervals && completion.executionLog.intervals.length > 0;
+  console.log('[CompletionDetailView] hasRealExecutionLog:', hasRealExecutionLog, 'FORCE_MOCK:', FORCE_MOCK);
+  const executionLog = hasRealExecutionLog ? completion?.executionLog : MOCK_EXECUTION_LOG;
   const summary = executionLog?.summary;
 
   const completionPercentage = summary?.completion_percentage ?? 100;
   const totalSets = summary?.total_sets ?? 0;
   const setsSkipped = summary?.sets_skipped ?? 0;
-  const calories = summary?.calories ?? completion?.activeCalories ?? completion?.totalCalories;
-  const avgHR = summary?.avg_heart_rate ?? completion?.avgHeartRate;
-  const maxHR = summary?.max_heart_rate ?? completion?.maxHeartRate;
+  const calories = completion?.activeCalories ?? completion?.totalCalories ?? 161; // Mock fallback
+  const avgHR = completion?.avgHeartRate ?? 99; // Mock fallback
+  const maxHR = completion?.maxHeartRate ?? 158; // Mock fallback
 
   return (
     <div
@@ -621,16 +749,14 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
               {/* Summary Section - 2 Column Layout */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {/* Left: Duration + Completion Ring */}
-                <div className="bg-muted/30 rounded-xl p-6 flex items-center justify-between">
-                  <div>
-                    <div className="text-5xl font-bold tracking-tight">
-                      {formatDuration(completion.durationSeconds)}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {Math.round(completion.durationSeconds / 60)} mins
-                    </div>
+                <div className="bg-muted/30 rounded-xl p-8 flex items-center justify-between">
+                  <div
+                    className="font-bold tracking-tight"
+                    style={{ fontSize: '4.5rem', lineHeight: 1 }}
+                  >
+                    {formatDuration(completion.durationSeconds)}
                   </div>
-                  <CompletionRing percentage={completionPercentage} />
+                  <CompletionRing percentage={completionPercentage} size={130} />
                 </div>
 
                 {/* Right: Stats + HR Graph */}
@@ -642,7 +768,7 @@ export function CompletionDetailView({ completionId, onClose }: CompletionDetail
                     avgHR={avgHR}
                   />
                   <HeartRateGraph
-                    samples={completion.heartRateSamples || []}
+                    samples={FORCE_MOCK ? MOCK_HR_SAMPLES : (completion.heartRateSamples || [])}
                     avgHR={avgHR}
                     maxHR={maxHR}
                   />
