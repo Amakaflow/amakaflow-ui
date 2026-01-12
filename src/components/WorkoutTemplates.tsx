@@ -1,28 +1,67 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  BookTemplate, 
-  History, 
-  Plus, 
+import {
+  BookTemplate,
+  History,
+  Plus,
   Download,
   Clock,
   CheckCircle,
-  Circle
+  Circle,
+  ChevronDown,
+  ChevronRight,
+  Timer
 } from 'lucide-react';
 import { WorkoutStructure } from '../types/workout';
-import { workoutTemplates, getWorkoutHistory } from '../lib/templates';
+import {
+  getWorkoutHistory,
+  getTemplatesByCategory,
+  templateCategoryLabels,
+  TemplateCategory,
+  CategorizedWorkoutStructure
+} from '../lib/templates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 interface WorkoutTemplatesProps {
   onSelectTemplate: (workout: WorkoutStructure) => void;
   onSelectHistory: (workout: WorkoutStructure) => void;
 }
 
+// Category display order
+const categoryOrder: TemplateCategory[] = [
+  'strength',
+  'hiit',
+  'quick',
+  'emom-amrap',
+  'focus',
+  'superset',
+  'cardio',
+];
+
 export function WorkoutTemplates({ onSelectTemplate, onSelectHistory }: WorkoutTemplatesProps) {
   const [history] = useState(getWorkoutHistory());
+  const [expandedCategories, setExpandedCategories] = useState<Set<TemplateCategory>>(
+    new Set(['strength', 'hiit', 'quick']) // Default expanded categories
+  );
+
+  // Group templates by category
+  const templatesByCategory = useMemo(() => getTemplatesByCategory(), []);
+
+  const toggleCategory = (category: TemplateCategory) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -46,6 +85,52 @@ export function WorkoutTemplates({ onSelectTemplate, onSelectHistory }: WorkoutT
       return sum + blockExercises + supersetExercises;
     }, 0);
   };
+
+  const renderTemplateCard = (template: CategorizedWorkoutStructure, idx: number) => (
+    <Card key={idx} className="hover:border-primary transition-colors">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-base">{template.title}</CardTitle>
+            <CardDescription className="text-xs mt-1 flex items-center gap-2">
+              {template.blocks.length} block(s) • {getExerciseCount(template)} exercises
+              {template.duration && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="flex items-center gap-1">
+                    <Timer className="w-3 h-3" />
+                    {template.duration}
+                  </span>
+                </>
+              )}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-wrap gap-2 mb-3">
+          {template.blocks.slice(0, 2).map((block, blockIdx) => (
+            <Badge key={blockIdx} variant="secondary" className="text-xs">
+              {block.label}
+            </Badge>
+          ))}
+          {template.blocks.length > 2 && (
+            <Badge variant="outline" className="text-xs">
+              +{template.blocks.length - 2} more
+            </Badge>
+          )}
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onSelectTemplate(template)}
+          className="w-full"
+        >
+          <Plus className="w-3 h-3 mr-2" />
+          Use Template
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Card>
@@ -73,43 +158,41 @@ export function WorkoutTemplates({ onSelectTemplate, onSelectHistory }: WorkoutT
 
           <TabsContent value="templates">
             <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-3">
-                {workoutTemplates.map((template, idx) => (
-                  <Card key={idx} className="hover:border-primary transition-colors">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-base">{template.title}</CardTitle>
-                          <CardDescription className="text-xs mt-1">
-                            {template.blocks.length} block(s) • {getExerciseCount(template)} exercises
-                          </CardDescription>
+              <div className="space-y-4">
+                {categoryOrder.map(category => {
+                  const templates = templatesByCategory.get(category);
+                  if (!templates || templates.length === 0) return null;
+
+                  const isExpanded = expandedCategories.has(category);
+                  const categoryLabel = templateCategoryLabels[category];
+
+                  return (
+                    <Collapsible
+                      key={category}
+                      open={isExpanded}
+                      onOpenChange={() => toggleCategory(category)}
+                    >
+                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <span className="font-medium text-sm">{categoryLabel}</span>
+                          <Badge variant="secondary" className="text-xs ml-1">
+                            {templates.length}
+                          </Badge>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {template.blocks.slice(0, 2).map((block, blockIdx) => (
-                          <Badge key={blockIdx} variant="secondary" className="text-xs">
-                            {block.label}
-                          </Badge>
-                        ))}
-                        {template.blocks.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{template.blocks.length - 2} more
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => onSelectTemplate(template)}
-                        className="w-full"
-                      >
-                        <Plus className="w-3 h-3 mr-2" />
-                        Use Template
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="space-y-3 mt-2 ml-6">
+                          {templates.map((template, idx) => renderTemplateCard(template, idx))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
               </div>
             </ScrollArea>
           </TabsContent>
