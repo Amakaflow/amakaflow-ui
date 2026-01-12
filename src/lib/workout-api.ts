@@ -28,6 +28,12 @@ export interface SavedWorkout {
   strava_activity_id?: string;
   ios_companion_synced_at?: string;
   android_companion_synced_at?: string;
+  // AMA-307: New sync status from workout_sync_queue
+  sync_status?: {
+    ios?: { status: string; queued_at?: string; synced_at?: string; failed_at?: string; error_message?: string };
+    android?: { status: string; queued_at?: string; synced_at?: string; failed_at?: string; error_message?: string };
+    garmin?: { status: string; queued_at?: string; synced_at?: string; failed_at?: string; error_message?: string };
+  };
   created_at: string;
   updated_at: string;
 }

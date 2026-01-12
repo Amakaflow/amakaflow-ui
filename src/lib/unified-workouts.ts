@@ -334,7 +334,7 @@ export function normalizeHistoryWorkout(item: WorkoutHistoryItem): UnifiedWorkou
   const titleCategory = inferCategoryFromTitle(workout?.title || '');
   const category = titleCategory || inferCategoryFromExercises(exerciseNames);
 
-  // Build sync status
+  // Build sync status - AMA-307: Use sync_status from API when available
   const syncStatus: SyncStatus = {};
   if (item.syncedToStrava) {
     syncStatus.strava = {
@@ -343,14 +343,36 @@ export function normalizeHistoryWorkout(item: WorkoutHistoryItem): UnifiedWorkou
       id: item.stravaActivityId,
     };
   }
-  if (item.iosCompanionSyncedAt) {
+  // iOS sync status from workout_sync_queue (AMA-307)
+  if (item.syncStatus?.ios) {
+    const iosStatus = item.syncStatus.ios;
+    syncStatus.ios = {
+      synced: iosStatus.status === 'synced',
+      status: iosStatus.status as any,
+      syncedAt: iosStatus.synced_at,
+      queuedAt: iosStatus.queued_at,
+      errorMessage: iosStatus.error_message,
+    };
+  } else if (item.iosCompanionSyncedAt) {
+    // Backwards compatibility: fall back to old timestamp field
     syncStatus.ios = {
       synced: true,
       status: 'synced',
       syncedAt: item.iosCompanionSyncedAt,
     };
   }
-  if (item.androidCompanionSyncedAt) {
+  // Android sync status from workout_sync_queue (AMA-307)
+  if (item.syncStatus?.android) {
+    const androidStatus = item.syncStatus.android;
+    syncStatus.android = {
+      synced: androidStatus.status === 'synced',
+      status: androidStatus.status as any,
+      syncedAt: androidStatus.synced_at,
+      queuedAt: androidStatus.queued_at,
+      errorMessage: androidStatus.error_message,
+    };
+  } else if (item.androidCompanionSyncedAt) {
+    // Backwards compatibility: fall back to old timestamp field
     syncStatus.android = {
       synced: true,
       status: 'synced',
