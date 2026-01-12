@@ -3,6 +3,15 @@ import { WorkoutStructure, ExportFormats } from '../types/workout';
 import { DeviceId } from './devices';
 import { getWorkoutsFromAPI, SavedWorkout } from './workout-api';
 
+// AMA-307: Sync status entry type
+export type SyncStatusEntry = {
+  status: string;
+  queued_at?: string;
+  synced_at?: string;
+  failed_at?: string;
+  error_message?: string;
+};
+
 export type WorkoutHistoryItem = {
   id: string;
   workout: WorkoutStructure;
@@ -16,6 +25,12 @@ export type WorkoutHistoryItem = {
   stravaActivityId?: string;
   iosCompanionSyncedAt?: string;
   androidCompanionSyncedAt?: string;
+  // AMA-307: New sync status from workout_sync_queue
+  syncStatus?: {
+    ios?: SyncStatusEntry;
+    android?: SyncStatusEntry;
+    garmin?: SyncStatusEntry;
+  };
 };
 
 const LEGACY_HISTORY_KEY = 'amakaflow_workout_history';
@@ -138,6 +153,8 @@ function normalizeApiWorkoutItem(item: SavedWorkout): WorkoutHistoryItem {
     stravaActivityId: item.strava_activity_id,
     iosCompanionSyncedAt: item.ios_companion_synced_at,
     androidCompanionSyncedAt: item.android_companion_synced_at,
+    // AMA-307: Include sync_status from workout_sync_queue
+    syncStatus: item.sync_status,
   };
 }
 
