@@ -22,3 +22,17 @@ Thumbs.db
 
 # Test data
 garmin-exercise-data/
+
+# Service repositories (cloned separately)
+amakaflow-db/
+amakaflow-fitfiletool/
+amakaflow-ui/
+calendar-api/
+garmin-sync-api/
+garmin-usb-fit-api/
+mapper-api/
+strava-sync-api/
+workout-ingestor-api/
+
+# Claude Code local settings
+.claude/
