@@ -3,13 +3,15 @@
 Parses natural language workout descriptions into structured workout data
 compatible with iOS WorkoutKit intervals format.
 """
-import os
 import json
+import logging
 import re
 import uuid
-import logging
-from typing import Dict, Optional, List, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +145,8 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
         transcription: str,
         sport_hint: Optional[str] = None,
         api_key: Optional[str] = None,
-        model: str = "gpt-4-turbo"
+        model: str = "gpt-4-turbo",
+        user_id: Optional[str] = None,
     ) -> VoiceParseResult:
         """
         Parse a voice transcription into structured workout data.
@@ -151,8 +154,9 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
         Args:
             transcription: The transcribed text from voice input
             sport_hint: Optional hint about the sport type
-            api_key: OpenAI API key (or use OPENAI_API_KEY env var)
+            api_key: OpenAI API key (deprecated, uses config)
             model: OpenAI model to use (default: gpt-4-turbo)
+            user_id: Optional user ID for tracking
 
         Returns:
             VoiceParseResult with parsed workout or error
@@ -161,13 +165,6 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
             return VoiceParseResult(
                 success=False,
                 error="OpenAI library not installed. Run: pip install openai"
-            )
-
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return VoiceParseResult(
-                success=False,
-                error="OpenAI API key not provided. Set OPENAI_API_KEY environment variable."
             )
 
         # Validate transcription
@@ -183,9 +180,19 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
         if sport_hint:
             user_content += f"\n\nSport type hint: {sport_hint}"
 
-        client = OpenAI(api_key=api_key, timeout=60.0)
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="voice_workout_parsing",
+            custom_properties={"model": model, "sport_hint": sport_hint or "none"},
+        )
 
         try:
+            client = AIClientFactory.create_openai_client(context=context)
+        except ValueError as e:
+            return VoiceParseResult(success=False, error=str(e))
+
+        def _make_api_call() -> Dict[str, Any]:
             response = client.chat.completions.create(
                 model=model,
                 max_tokens=4096,
@@ -195,15 +202,16 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
                 ],
                 temperature=0.1,
             )
-
             result_text = response.choices[0].message.content
 
             # Extract JSON from response (model may add markdown formatting)
             json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
             if json_match:
-                workout_data = json.loads(json_match.group(0))
-            else:
-                workout_data = json.loads(result_text)
+                return json.loads(json_match.group(0))
+            return json.loads(result_text)
+
+        try:
+            workout_data = retry_sync_call(_make_api_call)
 
             # Validate required fields
             if not workout_data.get("intervals"):

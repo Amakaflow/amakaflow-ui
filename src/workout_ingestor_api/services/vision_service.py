@@ -1,10 +1,16 @@
 """Vision model service for extracting and structuring workout data from images."""
-import os
-import json
 import base64
-from typing import Dict, List, Optional
-from PIL import Image
 import io
+import json
+import logging
+from typing import Dict, List, Optional
+
+from PIL import Image
+
+from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+
+
+logger = logging.getLogger(__name__)
 
 # Optional dependencies
 try:
@@ -184,16 +190,18 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
     def extract_text_from_images_openai(
         image_paths: List[str],
         model: str = "gpt-4o-mini",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Extract text from workout images using OpenAI Vision API.
-        
+
         Args:
             image_paths: List of paths to image files
             model: OpenAI model to use (gpt-4o-mini or gpt-4o recommended)
-            api_key: OpenAI API key (or use OPENAI_API_KEY env var)
-            
+            api_key: OpenAI API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
+
         Returns:
             Extracted text from all images
         """
@@ -201,15 +209,16 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
             raise ValueError(
                 "OpenAI library not installed. Run: pip install openai"
             )
-        
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable."
-            )
-        
-        client = openai.OpenAI(api_key=api_key)
-        
+
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="vision_extract_text",
+            custom_properties={"model": model, "image_count": str(len(image_paths))},
+        )
+
+        client = AIClientFactory.create_openai_client(context=context)
+
         # Prepare image content for API
         image_content = []
         for image_path in image_paths:
@@ -217,15 +226,15 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
             # Get image format
             with Image.open(image_path) as img:
                 img_format = img.format.lower() or "jpeg"
-            
+
             image_content.append({
                 "type": "image_url",
                 "image_url": {
                     "url": f"data:image/{img_format};base64,{base64_image}"
                 }
             })
-        
-        try:
+
+        def _make_api_call() -> str:
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -240,42 +249,34 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
                 temperature=0.1,  # Low temperature for accurate text extraction
                 max_tokens=4000
             )
-            
             return response.choices[0].message.content or ""
+
+        try:
+            return retry_sync_call(_make_api_call)
         except Exception as e:
+            logger.error(f"OpenAI Vision API call failed after retries: {e}")
             raise ValueError(f"OpenAI Vision API call failed: {e}") from e
 
     @staticmethod
     def extract_and_structure_workout_openai(
         image_paths: List[str],
         model: str = "gpt-4o-mini",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict:
         """
         Extract and structure workout data from images using OpenAI Vision API.
-        
+
         Works with:
         - ChatGPT Plus ($20/month) - includes API access
         - OpenAI API account (pay-as-you-go)
-        
+
         Args:
             image_paths: List of paths to image files
             model: OpenAI model to use (gpt-4o-mini recommended for cost, gpt-4o for accuracy)
-            api_key: OpenAI API key (or use OPENAI_API_KEY env var, or pass from request)
-            
-        Returns:
-            Structured workout JSON
-        """
-        """
-        Extract and structure workout data from images in one API call.
-        
-        This is more efficient and often more accurate than extracting text then structuring.
-        
-        Args:
-            image_paths: List of paths to image files
-            model: OpenAI model to use (gpt-4o-mini or gpt-4o recommended)
-            api_key: OpenAI API key (or use OPENAI_API_KEY env var)
-            
+            api_key: OpenAI API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
+
         Returns:
             Structured workout JSON
         """
@@ -283,15 +284,16 @@ Return ONLY valid JSON matching the format above, no additional text or explanat
             raise ValueError(
                 "OpenAI library not installed. Run: pip install openai"
             )
-        
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable."
-            )
-        
-        client = openai.OpenAI(api_key=api_key)
-        
+
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="vision_extract_and_structure",
+            custom_properties={"model": model, "image_count": str(len(image_paths))},
+        )
+
+        client = AIClientFactory.create_openai_client(context=context)
+
         # Prepare image content for API - resize images to stay under 50MB limit
         image_content = []
         for image_path in image_paths:
@@ -318,8 +320,8 @@ FINAL REMINDER:
 - Do NOT invent or make up exercises - only extract what's visible
 - Use exercise names EXACTLY as written in images (preserve abbreviations)
 - Combine all exercises from all frames into one complete workout"""
-        
-        try:
+
+        def _make_api_call() -> Dict:
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -335,10 +337,13 @@ FINAL REMINDER:
                 response_format={"type": "json_object"},
                 max_tokens=4000
             )
-            
+
             result_text = response.choices[0].message.content
-            workout_dict = json.loads(result_text)
-            
+            return json.loads(result_text)
+
+        try:
+            workout_dict = retry_sync_call(_make_api_call)
+
             # Post-process: Filter out obviously garbled/invalid exercise names
             # If exercise names look like OCR garbage (random chars, symbols), remove them
             for block in workout_dict.get("blocks", []):
@@ -348,65 +353,68 @@ FINAL REMINDER:
                     name = ex.get("name", "").strip()
                     if not name:
                         continue
-                    
+
                     # Skip if name is clearly garbled/invalid:
                     # 1. Too short (1-2 chars) with no meaningful content
                     # 2. Mostly symbols/special characters
                     # 3. Pattern matching OCR garbage (random combinations)
-                    
+
                     # Count meaningful characters
                     letters = sum(c.isalpha() for c in name)
                     digits = sum(c.isdigit() for c in name)
                     spaces = sum(c.isspace() for c in name)
                     symbols = len(name) - letters - digits - spaces
-                    
+
                     # Valid exercise name criteria:
                     # - Has at least 2 letters, OR
                     # - Has at least 4 characters total with more letters/digits than symbols
                     if len(name) <= 2 and letters == 0:
                         continue  # Too short, no letters
-                    
+
                     if len(name) >= 3:
                         # For longer names, require meaningful content
                         meaningful = letters + digits
                         if meaningful == 0:
                             continue  # Only symbols
-                        
+
                         # If mostly symbols, skip (likely OCR garbage)
                         if symbols > meaningful * 2:
                             continue
-                        
+
                         # If it's just random characters/symbols with no pattern, skip
                         # Check for patterns that suggest OCR garbage
                         if all(c in "®°©™'\"()[]{}.,;:!?-_=+|\\/@#$%^&*~`" for c in name.replace(" ", "")):
                             continue
-                    
+
                     # Keep this exercise
                     filtered_exercises.append(ex)
-                
+
                 block["exercises"] = filtered_exercises
-            
+
             # If all exercises were filtered out, keep at least empty structure
             # (don't delete blocks, just empty their exercises)
-            
+
             return workout_dict
         except Exception as e:
+            logger.error(f"OpenAI Vision API call failed after retries: {e}")
             raise ValueError(f"OpenAI Vision API call failed: {e}") from e
 
     @staticmethod
     def extract_text_from_images_anthropic(
         image_paths: List[str],
         model: str = "claude-3-5-sonnet-20241022",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Extract text from workout images using Anthropic Claude Vision API.
-        
+
         Args:
             image_paths: List of paths to image files
             model: Claude model to use
-            api_key: Anthropic API key (or use ANTHROPIC_API_KEY env var)
-            
+            api_key: Anthropic API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
+
         Returns:
             Extracted text from all images
         """
@@ -414,25 +422,26 @@ FINAL REMINDER:
             raise ValueError(
                 "Anthropic library not installed. Run: pip install anthropic"
             )
-        
-        api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "Anthropic API key not provided. Set ANTHROPIC_API_KEY environment variable."
-            )
-        
-        client = Anthropic(api_key=api_key)
-        
+
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="vision_extract_text_anthropic",
+            custom_properties={"model": model, "image_count": str(len(image_paths))},
+        )
+
+        client = AIClientFactory.create_anthropic_client(context=context)
+
         # Prepare image content for API
         image_content = []
         for image_path in image_paths:
             with open(image_path, "rb") as image_file:
                 image_data = image_file.read()
                 base64_image = base64.b64encode(image_data).decode('utf-8')
-                
+
             with Image.open(image_path) as img:
                 img_format = img.format.lower() or "jpeg"
-            
+
             image_content.append({
                 "type": "image",
                 "source": {
@@ -441,8 +450,8 @@ FINAL REMINDER:
                     "data": base64_image
                 }
             })
-        
-        try:
+
+        def _make_api_call() -> str:
             message = client.messages.create(
                 model=model,
                 max_tokens=4096,
@@ -457,9 +466,12 @@ FINAL REMINDER:
                 ],
                 temperature=0.1
             )
-            
             return message.content[0].text
+
+        try:
+            return retry_sync_call(_make_api_call)
         except Exception as e:
+            logger.error(f"Anthropic Vision API call failed after retries: {e}")
             raise ValueError(f"Anthropic Vision API call failed: {e}") from e
 
     @staticmethod

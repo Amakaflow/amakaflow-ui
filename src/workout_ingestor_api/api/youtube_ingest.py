@@ -6,24 +6,25 @@ Includes caching support to avoid redundant API calls for previously
 processed videos.
 """
 
-import os
 import json
+import logging
 import re
 import uuid
-import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import requests
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from workout_ingestor_api.models import Workout, Block, Exercise
+from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+from workout_ingestor_api.models import Block, Exercise, Workout
 from workout_ingestor_api.services.url_normalizer import (
     extract_youtube_video_id,
     normalize_youtube_url,
     parse_youtube_url,
 )
 from workout_ingestor_api.services.youtube_cache_service import YouTubeCacheService
+
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,13 @@ def _generate_id() -> str:
     return f"{int(__import__('time').time() * 1000)}-{uuid.uuid4().hex[:8]}"
 
 
-def _parse_with_openai(transcript: str, title: str, video_duration_sec: Optional[int] = None, chapter_info: str = "") -> Dict:
+def _parse_with_openai(
+    transcript: str,
+    title: str,
+    video_duration_sec: Optional[int] = None,
+    chapter_info: str = "",
+    user_id: Optional[str] = None,
+) -> Dict:
     """Parse transcript using OpenAI GPT-4."""
     try:
         import openai
@@ -69,15 +76,18 @@ def _parse_with_openai(transcript: str, title: str, video_duration_sec: Optional
             status_code=500,
             detail="OpenAI library not installed. Run: pip install openai"
         )
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
-        )
-    
-    client = openai.OpenAI(api_key=api_key, timeout=60.0)
+
+    # Create context for tracking
+    context = AIRequestContext(
+        user_id=user_id,
+        feature_name="youtube_parse_transcript",
+        custom_properties={"model": "gpt-4o-mini"},
+    )
+
+    try:
+        client = AIClientFactory.create_openai_client(context=context)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
     # Build duration context for timestamp estimation
     duration_context = ""
@@ -156,7 +166,7 @@ Rules:
 
 Return ONLY the JSON, no other text."""
 
-    try:
+    def _make_api_call() -> Dict:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -167,22 +177,31 @@ Return ONLY the JSON, no other text."""
             response_format={"type": "json_object"},
             timeout=60.0
         )
-        
         result_text = response.choices[0].message.content
         return json.loads(result_text)
+
+    try:
+        return retry_sync_call(_make_api_call)
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to parse LLM response as JSON: {e}"
         )
     except Exception as e:
+        logger.error(f"OpenAI API call failed after retries: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"OpenAI API call failed: {e}"
         )
 
 
-def _parse_with_anthropic(transcript: str, title: str, video_duration_sec: Optional[int] = None, chapter_info: str = "") -> Dict:
+def _parse_with_anthropic(
+    transcript: str,
+    title: str,
+    video_duration_sec: Optional[int] = None,
+    chapter_info: str = "",
+    user_id: Optional[str] = None,
+) -> Dict:
     """Parse transcript using Anthropic Claude."""
     try:
         from anthropic import Anthropic
@@ -191,15 +210,18 @@ def _parse_with_anthropic(transcript: str, title: str, video_duration_sec: Optio
             status_code=500,
             detail="Anthropic library not installed. Run: pip install anthropic"
         )
-    
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="Anthropic API key not configured. Set ANTHROPIC_API_KEY environment variable."
-        )
-    
-    client = Anthropic(api_key=api_key, timeout=60.0)
+
+    # Create context for tracking
+    context = AIRequestContext(
+        user_id=user_id,
+        feature_name="youtube_parse_transcript_anthropic",
+        custom_properties={"model": "claude-3-5-sonnet-20241022"},
+    )
+
+    try:
+        client = AIClientFactory.create_anthropic_client(context=context)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
     # Build duration context for timestamp estimation
     duration_context = ""
@@ -278,7 +300,7 @@ Rules:
 
 Return ONLY the JSON, no markdown formatting, no code blocks, just pure JSON."""
 
-    try:
+    def _make_api_call() -> Dict:
         message = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
@@ -287,20 +309,23 @@ Return ONLY the JSON, no markdown formatting, no code blocks, just pure JSON."""
             ],
             temperature=0.1,
         )
-        
         result_text = message.content[0].text
-        
+
         # Extract JSON from response (Claude may add markdown formatting)
         json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
         if json_match:
             return json.loads(json_match.group(0))
         return json.loads(result_text)
+
+    try:
+        return retry_sync_call(_make_api_call)
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to parse LLM response as JSON: {e}"
         )
     except Exception as e:
+        logger.error(f"Anthropic API call failed after retries: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Anthropic API call failed: {e}"

@@ -1,0 +1,50 @@
+name: Nightly E2E Tests
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 4 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    environment: staging  # Use staging secrets
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run E2E Helicone tests
+        run: |
+          pytest tests/ai/test_helicone_e2e.py -v \
+            -m "slow or e2e" \
+            --tb=long
+        env:
+          RUN_E2E_TESTS: "true"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HELICONE_ENABLED: "true"
+          HELICONE_API_KEY: ${{ secrets.HELICONE_API_KEY }}
+          ENVIRONMENT: staging
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Nightly E2E tests failed for workout-ingestor-api. Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true  # Don't fail the job if Slack notification fails

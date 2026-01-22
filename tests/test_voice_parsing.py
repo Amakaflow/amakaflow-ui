@@ -44,16 +44,21 @@ def mock_openai_voice_response():
 
 @pytest.fixture
 def mock_openai_voice_client(mock_openai_voice_response):
-    """Mock the OpenAI client for voice parsing tests."""
-    with patch("workout_ingestor_api.services.voice_parsing_service.OpenAI") as mock_class:
-        mock_instance = MagicMock()
+    """Mock the AIClientFactory for voice parsing tests.
+
+    After the Helicone integration (PR #34), the voice parsing service
+    now uses AIClientFactory.create_openai_client() instead of directly
+    instantiating the OpenAI client.
+    """
+    with patch("workout_ingestor_api.services.voice_parsing_service.AIClientFactory") as mock_factory:
+        mock_client = MagicMock()
         mock_choice = MagicMock()
         mock_choice.message.content = json.dumps(mock_openai_voice_response)
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
-        mock_instance.chat.completions.create.return_value = mock_response
-        mock_class.return_value = mock_instance
-        yield mock_instance
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_factory.create_openai_client.return_value = mock_client
+        yield mock_client
 
 
 @pytest.fixture
@@ -135,14 +140,14 @@ class TestParseVoiceEndpoint:
             "suggestions": ["Rest periods estimated at 90 seconds"],
         }
 
-        with patch("workout_ingestor_api.services.voice_parsing_service.OpenAI") as mock_class:
-            mock_instance = MagicMock()
+        with patch("workout_ingestor_api.services.voice_parsing_service.AIClientFactory") as mock_factory:
+            mock_client = MagicMock()
             mock_choice = MagicMock()
             mock_choice.message.content = json.dumps(strength_response)
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
-            mock_instance.chat.completions.create.return_value = mock_response
-            mock_class.return_value = mock_instance
+            mock_client.chat.completions.create.return_value = mock_response
+            mock_factory.create_openai_client.return_value = mock_client
 
             response = client.post(
                 "/workouts/parse-voice",
@@ -250,14 +255,14 @@ class TestVoiceParsingService:
 
 Let me know if you need any adjustments!"""
 
-        with patch("workout_ingestor_api.services.voice_parsing_service.OpenAI") as mock_class:
-            mock_instance = MagicMock()
+        with patch("workout_ingestor_api.services.voice_parsing_service.AIClientFactory") as mock_factory:
+            mock_client = MagicMock()
             mock_choice = MagicMock()
             mock_choice.message.content = markdown_response
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
-            mock_instance.chat.completions.create.return_value = mock_response
-            mock_class.return_value = mock_instance
+            mock_client.chat.completions.create.return_value = mock_response
+            mock_factory.create_openai_client.return_value = mock_client
 
             from workout_ingestor_api.services.voice_parsing_service import (
                 VoiceParsingService,
@@ -277,14 +282,14 @@ Let me know if you need any adjustments!"""
         """Test that service handles invalid JSON response gracefully."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
 
-        with patch("workout_ingestor_api.services.voice_parsing_service.OpenAI") as mock_class:
-            mock_instance = MagicMock()
+        with patch("workout_ingestor_api.services.voice_parsing_service.AIClientFactory") as mock_factory:
+            mock_client = MagicMock()
             mock_choice = MagicMock()
             mock_choice.message.content = "This is not valid JSON at all"
             mock_response = MagicMock()
             mock_response.choices = [mock_choice]
-            mock_instance.chat.completions.create.return_value = mock_response
-            mock_class.return_value = mock_instance
+            mock_client.chat.completions.create.return_value = mock_response
+            mock_factory.create_openai_client.return_value = mock_client
 
             from workout_ingestor_api.services.voice_parsing_service import (
                 VoiceParsingService,

@@ -1,9 +1,15 @@
 """Automatic Speech Recognition (ASR) service for video transcripts."""
-import os
+import logging
 import subprocess
 import tempfile
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from fastapi import HTTPException
+
+from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+
+
+logger = logging.getLogger(__name__)
 
 # Optional dependencies
 try:
@@ -147,7 +153,8 @@ class ASRService:
     @staticmethod
     def transcribe_with_openai_api(
         audio_path: str,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict:
         """
         Transcribe audio using OpenAI's Whisper API (cloud).
@@ -157,7 +164,8 @@ class ASRService:
 
         Args:
             audio_path: Path to audio file (mp3, mp4, wav, m4a, webm supported)
-            api_key: OpenAI API key (uses OPENAI_API_KEY env var if not provided)
+            api_key: OpenAI API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
 
         Returns:
             Dict with transcript text
@@ -170,29 +178,35 @@ class ASRService:
                 detail="OpenAI library not installed. Run: pip install openai"
             )
 
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(
-                status_code=500,
-                detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
-            )
-
-        client = openai.OpenAI(api_key=api_key)
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="asr_whisper_api",
+            custom_properties={"model": "whisper-1"},
+        )
 
         try:
+            client = AIClientFactory.create_openai_client(context=context)
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        def _make_api_call() -> Dict:
             with open(audio_path, "rb") as audio_file:
                 response = client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file,
                     response_format="text"
                 )
-
             return {
                 "text": response,
                 "segments": [],
                 "language": "en",
             }
+
+        try:
+            return retry_sync_call(_make_api_call)
         except Exception as e:
+            logger.error(f"OpenAI Whisper API transcription failed after retries: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"OpenAI Whisper API transcription failed: {e}"

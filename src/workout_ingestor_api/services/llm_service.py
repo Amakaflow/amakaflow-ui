@@ -1,10 +1,14 @@
 """LLM service for structuring workout text into canonical JSON format."""
-import os
 import json
+import logging
 import re
 from typing import Dict, Optional
 from fastapi import HTTPException
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+
+
+logger = logging.getLogger(__name__)
 
 # Optional dependencies
 try:
@@ -95,16 +99,18 @@ Return ONLY valid JSON, no additional text."""
     def structure_with_openai(
         text: str,
         model: str = "gpt-4o-mini",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict:
         """
         Structure workout text using OpenAI API.
-        
+
         Args:
             text: Fused workout text
             model: OpenAI model to use
-            api_key: OpenAI API key (or use OPENAI_API_KEY env var)
-            
+            api_key: OpenAI API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
+
         Returns:
             Structured workout JSON
         """
@@ -113,17 +119,20 @@ Return ONLY valid JSON, no additional text."""
                 status_code=500,
                 detail="OpenAI library not installed. Run: pip install openai"
             )
-        
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(
-                status_code=500,
-                detail="OpenAI API key not provided. Set OPENAI_API_KEY environment variable."
-            )
-        
-        client = openai.OpenAI(api_key=api_key, timeout=60.0)  # 60 second timeout
-        
+
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="llm_structure_workout",
+            custom_properties={"model": model},
+        )
+
         try:
+            client = AIClientFactory.create_openai_client(context=context)
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        def _make_api_call() -> Dict:
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -134,10 +143,13 @@ Return ONLY valid JSON, no additional text."""
                 response_format={"type": "json_object"},
                 timeout=60.0  # 60 second timeout
             )
-            
             result_text = response.choices[0].message.content
             return json.loads(result_text)
+
+        try:
+            return retry_sync_call(_make_api_call)
         except Exception as e:
+            logger.error(f"OpenAI API call failed after retries: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"OpenAI API call failed: {e}"
@@ -147,16 +159,18 @@ Return ONLY valid JSON, no additional text."""
     def structure_with_anthropic(
         text: str,
         model: str = "claude-3-5-sonnet-20241022",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict:
         """
         Structure workout text using Anthropic Claude API.
-        
+
         Args:
             text: Fused workout text
             model: Claude model to use
-            api_key: Anthropic API key (or use ANTHROPIC_API_KEY env var)
-            
+            api_key: Anthropic API key (deprecated, uses config)
+            user_id: Optional user ID for tracking
+
         Returns:
             Structured workout JSON
         """
@@ -165,17 +179,20 @@ Return ONLY valid JSON, no additional text."""
                 status_code=500,
                 detail="Anthropic library not installed. Run: pip install anthropic"
             )
-        
-        api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise HTTPException(
-                status_code=500,
-                detail="Anthropic API key not provided. Set ANTHROPIC_API_KEY environment variable."
-            )
-        
-        client = Anthropic(api_key=api_key, timeout=60.0)  # 60 second timeout
-        
+
+        # Create context for tracking
+        context = AIRequestContext(
+            user_id=user_id,
+            feature_name="llm_structure_workout",
+            custom_properties={"model": model},
+        )
+
         try:
+            client = AIClientFactory.create_anthropic_client(context=context)
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        def _make_api_call() -> Dict:
             message = client.messages.create(
                 model=model,
                 max_tokens=4096,
@@ -184,14 +201,17 @@ Return ONLY valid JSON, no additional text."""
                 ],
                 temperature=0.1,
             )
-            
             result_text = message.content[0].text
             # Extract JSON from response (Claude may add markdown formatting)
             json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return json.loads(result_text)
+
+        try:
+            return retry_sync_call(_make_api_call)
         except Exception as e:
+            logger.error(f"Anthropic API call failed after retries: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Anthropic API call failed: {e}"

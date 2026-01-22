@@ -38,6 +38,10 @@ PyJWT>=2.8.0  # JWT validation for Clerk authentication
 # Error tracking (AMA-225)
 sentry-sdk[fastapi]>=2.0.0
 
+# AI Gateway integration (AMA-405)
+tenacity>=8.2.0  # Retry with exponential backoff for AI calls
+anthropic>=0.40.0  # Anthropic Claude API (official dependency)
+
 # Cloud transcription providers (AMA-229)
 deepgram-sdk>=3.0.0  # Deepgram Nova-3 for cloud transcription
 assemblyai>=0.23.0   # AssemblyAI Universal for cloud transcription
