@@ -58,7 +58,7 @@ jobs:
       - name: Push migrations to staging
         run: |
           echo "📦 Pushing migrations to staging database..."
-          supabase db push
+          supabase db push --include-all
           echo "✅ Migrations applied successfully"
 
       - name: Show migration status
