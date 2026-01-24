@@ -478,9 +478,6 @@ export const progressionApi = new ProgressionApiClient();
 // Export class for testing
 export { ProgressionApiClient };
 
-// Export error class for type checking in consumers
-export { ProgressionApiError };
-
 // Re-export types for convenience
 export type {
   ExerciseHistory,

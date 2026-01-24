@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle, TrendingUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,7 @@ import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
 import { BulkImport } from './components/BulkImport';
 import { HelpPage } from './components/help/HelpPage';
+import { ExerciseHistory } from './components/ExerciseHistory';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
@@ -53,7 +54,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history';
 
 export default function App() {
   // Clerk authentication
@@ -1465,6 +1466,20 @@ export default function App() {
                   Analytics
                 </Button>
                 <Button
+                  variant={currentView === 'exercise-history' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setCurrentView('exercise-history');
+                    });
+                  }}
+                  className="gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  History
+                </Button>
+                <Button
                   variant={currentView === 'team' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1755,6 +1770,10 @@ export default function App() {
               <p className="text-muted-foreground">Please sign in to view analytics</p>
             </div>
           )
+        )}
+
+        {currentView === 'exercise-history' && user && (
+          <ExerciseHistory user={user} />
         )}
 
         {currentView === 'team' && (
