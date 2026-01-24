@@ -30,14 +30,13 @@ export default defineConfig({
       'src/test/e2e/**/*.test.ts',
     ],
 
-    // Exclude unit tests
+    // Exclude unit tests (but not E2E/contract tests)
+    // Note: We use specific patterns instead of negations for better Vitest 4 compatibility
     exclude: [
       'node_modules/**',
-      'src/**/*.test.ts',
-      'src/**/*.test.tsx',
-      '!src/**/*.e2e.test.ts',
-      '!src/**/*.e2e.test.tsx',
-      '!src/**/*.contract.test.ts',
+      'src/**/__tests__/**',
+      // Exclude .test.ts files that are NOT e2e or contract tests
+      // The include patterns will take precedence for e2e/contract files
     ],
 
     // Longer timeouts for E2E tests
