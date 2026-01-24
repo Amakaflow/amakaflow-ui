@@ -85,7 +85,14 @@ function SessionRow({ session }: { session: Session }) {
         data-testid={`session-row-${session.completionId}`}
       >
         <TableCell>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" data-testid={`session-expand-${session.completionId}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            aria-label={expanded ? 'Collapse session details' : 'Expand session details'}
+            aria-expanded={expanded}
+            data-testid={`session-expand-${session.completionId}`}
+          >
             {expanded ? (
               <ChevronDown className="h-4 w-4" />
             ) : (

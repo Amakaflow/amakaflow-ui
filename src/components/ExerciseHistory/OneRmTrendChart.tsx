@@ -50,6 +50,15 @@ function formatDateLong(dateStr: string): string {
   });
 }
 
+interface TooltipPayload {
+  payload: ChartDataPoint;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+}
+
 function prepareChartData(sessions: Session[]): ChartDataPoint[] {
   // Reverse to show oldest first (left to right chronologically)
   const reversed = [...sessions].reverse();
@@ -65,10 +74,10 @@ function prepareChartData(sessions: Session[]): ChartDataPoint[] {
     }));
 }
 
-function CustomTooltip({ active, payload }: any) {
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
 
-  const data = payload[0].payload as ChartDataPoint;
+  const data = payload[0].payload;
 
   return (
     <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
@@ -131,7 +140,7 @@ export function OneRmTrendChart({
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const padding = Math.max(10, (maxValue - minValue) * 0.1);
-  const yMin = Math.floor((minValue - padding) / 5) * 5;
+  const yMin = Math.max(0, Math.floor((minValue - padding) / 5) * 5);
   const yMax = Math.ceil((maxValue + padding) / 5) * 5;
 
   return (
