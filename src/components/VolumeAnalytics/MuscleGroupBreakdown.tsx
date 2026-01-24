@@ -4,7 +4,7 @@
  * Part of AMA-483: Volume Analytics Dashboard
  */
 
-import { ArrowUp, ArrowDown, Minus, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
 import {
@@ -16,7 +16,8 @@ import {
   TableRow,
 } from '../ui/table';
 import { Progress } from '../ui/progress';
-import { getMuscleGroupDisplayName, getMuscleGroupColor } from './constants';
+import { getMuscleGroupDisplayName, getMuscleGroupColor, formatVolume } from './constants';
+import { ChangeIndicator } from './ChangeIndicator';
 
 interface MuscleGroupBreakdownProps {
   current: Record<string, number> | null;
@@ -32,16 +33,6 @@ interface MuscleGroupRow {
   percentage: number;
   change: number | null;
   color: string;
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`;
-  }
-  if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`;
-  }
-  return volume.toLocaleString();
 }
 
 function calculateChange(current: number, previous: number): number | null {
@@ -65,29 +56,6 @@ function prepareRows(
       color: getMuscleGroupColor(muscleGroup),
     }))
     .sort((a, b) => b.volume - a.volume);
-}
-
-function ChangeIndicator({ change }: { change: number | null }) {
-  if (change === null) {
-    return <span className="text-muted-foreground">-</span>;
-  }
-
-  const isPositive = change > 0;
-  const isNegative = change < 0;
-  const absChange = Math.abs(change);
-
-  return (
-    <span
-      className={`flex items-center gap-1 ${
-        isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'
-      }`}
-    >
-      {isPositive && <ArrowUp className="w-3 h-3" />}
-      {isNegative && <ArrowDown className="w-3 h-3" />}
-      {!isPositive && !isNegative && <Minus className="w-3 h-3" />}
-      {absChange > 0 ? `${absChange.toFixed(0)}%` : '-'}
-    </span>
-  );
 }
 
 export function MuscleGroupBreakdown({
@@ -153,8 +121,17 @@ export function MuscleGroupBreakdown({
             {rows.map((row) => (
               <TableRow
                 key={row.muscleGroup}
-                className={onMuscleGroupClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+                className={onMuscleGroupClick ? 'cursor-pointer hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none' : ''}
+                tabIndex={onMuscleGroupClick ? 0 : undefined}
+                role={onMuscleGroupClick ? 'button' : undefined}
+                aria-label={onMuscleGroupClick ? `View ${row.displayName} exercises` : undefined}
                 onClick={onMuscleGroupClick ? () => onMuscleGroupClick(row.muscleGroup) : undefined}
+                onKeyDown={onMuscleGroupClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onMuscleGroupClick(row.muscleGroup);
+                  }
+                } : undefined}
                 data-testid={`muscle-group-row-${row.muscleGroup}`}
               >
                 <TableCell>

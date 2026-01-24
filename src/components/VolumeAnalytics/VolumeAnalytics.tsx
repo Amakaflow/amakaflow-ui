@@ -11,8 +11,8 @@
  * - Muscle group breakdown with drill-down
  */
 
-import { useState } from 'react';
-import { BarChart3, Dumbbell } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { BarChart3 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { PeriodSelector, getPeriodDates, type VolumePeriod } from './PeriodSelector';
 import { VolumeSummaryCards } from './VolumeSummaryCards';
@@ -23,6 +23,7 @@ import { ExerciseDrillDown } from './ExerciseDrillDown';
 import { useVolumeAnalytics } from '../../hooks/useProgressionApi';
 
 interface VolumeAnalyticsProps {
+  /** User context - reserved for future personalization features */
   user: {
     id: string;
     name: string;
@@ -50,13 +51,16 @@ function EmptyState() {
   );
 }
 
-export function VolumeAnalytics({ user }: VolumeAnalyticsProps) {
+export function VolumeAnalytics({ user: _user }: VolumeAnalyticsProps) {
   const [period, setPeriod] = useState<VolumePeriod>('weekly');
   const [drillDownMuscleGroup, setDrillDownMuscleGroup] = useState<string | null>(null);
   const [drillDownOpen, setDrillDownOpen] = useState(false);
 
-  // Calculate date ranges for current and previous periods
-  const { current, previous, granularity } = getPeriodDates(period);
+  // Calculate date ranges for current and previous periods (memoized)
+  const { current, previous, granularity } = useMemo(
+    () => getPeriodDates(period),
+    [period]
+  );
 
   // Fetch volume analytics for current period
   const {

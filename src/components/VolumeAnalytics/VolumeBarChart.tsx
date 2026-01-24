@@ -18,7 +18,7 @@ import {
 import { BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
-import { getMuscleGroupDisplayName, getMuscleGroupColor } from './constants';
+import { getMuscleGroupDisplayName, getMuscleGroupColor, formatVolume } from './constants';
 import type { VolumeDataPoint, VolumeGranularity } from '../../types/progression';
 
 interface VolumeBarChartProps {
@@ -47,16 +47,6 @@ function formatPeriod(period: string, granularity: VolumeGranularity): string {
     default:
       return period;
   }
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`;
-  }
-  if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`;
-  }
-  return volume.toLocaleString();
 }
 
 function prepareChartData(data: VolumeDataPoint[], granularity: VolumeGranularity): {

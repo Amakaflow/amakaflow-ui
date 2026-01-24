@@ -11,6 +11,7 @@ export { VolumeBarChart } from './VolumeBarChart';
 export { BalanceIndicators } from './BalanceIndicators';
 export { MuscleGroupBreakdown } from './MuscleGroupBreakdown';
 export { ExerciseDrillDown } from './ExerciseDrillDown';
+export { ChangeIndicator } from './ChangeIndicator';
 export {
   PUSH_MUSCLES,
   PULL_MUSCLES,
@@ -19,6 +20,7 @@ export {
   CORE_MUSCLES,
   getMuscleGroupDisplayName,
   getMuscleGroupColor,
+  formatVolume,
   isPushMuscle,
   isPullMuscle,
   isUpperMuscle,

@@ -4,9 +4,11 @@
  * Part of AMA-483: Volume Analytics Dashboard
  */
 
-import { ArrowUp, ArrowDown, Minus, Weight, Layers, Hash, Target } from 'lucide-react';
+import { Weight, Layers, Hash, Target } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
+import { formatVolume } from './constants';
+import { ChangeIndicator } from './ChangeIndicator';
 import type { VolumeSummary } from '../../types/progression';
 
 interface VolumeSummaryCardsProps {
@@ -15,43 +17,9 @@ interface VolumeSummaryCardsProps {
   isLoading?: boolean;
 }
 
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`;
-  }
-  if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`;
-  }
-  return volume.toLocaleString();
-}
-
 function calculatePercentChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null;
   return ((current - previous) / previous) * 100;
-}
-
-function ChangeIndicator({ change }: { change: number | null }) {
-  if (change === null) {
-    return <Minus className="w-3 h-3 text-muted-foreground" />;
-  }
-
-  const isPositive = change > 0;
-  const isNegative = change < 0;
-  const absChange = Math.abs(change);
-
-  return (
-    <span
-      className={`flex items-center gap-1 text-xs ${
-        isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'
-      }`}
-      data-testid="change-indicator"
-    >
-      {isPositive && <ArrowUp className="w-3 h-3" />}
-      {isNegative && <ArrowDown className="w-3 h-3" />}
-      {!isPositive && !isNegative && <Minus className="w-3 h-3" />}
-      {absChange > 0 ? `${absChange.toFixed(0)}%` : '-'}
-    </span>
-  );
 }
 
 export function VolumeSummaryCards({ current, previous, isLoading }: VolumeSummaryCardsProps) {

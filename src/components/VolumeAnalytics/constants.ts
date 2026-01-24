@@ -142,6 +142,19 @@ export const MUSCLE_GROUP_COLORS: Record<string, string> = {
 };
 
 /**
+ * Format volume with K/M suffixes for compact display.
+ */
+export function formatVolume(volume: number): string {
+  if (volume >= 1000000) {
+    return `${(volume / 1000000).toFixed(1)}M`;
+  }
+  if (volume >= 1000) {
+    return `${(volume / 1000).toFixed(1)}K`;
+  }
+  return volume.toLocaleString();
+}
+
+/**
  * Get display name for a muscle group.
  */
 export function getMuscleGroupDisplayName(muscleGroup: string): string {
@@ -177,32 +190,36 @@ export function getMuscleGroupColor(muscleGroup: string): string {
 
 /**
  * Check if a muscle group is a push muscle.
+ * Uses substring matching to handle variations (e.g., "chest_muscles" matches "chest").
  */
 export function isPushMuscle(muscleGroup: string): boolean {
   const normalized = muscleGroup.toLowerCase().replace(/\s+/g, '_');
-  return PUSH_MUSCLES.some(m => normalized.includes(m) || m.includes(normalized));
+  return PUSH_MUSCLES.some(m => normalized.includes(m));
 }
 
 /**
  * Check if a muscle group is a pull muscle.
+ * Uses substring matching to handle variations.
  */
 export function isPullMuscle(muscleGroup: string): boolean {
   const normalized = muscleGroup.toLowerCase().replace(/\s+/g, '_');
-  return PULL_MUSCLES.some(m => normalized.includes(m) || m.includes(normalized));
+  return PULL_MUSCLES.some(m => normalized.includes(m));
 }
 
 /**
  * Check if a muscle group is an upper body muscle.
+ * Uses substring matching to handle variations.
  */
 export function isUpperMuscle(muscleGroup: string): boolean {
   const normalized = muscleGroup.toLowerCase().replace(/\s+/g, '_');
-  return UPPER_MUSCLES.some(m => normalized.includes(m) || m.includes(normalized));
+  return UPPER_MUSCLES.some(m => normalized.includes(m));
 }
 
 /**
  * Check if a muscle group is a lower body muscle.
+ * Uses substring matching to handle variations.
  */
 export function isLowerMuscle(muscleGroup: string): boolean {
   const normalized = muscleGroup.toLowerCase().replace(/\s+/g, '_');
-  return LOWER_MUSCLES.some(m => normalized.includes(m) || m.includes(normalized));
+  return LOWER_MUSCLES.some(m => normalized.includes(m));
 }

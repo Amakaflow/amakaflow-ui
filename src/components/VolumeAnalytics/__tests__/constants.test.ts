@@ -12,6 +12,7 @@ import {
   LOWER_MUSCLES,
   getMuscleGroupDisplayName,
   getMuscleGroupColor,
+  formatVolume,
   isPushMuscle,
   isPullMuscle,
   isUpperMuscle,
@@ -198,5 +199,30 @@ describe('isLowerMuscle', () => {
   it('handles aliases', () => {
     expect(isLowerMuscle('quads')).toBe(true);
     expect(isLowerMuscle('gluteus')).toBe(true);
+  });
+});
+
+// =============================================================================
+// formatVolume Tests
+// =============================================================================
+
+describe('formatVolume', () => {
+  it('formats small values without suffix', () => {
+    expect(formatVolume(0)).toBe('0');
+    expect(formatVolume(500)).toBe('500');
+    expect(formatVolume(999)).toBe('999');
+  });
+
+  it('formats thousands with K suffix', () => {
+    expect(formatVolume(1000)).toBe('1.0K');
+    expect(formatVolume(5500)).toBe('5.5K');
+    expect(formatVolume(10000)).toBe('10.0K');
+    expect(formatVolume(999999)).toBe('1000.0K');
+  });
+
+  it('formats millions with M suffix', () => {
+    expect(formatVolume(1000000)).toBe('1.0M');
+    expect(formatVolume(2500000)).toBe('2.5M');
+    expect(formatVolume(10000000)).toBe('10.0M');
   });
 });

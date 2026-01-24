@@ -23,7 +23,7 @@ import {
 } from '../ui/table';
 import { Badge } from '../ui/badge';
 import { useVolumeAnalytics } from '../../hooks/useProgressionApi';
-import { getMuscleGroupDisplayName, getMuscleGroupColor } from './constants';
+import { getMuscleGroupDisplayName, getMuscleGroupColor, formatVolume } from './constants';
 import type { VolumeGranularity } from '../../types/progression';
 
 interface ExerciseDrillDownProps {
@@ -35,16 +35,6 @@ interface ExerciseDrillDownProps {
   granularity: VolumeGranularity;
 }
 
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`;
-  }
-  if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`;
-  }
-  return volume.toLocaleString();
-}
-
 interface ExerciseData {
   exerciseName: string;
   totalVolume: number;
@@ -52,6 +42,14 @@ interface ExerciseData {
   totalReps: number;
 }
 
+/**
+ * Aggregates volume data by exercise.
+ *
+ * TODO(AMA-483): The current API returns data grouped by muscle group and period,
+ * not by individual exercises. This function currently shows aggregate totals
+ * under "All Exercises". When the API supports exercise-level granularity,
+ * update this function to properly group by exercise name.
+ */
 function aggregateByExercise(data: Array<{
   period: string;
   muscleGroup: string;
@@ -59,14 +57,10 @@ function aggregateByExercise(data: Array<{
   totalSets: number;
   totalReps: number;
 }>): ExerciseData[] {
-  // Return empty array if no data
   if (!data || data.length === 0) {
     return [];
   }
 
-  // The API returns data grouped by muscle group and period
-  // For now, we'll show the aggregate data
-  // In a real implementation, you might want to fetch exercise-level data
   const aggregate: ExerciseData = {
     exerciseName: 'All Exercises',
     totalVolume: data.reduce((sum, d) => sum + d.totalVolume, 0),

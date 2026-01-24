@@ -260,9 +260,9 @@ describe('MuscleGroupBreakdown change indicators', () => {
       />
     );
 
-    // Should show "-" for all change columns
-    const dashes = screen.getAllByText('-');
-    expect(dashes.length).toBeGreaterThan(0);
+    // Should show change indicators (with minus icons) for all rows
+    const changeIndicators = screen.getAllByTestId('change-indicator');
+    expect(changeIndicators.length).toBeGreaterThan(0);
   });
 
   it('handles new muscle group not in previous period', () => {

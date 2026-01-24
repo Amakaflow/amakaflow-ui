@@ -8,7 +8,7 @@ import { Scale, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Badge } from '../ui/badge';
-import { isPushMuscle, isPullMuscle, isUpperMuscle, isLowerMuscle } from './constants';
+import { isPushMuscle, isPullMuscle, isUpperMuscle, isLowerMuscle, formatVolume } from './constants';
 
 interface BalanceIndicatorsProps {
   muscleGroupBreakdown: Record<string, number> | null;
@@ -79,16 +79,6 @@ function calculateRatio(
   return { ratio, groupA, groupB };
 }
 
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `${(volume / 1000000).toFixed(1)}M`;
-  }
-  if (volume >= 1000) {
-    return `${(volume / 1000).toFixed(1)}K`;
-  }
-  return volume.toLocaleString();
-}
-
 interface BalanceGaugeProps {
   ratio: number;
   leftLabel: string;
@@ -106,6 +96,8 @@ function BalanceGauge({ ratio, leftLabel, rightLabel, leftVolume, rightVolume }:
   const clampedRatio = Math.max(0.5, Math.min(1.5, ratio));
   const position = ((clampedRatio - 0.5) / 1) * 100;
 
+  const statusLabel = getStatusLabel(status);
+
   return (
     <div className="space-y-3">
       <div className="flex justify-between text-sm">
@@ -119,14 +111,23 @@ function BalanceGauge({ ratio, leftLabel, rightLabel, leftVolume, rightVolume }:
         </div>
       </div>
 
-      <div className="relative">
+      <div
+        className="relative"
+        role="meter"
+        aria-label={`${leftLabel} to ${rightLabel} balance ratio`}
+        aria-valuenow={ratio}
+        aria-valuemin={0.5}
+        aria-valuemax={1.5}
+        aria-valuetext={`${ratio.toFixed(2)} to 1, ${statusLabel}`}
+      >
         {/* Background track */}
-        <div className="h-3 rounded-full bg-gradient-to-r from-red-200 via-green-200 to-red-200" />
+        <div className="h-3 rounded-full bg-gradient-to-r from-red-200 via-green-200 to-red-200" aria-hidden="true" />
 
         {/* Balanced zone indicator */}
         <div
           className="absolute top-0 h-3 bg-green-100/50"
           style={{ left: '30%', width: '40%' }}
+          aria-hidden="true"
         />
 
         {/* Position indicator */}
@@ -134,10 +135,11 @@ function BalanceGauge({ ratio, leftLabel, rightLabel, leftVolume, rightVolume }:
           className={`absolute top-0 h-3 w-3 rounded-full ${statusColor} border-2 border-white shadow-sm transition-all duration-300`}
           style={{ left: `calc(${position}% - 6px)` }}
           data-testid="balance-indicator"
+          aria-hidden="true"
         />
 
         {/* Center line */}
-        <div className="absolute top-0 left-1/2 h-3 w-0.5 bg-green-600 -translate-x-1/2" />
+        <div className="absolute top-0 left-1/2 h-3 w-0.5 bg-green-600 -translate-x-1/2" aria-hidden="true" />
       </div>
 
       <div className="flex justify-between items-center">
