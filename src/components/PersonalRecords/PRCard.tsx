@@ -7,22 +7,18 @@
  * date achieved, and "New PR" indicator for recent records.
  */
 
+import { KeyboardEvent } from 'react';
 import { Trophy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import type { PersonalRecord, RecordType } from '../../types/progression';
+import { RECORD_TYPE_LABELS } from './constants';
+import type { PersonalRecord } from '../../types/progression';
 
 interface PRCardProps {
   record: PersonalRecord;
   isRecent?: boolean;
   onClick?: () => void;
 }
-
-const RECORD_TYPE_LABELS: Record<RecordType, string> = {
-  '1rm': 'Est. 1RM',
-  'max_weight': 'Max Weight',
-  'max_reps': 'Max Reps',
-};
 
 /**
  * Checks if a PR was achieved within the last 7 days.
@@ -58,17 +54,27 @@ export function PRCard({ record, isRecent, onClick }: PRCardProps) {
   const showNewPRBadge = isRecent ?? isRecentPR(record.achievedAt);
   const isClickable = !!onClick;
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick?.();
+    }
+  };
+
   return (
     <Card
       className={isClickable ? 'cursor-pointer hover:bg-accent/50 transition-colors' : undefined}
       onClick={onClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? handleKeyDown : undefined}
       data-testid="pr-card"
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium" data-testid="pr-exercise-name">
           {record.exerciseName}
         </CardTitle>
-        <Trophy className="w-4 h-4 text-amber-500" />
+        <Trophy className="w-4 h-4 text-amber-500" aria-hidden="true" />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold" data-testid="pr-value">

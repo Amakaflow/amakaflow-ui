@@ -6,7 +6,7 @@
  * Displays a filterable list of PRs with loading, error, and empty states.
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Skeleton } from '../ui/skeleton';
@@ -48,7 +48,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="pr-list-empty">
       <div className="rounded-full bg-muted p-4 mb-4">
-        <Trophy className="w-8 h-8 text-muted-foreground" />
+        <Trophy className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
       </div>
       <h3 className="text-lg font-semibold mb-1">No Personal Records Yet</h3>
       <p className="text-muted-foreground text-sm max-w-sm">
@@ -81,10 +81,7 @@ export function PRList({
     limit,
   });
 
-  const filteredRecords = useMemo(() => {
-    if (!data?.records) return [];
-    return data.records;
-  }, [data?.records]);
+  const records = data?.records ?? [];
 
   if (isLoading) {
     return (
@@ -107,12 +104,12 @@ export function PRList({
   return (
     <div className="space-y-4" data-testid="pr-list">
       {showFilter && <RecordTypeFilter value={filter} onChange={setFilter} />}
-      {filteredRecords.length === 0 ? (
+      {records.length === 0 ? (
         <EmptyState />
       ) : (
         <ScrollArea className="h-[400px]">
           <div className="space-y-3 pr-4">
-            {filteredRecords.map((record) => (
+            {records.map((record) => (
               <PRCard
                 key={`${record.exerciseId}-${record.recordType}`}
                 record={record}
