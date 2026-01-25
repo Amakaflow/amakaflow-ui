@@ -36,3 +36,4 @@ workout-ingestor-api/
 
 # Claude Code local settings
 .claude/
+program-api/
