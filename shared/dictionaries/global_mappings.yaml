@@ -4,4 +4,6 @@ popular_mappings:
     Deadlift: 1
   front squat:
     Dumbbell Front Squat: 3
+  test exercise:
+    Bench Press: 4
 note: Global exercise mapping popularity. Tracks how many users have chosen each mapping.
