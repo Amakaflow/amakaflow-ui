@@ -19,7 +19,12 @@ if root_str not in sys.path:
 
 from backend.main import create_app
 from backend.settings import Settings
-from api.deps import get_current_user, get_program_repo
+from api.deps import (
+    get_current_user,
+    get_exercise_repo,
+    get_program_repo,
+    get_template_repo,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -210,3 +215,94 @@ def client_with_seeded_repo(app, seeded_program_repo) -> Generator[TestClient, N
     app.dependency_overrides[get_program_repo] = lambda: seeded_program_repo
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Fake Repository Fixtures - AMA-462 Additions
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_template_repo():
+    """Create a fake template repository for testing."""
+    from tests.fakes import FakeTemplateRepository
+    repo = FakeTemplateRepository()
+    repo.seed_default_templates()
+    return repo
+
+
+@pytest.fixture
+def fake_exercise_repo():
+    """Create a fake exercise repository for testing."""
+    from tests.fakes import FakeExerciseRepository
+    repo = FakeExerciseRepository()
+    repo.seed_default_exercises()
+    return repo
+
+
+@pytest.fixture
+def fake_llm_selector():
+    """Create a fake LLM selector for testing."""
+    from tests.fakes import FakeExerciseSelector
+    return FakeExerciseSelector()
+
+
+@pytest.fixture
+def client_with_all_fakes(
+    app,
+    fake_program_repo,
+    fake_template_repo,
+    fake_exercise_repo,
+) -> Generator[TestClient, None, None]:
+    """TestClient with all fake repositories injected."""
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_program_repo] = lambda: fake_program_repo
+    app.dependency_overrides[get_template_repo] = lambda: fake_template_repo
+    app.dependency_overrides[get_exercise_repo] = lambda: fake_exercise_repo
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Service Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def periodization_service():
+    """Create a PeriodizationService for testing."""
+    from services.periodization import PeriodizationService
+    return PeriodizationService()
+
+
+@pytest.fixture
+def program_validator():
+    """Create a ProgramValidator for testing."""
+    from services.program_validator import ProgramValidator
+    return ProgramValidator()
+
+
+@pytest.fixture
+def template_selector(fake_template_repo):
+    """Create a TemplateSelector with fake repository."""
+    from services.template_selector import TemplateSelector
+    return TemplateSelector(fake_template_repo)
+
+
+@pytest.fixture
+def program_generator(
+    fake_program_repo,
+    fake_template_repo,
+    fake_exercise_repo,
+    fake_llm_selector,
+):
+    """Create a ProgramGenerator with all fakes."""
+    from services.program_generator import ProgramGenerator
+    gen = ProgramGenerator(
+        program_repo=fake_program_repo,
+        template_repo=fake_template_repo,
+        exercise_repo=fake_exercise_repo,
+        openai_api_key=None,
+    )
+    gen._exercise_selector = fake_llm_selector
+    return gen

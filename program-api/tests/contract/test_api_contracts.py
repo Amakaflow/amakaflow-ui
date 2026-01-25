@@ -137,16 +137,20 @@ class TestProgramsDeleteContract:
 class TestGenerationContract:
     """Contract tests for POST /generate."""
 
-    def test_generate_stub_returns_501(self, client, sample_generation_request):
-        """Generate endpoint stub returns 501 Not Implemented."""
-        response = client.post("/generate", json=sample_generation_request)
+    def test_generate_returns_success(self, client_with_all_fakes, sample_generation_request):
+        """Generate endpoint returns success with program."""
+        response = client_with_all_fakes.post("/generate", json=sample_generation_request)
 
-        assert response.status_code == 501
-        assert_error_response(response.json(), expected_detail="Not implemented")
+        # Endpoint is now implemented, returns 200 or 201
+        assert response.status_code in [200, 201]
+        data = response.json()
+        assert "program" in data
+        assert "generation_metadata" in data
+        assert "suggestions" in data
 
-    def test_generate_validation_error_shape(self, client):
+    def test_generate_validation_error_shape(self, client_with_all_fakes):
         """Validation errors have correct shape."""
-        response = client.post("/generate", json={})
+        response = client_with_all_fakes.post("/generate", json={})
 
         assert response.status_code == 422
         data = response.json()

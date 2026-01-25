@@ -2,14 +2,15 @@
 Service unit tests.
 
 Part of AMA-461: Create program-api service scaffold
+Updated in AMA-462: Full implementation tests
 
-Tests service layer logic (stubs for now, will be expanded as services are implemented).
+Tests service layer logic.
 """
 
 import pytest
 
 from services.program_generator import ProgramGenerator
-from services.periodization import PeriodizationService
+from services.periodization import PeriodizationService, PeriodizationModel
 from services.progression_engine import ProgressionEngine
 from models.program import ProgramGoal, ExperienceLevel
 from models.generation import GenerateProgramRequest
@@ -24,48 +25,64 @@ from models.generation import GenerateProgramRequest
 class TestProgramGenerator:
     """Tests for ProgramGenerator service."""
 
-    def test_initialization_without_keys(self):
-        """Generator can be initialized without API keys."""
-        generator = ProgramGenerator()
-        assert generator._openai_key is None
-        assert generator._anthropic_key is None
-
-    def test_initialization_with_keys(self):
-        """Generator can be initialized with API keys."""
+    def test_initialization_with_repositories(
+        self, fake_program_repo, fake_template_repo, fake_exercise_repo
+    ):
+        """Generator can be initialized with repositories."""
         generator = ProgramGenerator(
-            openai_api_key="sk-test-openai",
-            anthropic_api_key="sk-test-anthropic",
+            program_repo=fake_program_repo,
+            template_repo=fake_template_repo,
+            exercise_repo=fake_exercise_repo,
         )
-        assert generator._openai_key == "sk-test-openai"
-        assert generator._anthropic_key == "sk-test-anthropic"
+        assert generator._program_repo is fake_program_repo
+        assert generator._template_repo is fake_template_repo
+        assert generator._exercise_repo is fake_exercise_repo
+
+    def test_initialization_with_api_key(
+        self, fake_program_repo, fake_template_repo, fake_exercise_repo
+    ):
+        """Generator can be initialized with OpenAI API key."""
+        generator = ProgramGenerator(
+            program_repo=fake_program_repo,
+            template_repo=fake_template_repo,
+            exercise_repo=fake_exercise_repo,
+            openai_api_key="sk-test-openai",
+        )
+        # Exercise selector should be created when API key provided
+        assert generator._exercise_selector is not None
 
     @pytest.mark.asyncio
-    async def test_generate_raises_not_implemented(self):
-        """Generate method raises NotImplementedError (stub)."""
-        generator = ProgramGenerator()
+    async def test_generate_returns_response(self, program_generator):
+        """Generate method returns a valid response."""
         request = GenerateProgramRequest(
             goal=ProgramGoal.STRENGTH,
-            duration_weeks=8,
-            sessions_per_week=4,
+            duration_weeks=4,
+            sessions_per_week=3,
             experience_level=ExperienceLevel.INTERMEDIATE,
+            equipment_available=["barbell", "dumbbells", "bench", "squat_rack"],
         )
 
-        with pytest.raises(NotImplementedError):
-            await generator.generate(request, "user-123")
+        response = await program_generator.generate(request, "user-123")
 
-    def test_select_exercises_raises_not_implemented(self):
-        """_select_exercises raises NotImplementedError (stub)."""
-        generator = ProgramGenerator()
+        assert response.program is not None
+        assert response.program.goal == ProgramGoal.STRENGTH
+        assert response.program.duration_weeks == 4
+        assert len(response.program.weeks) == 4
 
-        with pytest.raises(NotImplementedError):
-            generator._select_exercises("strength", ["barbell"], "intermediate")
+    @pytest.mark.asyncio
+    async def test_generate_persists_program(self, program_generator, fake_program_repo):
+        """Generate method persists the program."""
+        request = GenerateProgramRequest(
+            goal=ProgramGoal.HYPERTROPHY,
+            duration_weeks=4,
+            sessions_per_week=3,
+            experience_level=ExperienceLevel.BEGINNER,
+            equipment_available=["barbell", "dumbbells", "bench", "squat_rack"],
+        )
 
-    def test_create_weekly_structure_raises_not_implemented(self):
-        """_create_weekly_structure raises NotImplementedError (stub)."""
-        generator = ProgramGenerator()
-
-        with pytest.raises(NotImplementedError):
-            generator._create_weekly_structure(4, "strength")
+        assert fake_program_repo.count() == 0
+        await program_generator.generate(request, "user-123")
+        assert fake_program_repo.count() == 1
 
 
 # ---------------------------------------------------------------------------
@@ -82,37 +99,49 @@ class TestPeriodizationService:
         service = PeriodizationService()
         assert service is not None
 
-    def test_plan_progression_raises_not_implemented(self):
-        """plan_progression raises NotImplementedError (stub)."""
+    def test_plan_progression_returns_week_parameters(self):
+        """plan_progression returns week parameters for each week."""
         service = PeriodizationService()
 
-        with pytest.raises(NotImplementedError):
-            service.plan_progression(
-                duration_weeks=12,
-                goal=ProgramGoal.STRENGTH,
-                experience_level=ExperienceLevel.INTERMEDIATE,
-            )
+        result = service.plan_progression(
+            duration_weeks=8,
+            goal=ProgramGoal.STRENGTH,
+            experience_level=ExperienceLevel.INTERMEDIATE,
+        )
 
-    def test_calculate_deload_weeks_raises_not_implemented(self):
-        """calculate_deload_weeks raises NotImplementedError (stub)."""
+        assert len(result) == 8
+        for week_params in result:
+            assert hasattr(week_params, "intensity_percent")
+            assert hasattr(week_params, "volume_modifier")
+            assert hasattr(week_params, "is_deload")
+
+    def test_calculate_deload_weeks_returns_list(self):
+        """calculate_deload_weeks returns list of week numbers."""
         service = PeriodizationService()
 
-        with pytest.raises(NotImplementedError):
-            service.calculate_deload_weeks(
-                duration_weeks=12,
-                experience_level=ExperienceLevel.INTERMEDIATE,
-            )
+        result = service.calculate_deload_weeks(
+            duration_weeks=12,
+            experience_level=ExperienceLevel.INTERMEDIATE,
+        )
 
-    def test_get_intensity_target_raises_not_implemented(self):
-        """get_intensity_target raises NotImplementedError (stub)."""
+        assert isinstance(result, list)
+        # Intermediate should have deload every 4 weeks
+        assert 4 in result or 8 in result or 12 in result
+
+    def test_get_week_parameters_returns_valid_values(self):
+        """get_week_parameters returns intensity and volume."""
         service = PeriodizationService()
 
-        with pytest.raises(NotImplementedError):
-            service.get_intensity_target(
-                week_number=4,
-                total_weeks=12,
-                goal=ProgramGoal.STRENGTH,
-            )
+        result = service.get_week_parameters(
+            week=4,
+            total_weeks=12,
+            model=PeriodizationModel.LINEAR,
+            goal=ProgramGoal.STRENGTH,
+            experience_level=ExperienceLevel.INTERMEDIATE,
+        )
+
+        assert 0.0 <= result.intensity_percent <= 1.0
+        assert 0.0 <= result.volume_modifier <= 2.0
 
 
 # ---------------------------------------------------------------------------

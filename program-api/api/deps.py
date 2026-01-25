@@ -27,14 +27,19 @@ Testing:
     app.dependency_overrides[get_program_repo] = lambda: MockProgramRepository()
 """
 
+import os
 from functools import lru_cache
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
 from supabase import Client, create_client
 
-from application.ports import ProgramRepository
-from infrastructure.db import SupabaseProgramRepository
+from application.ports import ExerciseRepository, ProgramRepository, TemplateRepository
+from infrastructure.db import (
+    SupabaseExerciseRepository,
+    SupabaseProgramRepository,
+    SupabaseTemplateRepository,
+)
 from backend.settings import Settings, get_settings as _get_settings
 
 
@@ -125,6 +130,42 @@ def get_program_repo(
     return SupabaseProgramRepository(client)
 
 
+def get_template_repo(
+    client: Client = Depends(get_supabase_client_required),
+) -> TemplateRepository:
+    """
+    Get TemplateRepository implementation.
+
+    Returns a SupabaseTemplateRepository instance with injected client.
+    The return type is the Protocol to enable easy mocking.
+
+    Args:
+        client: Supabase client (injected)
+
+    Returns:
+        TemplateRepository: Repository for template access
+    """
+    return SupabaseTemplateRepository(client)
+
+
+def get_exercise_repo(
+    client: Client = Depends(get_supabase_client_required),
+) -> ExerciseRepository:
+    """
+    Get ExerciseRepository implementation.
+
+    Returns a SupabaseExerciseRepository instance with injected client.
+    The return type is the Protocol to enable easy mocking.
+
+    Args:
+        client: Supabase client (injected)
+
+    Returns:
+        ExerciseRepository: Repository for exercise data access
+    """
+    return SupabaseExerciseRepository(client)
+
+
 # =============================================================================
 # Authentication Providers
 # =============================================================================
@@ -147,7 +188,18 @@ async def get_current_user(
 
     Raises:
         HTTPException: 401 if authentication fails
+        RuntimeError: If auth stub is used in production
     """
+    # CRITICAL: Block production deployment with auth stub
+    # This ensures we don't accidentally deploy without proper auth
+    environment = os.environ.get("ENVIRONMENT", "development").lower()
+    if environment == "production":
+        raise RuntimeError(
+            "Authentication stub cannot be used in production. "
+            "Implement proper Clerk JWT validation before deploying. "
+            "See AMA-463 for auth implementation tracking."
+        )
+
     if not authorization:
         raise HTTPException(
             status_code=401,
@@ -163,7 +215,7 @@ async def get_current_user(
 
     token = authorization[7:]  # Remove "Bearer " prefix
 
-    # TODO: Implement proper Clerk JWT validation
+    # TODO: Implement proper Clerk JWT validation (AMA-463)
     # For now, this is a stub that will be replaced with real auth
     # The token should be validated against Clerk's JWKS
     if not token:
@@ -211,7 +263,9 @@ __all__ = [
     "get_supabase_client",
     "get_supabase_client_required",
     # Repositories
+    "get_exercise_repo",
     "get_program_repo",
+    "get_template_repo",
     # Authentication
     "get_current_user",
     "get_optional_user",

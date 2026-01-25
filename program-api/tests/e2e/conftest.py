@@ -2,12 +2,15 @@
 E2E test fixtures and configuration for program-api.
 
 Part of AMA-460: Training Programs Schema
+Updated in AMA-462: Added retry wrappers, nuclear cleanup, timeouts
 
 These fixtures provide:
 - Real Supabase client for database verification
 - HTTP client for API endpoint testing
 - Test user setup/teardown
 - Proper cleanup of test data after tests
+- Retry wrappers for transient failures
+- Nuclear cleanup for orphan data
 
 Run with:
     pytest -m e2e tests/e2e/ -v
@@ -15,18 +18,100 @@ Run with:
 """
 
 import os
+import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Generator, List, Optional
+from functools import wraps
+from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
 
 import httpx
 import pytest
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+# Try to import tenacity for retries, fallback to simple retry if not available
+try:
+    from tenacity import (
+        retry,
+        stop_after_attempt,
+        wait_exponential,
+        retry_if_exception_type,
+    )
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
+
 
 # Load environment variables from .env file
 load_dotenv()
+
+
+# =============================================================================
+# Retry Utilities
+# =============================================================================
+
+T = TypeVar("T")
+
+
+def with_retry(
+    max_attempts: int = 3,
+    min_wait: float = 1.0,
+    max_wait: float = 10.0,
+) -> Callable:
+    """
+    Decorator for retrying database operations on transient failures.
+
+    Uses tenacity if available, otherwise falls back to simple retry logic.
+    """
+    if TENACITY_AVAILABLE:
+        return retry(
+            stop=stop_after_attempt(max_attempts),
+            wait=wait_exponential(multiplier=1, min=min_wait, max=max_wait),
+            reraise=True,
+        )
+    else:
+        # Simple fallback retry decorator
+        def decorator(func: Callable[..., T]) -> Callable[..., T]:
+            @wraps(func)
+            def wrapper(*args, **kwargs) -> T:
+                last_exception = None
+                for attempt in range(max_attempts):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        last_exception = e
+                        if attempt < max_attempts - 1:
+                            wait_time = min(min_wait * (2 ** attempt), max_wait)
+                            time.sleep(wait_time)
+                raise last_exception
+            return wrapper
+        return decorator
+
+
+def poll_until(
+    condition: Callable[[], bool],
+    timeout: float = 30.0,
+    interval: float = 0.5,
+    description: str = "condition",
+) -> bool:
+    """
+    Poll until a condition is true or timeout is reached.
+
+    Args:
+        condition: Callable that returns True when condition is met
+        timeout: Maximum time to wait in seconds
+        interval: Time between polls in seconds
+        description: Description for error message
+
+    Returns:
+        True if condition was met, raises TimeoutError otherwise
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        if condition():
+            return True
+        time.sleep(interval)
+    raise TimeoutError(f"Timed out waiting for {description} after {timeout}s")
 
 
 # =============================================================================
@@ -415,3 +500,195 @@ def valid_experience_levels() -> List[str]:
 def valid_program_statuses() -> List[str]:
     """Valid program status values."""
     return ["draft", "active", "completed", "archived"]
+
+
+# =============================================================================
+# Nuclear Cleanup Fixtures (Belt and Suspenders)
+# =============================================================================
+
+
+@pytest.fixture(scope="session", autouse=True)
+def nuclear_cleanup_e2e_data(supabase_client: Client):
+    """
+    Nuclear cleanup - delete ALL e2e-prefixed data after test session.
+
+    This is a safeguard to ensure no orphan test data remains in the database
+    even if individual test cleanups fail.
+
+    Runs automatically at the end of every E2E test session.
+    """
+    yield  # Run all tests first
+
+    # Nuclear cleanup: delete all programs with e2e test user prefix
+    try:
+        result = supabase_client.table("training_programs").delete().like(
+            "user_id", "e2e-test-user-%"
+        ).execute()
+        if result.data:
+            print(f"\nNuclear cleanup: Removed {len(result.data)} orphan e2e programs")
+    except Exception as e:
+        print(f"\nWarning: Nuclear cleanup failed: {e}")
+
+
+# =============================================================================
+# Async HTTP Client Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+async def async_http_client(api_base_url: str):
+    """
+    Async HTTP client for concurrent API requests.
+
+    Useful for testing race conditions and parallel operations.
+    """
+    async with httpx.AsyncClient(base_url=api_base_url, timeout=30.0) as client:
+        yield client
+
+
+# =============================================================================
+# Retry-Wrapped Database Operations
+# =============================================================================
+
+
+@pytest.fixture
+def db_insert_with_retry(supabase_client: Client):
+    """
+    Insert data with automatic retry on transient failures.
+
+    Usage:
+        program = db_insert_with_retry("training_programs", data)
+    """
+    @with_retry(max_attempts=3, min_wait=1.0, max_wait=10.0)
+    def _insert(table: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        result = supabase_client.table(table).insert(data).execute()
+        return result.data[0]
+
+    return _insert
+
+
+@pytest.fixture
+def db_query_with_retry(supabase_client: Client):
+    """
+    Query data with automatic retry on transient failures.
+
+    Usage:
+        programs = db_query_with_retry("training_programs", {"user_id": user_id})
+    """
+    @with_retry(max_attempts=3, min_wait=1.0, max_wait=10.0)
+    def _query(table: str, filters: Dict[str, Any], select: str = "*") -> List[Dict]:
+        query = supabase_client.table(table).select(select)
+        for key, value in filters.items():
+            query = query.eq(key, value)
+        result = query.execute()
+        return result.data
+
+    return _query
+
+
+# =============================================================================
+# Polling Utilities for Async Operations
+# =============================================================================
+
+
+@pytest.fixture
+def wait_for_program(supabase_client: Client):
+    """
+    Wait for a program to exist in the database.
+
+    Useful after API calls that may have async processing.
+
+    Usage:
+        program = wait_for_program(program_id, timeout=30)
+    """
+    def _wait(program_id: str, timeout: float = 30.0) -> Dict[str, Any]:
+        def check_exists():
+            result = supabase_client.table("training_programs").select("*").eq(
+                "id", program_id
+            ).execute()
+            return len(result.data) > 0
+
+        poll_until(check_exists, timeout=timeout, description=f"program {program_id}")
+
+        result = supabase_client.table("training_programs").select("*").eq(
+            "id", program_id
+        ).execute()
+        return result.data[0]
+
+    return _wait
+
+
+@pytest.fixture
+def wait_for_program_status(supabase_client: Client):
+    """
+    Wait for a program to reach a specific status.
+
+    Usage:
+        program = wait_for_program_status(program_id, "active", timeout=30)
+    """
+    def _wait(
+        program_id: str,
+        target_status: str,
+        timeout: float = 30.0,
+    ) -> Dict[str, Any]:
+        def check_status():
+            result = supabase_client.table("training_programs").select("status").eq(
+                "id", program_id
+            ).execute()
+            return result.data and result.data[0].get("status") == target_status
+
+        poll_until(
+            check_status,
+            timeout=timeout,
+            description=f"program {program_id} status={target_status}",
+        )
+
+        result = supabase_client.table("training_programs").select("*").eq(
+            "id", program_id
+        ).execute()
+        return result.data[0]
+
+    return _wait
+
+
+# =============================================================================
+# Generation Request Factory
+# =============================================================================
+
+
+@pytest.fixture
+def generation_request_factory():
+    """
+    Factory for creating program generation request data.
+
+    Usage:
+        request = generation_request_factory(goal="strength", duration_weeks=8)
+    """
+    def _create(
+        goal: str = "strength",
+        duration_weeks: int = 4,
+        sessions_per_week: int = 3,
+        experience_level: str = "intermediate",
+        equipment_available: Optional[List[str]] = None,
+        focus_areas: Optional[List[str]] = None,
+        limitations: Optional[List[str]] = None,
+        preferences: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        data = {
+            "goal": goal,
+            "duration_weeks": duration_weeks,
+            "sessions_per_week": sessions_per_week,
+            "experience_level": experience_level,
+            "equipment_available": equipment_available or [
+                "barbell", "dumbbells", "bench", "squat_rack", "cables"
+            ],
+        }
+        if focus_areas:
+            data["focus_areas"] = focus_areas
+        if limitations:
+            data["limitations"] = limitations
+        if preferences:
+            data["preferences"] = preferences
+        return data
+
+    return _create
