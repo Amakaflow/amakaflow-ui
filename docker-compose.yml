@@ -116,6 +116,29 @@ services:
     networks:
       - amakaflow
 
+  # Program API - Training program generation
+  program:
+    build:
+      context: ./program-api
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./program-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
+      - SENTRY_DSN=${SENTRY_DSN_API}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    networks:
+      - amakaflow
+
   # Garmin Sync (optional)
   garmin-sync:
     build:
