@@ -66,7 +66,7 @@ export function WeeklyCalendar({
   };
 
   const goToNextWeek = () => {
-    if (selectedWeekNumber < program.duration_weeks) {
+    if (selectedWeekNumber < program.weeks.length) {
       onSelectWeek(selectedWeekNumber + 1);
     }
   };
@@ -81,6 +81,7 @@ export function WeeklyCalendar({
           onClick={goToPrevWeek}
           disabled={selectedWeekNumber === 1}
           className="flex-shrink-0"
+          aria-label="Previous week"
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
@@ -89,6 +90,8 @@ export function WeeklyCalendar({
           <div
             ref={weekTabsRef}
             className="flex gap-2 p-1"
+            role="tablist"
+            aria-label="Program weeks"
           >
             {program.weeks.map((week) => (
               <WeekTab
@@ -97,6 +100,7 @@ export function WeeklyCalendar({
                 isSelected={week.week_number === selectedWeekNumber}
                 isCurrent={week.week_number === program.current_week}
                 onClick={() => onSelectWeek(week.week_number)}
+                tabPanelId={`week-panel-${week.week_number}`}
               />
             ))}
           </div>
@@ -107,65 +111,74 @@ export function WeeklyCalendar({
           variant="ghost"
           size="icon"
           onClick={goToNextWeek}
-          disabled={selectedWeekNumber === program.duration_weeks}
+          disabled={selectedWeekNumber >= program.weeks.length}
           className="flex-shrink-0"
+          aria-label="Next week"
         >
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
 
-      {/* Week info bar */}
-      {currentWeek && (
-        <div className="flex items-center gap-3 text-sm px-2">
-          {currentWeek.focus && (
-            <Badge variant="outline" className="capitalize">
-              Focus: {currentWeek.focus}
-            </Badge>
-          )}
-          {currentWeek.intensity_percentage && (
-            <Badge variant="secondary">
-              {currentWeek.intensity_percentage}% Intensity
-            </Badge>
-          )}
-          {currentWeek.is_deload && (
-            <Badge className="bg-blue-100 text-blue-800">
-              Deload Week
-            </Badge>
-          )}
-          {currentWeek.volume_modifier !== 1 && (
-            <span className="text-muted-foreground">
-              Volume: {Math.round(currentWeek.volume_modifier * 100)}%
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Day columns grid */}
-      <div className="grid grid-cols-7 gap-2">
-        {/* Day headers */}
-        {DAY_LABELS_SHORT.map((day, idx) => (
-          <div
-            key={day}
-            className="text-center text-sm font-medium text-muted-foreground pb-2"
-          >
-            {day}
-          </div>
-        ))}
-
-        {/* Workout cards or rest day cells */}
-        {workoutsByDay.map((workout, dayIndex) => (
-          <div key={dayIndex} className="min-h-[120px]">
-            {workout ? (
-              <WorkoutCard
-                workout={workout}
-                onClick={() => onSelectWorkout(workout)}
-                isSelected={selectedWorkout?.id === workout.id}
-              />
-            ) : (
-              <RestDayCell />
+      {/* Week content panel */}
+      <div
+        id={`week-panel-${selectedWeekNumber}`}
+        role="tabpanel"
+        aria-labelledby={`week-tab-${selectedWeekNumber}`}
+        className="space-y-4"
+      >
+        {/* Week info bar */}
+        {currentWeek && (
+          <div className="flex items-center gap-3 text-sm px-2">
+            {currentWeek.focus && (
+              <Badge variant="outline" className="capitalize">
+                Focus: {currentWeek.focus}
+              </Badge>
+            )}
+            {currentWeek.intensity_percentage && (
+              <Badge variant="secondary">
+                {currentWeek.intensity_percentage}% Intensity
+              </Badge>
+            )}
+            {currentWeek.is_deload && (
+              <Badge className="bg-blue-100 text-blue-800">
+                Deload Week
+              </Badge>
+            )}
+            {currentWeek.volume_modifier !== 1 && (
+              <span className="text-muted-foreground">
+                Volume: {Math.round(currentWeek.volume_modifier * 100)}%
+              </span>
             )}
           </div>
-        ))}
+        )}
+
+        {/* Day columns grid */}
+        <div className="grid grid-cols-7 gap-2">
+          {/* Day headers */}
+          {DAY_LABELS_SHORT.map((day, idx) => (
+            <div
+              key={day}
+              className="text-center text-sm font-medium text-muted-foreground pb-2"
+            >
+              {day}
+            </div>
+          ))}
+
+          {/* Workout cards or rest day cells */}
+          {workoutsByDay.map((workout, dayIndex) => (
+            <div key={dayIndex} className="min-h-[120px]">
+              {workout ? (
+                <WorkoutCard
+                  workout={workout}
+                  onClick={() => onSelectWorkout(workout)}
+                  isSelected={selectedWorkout?.id === workout.id}
+                />
+              ) : (
+                <RestDayCell />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -179,9 +192,10 @@ interface WeekTabProps {
   isSelected: boolean;
   isCurrent: boolean;
   onClick: () => void;
+  tabPanelId: string;
 }
 
-function WeekTab({ week, isSelected, isCurrent, onClick }: WeekTabProps) {
+function WeekTab({ week, isSelected, isCurrent, onClick, tabPanelId }: WeekTabProps) {
   // Calculate completion for the week
   const totalWorkouts = week.workouts.length;
   const completedWorkouts = week.workouts.filter((w) => w.is_completed).length;
@@ -189,6 +203,11 @@ function WeekTab({ week, isSelected, isCurrent, onClick }: WeekTabProps) {
 
   return (
     <button
+      id={`week-tab-${week.week_number}`}
+      role="tab"
+      aria-selected={isSelected}
+      aria-controls={tabPanelId}
+      tabIndex={isSelected ? 0 : -1}
       data-week={week.week_number}
       onClick={onClick}
       className={cn(
@@ -203,7 +222,7 @@ function WeekTab({ week, isSelected, isCurrent, onClick }: WeekTabProps) {
       <div className="flex items-center gap-1">
         <span className="font-medium text-sm">Week {week.week_number}</span>
         {week.is_deload && (
-          <Zap className="w-3 h-3" />
+          <Zap className="w-3 h-3" aria-label="Deload week" />
         )}
       </div>
       <span className="text-xs opacity-80">

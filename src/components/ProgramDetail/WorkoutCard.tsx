@@ -22,11 +22,22 @@ export function WorkoutCard({ workout, onClick, isSelected }: WorkoutCardProps) 
 
   const exerciseCount = workout.exercises.length;
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <Card
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      aria-label={`${workout.name}${workout.is_completed ? ', completed' : ''}`}
       className={cn(
-        'p-3 cursor-pointer transition-all hover:shadow-md border-l-4',
+        'p-3 cursor-pointer transition-all hover:shadow-md border-l-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
         borderColor,
         isSelected && 'ring-2 ring-primary',
         workout.is_completed && 'bg-muted/50'

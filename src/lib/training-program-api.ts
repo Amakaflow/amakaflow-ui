@@ -41,167 +41,141 @@ async function trainingProgramApiCall<T>(
 
 /**
  * Get a training program by ID with all weeks and workouts
+ * @throws Error if the API call fails (network error, server error, etc.)
+ * @returns TrainingProgram if found, null if not found
  */
 export async function getTrainingProgram(
   programId: string,
   userId: string
 ): Promise<TrainingProgram | null> {
-  try {
-    const queryParams = new URLSearchParams({ user_id: userId });
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      program?: TrainingProgram;
-      message?: string;
-    }>(`/training-programs/${programId}?${queryParams.toString()}`);
+  const queryParams = new URLSearchParams({ user_id: userId });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    program?: TrainingProgram;
+    message?: string;
+  }>(`/training-programs/${programId}?${queryParams.toString()}`);
 
-    return response.success ? response.program || null : null;
-  } catch (err) {
-    console.error('[getTrainingProgram] Error:', err);
-    return null;
-  }
+  return response.success ? response.program || null : null;
 }
 
 /**
  * Get all training programs for a user
+ * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function getTrainingPrograms(
   userId: string,
   includeArchived: boolean = false
 ): Promise<TrainingProgram[]> {
-  try {
-    const queryParams = new URLSearchParams({
-      user_id: userId,
-      include_archived: includeArchived.toString(),
-    });
+  const queryParams = new URLSearchParams({
+    user_id: userId,
+    include_archived: includeArchived.toString(),
+  });
 
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      programs: TrainingProgram[];
-      count: number;
-    }>(`/training-programs?${queryParams.toString()}`);
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    programs: TrainingProgram[];
+    count: number;
+  }>(`/training-programs?${queryParams.toString()}`);
 
-    return response.programs || [];
-  } catch (err) {
-    console.error('[getTrainingPrograms] Error:', err);
-    return [];
-  }
+  return response.programs || [];
 }
 
 /**
  * Update program status (activate, pause, archive, etc.)
+ * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function updateProgramStatus(
   programId: string,
   userId: string,
   status: ProgramStatus
 ): Promise<boolean> {
-  try {
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      message: string;
-    }>(`/training-programs/${programId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ user_id: userId, status }),
-    });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    message: string;
+  }>(`/training-programs/${programId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ user_id: userId, status }),
+  });
 
-    return response.success;
-  } catch (err) {
-    console.error('[updateProgramStatus] Error:', err);
-    return false;
-  }
+  return response.success;
 }
 
 /**
  * Update current week progress
+ * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function updateProgramProgress(
   programId: string,
   userId: string,
   currentWeek: number
 ): Promise<boolean> {
-  try {
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      message: string;
-    }>(`/training-programs/${programId}/progress`, {
-      method: 'PATCH',
-      body: JSON.stringify({ user_id: userId, current_week: currentWeek }),
-    });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    message: string;
+  }>(`/training-programs/${programId}/progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ user_id: userId, current_week: currentWeek }),
+  });
 
-    return response.success;
-  } catch (err) {
-    console.error('[updateProgramProgress] Error:', err);
-    return false;
-  }
+  return response.success;
 }
 
 /**
  * Delete a training program
+ * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function deleteTrainingProgram(
   programId: string,
   userId: string
 ): Promise<boolean> {
-  try {
-    const queryParams = new URLSearchParams({ user_id: userId });
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      message: string;
-    }>(`/training-programs/${programId}?${queryParams.toString()}`, {
-      method: 'DELETE',
-    });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    message: string;
+  }>(`/training-programs/${programId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ user_id: userId }),
+  });
 
-    return response.success;
-  } catch (err) {
-    console.error('[deleteTrainingProgram] Error:', err);
-    return false;
-  }
+  return response.success;
 }
 
 /**
  * Mark a workout as complete
+ * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function markWorkoutComplete(
   workoutId: string,
   userId: string,
   isCompleted: boolean = true
 ): Promise<boolean> {
-  try {
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      message: string;
-    }>(`/training-programs/workouts/${workoutId}/complete`, {
-      method: 'PATCH',
-      body: JSON.stringify({ user_id: userId, is_completed: isCompleted }),
-    });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    message: string;
+  }>(`/training-programs/workouts/${workoutId}/complete`, {
+    method: 'PATCH',
+    body: JSON.stringify({ user_id: userId, is_completed: isCompleted }),
+  });
 
-    return response.success;
-  } catch (err) {
-    console.error('[markWorkoutComplete] Error:', err);
-    return false;
-  }
+  return response.success;
 }
 
 /**
  * Get a single workout by ID
+ * @throws Error if the API call fails (network error, server error, etc.)
+ * @returns ProgramWorkout if found, null if not found
  */
 export async function getProgramWorkout(
   workoutId: string,
   userId: string
 ): Promise<ProgramWorkout | null> {
-  try {
-    const queryParams = new URLSearchParams({ user_id: userId });
-    const response = await trainingProgramApiCall<{
-      success: boolean;
-      workout?: ProgramWorkout;
-      message?: string;
-    }>(`/training-programs/workouts/${workoutId}?${queryParams.toString()}`);
+  const queryParams = new URLSearchParams({ user_id: userId });
+  const response = await trainingProgramApiCall<{
+    success: boolean;
+    workout?: ProgramWorkout;
+    message?: string;
+  }>(`/training-programs/workouts/${workoutId}?${queryParams.toString()}`);
 
-    return response.success ? response.workout || null : null;
-  } catch (err) {
-    console.error('[getProgramWorkout] Error:', err);
-    return null;
-  }
+  return response.success ? response.workout || null : null;
 }
 
 /**

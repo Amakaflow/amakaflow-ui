@@ -5,7 +5,7 @@
  * Provides methods for loading, updating, and managing training programs.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useProgramDetail } from '../context/ProgramDetailContext';
 import {
   getTrainingProgram,
@@ -62,32 +62,55 @@ export function useProgramDetailApi({
     markWorkoutComplete: markWorkoutCompleteInContext,
   } = useProgramDetail();
 
+  // Track mounted state to prevent stale updates
+  const isMountedRef = useRef(true);
+  const loadIdRef = useRef(0);
+
   // Load program on mount
   const loadProgram = useCallback(async () => {
     if (!programId || !userId) return;
+
+    // Increment load ID to track which load is current
+    const currentLoadId = ++loadIdRef.current;
 
     setLoading(true);
     setError(null);
 
     try {
       const programData = await getTrainingProgram(programId, userId);
+
+      // Only update state if this is still the current load and component is mounted
+      if (currentLoadId !== loadIdRef.current || !isMountedRef.current) {
+        return;
+      }
+
       if (programData) {
         setProgram(programData);
       } else {
         setError('Program not found');
       }
     } catch (err) {
+      // Only update state if this is still the current load and component is mounted
+      if (currentLoadId !== loadIdRef.current || !isMountedRef.current) {
+        return;
+      }
       console.error('[useProgramDetailApi] Error loading program:', err);
       setError(err instanceof Error ? err.message : 'Failed to load program');
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load and component is mounted
+      if (currentLoadId === loadIdRef.current && isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [programId, userId, setProgram, setLoading, setError]);
 
-  // Load on mount
+  // Load on mount, cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     loadProgram();
+
     return () => {
+      isMountedRef.current = false;
       clearProgram();
     };
   }, [loadProgram, clearProgram]);

@@ -155,7 +155,15 @@ export function ProgramActions({
       </div>
 
       {/* Delete confirmation dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          // Prevent closing the dialog while deletion is in progress
+          if (!isDeleting) {
+            setShowDeleteDialog(open);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Program?</AlertDialogTitle>
