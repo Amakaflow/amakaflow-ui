@@ -40,3 +40,5 @@ build
 .supabase/
 supabase/
 
+# Test coverage
+coverage/

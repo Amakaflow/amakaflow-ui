@@ -3,11 +3,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, FolderOpen, Loader2 } from 'lucide-react';
+import { Plus, FolderOpen, Loader2, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { WorkoutProgramCard } from './WorkoutProgramCard';
 import { CreateProgramModal } from './CreateProgramModal';
 import { AddWorkoutToProgramModal } from './AddWorkoutToProgramModal';
+import { ProgramWizard } from './ProgramWizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,7 @@ export function ProgramsSection({
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGenerateWizard, setShowGenerateWizard] = useState(false);
   const [editingProgram, setEditingProgram] = useState<WorkoutProgram | null>(null);
   const [addingToProgram, setAddingToProgram] = useState<WorkoutProgram | null>(null);
   const [deletingProgram, setDeletingProgram] = useState<WorkoutProgram | null>(null);
@@ -201,18 +203,29 @@ export function ProgramsSection({
           <h3 className="font-semibold">Programs</h3>
           <span className="text-sm text-muted-foreground">({programs.length})</span>
         </button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setEditingProgram(null);
-            setShowCreateModal(true);
-          }}
-          className="gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          New Program
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowGenerateWizard(true)}
+            className="gap-1.5"
+          >
+            <Sparkles className="w-4 h-4" />
+            Generate Program
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditingProgram(null);
+              setShowCreateModal(true);
+            }}
+            className="gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            New Program
+          </Button>
+        </div>
       </div>
 
       {/* Programs List */}
@@ -307,6 +320,17 @@ export function ProgramsSection({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Program Generation Wizard */}
+      <ProgramWizard
+        userId={profileId}
+        isOpen={showGenerateWizard}
+        onClose={() => setShowGenerateWizard(false)}
+        onComplete={() => {
+          setShowGenerateWizard(false);
+          loadPrograms();
+        }}
+      />
     </div>
   );
 }
