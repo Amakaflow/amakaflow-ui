@@ -2,9 +2,15 @@
 LLM prompt templates for exercise selection.
 
 Part of AMA-462: Implement ProgramGenerator Service
+Updated in AMA-491: Added input sanitization for prompt injection prevention
 
 System and user prompts for structured exercise selection.
 """
+
+from core.sanitization import sanitize_user_input
+
+# Re-export for backwards compatibility and clearer domain naming
+sanitize_limitation = sanitize_user_input
 
 EXERCISE_SELECTION_SYSTEM_PROMPT = """You are an expert strength and conditioning coach designing workout programs.
 
@@ -129,12 +135,17 @@ def build_exercise_selection_prompt(
         for ex in available_exercises
     )
 
-    # Format limitations section
+    # Format limitations section with sanitization to prevent prompt injection
     limitations_section = ""
     if limitations:
-        limitations_section = f"**User Limitations (AVOID exercises that stress these areas):**\n- " + "\n- ".join(
-            limitations
-        )
+        sanitized_limitations = [sanitize_limitation(l) for l in limitations if l]
+        # Filter out empty strings after sanitization
+        sanitized_limitations = [l for l in sanitized_limitations if l]
+        if sanitized_limitations:
+            limitations_section = (
+                f"**User Limitations (AVOID exercises that stress these areas):**\n- "
+                + "\n- ".join(sanitized_limitations)
+            )
 
     return EXERCISE_SELECTION_USER_PROMPT.format(
         workout_type=workout_type,

@@ -2,15 +2,17 @@
 Request/response models for program generation.
 
 Part of AMA-461: Create program-api service scaffold
+Updated in AMA-491: Added input validation for limitations
 
 These models define the API contract for AI-powered program generation.
 """
 
-from typing import List, Optional
-from uuid import UUID
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from core.constants import MAX_LIMITATIONS_COUNT
+from core.sanitization import sanitize_user_input
 from models.program import ProgramGoal, ExperienceLevel, TrainingProgram
 
 
@@ -43,6 +45,38 @@ class GenerateProgramRequest(BaseModel):
         None,
         description="Additional preferences or notes for program generation",
     )
+
+    @field_validator("limitations", mode="before")
+    @classmethod
+    def validate_limitations(cls, v: Any) -> List[str]:
+        """
+        Validate and sanitize limitations to prevent prompt injection.
+
+        - Limits the number of limitations
+        - Removes control characters from each limitation
+        - Truncates each limitation to max length
+        - Filters out empty strings
+        """
+        if not v:
+            return []
+
+        if not isinstance(v, list):
+            return []
+
+        if len(v) > MAX_LIMITATIONS_COUNT:
+            raise ValueError(
+                f"Too many limitations. Maximum allowed: {MAX_LIMITATIONS_COUNT}"
+            )
+
+        sanitized = []
+        for limitation in v:
+            if not isinstance(limitation, str):
+                continue
+            clean = sanitize_user_input(limitation)
+            if clean:
+                sanitized.append(clean)
+
+        return sanitized
 
 
 class GenerateProgramResponse(BaseModel):
