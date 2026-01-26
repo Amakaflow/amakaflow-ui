@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner@2.0.3';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle, TrendingUp } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle, TrendingUp, FolderOpen } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ import { ExerciseHistory } from './components/ExerciseHistory';
 import { VolumeAnalytics } from './components/VolumeAnalytics';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import { ProgramDetail } from './components/ProgramDetail';
+import { ProgramsList } from './components/ProgramsList';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from './types/workout';
@@ -56,7 +57,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs';
 
 export default function App() {
   // Clerk authentication
@@ -1456,6 +1457,20 @@ export default function App() {
                   My Workouts
                 </Button>
                 <Button
+                  variant={currentView === 'programs' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setCurrentView('programs');
+                    });
+                  }}
+                  className="gap-2"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Programs
+                </Button>
+                <Button
                   variant={currentView === 'analytics' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1920,6 +1935,16 @@ export default function App() {
               // Delete is handled internally by UnifiedWorkouts
               console.log('Workout deleted:', id);
             }}
+            onViewProgram={(programId) => {
+              setSelectedProgramId(programId);
+              setCurrentView('program-detail');
+            }}
+          />
+        )}
+
+        {currentView === 'programs' && (
+          <ProgramsList
+            userId={user.id}
             onViewProgram={(programId) => {
               setSelectedProgramId(programId);
               setCurrentView('program-detail');
