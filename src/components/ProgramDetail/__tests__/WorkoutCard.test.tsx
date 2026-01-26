@@ -116,6 +116,47 @@ describe('WorkoutCard', () => {
     });
   });
 
+  describe('Keyboard Accessibility', () => {
+    it('should have role="button" for screen readers', () => {
+      render(<WorkoutCard {...defaultProps} />);
+      const card = screen.getByRole('button', { name: mockWorkout.name });
+      expect(card).toBeInTheDocument();
+    });
+
+    it('should have tabIndex=0 for keyboard focus', () => {
+      render(<WorkoutCard {...defaultProps} />);
+      const card = screen.getByRole('button', { name: mockWorkout.name });
+      expect(card).toHaveAttribute('tabIndex', '0');
+    });
+
+    it('should call onClick when Enter key is pressed', () => {
+      render(<WorkoutCard {...defaultProps} />);
+      const card = screen.getByRole('button', { name: mockWorkout.name });
+      fireEvent.keyDown(card, { key: 'Enter' });
+      expect(mockOnClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onClick when Space key is pressed', () => {
+      render(<WorkoutCard {...defaultProps} />);
+      const card = screen.getByRole('button', { name: mockWorkout.name });
+      fireEvent.keyDown(card, { key: ' ' });
+      expect(mockOnClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not call onClick for other keys', () => {
+      render(<WorkoutCard {...defaultProps} />);
+      const card = screen.getByRole('button', { name: mockWorkout.name });
+      fireEvent.keyDown(card, { key: 'Tab' });
+      expect(mockOnClick).not.toHaveBeenCalled();
+    });
+
+    it('should include completion status in aria-label', () => {
+      render(<WorkoutCard {...defaultProps} workout={mockCompletedWorkout} />);
+      const card = screen.getByRole('button', { name: /completed/ });
+      expect(card).toBeInTheDocument();
+    });
+  });
+
   describe('Workout Types', () => {
     it('should render push workout type', () => {
       const pushWorkout = { ...mockWorkout, workout_type: 'push' };

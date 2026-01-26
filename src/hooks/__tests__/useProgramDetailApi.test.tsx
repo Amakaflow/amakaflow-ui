@@ -482,4 +482,122 @@ describe('useProgramDetailApi', () => {
       expect(newResult.current.isLoading).toBe(true);
     });
   });
+
+  describe('Race Condition Prevention', () => {
+    it('should not update state with stale data when programId changes', async () => {
+      const programA = { ...mockTrainingProgram, id: 'program-a', name: 'Program A' };
+      const programB = { ...mockTrainingProgram, id: 'program-b', name: 'Program B' };
+
+      // Program A loads slowly
+      mockGetTrainingProgram.mockImplementation((id: string) => {
+        if (id === 'program-a') {
+          return new Promise((resolve) => setTimeout(() => resolve(programA), 200));
+        }
+        return Promise.resolve(programB);
+      });
+
+      // Start with program A
+      const { result, rerender } = renderHook(
+        ({ programId }) => useProgramDetailApi({ programId, userId: TEST_USER_ID }),
+        {
+          wrapper,
+          initialProps: { programId: 'program-a' },
+        }
+      );
+
+      // Immediately switch to program B before A finishes loading
+      rerender({ programId: 'program-b' });
+
+      // Wait for B to load (it's faster)
+      await waitFor(() => {
+        expect(result.current.program?.name).toBe('Program B');
+      });
+
+      // Wait a bit more to ensure A's response doesn't override B
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      // Should still show program B, not A (stale data prevention)
+      expect(result.current.program?.name).toBe('Program B');
+    });
+
+    it('should not update state after unmount', async () => {
+      // Slow loading program
+      mockGetTrainingProgram.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(mockTrainingProgram), 100))
+      );
+
+      const { unmount } = renderHook(
+        () => useProgramDetailApi(defaultOptions),
+        { wrapper }
+      );
+
+      // Unmount before load completes
+      unmount();
+
+      // Wait for the load to complete
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // No error should be thrown (React would warn about state updates on unmounted component)
+      // If the fix works, the isMountedRef prevents the state update
+    });
+  });
+
+  describe('API Error Propagation', () => {
+    it('should propagate API errors from updateStatus', async () => {
+      mockUpdateProgramStatus.mockRejectedValue(new Error('Status update failed'));
+
+      const { result } = renderHook(
+        () => useProgramDetailApi(defaultOptions),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.program).toBeTruthy();
+      });
+
+      await act(async () => {
+        await result.current.updateStatus('paused');
+      });
+
+      expect(result.current.error).toBe('Status update failed');
+    });
+
+    it('should propagate API errors from deleteProgram', async () => {
+      mockDeleteTrainingProgram.mockRejectedValue(new Error('Delete failed'));
+
+      const { result } = renderHook(
+        () => useProgramDetailApi(defaultOptions),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.program).toBeTruthy();
+      });
+
+      await act(async () => {
+        await result.current.deleteProgram();
+      });
+
+      expect(result.current.error).toBe('Delete failed');
+    });
+
+    it('should propagate API errors from markWorkoutComplete', async () => {
+      mockMarkWorkoutComplete.mockRejectedValue(new Error('Workout update failed'));
+
+      const { result } = renderHook(
+        () => useProgramDetailApi(defaultOptions),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.program).toBeTruthy();
+      });
+
+      await act(async () => {
+        await result.current.markWorkoutComplete(TEST_WORKOUT_ID, true);
+      });
+
+      expect(result.current.error).toBe('Workout update failed');
+    });
+  });
 });

@@ -200,4 +200,74 @@ describe('WeeklyCalendar', () => {
       expect(workoutCard).toHaveClass('ring-2');
     });
   });
+
+  describe('ARIA Accessibility', () => {
+    it('should have tablist role on week tabs container', () => {
+      render(<WeeklyCalendar {...defaultProps} />);
+      const tablist = screen.getByRole('tablist');
+      expect(tablist).toBeInTheDocument();
+      expect(tablist).toHaveAttribute('aria-label', 'Program weeks');
+    });
+
+    it('should have tab role on each week tab', () => {
+      render(<WeeklyCalendar {...defaultProps} />);
+      const tabs = screen.getAllByRole('tab');
+      // Should have tabs for weeks 1, 2, and 4 (from mockTrainingProgram)
+      expect(tabs.length).toBe(3);
+    });
+
+    it('should have aria-selected on selected week tab', () => {
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={1} />);
+      const tabs = screen.getAllByRole('tab');
+      const selectedTab = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
+      expect(selectedTab).toHaveTextContent('Week 1');
+    });
+
+    it('should have aria-selected=false on non-selected tabs', () => {
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={1} />);
+      const tabs = screen.getAllByRole('tab');
+      const nonSelectedTabs = tabs.filter(tab => tab.getAttribute('aria-selected') === 'false');
+      expect(nonSelectedTabs.length).toBe(2);
+    });
+
+    it('should have tabpanel for week content', () => {
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={1} />);
+      const tabpanel = screen.getByRole('tabpanel');
+      expect(tabpanel).toBeInTheDocument();
+    });
+
+    it('should have aria-controls linking tab to panel', () => {
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={1} />);
+      const tabs = screen.getAllByRole('tab');
+      const selectedTab = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
+      expect(selectedTab).toHaveAttribute('aria-controls', 'week-panel-1');
+    });
+
+    it('should have aria-labels on navigation buttons', () => {
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={2} />);
+      expect(screen.getByRole('button', { name: 'Previous week' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Next week' })).toBeInTheDocument();
+    });
+  });
+
+  describe('Week Navigation Boundary', () => {
+    it('should disable next button based on actual weeks array length', () => {
+      // mockTrainingProgram has duration_weeks=8 but only 3 weeks in array
+      // Week 4 is the last week in the array (week_number=4)
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={4} />);
+
+      const buttons = screen.getAllByRole('button');
+      const nextButton = buttons.find((btn) => btn.querySelector('.lucide-chevron-right'));
+      expect(nextButton).toBeDisabled();
+    });
+
+    it('should enable next button when more weeks exist', () => {
+      // Week 1 has weeks 2 and 4 after it
+      render(<WeeklyCalendar {...defaultProps} selectedWeekNumber={1} />);
+
+      const buttons = screen.getAllByRole('button');
+      const nextButton = buttons.find((btn) => btn.querySelector('.lucide-chevron-right'));
+      expect(nextButton).not.toBeDisabled();
+    });
+  });
 });
