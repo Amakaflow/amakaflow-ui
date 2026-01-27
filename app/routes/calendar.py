@@ -62,8 +62,9 @@ async def get_calendar_events(
                     id, user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
+                    external_event_url, recurrence_rule,
+                    program_id, program_workout_id, program_week_number,
+                    json_payload, created_at, updated_at
                 FROM workout_events
                 WHERE user_id = %s AND (
                     (recurrence_rule IS NULL AND date >= %s AND date <= %s)
@@ -123,16 +124,19 @@ async def create_calendar_event(
                     user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload
+                    external_event_url, recurrence_rule,
+                    program_id, program_workout_id, program_week_number,
+                    json_payload
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
-                RETURNING 
+                RETURNING
                     id, user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
+                    external_event_url, recurrence_rule,
+                    program_id, program_workout_id, program_week_number,
+                    json_payload, created_at, updated_at
             """, (
                 user_id,
                 event.title,
@@ -149,6 +153,9 @@ async def create_calendar_event(
                 event.connected_calendar_type,
                 event.external_event_url,
                 event.recurrence_rule,
+                str(event.program_id) if event.program_id else None,
+                str(event.program_workout_id) if event.program_workout_id else None,
+                event.program_week_number,
                 json.dumps(event.json_payload) if event.json_payload else None,
             ))
             
@@ -446,8 +453,9 @@ async def get_calendar_event(
                     id, user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
+                    external_event_url, recurrence_rule,
+                    program_id, program_workout_id, program_week_number,
+                    json_payload, created_at, updated_at
                 FROM workout_events
                 WHERE id = %s AND user_id = %s
             """, (str(event_id), user_id))
@@ -524,6 +532,15 @@ async def update_calendar_event(
     if event_update.recurrence_rule is not None:
         update_fields.append("recurrence_rule = %s")
         values.append(event_update.recurrence_rule)
+    if event_update.program_id is not None:
+        update_fields.append("program_id = %s")
+        values.append(str(event_update.program_id))
+    if event_update.program_workout_id is not None:
+        update_fields.append("program_workout_id = %s")
+        values.append(str(event_update.program_workout_id))
+    if event_update.program_week_number is not None:
+        update_fields.append("program_week_number = %s")
+        values.append(event_update.program_week_number)
     if event_update.json_payload is not None:
         update_fields.append("json_payload = %s")
         values.append(json.dumps(event_update.json_payload))
@@ -555,8 +572,9 @@ async def update_calendar_event(
                     id, user_id, title, source, date, start_time, end_time,
                     type, status, is_anchor, primary_muscle, intensity,
                     connected_calendar_id, connected_calendar_type,
-                    external_event_url, recurrence_rule, json_payload,
-                    created_at, updated_at
+                    external_event_url, recurrence_rule,
+                    program_id, program_workout_id, program_week_number,
+                    json_payload, created_at, updated_at
             """
 
             cur.execute(query, values)

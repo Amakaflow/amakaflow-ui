@@ -122,3 +122,56 @@ async def get_optional_user(
         return await get_current_user(authorization, x_api_key)
     except HTTPException:
         return None
+
+
+# Service-to-service authentication (AMA-469)
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
+
+
+async def verify_service_token(
+    x_service_token: Optional[str] = Header(None, alias="X-Service-Token"),
+) -> bool:
+    """
+    Verify service-to-service authentication token.
+
+    Used for internal API calls between services (e.g., Program-API calling
+    Calendar-API). Checks the X-Service-Token header against the configured
+    INTERNAL_SERVICE_TOKEN environment variable.
+
+    In development/test without token configured, allows all requests.
+    In production, requires valid token.
+
+    Args:
+        x_service_token: Service token from header
+
+    Returns:
+        bool: True if token is valid
+
+    Raises:
+        HTTPException: 401 if token is missing or invalid
+    """
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+
+    # In dev/test without token configured, allow all requests
+    if not INTERNAL_SERVICE_TOKEN:
+        if environment == "production":
+            logger.error("INTERNAL_SERVICE_TOKEN not configured in production")
+            raise HTTPException(
+                status_code=500,
+                detail="Internal service token not configured",
+            )
+        return True
+
+    if not x_service_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-Service-Token header for service authentication",
+        )
+
+    if x_service_token != INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid service token",
+        )
+
+    return True
