@@ -51,37 +51,48 @@ async def bulk_create_program_events(
     created_ids = []
 
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            for event in request.events:
-                cur.execute("""
-                    INSERT INTO workout_events (
-                        user_id, title, source, date, start_time, end_time,
-                        type, status, primary_muscle, intensity,
-                        program_id, program_workout_id, program_week_number,
-                        json_payload
-                    ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                    )
-                    RETURNING id
-                """, (
-                    user_id,
-                    event.title,
-                    "training_program",
-                    event.date,
-                    event.start_time,
-                    event.end_time,
-                    event.type,
-                    "planned",
-                    event.primary_muscle,
-                    event.intensity,
-                    str(request.program_id),
-                    str(event.program_workout_id),
-                    event.program_week_number,
-                    json.dumps(event.json_payload) if event.json_payload else None,
-                ))
+        try:
+            with conn.cursor() as cur:
+                for event in request.events:
+                    cur.execute("""
+                        INSERT INTO workout_events (
+                            user_id, title, source, date, start_time, end_time,
+                            type, status, primary_muscle, intensity,
+                            program_id, program_workout_id, program_week_number,
+                            json_payload
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                        RETURNING id
+                    """, (
+                        user_id,
+                        event.title,
+                        "training_program",
+                        event.date,
+                        event.start_time,
+                        event.end_time,
+                        event.type,
+                        "planned",
+                        event.primary_muscle,
+                        event.intensity,
+                        str(request.program_id),
+                        str(event.program_workout_id),
+                        event.program_week_number,
+                        json.dumps(event.json_payload) if event.json_payload else None,
+                    ))
 
-                row = cur.fetchone()
-                created_ids.append(row[0])
+                    row = cur.fetchone()
+                    created_ids.append(row[0])
+
+            # Explicitly commit the transaction after all inserts succeed
+            conn.commit()
+        except Exception as e:
+            # Rollback on any error to ensure atomicity
+            conn.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create program events: {str(e)}"
+            )
 
     return BulkProgramEventsResponse(
         program_id=request.program_id,
