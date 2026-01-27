@@ -13,7 +13,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import get_current_user
+from ..auth import get_current_user, verify_service_token
 from ..db import get_db_connection
 from ..schemas import (
     BulkProgramEventsCreate,
@@ -29,6 +29,7 @@ router = APIRouter()
 async def bulk_create_program_events(
     request: BulkProgramEventsCreate,
     user_id: str = Depends(get_current_user),
+    _service_auth: bool = Depends(verify_service_token),
 ):
     """
     Bulk create calendar events for a training program.
@@ -49,6 +50,7 @@ async def bulk_create_program_events(
         )
 
     created_ids = []
+    event_mapping: dict[str, str] = {}  # program_workout_id -> calendar_event_id
 
     with get_db_connection() as conn:
         try:
@@ -82,7 +84,10 @@ async def bulk_create_program_events(
                     ))
 
                     row = cur.fetchone()
-                    created_ids.append(row[0])
+                    event_id = row[0]
+                    created_ids.append(event_id)
+                    # Build explicit mapping: program_workout_id -> calendar_event_id
+                    event_mapping[str(event.program_workout_id)] = str(event_id)
 
             # Explicitly commit the transaction after all inserts succeed
             conn.commit()
@@ -91,13 +96,14 @@ async def bulk_create_program_events(
             conn.rollback()
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to create program events: {str(e)}"
+                detail="Failed to create program events"
             )
 
     return BulkProgramEventsResponse(
         program_id=request.program_id,
         events_created=len(created_ids),
         event_ids=created_ids,
+        event_mapping=event_mapping,
     )
 
 
@@ -105,6 +111,7 @@ async def bulk_create_program_events(
 async def get_program_events(
     program_id: UUID,
     user_id: str = Depends(get_current_user),
+    _service_auth: bool = Depends(verify_service_token),
 ):
     """
     Get all calendar events for a specific training program.
@@ -160,6 +167,7 @@ async def get_program_events(
 async def delete_program_events(
     program_id: UUID,
     user_id: str = Depends(get_current_user),
+    _service_auth: bool = Depends(verify_service_token),
 ):
     """
     Delete all calendar events for a specific training program.

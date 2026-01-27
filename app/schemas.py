@@ -183,6 +183,9 @@ class BulkProgramEventsResponse(BaseModel):
     program_id: UUID
     events_created: int
     event_ids: list[UUID]
+    event_mapping: dict[str, str] = Field(
+        description="Mapping of program_workout_id to calendar_event_id"
+    )
 
 
 class ProgramEventsResponse(BaseModel):
