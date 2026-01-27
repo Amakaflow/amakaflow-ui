@@ -163,6 +163,34 @@ async def get_optional_user(
 
 
 # =============================================================================
+# AI Client Factory
+# =============================================================================
+
+
+def get_ai_client_factory():
+    """
+    Get AIClientFactory class for creating AI clients.
+
+    Returns the class itself (all methods are static), which allows
+    test overrides via dependency_overrides.
+
+    Usage in routers:
+        from api.deps import get_ai_client_factory, get_settings
+        from backend.ai import AIRequestContext
+
+        @router.post("/chat")
+        def chat(
+            settings: Settings = Depends(get_settings),
+            factory = Depends(get_ai_client_factory),
+        ):
+            ctx = AIRequestContext(user_id=user_id, feature_name="chat")
+            client = factory.create_anthropic_client(settings, context=ctx)
+    """
+    from backend.ai import AIClientFactory
+    return AIClientFactory
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -175,4 +203,6 @@ __all__ = [
     # Authentication
     "get_current_user",
     "get_optional_user",
+    # AI
+    "get_ai_client_factory",
 ]
