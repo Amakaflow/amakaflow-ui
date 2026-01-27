@@ -90,6 +90,22 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Service URLs (AMA-469)
+    # -------------------------------------------------------------------------
+    calendar_api_url: str = Field(
+        default="http://calendar-api:8001",
+        description="URL of the Calendar-API service",
+    )
+
+    # -------------------------------------------------------------------------
+    # Service-to-Service Authentication (AMA-469)
+    # -------------------------------------------------------------------------
+    internal_service_token: Optional[str] = Field(
+        default=None,
+        description="Shared secret for service-to-service authentication",
+    )
+
+    # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
     @field_validator("environment")

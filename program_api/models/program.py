@@ -140,6 +140,13 @@ class ActivationRequest(BaseModel):
     )
 
 
+class CalendarEventMapping(BaseModel):
+    """Mapping between a program workout and its calendar event."""
+
+    program_workout_id: UUID
+    calendar_event_id: UUID
+
+
 class ActivationResponse(BaseModel):
     """Response model for program activation."""
 
@@ -148,6 +155,10 @@ class ActivationResponse(BaseModel):
     start_date: datetime
     scheduled_workouts: int = Field(
         description="Number of workouts scheduled on calendar"
+    )
+    calendar_event_mapping: Optional[List[CalendarEventMapping]] = Field(
+        default=None,
+        description="Mapping of program workout IDs to calendar event IDs"
     )
     message: str
 
@@ -160,3 +171,12 @@ class ProgramListResponse(BaseModel):
     limit: int
     offset: int
     has_more: bool
+
+
+class WorkoutCompletedWebhook(BaseModel):
+    """Webhook payload when a program workout is marked complete on calendar."""
+
+    event_id: UUID = Field(description="The calendar event ID that was completed")
+    program_workout_id: UUID = Field(description="The program workout ID")
+    program_week_number: int = Field(ge=1, description="Week number in the program")
+    completed_at: datetime = Field(description="When the workout was completed")

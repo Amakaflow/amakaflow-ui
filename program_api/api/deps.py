@@ -40,6 +40,7 @@ from infrastructure.db import (
     SupabaseProgramRepository,
     SupabaseTemplateRepository,
 )
+from infrastructure.calendar_client import CalendarClient
 from backend.settings import Settings, get_settings as _get_settings
 
 
@@ -167,6 +168,28 @@ def get_exercise_repo(
 
 
 # =============================================================================
+# Calendar Client Provider (AMA-469)
+# =============================================================================
+
+
+def get_calendar_client(
+    settings: Settings = Depends(get_settings),
+) -> CalendarClient:
+    """
+    Get CalendarClient instance for Calendar-API communication.
+
+    Returns a CalendarClient configured with the Calendar-API URL from settings.
+
+    Args:
+        settings: Application settings (injected)
+
+    Returns:
+        CalendarClient: Client for calendar event operations
+    """
+    return CalendarClient(base_url=settings.calendar_api_url)
+
+
+# =============================================================================
 # Authentication Providers
 # =============================================================================
 
@@ -253,6 +276,56 @@ async def get_optional_user(
 
 
 # =============================================================================
+# Service-to-Service Authentication (AMA-469)
+# =============================================================================
+
+
+async def verify_service_token(
+    x_service_token: Optional[str] = Header(None),
+    settings: Settings = Depends(get_settings),
+) -> bool:
+    """
+    Verify service-to-service authentication token.
+
+    Used for internal API calls between services (e.g., Calendar-API calling
+    Program-API webhook). Checks the X-Service-Token header against the
+    configured internal_service_token.
+
+    Args:
+        x_service_token: Service token from header
+        settings: Application settings (injected)
+
+    Returns:
+        bool: True if token is valid
+
+    Raises:
+        HTTPException: 401 if token is missing or invalid
+    """
+    # In test/development without token configured, allow all requests
+    if not settings.internal_service_token:
+        if settings.is_production:
+            raise HTTPException(
+                status_code=500,
+                detail="Internal service token not configured in production",
+            )
+        return True
+
+    if not x_service_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-Service-Token header for service authentication",
+        )
+
+    if x_service_token != settings.internal_service_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid service token",
+        )
+
+    return True
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -266,7 +339,10 @@ __all__ = [
     "get_exercise_repo",
     "get_program_repo",
     "get_template_repo",
+    # Calendar
+    "get_calendar_client",
     # Authentication
     "get_current_user",
     "get_optional_user",
+    "verify_service_token",
 ]
