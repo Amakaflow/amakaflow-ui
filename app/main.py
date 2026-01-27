@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes.calendar import router as calendar_router
 from .routes.smart_planner import router as smart_planner_router
+from .routes.programs import router as programs_router
 
 # Initialize Sentry for error tracking (AMA-225)
 sentry_dsn = os.getenv("SENTRY_DSN")
@@ -35,6 +36,7 @@ app.add_middleware(
 # Smart planner FIRST (so /calendar/rules doesn't get caught by /calendar/{event_id})
 app.include_router(smart_planner_router, prefix="/planner", tags=["smart-planner"])
 app.include_router(calendar_router, prefix="/calendar", tags=["calendar"])
+app.include_router(programs_router, prefix="/program-events", tags=["program-events"])
 
 
 @app.get("/health")

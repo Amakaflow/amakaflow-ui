@@ -23,6 +23,7 @@ SourceType = Literal[
     "tiktok",
     "garmin",
     "runna",
+    "training_program",
 ]
 
 WorkoutType = Literal[
@@ -55,7 +56,7 @@ class WorkoutEventBase(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     status: StatusType = "planned"
-    
+
     # New fields
     is_anchor: bool = False
     primary_muscle: Optional[PrimaryMuscleType] = None
@@ -64,7 +65,12 @@ class WorkoutEventBase(BaseModel):
     connected_calendar_type: Optional[ConnectedCalendarType] = None
     external_event_url: Optional[str] = None
     recurrence_rule: Optional[str] = None
-    
+
+    # Program integration fields (AMA-469)
+    program_id: Optional[UUID] = None
+    program_workout_id: Optional[UUID] = None
+    program_week_number: Optional[int] = None
+
     json_payload: Optional[dict[str, Any]] = None
 
 
@@ -82,7 +88,7 @@ class WorkoutEventUpdate(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     status: Optional[StatusType] = None
-    
+
     # New fields
     is_anchor: Optional[bool] = None
     primary_muscle: Optional[PrimaryMuscleType] = None
@@ -91,7 +97,12 @@ class WorkoutEventUpdate(BaseModel):
     connected_calendar_type: Optional[ConnectedCalendarType] = None
     external_event_url: Optional[str] = None
     recurrence_rule: Optional[str] = None
-    
+
+    # Program integration fields (AMA-469)
+    program_id: Optional[UUID] = None
+    program_workout_id: Optional[UUID] = None
+    program_week_number: Optional[int] = None
+
     json_payload: Optional[dict[str, Any]] = None
 
 
@@ -144,3 +155,38 @@ class ConnectedCalendar(ConnectedCalendarBase):
 
     class Config:
         from_attributes = True
+
+
+# Program Events schemas (AMA-469)
+class ProgramEventCreate(BaseModel):
+    """Schema for creating a single program event in bulk."""
+    title: str
+    date: date
+    type: Optional[WorkoutType] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    primary_muscle: Optional[PrimaryMuscleType] = None
+    intensity: Optional[int] = Field(default=1, ge=0, le=3)
+    program_workout_id: UUID
+    program_week_number: int = Field(ge=1)
+    json_payload: Optional[dict[str, Any]] = None
+
+
+class BulkProgramEventsCreate(BaseModel):
+    """Schema for bulk creating program events."""
+    program_id: UUID
+    events: list[ProgramEventCreate]
+
+
+class BulkProgramEventsResponse(BaseModel):
+    """Response schema for bulk program event creation."""
+    program_id: UUID
+    events_created: int
+    event_ids: list[UUID]
+
+
+class ProgramEventsResponse(BaseModel):
+    """Response schema for listing program events."""
+    program_id: UUID
+    events: list[WorkoutEvent]
+    total: int
