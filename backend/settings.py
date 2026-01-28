@@ -21,7 +21,7 @@ Usage:
 
 import json
 from functools import lru_cache
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -101,9 +101,9 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # CORS
     # -------------------------------------------------------------------------
-    allowed_origins: List[str] = Field(
-        default_factory=list,
-        description="Allowed CORS origins. If empty, defaults to localhost:3000/3001.",
+    allowed_origins: str = Field(
+        default="",
+        description="Allowed CORS origins. Comma-separated or JSON array string.",
     )
 
     # -------------------------------------------------------------------------
@@ -181,15 +181,10 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: Union[str, List[str], None]) -> List[str]:
-        """Accept JSON array, comma-separated string, or list."""
-        if v is None:
-            return []
-        if isinstance(v, list):
-            return v
-        v = v.strip()
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """Parse allowed_origins string into a list of origins."""
+        v = self.allowed_origins.strip()
         if not v:
             return []
         if v.startswith("["):

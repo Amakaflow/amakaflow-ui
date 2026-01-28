@@ -130,13 +130,10 @@ def _init_sentry(settings: Settings) -> None:
 
 def _configure_cors(app: FastAPI, settings: Settings) -> None:
     """Configure CORS middleware for the application."""
-    allowed_origins = settings.allowed_origins if settings.allowed_origins else [
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    origins = settings.allowed_origins_list
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
