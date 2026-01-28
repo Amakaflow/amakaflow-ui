@@ -11,7 +11,7 @@ from typing import Any, Dict, Generator, List, Optional
 from application.ports.chat_message_repository import ChatMessageRepository
 from application.ports.chat_session_repository import ChatSessionRepository
 from application.ports.rate_limit_repository import RateLimitRepository
-from backend.services.ai_client import AIClient, StreamEvent
+from backend.services.ai_client import AIClient
 from backend.services.tool_schemas import PHASE_1_TOOLS, execute_tool_stub
 
 logger = logging.getLogger(__name__)

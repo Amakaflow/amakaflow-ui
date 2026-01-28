@@ -11,7 +11,10 @@ from typing import Any, Dict, List
 PHASE_1_TOOLS: List[Dict[str, Any]] = [
     {
         "name": "lookup_user_profile",
-        "description": "Look up the user's fitness profile including goals, experience level, injuries, and preferences.",
+        "description": (
+            "Look up the user's fitness profile including goals, "
+            "experience level, injuries, and preferences."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -20,7 +23,10 @@ PHASE_1_TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "search_workouts",
-        "description": "Search the workout library for workouts matching criteria like muscle group, equipment, difficulty, or duration.",
+        "description": (
+            "Search the workout library for workouts matching criteria "
+            "like muscle group, equipment, difficulty, or duration."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {

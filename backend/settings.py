@@ -114,6 +114,30 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Deployment / Render
+    # -------------------------------------------------------------------------
+    render_git_commit: Optional[str] = Field(
+        default=None,
+        description="Git commit SHA provided by Render (RENDER_GIT_COMMIT)",
+    )
+
+    # -------------------------------------------------------------------------
+    # SSE Configuration
+    # -------------------------------------------------------------------------
+    sse_heartbeat_interval: int = Field(
+        default=30,
+        description="Seconds between SSE heartbeat pings",
+    )
+    sse_max_connections_warning: int = Field(
+        default=150,
+        description="Log warning when active SSE connections reach this threshold",
+    )
+    sse_max_connections_critical: int = Field(
+        default=200,
+        description="Log critical when active SSE connections reach this threshold",
+    )
+
+    # -------------------------------------------------------------------------
     # Rate Limits
     # -------------------------------------------------------------------------
     rate_limit_free: int = Field(

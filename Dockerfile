@@ -2,15 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONUNBUFFERED=1
+
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy requirements and install dependencies (cached layer)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
+
+# Render provides RENDER_GIT_COMMIT at build time
+ARG RENDER_GIT_COMMIT
+LABEL org.opencontainers.image.revision=$RENDER_GIT_COMMIT
 
 # Expose port 8005
 EXPOSE 8005
