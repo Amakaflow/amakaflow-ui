@@ -88,7 +88,7 @@ class FunctionDispatcher:
             return handler(arguments, context)
         except FunctionExecutionError as e:
             return self._error_response("execution_error", e.message)
-        except Exception as e:
+        except Exception:
             logger.exception("Error in function %s", function_name)
             return self._error_response("internal_error", "An unexpected error occurred. Please try again.")
 
@@ -187,7 +187,9 @@ class FunctionDispatcher:
         time = args.get("time")
 
         if not workout_id or not date:
-            return self._error_response("validation_error", "Missing required fields: workout_id and date are required.")
+            return self._error_response(
+                "validation_error", "Missing required fields: workout_id and date are required."
+            )
 
         body = {
             "workout_id": workout_id,

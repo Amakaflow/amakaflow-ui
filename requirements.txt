@@ -30,3 +30,7 @@ sse-starlette>=1.6.0
 # Testing
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
+pyyaml>=6.0.0,<7.0.0
+
+# Load testing (optional, for tests/load/)
+locust>=2.20.0,<3.0.0
