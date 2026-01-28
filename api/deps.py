@@ -20,6 +20,7 @@ from supabase import Client, create_client
 
 from backend.settings import Settings, get_settings as _get_settings
 from backend.services.function_dispatcher import FunctionDispatcher
+from backend.services.feature_flag_service import FeatureFlagService
 
 # Auth from existing module (wrap to maintain single source of truth)
 from backend.auth import (
@@ -299,6 +300,13 @@ def get_function_dispatcher() -> FunctionDispatcher:
     )
 
 
+def get_feature_flag_service(
+    client: Client = Depends(get_supabase_client_required),
+) -> FeatureFlagService:
+    """Get feature flag service instance."""
+    return FeatureFlagService(client)
+
+
 # =============================================================================
 # Use Case Providers
 # =============================================================================
@@ -323,6 +331,7 @@ def get_stream_chat_use_case(
     rate_limit_repo: SupabaseRateLimitRepository = Depends(get_rate_limit_repository),
     ai_client: AIClient = Depends(get_ai_client),
     dispatcher: FunctionDispatcher = Depends(get_function_dispatcher),
+    feature_flags: FeatureFlagService = Depends(get_feature_flag_service),
     settings: Settings = Depends(get_settings),
 ) -> StreamChatUseCase:
     """Get stream chat use case."""
@@ -332,6 +341,7 @@ def get_stream_chat_use_case(
         rate_limit_repo=rate_limit_repo,
         ai_client=ai_client,
         function_dispatcher=dispatcher,
+        feature_flag_service=feature_flags,
         monthly_limit=settings.rate_limit_free,
     )
 
@@ -362,6 +372,7 @@ __all__ = [
     "get_embedding_service",
     "get_ai_client",
     "get_function_dispatcher",
+    "get_feature_flag_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",

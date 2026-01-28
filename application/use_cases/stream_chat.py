@@ -14,6 +14,7 @@ from application.ports.rate_limit_repository import RateLimitRepository
 from backend.services.ai_client import AIClient
 from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
 from backend.services.tool_schemas import PHASE_1_TOOLS
+from backend.services.feature_flag_service import FeatureFlagService
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class StreamChatUseCase:
         rate_limit_repo: RateLimitRepository,
         ai_client: AIClient,
         function_dispatcher: FunctionDispatcher,
+        feature_flag_service: Optional[FeatureFlagService] = None,
         monthly_limit: int = 50,
     ) -> None:
         self._session_repo = session_repo
@@ -66,6 +68,7 @@ class StreamChatUseCase:
         self._rate_limit_repo = rate_limit_repo
         self._ai_client = ai_client
         self._dispatcher = function_dispatcher
+        self._feature_flags = feature_flag_service
         self._monthly_limit = monthly_limit
 
     def execute(
@@ -86,14 +89,26 @@ class StreamChatUseCase:
         Yields:
             SSEEvent objects for the EventSourceResponse.
         """
-        # 1. Rate limit check
+        # 0. Feature flag check - is chat enabled for this user?
+        if self._feature_flags and not self._feature_flags.is_chat_enabled(user_id):
+            yield _sse("error", {
+                "type": "feature_disabled",
+                "message": "Chat is not available for your account. Please check back later.",
+            })
+            return
+
+        # 1. Rate limit check with dynamic limit from feature flags
+        monthly_limit = self._monthly_limit
+        if self._feature_flags:
+            monthly_limit = self._feature_flags.get_rate_limit_for_user(user_id)
+
         usage = self._rate_limit_repo.get_monthly_usage(user_id)
-        if usage >= self._monthly_limit:
+        if usage >= monthly_limit:
             yield _sse("error", {
                 "type": "rate_limit_exceeded",
-                "message": f"Monthly message limit ({self._monthly_limit}) reached. Upgrade for more.",
+                "message": f"Monthly message limit ({monthly_limit}) reached. Upgrade for more.",
                 "usage": usage,
-                "limit": self._monthly_limit,
+                "limit": monthly_limit,
             })
             return
 
