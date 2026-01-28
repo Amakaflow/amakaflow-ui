@@ -5,7 +5,7 @@ Uses text-embedding-3-small to generate embeddings for workout content.
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
