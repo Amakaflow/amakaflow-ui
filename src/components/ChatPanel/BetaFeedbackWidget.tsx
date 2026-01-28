@@ -101,6 +101,7 @@ export function BetaFeedbackWidget({ sessionId, messageId }: BetaFeedbackWidgetP
           size="sm"
           onClick={() => setIsExpanded(true)}
           className="gap-1.5 rounded-full border-primary/20 bg-primary/5 text-xs hover:bg-primary/10"
+          data-testid="feedback-expand-button"
         >
           <MessageCircle className="h-3.5 w-3.5" />
           <span>Feedback</span>
@@ -143,6 +144,7 @@ export function BetaFeedbackWidget({ sessionId, messageId }: BetaFeedbackWidgetP
                       : 'bg-muted hover:bg-green-500/10 hover:text-green-600'
                   }`}
                   aria-label="Positive feedback"
+                  data-testid="feedback-thumbs-up"
                 >
                   <ThumbsUp className="h-5 w-5" />
                 </button>
@@ -155,6 +157,7 @@ export function BetaFeedbackWidget({ sessionId, messageId }: BetaFeedbackWidgetP
                       : 'bg-muted hover:bg-red-500/10 hover:text-red-600'
                   }`}
                   aria-label="Negative feedback"
+                  data-testid="feedback-thumbs-down"
                 >
                   <ThumbsDown className="h-5 w-5" />
                 </button>
@@ -168,12 +171,14 @@ export function BetaFeedbackWidget({ sessionId, messageId }: BetaFeedbackWidgetP
                   placeholder="Tell us more (optional)..."
                   className="h-16 w-full resize-none rounded-md border bg-background px-2 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   disabled={isSubmitting}
+                  data-testid="feedback-textarea"
                 />
                 <Button
                   size="sm"
                   className="w-full gap-1.5"
                   onClick={handleSubmit}
                   disabled={!sentiment || isSubmitting}
+                  data-testid="feedback-submit"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
