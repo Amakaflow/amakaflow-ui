@@ -59,6 +59,10 @@ from application.ports.progression_repository import (
     VolumeDataPoint,
 )
 
+# Search (AMA-432: Semantic Search)
+from application.ports.search_repository import SearchRepository
+from application.ports.embedding_service import EmbeddingService
+
 __all__ = [
     # Workout
     "WorkoutRepository",
@@ -82,4 +86,7 @@ __all__ = [
     "PersonalRecord",
     "LastWeightResult",
     "VolumeDataPoint",
+    # Search (AMA-432)
+    "SearchRepository",
+    "EmbeddingService",
 ]

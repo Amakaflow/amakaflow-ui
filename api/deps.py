@@ -47,6 +47,8 @@ from application.ports import (
     ExerciseMatchRepository,
     ExercisesRepository,
     ProgressionRepository,
+    SearchRepository,
+    EmbeddingService,
 )
 
 # Concrete implementations
@@ -60,6 +62,7 @@ from infrastructure import (
     InMemoryExerciseMatchRepository,
     SupabaseExercisesRepository,
     SupabaseProgressionRepository,
+    SupabaseSearchRepository,
 )
 
 # Exercise matching service (AMA-299)
@@ -377,6 +380,56 @@ def get_progression_service(
 
 
 # =============================================================================
+# Search Providers (AMA-432)
+# =============================================================================
+
+
+def get_search_repo(
+    client: Client = Depends(get_supabase_client_required),
+) -> SearchRepository:
+    """
+    Get SearchRepository implementation.
+
+    Returns a SupabaseSearchRepository instance with injected client.
+    Used for semantic and keyword search over workouts.
+
+    Part of AMA-432: Semantic Search Endpoint
+
+    Args:
+        client: Supabase client (injected)
+
+    Returns:
+        SearchRepository: Repository for workout search operations
+    """
+    return SupabaseSearchRepository(client)
+
+
+@lru_cache
+def get_embedding_service() -> Optional[EmbeddingService]:
+    """
+    Get EmbeddingService if OpenAI is configured, None otherwise (cached).
+
+    Returns None when OPENAI_API_KEY is not set, allowing the search
+    endpoint to fall back to keyword search. The instance is cached
+    for the lifetime of the process to reuse the underlying HTTP client.
+
+    Part of AMA-432: Semantic Search Endpoint
+
+    Returns:
+        Optional[EmbeddingService]: Service for generating embeddings, or None
+    """
+    from backend.services.embedding_service import EmbeddingService as EmbeddingServiceImpl
+
+    settings = _get_settings()
+    if not settings.openai_api_key:
+        return None
+    return EmbeddingServiceImpl(
+        api_key=settings.openai_api_key,
+        model=settings.embedding_model,
+    )
+
+
+# =============================================================================
 # Use Case Providers
 # =============================================================================
 
@@ -524,9 +577,12 @@ __all__ = [
     "get_exercise_match_repo",
     "get_exercises_repo",
     "get_progression_repo",
+    "get_search_repo",
     # Services (AMA-299)
     "get_exercise_matcher",
     "get_progression_service",
+    # Search (AMA-432)
+    "get_embedding_service",
     # Use Cases
     "get_save_workout_use_case",
     "get_export_workout_use_case",
