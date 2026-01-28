@@ -1,32 +1,20 @@
 """
 FastAPI Dependency Providers for AmakaFlow Chat API.
 
-Part of AMA-429: Chat API service skeleton
-
 This module provides FastAPI dependency injection functions that return
 interface types (Protocols) rather than concrete implementations.
 
 Architecture:
 - Settings and Supabase client are cached per-process (lru_cache)
 - Auth providers wrap existing Clerk/JWT logic
-- Repositories will be added in later tickets
-
-Usage in routers:
-    from api.deps import get_current_user
-
-    @router.get("/chat")
-    def chat(user_id: str = Depends(get_current_user)):
-        return {"user_id": user_id}
-
-Testing:
-    # Override dependencies in tests
-    app.dependency_overrides[get_current_user] = lambda: "test-user-123"
+- Repositories are instantiated per-request with shared Supabase client
+- Services and use cases are wired through dependency chains
 """
 
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import Header
+from fastapi import Depends, Header
 from supabase import Client, create_client
 
 from backend.settings import Settings, get_settings as _get_settings
@@ -36,6 +24,20 @@ from backend.auth import (
     get_current_user as _get_current_user,
     get_optional_user as _get_optional_user,
 )
+
+# Repositories
+from infrastructure.db.embedding_repository import SupabaseEmbeddingRepository
+from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
+from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
+from infrastructure.db.rate_limit_repository import SupabaseRateLimitRepository
+
+# Services
+from backend.services.embedding_service import EmbeddingService
+from backend.services.ai_client import AIClient
+
+# Use cases
+from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
+from application.use_cases.stream_chat import StreamChatUseCase
 
 
 # =============================================================================
@@ -191,6 +193,102 @@ def get_ai_client_factory():
 
 
 # =============================================================================
+# Repository Providers
+# =============================================================================
+
+
+def get_embedding_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseEmbeddingRepository:
+    """Get embedding repository instance."""
+    return SupabaseEmbeddingRepository(client)
+
+
+def get_chat_session_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseChatSessionRepository:
+    """Get chat session repository instance."""
+    return SupabaseChatSessionRepository(client)
+
+
+def get_chat_message_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseChatMessageRepository:
+    """Get chat message repository instance."""
+    return SupabaseChatMessageRepository(client)
+
+
+def get_rate_limit_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseRateLimitRepository:
+    """Get rate limit repository instance."""
+    return SupabaseRateLimitRepository(client)
+
+
+# =============================================================================
+# Service Providers
+# =============================================================================
+
+
+@lru_cache
+def get_embedding_service() -> EmbeddingService:
+    """Get cached embedding service instance."""
+    settings = _get_settings()
+    if not settings.openai_api_key:
+        raise ValueError("OPENAI_API_KEY not configured")
+    return EmbeddingService(api_key=settings.openai_api_key)
+
+
+@lru_cache
+def get_ai_client() -> AIClient:
+    """Get cached AI client instance."""
+    settings = _get_settings()
+    if not settings.anthropic_api_key:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+    return AIClient(
+        api_key=settings.anthropic_api_key,
+        helicone_api_key=settings.helicone_api_key,
+        helicone_enabled=settings.helicone_enabled,
+        default_model=settings.default_model,
+    )
+
+
+# =============================================================================
+# Use Case Providers
+# =============================================================================
+
+
+def get_generate_embeddings_use_case(
+    repo: SupabaseEmbeddingRepository = Depends(get_embedding_repository),
+    service: EmbeddingService = Depends(get_embedding_service),
+    settings: Settings = Depends(get_settings),
+) -> GenerateEmbeddingsUseCase:
+    """Get embedding generation use case."""
+    return GenerateEmbeddingsUseCase(
+        repository=repo,
+        embedding_service=service,
+        batch_size=settings.embedding_batch_size,
+    )
+
+
+def get_stream_chat_use_case(
+    session_repo: SupabaseChatSessionRepository = Depends(get_chat_session_repository),
+    message_repo: SupabaseChatMessageRepository = Depends(get_chat_message_repository),
+    rate_limit_repo: SupabaseRateLimitRepository = Depends(get_rate_limit_repository),
+    ai_client: AIClient = Depends(get_ai_client),
+    settings: Settings = Depends(get_settings),
+) -> StreamChatUseCase:
+    """Get stream chat use case."""
+    return StreamChatUseCase(
+        session_repo=session_repo,
+        message_repo=message_repo,
+        rate_limit_repo=rate_limit_repo,
+        ai_client=ai_client,
+        monthly_limit=settings.rate_limit_free,
+    )
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -205,4 +303,15 @@ __all__ = [
     "get_optional_user",
     # AI
     "get_ai_client_factory",
+    # Repositories
+    "get_embedding_repository",
+    "get_chat_session_repository",
+    "get_chat_message_repository",
+    "get_rate_limit_repository",
+    # Services
+    "get_embedding_service",
+    "get_ai_client",
+    # Use Cases
+    "get_generate_embeddings_use_case",
+    "get_stream_chat_use_case",
 ]

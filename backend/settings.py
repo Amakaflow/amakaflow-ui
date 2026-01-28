@@ -126,6 +126,34 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Internal API
+    # -------------------------------------------------------------------------
+    internal_api_key: Optional[str] = Field(
+        default=None,
+        description="Shared secret for internal service-to-service calls",
+    )
+
+    # -------------------------------------------------------------------------
+    # Embeddings
+    # -------------------------------------------------------------------------
+    embedding_batch_size: int = Field(
+        default=100,
+        description="Number of workouts to embed per batch",
+    )
+    embedding_rate_limit_rpm: int = Field(
+        default=3000,
+        description="OpenAI embedding API rate limit (requests per minute)",
+    )
+
+    # -------------------------------------------------------------------------
+    # AI Model Defaults
+    # -------------------------------------------------------------------------
+    default_model: str = Field(
+        default="claude-sonnet-4-20250514",
+        description="Default Anthropic model for chat completions",
+    )
+
+    # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
     @field_validator("environment")
