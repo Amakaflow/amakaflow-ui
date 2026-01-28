@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Generator
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -44,12 +45,7 @@ async def mock_get_current_user() -> str:
 
 @pytest.fixture(autouse=True)
 def mock_env_vars(monkeypatch):
-    """Reinforce test environment variables for each test function.
-
-    Note: Module-level os.environ.setdefault() above handles auth.py's
-    import-time os.getenv() calls. This fixture provides per-test
-    isolation via monkeypatch for any runtime os.getenv() calls.
-    """
+    """Reinforce test environment variables for each test function."""
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-supabase-key")
@@ -79,10 +75,7 @@ def app(test_settings):
 
 @pytest.fixture(scope="session")
 def api_client(app) -> Generator[TestClient, None, None]:
-    """
-    Shared FastAPI TestClient for chat-api endpoints.
-    Properly cleans up dependency overrides.
-    """
+    """Shared FastAPI TestClient for chat-api endpoints."""
     app.dependency_overrides[backend_get_current_user] = mock_get_current_user
     app.dependency_overrides[deps_get_current_user] = mock_get_current_user
     yield TestClient(app)
@@ -91,10 +84,77 @@ def api_client(app) -> Generator[TestClient, None, None]:
 
 @pytest.fixture
 def client(app) -> Generator[TestClient, None, None]:
-    """
-    Per-test FastAPI TestClient (for tests needing fresh state).
-    """
+    """Per-test FastAPI TestClient (for tests needing fresh state)."""
     app.dependency_overrides[backend_get_current_user] = mock_get_current_user
     app.dependency_overrides[deps_get_current_user] = mock_get_current_user
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Mock Repository Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_embedding_repo():
+    """Mock embedding repository."""
+    repo = MagicMock()
+    repo.get_workouts_without_embeddings.return_value = []
+    repo.get_progress.return_value = {"total": 0, "embedded": 0, "remaining": 0}
+    return repo
+
+
+@pytest.fixture
+def mock_session_repo():
+    """Mock chat session repository."""
+    repo = MagicMock()
+    repo.create.return_value = {"id": "sess-test", "title": "New Chat"}
+    repo.get.return_value = {"id": "sess-test", "title": "Test"}
+    repo.list_for_user.return_value = []
+    return repo
+
+
+@pytest.fixture
+def mock_message_repo():
+    """Mock chat message repository."""
+    repo = MagicMock()
+    repo.create.return_value = {"id": "msg-test"}
+    repo.list_for_session.return_value = []
+    return repo
+
+
+@pytest.fixture
+def mock_rate_limit_repo():
+    """Mock rate limit repository."""
+    repo = MagicMock()
+    repo.get_monthly_usage.return_value = 0
+    return repo
+
+
+# ---------------------------------------------------------------------------
+# Mock Service Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_embedding_service():
+    """Mock embedding service."""
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_ai_client():
+    """Mock AI client."""
+    from backend.services.ai_client import StreamEvent
+    client = MagicMock()
+    client.stream_chat.return_value = iter([
+        StreamEvent(event="content_delta", data={"text": "Test response"}),
+        StreamEvent(event="message_end", data={
+            "model": "claude-sonnet-4-20250514",
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "latency_ms": 500,
+        }),
+    ])
+    return client

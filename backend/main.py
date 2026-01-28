@@ -96,10 +96,16 @@ def _configure_cors(app: FastAPI, settings: Settings) -> None:
 
 def _include_routers(app: FastAPI) -> None:
     """Include all API routers in the application."""
-    from api.routers import health_router
+    from api.routers import health_router, chat_router, embeddings_router
 
     # Health router (no prefix - /health at root)
     app.include_router(health_router)
+
+    # Chat router (/chat/stream)
+    app.include_router(chat_router)
+
+    # Embeddings router (/internal/embeddings/*)
+    app.include_router(embeddings_router)
 
 
 # Default app instance for uvicorn
