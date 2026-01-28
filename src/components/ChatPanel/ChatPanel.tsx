@@ -7,6 +7,7 @@
  * - Message list: ScrollArea for messages with auto-scroll
  * - Input area: ChatInput component
  * - Mobile: full-screen mode via media query
+ * - Feature flags: Respects beta rollout configuration (AMA-437)
  */
 
 import { useRef, useEffect } from 'react';
@@ -16,10 +17,15 @@ import { ScrollArea } from '../ui/scroll-area';
 import { useChat } from '../../context/ChatContext';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { ComingSoonBadge } from './ComingSoonBadge';
+import { BetaFeedbackWidget } from './BetaFeedbackWidget';
+import { useChatFeatureFlags, isChatAccessible } from '../../hooks/useChatFeatureFlags';
+import { CHAT_BETA_PERIOD } from '../../lib/env';
 
 export function ChatPanel() {
   const { state, togglePanel, closePanel, sendMessage, clearSession, cancelStream } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { flags, isLoading: flagsLoading } = useChatFeatureFlags();
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -32,6 +38,19 @@ export function ChatPanel() {
       cancelStream();
     };
   }, [cancelStream]);
+
+  // Chat completely disabled via kill switch
+  if (!flagsLoading && !flags.chat_enabled) {
+    return null;
+  }
+
+  // Beta period active but user lacks access - show "Coming Soon" badge
+  if (!flagsLoading && !isChatAccessible(flags)) {
+    return <ComingSoonBadge />;
+  }
+
+  // Determine if user is a beta tester (for showing feedback widget)
+  const isBetaTester = CHAT_BETA_PERIOD && flags.chat_beta_access;
 
   return (
     <>
@@ -125,6 +144,14 @@ export function ChatPanel() {
               <div ref={bottomRef} />
             </div>
           </ScrollArea>
+
+          {/* Beta feedback widget for testers */}
+          {isBetaTester && (
+            <BetaFeedbackWidget
+              sessionId={state.sessionId ?? undefined}
+              messageId={state.messages.length > 0 ? state.messages[state.messages.length - 1].id : undefined}
+            />
+          )}
 
           {/* Input */}
           <ChatInput
