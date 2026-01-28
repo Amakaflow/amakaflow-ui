@@ -34,6 +34,8 @@ import { ProgramDetail } from './components/ProgramDetail';
 import { ProgramsList } from './components/ProgramsList';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
+import { ChatPanel } from './components/ChatPanel';
+import { ChatProvider } from './context/ChatContext';
 import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from './types/workout';
 import { generateWorkoutStructure as generateWorkoutStructureReal, checkApiHealth, normalizeWorkoutStructure } from './lib/api';
 import { generateWorkoutStructure as generateWorkoutStructureMock } from './lib/mock-api';
@@ -1351,6 +1353,7 @@ export default function App() {
   }
 
   return (
+    <ChatProvider>
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" />
       
@@ -2060,6 +2063,10 @@ export default function App() {
 
       {/* Dev-only connected services status (hidden in production) */}
       <DevSystemStatus />
+
+      {/* Chat Panel - floating overlay available on all authenticated views */}
+      <ChatPanel />
     </div>
+    </ChatProvider>
   );
 }

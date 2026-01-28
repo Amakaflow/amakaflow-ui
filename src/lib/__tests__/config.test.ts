@@ -26,6 +26,7 @@ describe('config module', () => {
       expect(API_URLS).toHaveProperty('STRAVA');
       expect(API_URLS).toHaveProperty('GARMIN');
       expect(API_URLS).toHaveProperty('CALENDAR');
+      expect(API_URLS).toHaveProperty('CHAT');
     });
 
     it('should use correct default values for development', async () => {
@@ -37,6 +38,7 @@ describe('config module', () => {
       expect(typeof API_URLS.STRAVA).toBe('string');
       expect(typeof API_URLS.GARMIN).toBe('string');
       expect(typeof API_URLS.CALENDAR).toBe('string');
+      expect(typeof API_URLS.CHAT).toBe('string');
     });
 
     it('should have different default ports for each service', async () => {
@@ -46,6 +48,7 @@ describe('config module', () => {
       delete (import.meta.env as any).VITE_STRAVA_API_URL;
       delete (import.meta.env as any).VITE_GARMIN_API_URL;
       delete (import.meta.env as any).VITE_CALENDAR_API_URL;
+      delete (import.meta.env as any).VITE_CHAT_API_URL;
 
       const { API_URLS } = await import('../config');
 
@@ -61,6 +64,7 @@ describe('config module', () => {
         getPort(API_URLS.STRAVA),
         getPort(API_URLS.GARMIN),
         getPort(API_URLS.CALENDAR),
+        getPort(API_URLS.CHAT),
       ].filter(Boolean);
 
       // All ports should be unique
@@ -78,6 +82,7 @@ describe('config module', () => {
       expect(getApiUrl('STRAVA')).toBe(API_URLS.STRAVA);
       expect(getApiUrl('GARMIN')).toBe(API_URLS.GARMIN);
       expect(getApiUrl('CALENDAR')).toBe(API_URLS.CALENDAR);
+      expect(getApiUrl('CHAT')).toBe(API_URLS.CHAT);
     });
   });
 
@@ -98,7 +103,7 @@ describe('config module', () => {
       const endpoints = getApiHealthEndpoints();
 
       expect(Array.isArray(endpoints)).toBe(true);
-      expect(endpoints.length).toBe(5); // 5 services
+      expect(endpoints.length).toBe(6); // 6 services
 
       // Each endpoint should have name and url
       endpoints.forEach(endpoint => {
@@ -120,6 +125,7 @@ describe('config module', () => {
       expect(names).toContain('Strava Sync API');
       expect(names).toContain('Garmin Sync API (UNOFFICIAL - TEST ONLY)');
       expect(names).toContain('Calendar API');
+      expect(names).toContain('Chat API');
     });
   });
 });
