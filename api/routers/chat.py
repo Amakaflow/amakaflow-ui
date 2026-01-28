@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from api.deps import get_current_user, get_stream_chat_use_case
+from api.deps import get_auth_context, get_stream_chat_use_case, AuthContext
 from application.use_cases.stream_chat import StreamChatUseCase
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -25,7 +25,7 @@ class ChatRequest(BaseModel):
 @router.post("/stream")
 def stream_chat(
     body: ChatRequest,
-    user_id: str = Depends(get_current_user),
+    auth: AuthContext = Depends(get_auth_context),
     use_case: StreamChatUseCase = Depends(get_stream_chat_use_case),
 ):
     """Stream a chat response as Server-Sent Events.
@@ -41,9 +41,10 @@ def stream_chat(
 
     def event_generator():
         for sse_event in use_case.execute(
-            user_id=user_id,
+            user_id=auth.user_id,
             message=body.message,
             session_id=body.session_id,
+            auth_token=auth.auth_token,
         ):
             yield {"event": sse_event.event, "data": sse_event.data}
 

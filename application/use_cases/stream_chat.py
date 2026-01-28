@@ -1,6 +1,6 @@
 """Use case: Stream a chat response via SSE.
 
-Orchestrates: rate limit check → session management → Claude streaming → persistence.
+Orchestrates: rate limit check -> session management -> Claude streaming -> persistence.
 """
 
 import json
@@ -12,7 +12,8 @@ from application.ports.chat_message_repository import ChatMessageRepository
 from application.ports.chat_session_repository import ChatSessionRepository
 from application.ports.rate_limit_repository import RateLimitRepository
 from backend.services.ai_client import AIClient
-from backend.services.tool_schemas import PHASE_1_TOOLS, execute_tool_stub
+from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
+from backend.services.tool_schemas import PHASE_1_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +58,14 @@ class StreamChatUseCase:
         message_repo: ChatMessageRepository,
         rate_limit_repo: RateLimitRepository,
         ai_client: AIClient,
+        function_dispatcher: FunctionDispatcher,
         monthly_limit: int = 50,
     ) -> None:
         self._session_repo = session_repo
         self._message_repo = message_repo
         self._rate_limit_repo = rate_limit_repo
         self._ai_client = ai_client
+        self._dispatcher = function_dispatcher
         self._monthly_limit = monthly_limit
 
     def execute(
@@ -70,6 +73,7 @@ class StreamChatUseCase:
         user_id: str,
         message: str,
         session_id: Optional[str] = None,
+        auth_token: Optional[str] = None,
     ) -> Generator[SSEEvent, None, None]:
         """Stream a chat response.
 
@@ -77,6 +81,7 @@ class StreamChatUseCase:
             user_id: Authenticated user ID.
             message: User's message text.
             session_id: Optional existing session ID; creates new if None.
+            auth_token: Optional auth token for forwarding to external services.
 
         Yields:
             SSEEvent objects for the EventSourceResponse.
@@ -129,10 +134,17 @@ class StreamChatUseCase:
         # 5. Yield message_start
         yield _sse("message_start", {"session_id": session_id})
 
-        # 6. Stream from Claude
+        # 6. Create function context for tool execution
+        context = FunctionContext(user_id=user_id, auth_token=auth_token)
+
+        # 7. Stream from Claude
         full_text = ""
         tool_calls: List[Dict[str, Any]] = []
         end_data: Dict[str, Any] = {}
+
+        # Track current tool block for accumulating partial_json
+        current_tool: Optional[Dict[str, Any]] = None
+        tool_input_json = ""
 
         for event in self._ai_client.stream_chat(
             messages=anthropic_messages,
@@ -141,32 +153,42 @@ class StreamChatUseCase:
             user_id=user_id,
         ):
             if event.event == "content_delta":
-                full_text += event.data.get("text", "")
-                yield _sse("content_delta", event.data)
+                text = event.data.get("text", "")
+                partial_json = event.data.get("partial_json", "")
+
+                if current_tool and partial_json:
+                    # Accumulating tool arguments
+                    tool_input_json += partial_json
+                elif text:
+                    # Normal text response
+                    full_text += text
+                    yield _sse("content_delta", event.data)
 
             elif event.event == "function_call":
+                # Starting a new tool block
+                # First, execute previous tool if one was pending
+                if current_tool:
+                    yield from self._execute_tool(current_tool, tool_input_json, context)
+
+                # Start tracking new tool
+                current_tool = event.data
+                tool_input_json = ""
                 tool_calls.append(event.data)
                 yield _sse("function_call", event.data)
 
-                # Execute stub and yield result
-                result = execute_tool_stub(
-                    event.data["name"],
-                    {},  # Input comes via content_delta partial_json
-                )
-                yield _sse("function_result", {
-                    "tool_use_id": event.data["id"],
-                    "name": event.data["name"],
-                    "result": result,
-                })
-
             elif event.event == "message_end":
+                # Execute any pending tool before ending
+                if current_tool:
+                    yield from self._execute_tool(current_tool, tool_input_json, context)
+                    current_tool = None
+
                 end_data = event.data
 
             elif event.event == "error":
                 yield _sse("error", event.data)
                 return
 
-        # 7. Persist assistant message
+        # 8. Persist assistant message
         try:
             self._message_repo.create({
                 "session_id": session_id,
@@ -181,13 +203,13 @@ class StreamChatUseCase:
         except Exception as e:
             logger.error("Failed to persist assistant message: %s", e)
 
-        # 8. Increment rate limit
+        # 9. Increment rate limit
         try:
             self._rate_limit_repo.increment(user_id)
         except Exception as e:
             logger.error("Failed to increment rate limit: %s", e)
 
-        # 9. Auto-title new sessions
+        # 10. Auto-title new sessions
         if is_new_session and message:
             try:
                 title = message[:80].strip()
@@ -197,11 +219,51 @@ class StreamChatUseCase:
             except Exception as e:
                 logger.error("Failed to auto-title session: %s", e)
 
-        # 10. Yield message_end
+        # 11. Yield message_end
         yield _sse("message_end", {
             "session_id": session_id,
             "tokens_used": end_data.get("input_tokens", 0) + end_data.get("output_tokens", 0),
             "latency_ms": end_data.get("latency_ms", 0),
+        })
+
+    def _execute_tool(
+        self,
+        tool: Dict[str, Any],
+        json_str: str,
+        ctx: FunctionContext,
+    ) -> Generator[SSEEvent, None, None]:
+        """Parse tool arguments and execute via dispatcher.
+
+        Args:
+            tool: Tool info with 'id' and 'name'.
+            json_str: Accumulated JSON string of tool arguments.
+            ctx: Function context with user info and auth.
+
+        Yields:
+            SSEEvent for the function result.
+        """
+        try:
+            args = json.loads(json_str) if json_str else {}
+        except json.JSONDecodeError:
+            # Don't log raw json_str as it may contain sensitive user data
+            logger.warning(
+                "Failed to parse tool arguments for %s (length: %d)",
+                tool.get("name"),
+                len(json_str) if json_str else 0,
+            )
+            # Return explicit error to Claude so it can recover
+            yield _sse("function_result", {
+                "tool_use_id": tool["id"],
+                "name": tool["name"],
+                "result": "Error: Invalid tool arguments received. Please try again.",
+            })
+            return
+
+        result = self._dispatcher.execute(tool["name"], args, ctx)
+        yield _sse("function_result", {
+            "tool_use_id": tool["id"],
+            "name": tool["name"],
+            "result": result,
         })
 
     def _build_messages(

@@ -179,6 +179,26 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # External Service URLs
+    # -------------------------------------------------------------------------
+    mapper_api_url: str = Field(
+        default="http://localhost:8001",
+        description="Base URL for mapper-api service",
+    )
+    calendar_api_url: str = Field(
+        default="http://localhost:8002",
+        description="Base URL for calendar-api service",
+    )
+    workout_ingestor_api_url: str = Field(
+        default="http://localhost:8003",
+        description="Base URL for workout-ingestor-api service",
+    )
+    function_timeout_seconds: float = Field(
+        default=30.0,
+        description="Timeout for external function calls",
+    )
+
+    # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
     @property

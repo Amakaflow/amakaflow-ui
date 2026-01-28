@@ -23,7 +23,7 @@ if root_str not in sys.path:
 from backend.main import create_app
 from backend.settings import Settings
 from backend.auth import get_current_user as backend_get_current_user
-from api.deps import get_current_user as deps_get_current_user
+from api.deps import get_current_user as deps_get_current_user, get_auth_context, AuthContext
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +36,11 @@ TEST_USER_ID = "test-user-123"
 async def mock_get_current_user() -> str:
     """Mock auth dependency that returns a test user."""
     return TEST_USER_ID
+
+
+async def mock_get_auth_context() -> AuthContext:
+    """Mock auth context dependency that returns test user with token."""
+    return AuthContext(user_id=TEST_USER_ID, auth_token="Bearer test-token")
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +83,7 @@ def api_client(app) -> Generator[TestClient, None, None]:
     """Shared FastAPI TestClient for chat-api endpoints."""
     app.dependency_overrides[backend_get_current_user] = mock_get_current_user
     app.dependency_overrides[deps_get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_auth_context] = mock_get_auth_context
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -87,6 +93,7 @@ def client(app) -> Generator[TestClient, None, None]:
     """Per-test FastAPI TestClient (for tests needing fresh state)."""
     app.dependency_overrides[backend_get_current_user] = mock_get_current_user
     app.dependency_overrides[deps_get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_auth_context] = mock_get_auth_context
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -158,3 +165,12 @@ def mock_ai_client():
         }),
     ])
     return client
+
+
+@pytest.fixture
+def mock_function_dispatcher():
+    """Mock function dispatcher for tool execution."""
+    from backend.services.function_dispatcher import FunctionDispatcher
+    dispatcher = MagicMock(spec=FunctionDispatcher)
+    dispatcher.execute.return_value = "Mock result"
+    return dispatcher

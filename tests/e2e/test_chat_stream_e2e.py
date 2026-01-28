@@ -277,9 +277,10 @@ class TestChatStreamFunctionCalls:
         """When AI invokes a tool, both function_call and function_result appear."""
         ai_client.response_events = [
             StreamEvent(event="function_call", data={
-                "id": "tool-abc", "name": "lookup_user_profile",
+                "id": "tool-abc", "name": "search_workout_library",
             }),
-            StreamEvent(event="content_delta", data={"text": "Based on your profile..."}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
+            StreamEvent(event="content_delta", data={"text": "Based on your search..."}),
             StreamEvent(event="message_end", data={
                 "model": "claude-sonnet-4-20250514",
                 "input_tokens": 200,
@@ -290,7 +291,7 @@ class TestChatStreamFunctionCalls:
 
         response = client.post(
             "/chat/stream",
-            json={"message": "What is my fitness profile?"},
+            json={"message": "Find leg workouts"},
         )
 
         events = parse_sse_events(response.text)
@@ -301,19 +302,21 @@ class TestChatStreamFunctionCalls:
 
         fc = find_events(events, "function_call")[0]["data"]
         assert fc["id"] == "tool-abc"
-        assert fc["name"] == "lookup_user_profile"
+        assert fc["name"] == "search_workout_library"
 
         fr = find_events(events, "function_result")[0]["data"]
         assert fr["tool_use_id"] == "tool-abc"
-        assert fr["name"] == "lookup_user_profile"
-        assert "not yet connected" in fr["result"]
+        assert fr["name"] == "search_workout_library"
+        # FakeFunctionDispatcher returns deterministic search results
+        assert "Found these workouts" in fr["result"]
 
-    def test_function_result_precedes_content(self, client, ai_client):
-        """function_result should appear before subsequent content_delta events."""
+    def test_function_result_appears_before_message_end(self, client, ai_client):
+        """function_result should appear before message_end."""
         ai_client.response_events = [
             StreamEvent(event="function_call", data={
-                "id": "tool-1", "name": "search_workouts",
+                "id": "tool-1", "name": "search_workout_library",
             }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "chest"}'}),
             StreamEvent(event="content_delta", data={"text": "Found workouts!"}),
             StreamEvent(event="message_end", data={
                 "model": "claude-sonnet-4-20250514",
@@ -331,9 +334,15 @@ class TestChatStreamFunctionCalls:
         events = parse_sse_events(response.text)
         types = extract_event_types(events)
 
+        # function_result must appear before message_end
         fr_idx = types.index("function_result")
-        cd_idx = types.index("content_delta")
-        assert fr_idx < cd_idx, "function_result must appear before content_delta"
+        me_idx = types.index("message_end")
+        assert fr_idx < me_idx, "function_result must appear before message_end"
+
+        # Verify function_result contains expected data
+        fr = find_events(events, "function_result")[0]["data"]
+        assert fr["name"] == "search_workout_library"
+        assert "Found these workouts" in fr["result"]
 
 
 @pytest.mark.integration

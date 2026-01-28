@@ -42,12 +42,15 @@ from backend.auth import get_current_user as backend_get_current_user
 from backend.services.ai_client import StreamEvent
 from api.deps import (
     get_current_user as deps_get_current_user,
+    get_auth_context,
     get_stream_chat_use_case,
     get_generate_embeddings_use_case,
     get_settings,
+    AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
+from backend.services.function_dispatcher import FunctionContext
 
 
 # ============================================================================
@@ -279,6 +282,86 @@ class FakeEmbeddingService:
         self.should_fail = False
 
 
+class FakeFunctionDispatcher:
+    """Deterministic function dispatcher for E2E tests.
+
+    Returns predictable results for each tool. Can be configured per test.
+    Supports error injection and auth token capture for verification.
+    """
+
+    def __init__(self) -> None:
+        self.call_count: int = 0
+        self.last_call: Optional[Dict[str, Any]] = None
+        self.all_calls: List[Dict[str, Any]] = []
+        self.custom_results: Dict[str, str] = {}
+        self.error_results: Dict[str, str] = {}
+
+    def execute(
+        self,
+        function_name: str,
+        arguments: Dict[str, Any],
+        context: FunctionContext,
+    ) -> str:
+        self.call_count += 1
+        call_info = {
+            "function_name": function_name,
+            "arguments": arguments,
+            "user_id": context.user_id,
+            "auth_token": context.auth_token,
+        }
+        self.last_call = call_info
+        self.all_calls.append(call_info)
+
+        # Return error if configured
+        if function_name in self.error_results:
+            return f"I couldn't complete that action: {self.error_results[function_name]}"
+
+        # Return custom result if configured
+        if function_name in self.custom_results:
+            return self.custom_results[function_name]
+
+        # Default deterministic responses
+        if function_name == "search_workout_library":
+            query = arguments.get("query", "")
+            return f"Found these workouts:\n1. Test Workout for '{query}' (ID: w-test-1)"
+
+        if function_name == "add_workout_to_calendar":
+            date = arguments.get("date", "unknown")
+            time = arguments.get("time")
+            result = f"Added workout to calendar on {date}"
+            if time:
+                result += f" at {time}"
+            return result
+
+        if function_name == "generate_ai_workout":
+            return "Generated workout: E2E Test Workout"
+
+        if function_name == "navigate_to_page":
+            page = arguments.get("page", "home")
+            workout_id = arguments.get("workout_id")
+            nav = {"action": "navigate", "page": page}
+            if workout_id:
+                nav["workout_id"] = workout_id
+            return json.dumps(nav)
+
+        return f"Unknown function '{function_name}'"
+
+    def set_result(self, function_name: str, result: str) -> None:
+        """Configure custom result for a function (test helper)."""
+        self.custom_results[function_name] = result
+
+    def set_error(self, function_name: str, error_message: str) -> None:
+        """Configure error response for a function (test helper)."""
+        self.error_results[function_name] = error_message
+
+    def reset(self) -> None:
+        self.call_count = 0
+        self.last_call = None
+        self.all_calls.clear()
+        self.custom_results.clear()
+        self.error_results.clear()
+
+
 # ============================================================================
 # Shared fake instances (reset per test)
 # ============================================================================
@@ -289,6 +372,7 @@ _rate_limit_repo = FakeRateLimitRepository()
 _ai_client = FakeAIClient()
 _embedding_repo = FakeEmbeddingRepository()
 _embedding_service = FakeEmbeddingService()
+_function_dispatcher = FakeFunctionDispatcher()
 
 
 # ============================================================================
@@ -325,12 +409,17 @@ async def _override_auth() -> str:
     return TEST_USER_ID
 
 
+async def _override_auth_context() -> AuthContext:
+    return AuthContext(user_id=TEST_USER_ID, auth_token="Bearer e2e-test-token")
+
+
 def _override_stream_chat_use_case() -> StreamChatUseCase:
     return StreamChatUseCase(
         session_repo=_session_repo,
         message_repo=_message_repo,
         rate_limit_repo=_rate_limit_repo,
         ai_client=_ai_client,
+        function_dispatcher=_function_dispatcher,
         monthly_limit=_test_settings.rate_limit_free,
     )
 
@@ -357,6 +446,7 @@ def _reset_fakes():
     _ai_client.reset()
     _embedding_repo.reset()
     _embedding_service.reset()
+    _function_dispatcher.reset()
     yield
 
 
@@ -366,6 +456,7 @@ def app():
     application = create_app(settings=_test_settings)
     application.dependency_overrides[backend_get_current_user] = _override_auth
     application.dependency_overrides[deps_get_current_user] = _override_auth
+    application.dependency_overrides[get_auth_context] = _override_auth_context
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
@@ -424,6 +515,11 @@ def embedding_repo() -> FakeEmbeddingRepository:
 @pytest.fixture
 def embedding_service() -> FakeEmbeddingService:
     return _embedding_service
+
+
+@pytest.fixture
+def function_dispatcher() -> FakeFunctionDispatcher:
+    return _function_dispatcher
 
 
 # ============================================================================

@@ -11,6 +11,7 @@ Architecture:
 - Services and use cases are wired through dependency chains
 """
 
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 
@@ -18,6 +19,7 @@ from fastapi import Depends, Header
 from supabase import Client, create_client
 
 from backend.settings import Settings, get_settings as _get_settings
+from backend.services.function_dispatcher import FunctionDispatcher
 
 # Auth from existing module (wrap to maintain single source of truth)
 from backend.auth import (
@@ -109,6 +111,38 @@ def get_supabase_client_required() -> Client:
 # =============================================================================
 # Authentication Providers
 # =============================================================================
+
+
+@dataclass
+class AuthContext:
+    """Auth info for request, including token for forwarding to external services."""
+
+    user_id: str
+    auth_token: Optional[str] = None
+
+
+async def get_auth_context(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_test_auth: Optional[str] = Header(None, alias="X-Test-Auth"),
+    x_test_user_id: Optional[str] = Header(None, alias="X-Test-User-Id"),
+) -> AuthContext:
+    """
+    Get auth context with user ID and token for external service calls.
+
+    Returns:
+        AuthContext: Contains user_id and auth_token for forwarding.
+
+    Raises:
+        HTTPException: 401 if authentication fails.
+    """
+    user_id = await _get_current_user(
+        authorization=authorization,
+        x_api_key=x_api_key,
+        x_test_auth=x_test_auth,
+        x_test_user_id=x_test_user_id,
+    )
+    return AuthContext(user_id=user_id, auth_token=authorization)
 
 
 async def get_current_user(
@@ -253,6 +287,18 @@ def get_ai_client() -> AIClient:
     )
 
 
+@lru_cache
+def get_function_dispatcher() -> FunctionDispatcher:
+    """Get cached function dispatcher for tool execution."""
+    settings = _get_settings()
+    return FunctionDispatcher(
+        mapper_api_url=settings.mapper_api_url,
+        calendar_api_url=settings.calendar_api_url,
+        ingestor_api_url=settings.workout_ingestor_api_url,
+        timeout=settings.function_timeout_seconds,
+    )
+
+
 # =============================================================================
 # Use Case Providers
 # =============================================================================
@@ -276,6 +322,7 @@ def get_stream_chat_use_case(
     message_repo: SupabaseChatMessageRepository = Depends(get_chat_message_repository),
     rate_limit_repo: SupabaseRateLimitRepository = Depends(get_rate_limit_repository),
     ai_client: AIClient = Depends(get_ai_client),
+    dispatcher: FunctionDispatcher = Depends(get_function_dispatcher),
     settings: Settings = Depends(get_settings),
 ) -> StreamChatUseCase:
     """Get stream chat use case."""
@@ -284,6 +331,7 @@ def get_stream_chat_use_case(
         message_repo=message_repo,
         rate_limit_repo=rate_limit_repo,
         ai_client=ai_client,
+        function_dispatcher=dispatcher,
         monthly_limit=settings.rate_limit_free,
     )
 
@@ -299,6 +347,8 @@ __all__ = [
     "get_supabase_client",
     "get_supabase_client_required",
     # Authentication
+    "AuthContext",
+    "get_auth_context",
     "get_current_user",
     "get_optional_user",
     # AI
@@ -311,6 +361,7 @@ __all__ = [
     # Services
     "get_embedding_service",
     "get_ai_client",
+    "get_function_dispatcher",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",

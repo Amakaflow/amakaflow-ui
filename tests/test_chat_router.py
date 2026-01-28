@@ -9,7 +9,12 @@ from fastapi.testclient import TestClient
 from backend.main import create_app
 from backend.settings import Settings
 from backend.auth import get_current_user as backend_get_current_user
-from api.deps import get_current_user as deps_get_current_user, get_stream_chat_use_case
+from api.deps import (
+    get_current_user as deps_get_current_user,
+    get_auth_context,
+    get_stream_chat_use_case,
+    AuthContext,
+)
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
 
 
@@ -18,6 +23,10 @@ TEST_USER_ID = "test-user-456"
 
 async def mock_auth():
     return TEST_USER_ID
+
+
+async def mock_auth_context():
+    return AuthContext(user_id=TEST_USER_ID, auth_token="Bearer test-token")
 
 
 @pytest.fixture
@@ -50,6 +59,7 @@ def mock_stream_use_case():
 def chat_client(chat_app, mock_stream_use_case):
     chat_app.dependency_overrides[backend_get_current_user] = mock_auth
     chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+    chat_app.dependency_overrides[get_auth_context] = mock_auth_context
     chat_app.dependency_overrides[get_stream_chat_use_case] = lambda: mock_stream_use_case
     yield TestClient(chat_app)
     chat_app.dependency_overrides.clear()
@@ -143,6 +153,7 @@ class TestChatStream:
             user_id=TEST_USER_ID,
             message="Hello",
             session_id="sess-existing",
+            auth_token="Bearer test-token",
         )
 
     def test_empty_message_returns_422(self, chat_client):
@@ -178,6 +189,7 @@ class TestChatRateLimit:
 
         chat_app.dependency_overrides[backend_get_current_user] = mock_auth
         chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_auth_context] = mock_auth_context
         chat_app.dependency_overrides[get_stream_chat_use_case] = lambda: mock_uc
 
         test_client = TestClient(chat_app)

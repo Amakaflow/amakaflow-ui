@@ -7,6 +7,7 @@ import pytest
 
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
 from backend.services.ai_client import StreamEvent
+from backend.services.function_dispatcher import FunctionDispatcher
 
 
 @pytest.fixture
@@ -51,12 +52,20 @@ def mock_ai_client():
 
 
 @pytest.fixture
-def use_case(mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client):
+def mock_function_dispatcher():
+    dispatcher = MagicMock(spec=FunctionDispatcher)
+    dispatcher.execute.return_value = "Mock result"
+    return dispatcher
+
+
+@pytest.fixture
+def use_case(mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher):
     return StreamChatUseCase(
         session_repo=mock_session_repo,
         message_repo=mock_message_repo,
         rate_limit_repo=mock_rate_limit_repo,
         ai_client=mock_ai_client,
+        function_dispatcher=mock_function_dispatcher,
         monthly_limit=50,
     )
 
@@ -171,12 +180,13 @@ class TestStreamChat:
 
 class TestStreamChatToolCalls:
     def test_function_call_and_result(
-        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
     ):
         mock_ai_client = MagicMock()
         mock_ai_client.stream_chat.return_value = iter([
-            StreamEvent(event="function_call", data={"id": "tool-1", "name": "lookup_user_profile"}),
-            StreamEvent(event="content_delta", data={"text": "Based on your profile..."}),
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
+            StreamEvent(event="content_delta", data={"text": "Based on the search..."}),
             StreamEvent(event="message_end", data={
                 "model": "claude-sonnet-4-20250514",
                 "input_tokens": 200,
@@ -185,20 +195,186 @@ class TestStreamChatToolCalls:
             }),
         ])
 
+        mock_function_dispatcher.execute.return_value = "Found these workouts:\n1. Leg Day (ID: w-1)"
+
         use_case = StreamChatUseCase(
             session_repo=mock_session_repo,
             message_repo=mock_message_repo,
             rate_limit_repo=mock_rate_limit_repo,
             ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
         )
 
-        events = list(use_case.execute(user_id="user-1", message="What's my profile?"))
+        events = list(use_case.execute(user_id="user-1", message="Find me a leg workout"))
         event_types = [e.event for e in events]
 
         assert "function_call" in event_types
         assert "function_result" in event_types
 
-        # Check function_result is a stub
+        # Check function_result contains dispatcher result
         fr = next(e for e in events if e.event == "function_result")
         data = json.loads(fr.data)
-        assert "not yet connected" in data["result"]
+        assert "Leg Day" in data["result"]
+
+        # Verify dispatcher was called with accumulated args
+        mock_function_dispatcher.execute.assert_called_once()
+        call_args = mock_function_dispatcher.execute.call_args
+        assert call_args[0][0] == "search_workout_library"
+        assert call_args[0][1] == {"query": "legs"}
+
+    def test_multiple_tool_calls_in_sequence(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify multiple sequential tool calls are each executed."""
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            # First tool call
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
+            # Second tool call (triggers execution of first)
+            StreamEvent(event="function_call", data={"id": "tool-2", "name": "add_workout_to_calendar"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"workout_id": "w-1", "date": "2024-01-15"}'}),
+            # End triggers execution of second
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 300,
+                "output_tokens": 150,
+                "latency_ms": 3000,
+            }),
+        ])
+
+        mock_function_dispatcher.execute.side_effect = [
+            "Found: Leg Day (ID: w-1)",
+            "Scheduled for 2024-01-15",
+        ]
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Schedule leg workout"))
+
+        # Should have 2 function_call and 2 function_result events
+        function_calls = [e for e in events if e.event == "function_call"]
+        function_results = [e for e in events if e.event == "function_result"]
+
+        assert len(function_calls) == 2
+        assert len(function_results) == 2
+
+        # Verify dispatcher was called twice with correct args
+        assert mock_function_dispatcher.execute.call_count == 2
+        calls = mock_function_dispatcher.execute.call_args_list
+
+        assert calls[0][0][0] == "search_workout_library"
+        assert calls[0][0][1] == {"query": "legs"}
+
+        assert calls[1][0][0] == "add_workout_to_calendar"
+        assert calls[1][0][1] == {"workout_id": "w-1", "date": "2024-01-15"}
+
+    def test_tool_call_with_malformed_json(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify malformed JSON in partial_json returns error to Claude."""
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "navigate_to_page"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{invalid json'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "latency_ms": 1000,
+            }),
+        ])
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Go home"))
+
+        # Should have function_result with error message
+        function_results = [e for e in events if e.event == "function_result"]
+        assert len(function_results) == 1
+
+        # Error should be returned to Claude instead of calling dispatcher
+        fr_data = json.loads(function_results[0].data)
+        assert "Error" in fr_data["result"]
+        assert "Invalid tool arguments" in fr_data["result"]
+
+        # Dispatcher should NOT have been called (error returned early)
+        mock_function_dispatcher.execute.assert_not_called()
+
+    def test_auth_token_forwarded_to_context(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify auth_token is passed through to FunctionContext."""
+        from backend.services.function_dispatcher import FunctionContext
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "test"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "latency_ms": 1000,
+            }),
+        ])
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Search",
+            auth_token="Bearer my-secret-token",
+        ))
+
+        # Verify the context passed to dispatcher has the auth token
+        mock_function_dispatcher.execute.assert_called_once()
+        call_args = mock_function_dispatcher.execute.call_args
+        context = call_args[0][2]
+
+        assert isinstance(context, FunctionContext)
+        assert context.user_id == "user-1"
+        assert context.auth_token == "Bearer my-secret-token"
+
+
+class TestStreamChatErrorHandling:
+    def test_session_creation_failure(
+        self, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Verify session creation exception yields error SSE."""
+        mock_session_repo = MagicMock()
+        mock_session_repo.create.side_effect = Exception("Database connection failed")
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        assert len(events) == 1
+        assert events[0].event == "error"
+        data = json.loads(events[0].data)
+        assert data["type"] == "internal_error"
+        assert "session" in data["message"].lower()

@@ -1,114 +1,112 @@
-"""Phase 1 tool JSON schemas and stub executor.
+"""Phase 1 tool JSON schemas for Claude function calling.
 
-Defines tool schemas so Claude knows what's available.
-execute_tool_stub() returns a placeholder message until real
-tool execution is implemented in AMA-440.
+Defines the tools available for Claude to use when chatting with users.
+These schemas follow Anthropic's tool use specification.
 """
 
 from typing import Any, Dict, List
 
-# Phase 1 tools: Claude sees these but they return stub results
 PHASE_1_TOOLS: List[Dict[str, Any]] = [
     {
-        "name": "lookup_user_profile",
+        "name": "search_workout_library",
         "description": (
-            "Look up the user's fitness profile including goals, "
-            "experience level, injuries, and preferences."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
-    },
-    {
-        "name": "search_workouts",
-        "description": (
-            "Search the workout library for workouts matching criteria "
-            "like muscle group, equipment, difficulty, or duration."
+            "Search the user's workout library using natural language. "
+            "Returns matching workouts with IDs that can be used for scheduling."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Natural language search query for workouts",
+                    "description": (
+                        "Natural language search query (e.g., 'leg workouts', 'quick cardio')"
+                    ),
                 },
-                "muscle_group": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default: 5)",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "add_workout_to_calendar",
+        "description": (
+            "Schedule a workout on the user's calendar for a specific date and time."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
                     "type": "string",
-                    "description": "Target muscle group (e.g., chest, back, legs)",
+                    "description": "ID of the workout to schedule",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Date in ISO format (YYYY-MM-DD)",
+                },
+                "time": {
+                    "type": "string",
+                    "description": "Time in HH:MM format (optional)",
+                },
+                "recurrence": {
+                    "type": "string",
+                    "enum": ["daily", "weekly"],
+                    "description": "Recurring schedule (optional)",
+                },
+            },
+            "required": ["workout_id", "date"],
+        },
+    },
+    {
+        "name": "generate_ai_workout",
+        "description": (
+            "Generate a custom workout based on a natural language description "
+            "of what the user wants."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Natural language description of desired workout",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Target workout duration in minutes",
                 },
                 "equipment": {
-                    "type": "string",
-                    "description": "Available equipment (e.g., dumbbells, barbell, bodyweight)",
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Available equipment",
                 },
                 "difficulty": {
                     "type": "string",
                     "enum": ["beginner", "intermediate", "advanced"],
-                    "description": "Workout difficulty level",
-                },
-                "max_duration_minutes": {
-                    "type": "integer",
-                    "description": "Maximum workout duration in minutes",
+                    "description": "Difficulty level",
                 },
             },
-            "required": [],
+            "required": ["description"],
         },
     },
     {
-        "name": "get_workout_history",
-        "description": "Get the user's recent workout history including completed workouts, sets, reps, and progress.",
+        "name": "navigate_to_page",
+        "description": "Navigate the user to a specific page in the app.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Number of recent workouts to return (default: 10)",
-                },
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "create_workout_plan",
-        "description": "Create a structured workout plan for the user based on their goals and preferences.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "goal": {
+                "page": {
                     "type": "string",
-                    "description": "Training goal (e.g., muscle gain, fat loss, strength)",
+                    "enum": ["home", "library", "calendar", "workout", "settings"],
+                    "description": "Target page",
                 },
-                "days_per_week": {
-                    "type": "integer",
-                    "description": "Number of training days per week",
-                },
-                "duration_weeks": {
-                    "type": "integer",
-                    "description": "Program duration in weeks",
+                "workout_id": {
+                    "type": "string",
+                    "description": "Workout ID (required when page='workout')",
                 },
             },
-            "required": ["goal"],
+            "required": ["page"],
         },
     },
 ]
-
-
-def execute_tool_stub(tool_name: str, tool_input: Dict[str, Any]) -> str:
-    """Execute a tool call with a stub response.
-
-    Returns a message indicating the tool is not yet implemented.
-    AMA-440 will replace this with real FunctionDispatcher.
-
-    Args:
-        tool_name: The tool being called.
-        tool_input: The input arguments.
-
-    Returns:
-        Stub response string.
-    """
-    return (
-        f"[Tool '{tool_name}' is not yet connected. "
-        f"This feature is coming soon. For now, I'll provide general guidance "
-        f"based on my training knowledge.]"
-    )

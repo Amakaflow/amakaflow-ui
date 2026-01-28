@@ -44,6 +44,7 @@ from tests.e2e.conftest import (
     FakeRateLimitRepository,
     FakeEmbeddingRepository,
     FakeEmbeddingService,
+    FakeFunctionDispatcher,
     parse_sse_events,
     extract_event_types,
     find_events,
@@ -597,11 +598,13 @@ class TestFunctionCallOrdering:
         """When AI makes multiple tool calls, each gets a corresponding result."""
         ai_client.response_events = [
             StreamEvent(event="function_call", data={
-                "id": "tool-1", "name": "lookup_user_profile",
+                "id": "tool-1", "name": "search_workout_library",
             }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
             StreamEvent(event="function_call", data={
-                "id": "tool-2", "name": "get_workout_history",
+                "id": "tool-2", "name": "navigate_to_page",
             }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"page": "calendar"}'}),
             StreamEvent(event="content_delta", data={"text": "Here is your plan."}),
             StreamEvent(event="message_end", data={
                 "model": "claude-sonnet-4-20250514",
@@ -613,7 +616,7 @@ class TestFunctionCallOrdering:
 
         response = client.post(
             "/chat/stream",
-            json={"message": "Create a workout plan based on my profile"},
+            json={"message": "Find leg workouts and show me the calendar"},
         )
 
         events = parse_sse_events(response.text)
@@ -629,15 +632,16 @@ class TestFunctionCallOrdering:
 
         # Each function_result should reference the correct tool name
         fr_names = {e["data"]["name"] for e in fr_events}
-        assert fr_names == {"lookup_user_profile", "get_workout_history"}
+        assert fr_names == {"search_workout_library", "navigate_to_page"}
 
-    def test_function_result_contains_stub_response(self, client, ai_client):
-        """All function_result events contain the stub message."""
+    def test_function_result_contains_dispatcher_response(self, client, ai_client):
+        """All function_result events contain dispatcher responses."""
         ai_client.response_events = [
             StreamEvent(event="function_call", data={
-                "id": "tool-x", "name": "create_workout_plan",
+                "id": "tool-x", "name": "generate_ai_workout",
             }),
-            StreamEvent(event="content_delta", data={"text": "Plan created."}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"description": "quick HIIT"}'}),
+            StreamEvent(event="content_delta", data={"text": "Workout created."}),
             StreamEvent(event="message_end", data={
                 "model": "claude-sonnet-4-20250514",
                 "input_tokens": 100,
@@ -648,10 +652,211 @@ class TestFunctionCallOrdering:
 
         response = client.post(
             "/chat/stream",
-            json={"message": "Make me a plan"},
+            json={"message": "Make me a HIIT workout"},
         )
 
         events = parse_sse_events(response.text)
         fr = find_events(events, "function_result")[0]
-        assert "not yet connected" in fr["data"]["result"]
-        assert fr["data"]["name"] == "create_workout_plan"
+        # FakeFunctionDispatcher returns "Generated workout: E2E Test Workout"
+        assert "Generated workout" in fr["data"]["result"]
+        assert fr["data"]["name"] == "generate_ai_workout"
+
+
+# ============================================================================
+# P1: Function Dispatcher Integration Tests (SMOKE - PR Gate)
+# ============================================================================
+
+
+@pytest.mark.integration
+class TestFunctionDispatcherIntegration:
+    """Critical E2E tests for function dispatcher integration."""
+
+    def test_add_workout_to_calendar_happy_path(
+        self, client, ai_client, function_dispatcher
+    ):
+        """Verify add_workout_to_calendar tool executes and returns success message."""
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-cal", "name": "add_workout_to_calendar",
+            }),
+            StreamEvent(event="content_delta", data={
+                "partial_json": '{"workout_id": "w-123", "date": "2024-02-15", "time": "09:00"}'
+            }),
+            StreamEvent(event="content_delta", data={"text": "Scheduled!"}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 150,
+                "output_tokens": 40,
+                "latency_ms": 800,
+            }),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Schedule my leg workout for Feb 15 at 9am"},
+        )
+
+        events = parse_sse_events(response.text)
+        fr = find_events(events, "function_result")[0]
+
+        # Verify success message with date and time
+        assert "Added workout to calendar" in fr["data"]["result"]
+        assert "2024-02-15" in fr["data"]["result"]
+        assert "09:00" in fr["data"]["result"]
+        assert fr["data"]["name"] == "add_workout_to_calendar"
+
+        # Verify dispatcher received correct arguments
+        assert function_dispatcher.last_call["function_name"] == "add_workout_to_calendar"
+        assert function_dispatcher.last_call["arguments"]["workout_id"] == "w-123"
+        assert function_dispatcher.last_call["arguments"]["date"] == "2024-02-15"
+
+    def test_tool_error_appears_in_function_result(
+        self, client, ai_client, function_dispatcher
+    ):
+        """When dispatcher returns an error, it appears in function_result."""
+        # Configure error for search
+        function_dispatcher.set_error(
+            "search_workout_library",
+            "The service is taking too long. Please try again."
+        )
+
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-err", "name": "search_workout_library",
+            }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "test"}'}),
+            StreamEvent(event="content_delta", data={"text": "Let me try again..."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 30,
+                "latency_ms": 500,
+            }),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Find workouts"},
+        )
+
+        events = parse_sse_events(response.text)
+        fr = find_events(events, "function_result")[0]
+
+        # Verify error message appears in result
+        assert "couldn't complete that action" in fr["data"]["result"]
+        assert "taking too long" in fr["data"]["result"]
+        assert fr["data"]["name"] == "search_workout_library"
+
+        # Stream should complete successfully (not crash)
+        types = extract_event_types(events)
+        assert "message_end" in types
+
+    def test_function_context_receives_auth_token(
+        self, client, ai_client, function_dispatcher
+    ):
+        """Verify auth_token is forwarded to FunctionContext."""
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-auth", "name": "navigate_to_page",
+            }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"page": "library"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 80,
+                "output_tokens": 20,
+                "latency_ms": 400,
+            }),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Go to library"},
+        )
+
+        events = parse_sse_events(response.text)
+
+        # Verify auth token was captured by dispatcher
+        assert function_dispatcher.last_call is not None
+        assert function_dispatcher.last_call["auth_token"] == "Bearer e2e-test-token"
+        assert function_dispatcher.last_call["user_id"] == TEST_USER_ID
+
+        # Verify function completed
+        fr = find_events(events, "function_result")
+        assert len(fr) == 1
+
+    def test_partial_json_accumulates_across_multiple_deltas(
+        self, client, ai_client, function_dispatcher
+    ):
+        """Verify tool arguments split across multiple content_delta events reassemble."""
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-multi", "name": "search_workout_library",
+            }),
+            # Split the JSON across 4 chunks
+            StreamEvent(event="content_delta", data={"partial_json": '{"qu'}),
+            StreamEvent(event="content_delta", data={"partial_json": 'ery"'}),
+            StreamEvent(event="content_delta", data={"partial_json": ': "leg'}),
+            StreamEvent(event="content_delta", data={"partial_json": 's"}'}),
+            StreamEvent(event="content_delta", data={"text": "Here are your results."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 120,
+                "output_tokens": 35,
+                "latency_ms": 600,
+            }),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Find leg workouts"},
+        )
+
+        events = parse_sse_events(response.text)
+        fr = find_events(events, "function_result")[0]
+
+        # Verify dispatcher received the reassembled arguments
+        assert function_dispatcher.last_call["arguments"] == {"query": "legs"}
+
+        # Verify result reflects the query
+        assert "legs" in fr["data"]["result"]
+
+    def test_malformed_tool_arguments_uses_empty_dict(
+        self, client, ai_client, function_dispatcher
+    ):
+        """When partial_json is invalid, dispatcher receives empty dict and stream continues."""
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-bad", "name": "navigate_to_page",
+            }),
+            # Invalid JSON - missing closing brace
+            StreamEvent(event="content_delta", data={"partial_json": '{"page": "home"'}),
+            StreamEvent(event="content_delta", data={"text": "Navigating now."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 90,
+                "output_tokens": 25,
+                "latency_ms": 450,
+            }),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Go home"},
+        )
+
+        events = parse_sse_events(response.text)
+
+        # Stream should complete without crashing
+        types = extract_event_types(events)
+        assert "message_start" in types
+        assert "function_call" in types
+        assert "function_result" in types
+        assert "message_end" in types
+
+        # Dispatcher should NOT have been called - error returned early
+        assert function_dispatcher.last_call is None
+
+        # function_result should contain error message
+        fr = find_events(events, "function_result")[0]
+        assert "Error" in fr["data"]["result"]
+        assert "Invalid tool arguments" in fr["data"]["result"]
