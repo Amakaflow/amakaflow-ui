@@ -19,8 +19,9 @@ Usage:
     print(settings.supabase_url)
 """
 
+import json
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -180,6 +181,21 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Union[str, List[str], None]) -> List[str]:
+        """Accept JSON array, comma-separated string, or list."""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        v = v.strip()
+        if not v:
+            return []
+        if v.startswith("["):
+            return json.loads(v)
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
+
     @field_validator("environment")
     @classmethod
     def validate_environment(cls, v: str) -> str:
