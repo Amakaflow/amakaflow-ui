@@ -3,6 +3,7 @@
 POST /chat/stream returns an SSE event stream via sse-starlette.
 GET /chat/sessions returns a paginated list of user's chat sessions.
 GET /chat/sessions/{session_id}/messages returns messages for a session.
+DELETE /chat/sessions/{session_id} deletes a chat session and its messages.
 """
 
 from datetime import datetime
@@ -159,3 +160,24 @@ async def get_session_messages(
         ],
         has_more=len(messages) == limit,
     )
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: str,
+    user_id: str = Depends(get_current_user),
+    session_repo: SupabaseChatSessionRepository = Depends(get_chat_session_repository),
+) -> None:
+    """Delete a chat session and all its messages.
+
+    Messages are automatically deleted via FK cascade constraint.
+
+    Args:
+        session_id: The session ID to delete.
+
+    Raises:
+        HTTPException 404: If session not found or doesn't belong to user.
+    """
+    deleted = session_repo.delete(session_id, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")

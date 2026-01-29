@@ -582,3 +582,73 @@ class TestGetSessionMessages:
         assert data["messages"][1]["tool_results"] == [{"name": "get_weather", "result": {"temp": 72}}]
 
         chat_app.dependency_overrides.clear()
+
+
+class TestDeleteSession:
+    """Tests for DELETE /chat/sessions/{session_id} endpoint."""
+
+    @pytest.fixture
+    def mock_session_repo(self):
+        repo = MagicMock(spec=SupabaseChatSessionRepository)
+        repo.delete.return_value = True
+        return repo
+
+    @pytest.fixture
+    def delete_client(self, chat_app, mock_session_repo):
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        yield TestClient(chat_app)
+        chat_app.dependency_overrides.clear()
+
+    def test_unauthenticated_returns_401(self, chat_app):
+        """No auth override -> 401."""
+        client = TestClient(chat_app)
+        response = client.delete("/chat/sessions/sess-1")
+        assert response.status_code == 401
+
+    def test_delete_success_returns_204(self, delete_client, mock_session_repo):
+        """Successful delete returns 204 No Content."""
+        response = delete_client.delete("/chat/sessions/sess-1")
+        assert response.status_code == 204
+        mock_session_repo.delete.assert_called_once_with("sess-1", TEST_USER_ID)
+
+    def test_session_not_found_returns_404(self, chat_app):
+        """Non-existent session returns 404."""
+        mock_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_repo.delete.return_value = False
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_repo
+
+        client = TestClient(chat_app)
+        response = client.delete("/chat/sessions/nonexistent")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Session not found"
+
+        chat_app.dependency_overrides.clear()
+
+    def test_other_user_session_returns_404(self, chat_app):
+        """Session belonging to different user returns 404."""
+        mock_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_repo.delete.return_value = False
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_repo
+
+        client = TestClient(chat_app)
+        response = client.delete("/chat/sessions/other-user-session")
+
+        assert response.status_code == 404
+        mock_repo.delete.assert_called_once_with("other-user-session", TEST_USER_ID)
+
+        chat_app.dependency_overrides.clear()
+
+    def test_delete_returns_no_body(self, delete_client):
+        """204 response has no body."""
+        response = delete_client.delete("/chat/sessions/sess-1")
+        assert response.status_code == 204
+        assert response.content == b""

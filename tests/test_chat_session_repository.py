@@ -240,6 +240,55 @@ class TestUpdateTitle:
         mock_eq.assert_called_once_with("id", "sess-123")
 
 
+class TestDelete:
+    """Tests for delete method."""
+
+    def _setup_delete_mock(self, mock_client, data):
+        """Helper to setup the chained delete mock."""
+        mock_execute = MagicMock()
+        mock_execute.execute.return_value.data = data
+        mock_eq2 = MagicMock(return_value=mock_execute)
+        mock_eq1 = MagicMock()
+        mock_eq1.eq = mock_eq2
+        mock_client.table.return_value.delete.return_value.eq.return_value = mock_eq1
+
+    def test_deletes_session_returns_true(self, repo, mock_supabase_client):
+        """Should delete session and return True when found."""
+        self._setup_delete_mock(mock_supabase_client, [{"id": "sess-123"}])
+
+        result = repo.delete("sess-123", "user-123")
+
+        assert result is True
+        mock_supabase_client.table.assert_called_with("chat_sessions")
+
+    def test_returns_false_when_not_found(self, repo, mock_supabase_client):
+        """Should return False when session not found."""
+        self._setup_delete_mock(mock_supabase_client, [])
+
+        result = repo.delete("sess-nonexistent", "user-123")
+
+        assert result is False
+
+    def test_filters_by_session_id_and_user_id(self, repo, mock_supabase_client):
+        """Should filter by both session_id and user_id."""
+        self._setup_delete_mock(mock_supabase_client, [{"id": "sess-123"}])
+
+        repo.delete("sess-123", "user-456")
+
+        # Verify chained eq calls
+        mock_supabase_client.table.return_value.delete.return_value.eq.assert_called_with(
+            "id", "sess-123"
+        )
+
+    def test_returns_false_on_none_data(self, repo, mock_supabase_client):
+        """Should return False when data is None."""
+        self._setup_delete_mock(mock_supabase_client, None)
+
+        result = repo.delete("sess-123", "user-123")
+
+        assert result is False
+
+
 class TestTableName:
     """Tests for table configuration."""
 

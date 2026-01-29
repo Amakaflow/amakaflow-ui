@@ -49,3 +49,22 @@ class SupabaseChatSessionRepository:
             .execute()
         )
         return result.data or []
+
+    def delete(self, session_id: str, user_id: str) -> bool:
+        """Delete a session if it belongs to the user.
+
+        Args:
+            session_id: The session ID to delete.
+            user_id: The user ID (for ownership verification).
+
+        Returns:
+            True if a session was deleted, False if not found.
+        """
+        result = (
+            self._client.table(self.TABLE)
+            .delete()
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return len(result.data) > 0 if result.data else False

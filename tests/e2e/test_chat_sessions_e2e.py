@@ -476,3 +476,112 @@ class TestListSessionsEdgeCases:
         data = response.json()
         assert len(data) == 1
         assert data[0]["title"] == unicode_title
+
+
+# ============================================================================
+# DELETE SESSION TESTS (AMA-499)
+# ============================================================================
+
+
+@pytest.mark.integration
+class TestDeleteSessionSmoke:
+    """Critical-path tests for DELETE /chat/sessions/{id} endpoint."""
+
+    def test_delete_success_returns_204(self, client, session_repo):
+        """DELETE /chat/sessions/{id} returns 204 on success."""
+        session = session_repo.create(TEST_USER_ID, "Session to delete")
+
+        response = client.delete(f"/chat/sessions/{session['id']}")
+
+        assert response.status_code == 204
+        assert response.content == b""
+
+    def test_auth_required(self, noauth_client, session_repo):
+        """Missing auth credentials returns 401."""
+        session = session_repo.create(TEST_USER_ID, "Protected session")
+
+        response = noauth_client.delete(f"/chat/sessions/{session['id']}")
+
+        assert response.status_code == 401
+
+    def test_session_not_found_returns_404(self, client):
+        """Non-existent session returns 404."""
+        response = client.delete("/chat/sessions/nonexistent-session-id")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Session not found"
+
+    def test_other_user_session_returns_404(self, client, session_repo):
+        """Cannot delete another user's session (returns 404)."""
+        other_session = session_repo.create(SECOND_USER_ID, "Other user's session")
+
+        response = client.delete(f"/chat/sessions/{other_session['id']}")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Session not found"
+
+
+@pytest.mark.integration
+class TestDeleteSessionBehavior:
+    """Tests for delete session behavior."""
+
+    def test_session_removed_from_list(self, client, session_repo):
+        """Deleted session no longer appears in list."""
+        session1 = session_repo.create(TEST_USER_ID, "Keep this")
+        session2 = session_repo.create(TEST_USER_ID, "Delete this")
+
+        # Verify both exist
+        response = client.get("/chat/sessions")
+        assert len(response.json()) == 2
+
+        # Delete one
+        client.delete(f"/chat/sessions/{session2['id']}")
+
+        # Verify only one remains
+        response = client.get("/chat/sessions")
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["id"] == session1["id"]
+
+    def test_delete_is_idempotent_style(self, client, session_repo):
+        """Deleting already-deleted session returns 404."""
+        session = session_repo.create(TEST_USER_ID, "Will be deleted")
+
+        # First delete succeeds
+        response = client.delete(f"/chat/sessions/{session['id']}")
+        assert response.status_code == 204
+
+        # Second delete returns 404
+        response = client.delete(f"/chat/sessions/{session['id']}")
+        assert response.status_code == 404
+
+    def test_messages_cascade_deleted(self, client, session_repo, message_repo):
+        """Messages are deleted when session is deleted (cascade)."""
+        session = session_repo.create(TEST_USER_ID, "Chat with messages")
+
+        # Add messages
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "user",
+            "content": "Hello",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "assistant",
+            "content": "Hi there!",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        # Verify messages exist
+        response = client.get(f"/chat/sessions/{session['id']}/messages")
+        assert len(response.json()["messages"]) == 2
+
+        # Delete session
+        client.delete(f"/chat/sessions/{session['id']}")
+
+        # Session no longer exists (404 on messages endpoint)
+        response = client.get(f"/chat/sessions/{session['id']}/messages")
+        assert response.status_code == 404

@@ -113,6 +113,17 @@ class FakeChatSessionRepository:
         user_sessions.sort(key=lambda s: s.get("updated_at", ""), reverse=True)
         return user_sessions[offset:offset + limit]
 
+    def delete(self, session_id: str, user_id: str) -> bool:
+        """Delete a session if it belongs to the user.
+
+        Returns True if deleted, False if not found.
+        """
+        session = self._sessions.get(session_id)
+        if session and session["user_id"] == user_id:
+            del self._sessions[session_id]
+            return True
+        return False
+
     def reset(self) -> None:
         self._sessions.clear()
 
