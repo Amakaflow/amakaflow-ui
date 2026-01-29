@@ -14,10 +14,10 @@ class RateLimitRepository(Protocol):
         """
         ...
 
-    def increment(self, user_id: str) -> None:
-        """Increment the request count for today.
+    def increment(self, user_id: str) -> int:
+        """Atomically increment the request count for today.
 
-        Uses select-then-upsert: checks for existing row for today,
-        updates count or inserts new row.
+        Returns:
+            The new request count after incrementing.
         """
         ...

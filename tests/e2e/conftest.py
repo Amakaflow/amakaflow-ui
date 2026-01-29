@@ -141,8 +141,9 @@ class FakeRateLimitRepository:
     def get_monthly_usage(self, user_id: str) -> int:
         return self._usage.get(user_id, 0)
 
-    def increment(self, user_id: str) -> None:
+    def increment(self, user_id: str) -> int:
         self._usage[user_id] = self._usage.get(user_id, 0) + 1
+        return self._usage[user_id]
 
     def set_usage(self, user_id: str, count: int) -> None:
         """Test helper to preset usage."""

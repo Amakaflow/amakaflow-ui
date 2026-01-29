@@ -1,6 +1,6 @@
 """Supabase implementation of RateLimitRepository."""
 
-from datetime import date, datetime
+from datetime import date
 
 from supabase import Client
 
@@ -28,33 +28,24 @@ class SupabaseRateLimitRepository:
         )
         return sum(row["request_count"] for row in (result.data or []))
 
-    def increment(self, user_id: str) -> None:
+    def increment(self, user_id: str) -> int:
+        """Atomically increment the AI request count for today.
+
+        Uses an atomic RPC to prevent race conditions where concurrent
+        requests could bypass the rate limit.
+
+        Args:
+            user_id: The user's ID.
+
+        Returns:
+            The new request count after incrementing.
+        """
         today = date.today().isoformat()
+        result = self._client.rpc(
+            "increment_ai_request_limit",
+            {"p_user_id": user_id, "p_date": today},
+        ).execute()
 
-        # Check for existing row
-        existing = (
-            self._client.table(self.TABLE)
-            .select("id, request_count")
-            .eq("user_id", user_id)
-            .eq("request_date", today)
-            .limit(1)
-            .execute()
-        )
-
-        if existing.data:
-            row = existing.data[0]
-            self._client.table(self.TABLE).update(
-                {
-                    "request_count": row["request_count"] + 1,
-                    "last_request_at": datetime.utcnow().isoformat(),
-                }
-            ).eq("id", row["id"]).execute()
-        else:
-            self._client.table(self.TABLE).insert(
-                {
-                    "user_id": user_id,
-                    "request_date": today,
-                    "request_count": 1,
-                    "last_request_at": datetime.utcnow().isoformat(),
-                }
-            ).execute()
+        if result.data:
+            return result.data[0]["new_count"]
+        return 1
