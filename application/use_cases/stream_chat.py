@@ -15,7 +15,7 @@ from application.ports.chat_session_repository import ChatSessionRepository
 from application.ports.rate_limit_repository import RateLimitRepository
 from backend.services.ai_client import AIClient
 from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
-from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS
+from backend.services.tool_schemas import ALL_TOOLS
 from backend.services.feature_flag_service import FeatureFlagService
 
 if TYPE_CHECKING:
@@ -177,8 +177,8 @@ class StreamChatUseCase:
         ai_call_count = 0
         end_data: Dict[str, Any] = {}
 
-        # Combine Phase 1, Phase 2, and Phase 3 tools for Claude
-        tools = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS
+        # All tools (Phase 1-4) available to Claude
+        tools = ALL_TOOLS
 
         # Maximum tool loop iterations to prevent infinite loops
         MAX_TOOL_ITERATIONS = 10

@@ -81,6 +81,34 @@ class TestStreamChat:
         assert "content_delta" in event_types
         assert event_types[-1] == "message_end"
 
+    def test_all_tool_phases_passed_to_claude(self, use_case, mock_ai_client):
+        """Verify all tool phases (1-4) are passed to Claude."""
+        list(use_case.execute(user_id="user-1", message="Hello"))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        tools = call_kwargs["tools"]
+        tool_names = [t["name"] for t in tools]
+
+        # Phase 1 tools
+        assert "search_workout_library" in tool_names
+        assert "add_workout_to_calendar" in tool_names
+
+        # Phase 2 tools (content ingestion)
+        assert "import_from_youtube" in tool_names
+        assert "import_from_tiktok" in tool_names
+
+        # Phase 3 tools (edit, export, history)
+        assert "edit_workout" in tool_names
+        assert "get_workout_history" in tool_names
+
+        # Phase 4 tools (calendar & sync)
+        assert "get_calendar_events" in tool_names
+        assert "reschedule_workout" in tool_names
+        assert "cancel_scheduled_workout" in tool_names
+        assert "sync_strava" in tool_names
+        assert "sync_garmin" in tool_names
+        assert "get_strava_activities" in tool_names
+
     def test_new_session_created(self, use_case, mock_session_repo):
         events = list(use_case.execute(user_id="user-1", message="Hello"))
 
