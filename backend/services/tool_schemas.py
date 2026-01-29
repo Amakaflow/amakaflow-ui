@@ -215,5 +215,149 @@ PHASE_2_TOOLS: List[Dict[str, Any]] = [
     },
 ]
 
+PHASE_3_TOOLS: List[Dict[str, Any]] = [
+    {
+        "name": "edit_workout",
+        "description": (
+            "Edit a workout's title, description, tags, or exercises using "
+            "JSON Patch operations."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
+                    "type": "string",
+                    "description": "ID of workout to edit",
+                },
+                "operations": {
+                    "type": "array",
+                    "description": "JSON Patch operations (op: replace/add/remove, path, value)",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "op": {
+                                "type": "string",
+                                "enum": ["replace", "add", "remove"],
+                            },
+                            "path": {"type": "string"},
+                            "value": {},
+                        },
+                        "required": ["op", "path"],
+                    },
+                },
+            },
+            "required": ["workout_id", "operations"],
+        },
+    },
+    {
+        "name": "export_workout",
+        "description": (
+            "Export a workout to a specific format for use with fitness devices or apps."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
+                    "type": "string",
+                    "description": "ID of workout to export",
+                },
+                "format": {
+                    "type": "string",
+                    "enum": ["yaml", "zwo", "workoutkit", "fit_metadata"],
+                    "description": (
+                        "Export format (yaml=Garmin, zwo=Zwift, workoutkit=Apple Watch)"
+                    ),
+                },
+            },
+            "required": ["workout_id", "format"],
+        },
+    },
+    {
+        "name": "duplicate_workout",
+        "description": "Create a copy of an existing workout, optionally with modifications.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
+                    "type": "string",
+                    "description": "ID of workout to duplicate",
+                },
+                "new_title": {
+                    "type": "string",
+                    "description": "Title for the new workout",
+                },
+                "modifications": {
+                    "type": "object",
+                    "description": "Optional changes to apply to the copy",
+                },
+            },
+            "required": ["workout_id"],
+        },
+    },
+    {
+        "name": "log_workout_completion",
+        "description": "Record that a workout was completed with optional metrics.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
+                    "type": "string",
+                    "description": "ID of completed workout",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Actual duration in minutes",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "User notes about the workout",
+                },
+                "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "Rating 1-5",
+                },
+            },
+            "required": ["workout_id"],
+        },
+    },
+    {
+        "name": "get_workout_history",
+        "description": "Get the user's workout completion history with optional date filtering.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 10, max 50)",
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Filter from date (YYYY-MM-DD)",
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "Filter to date (YYYY-MM-DD)",
+                },
+            },
+        },
+    },
+    {
+        "name": "get_workout_details",
+        "description": "Get detailed information about a specific workout.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_id": {
+                    "type": "string",
+                    "description": "ID of workout to retrieve",
+                },
+            },
+            "required": ["workout_id"],
+        },
+    },
+]
+
 # Combined list for convenience
-ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS
+ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS

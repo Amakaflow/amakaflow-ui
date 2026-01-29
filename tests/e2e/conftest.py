@@ -416,6 +416,92 @@ class FakeFunctionDispatcher:
                 },
             })
 
+        # Phase 3: Workout Management handlers
+        if function_name == "edit_workout":
+            workout_id = arguments.get("workout_id", "unknown")
+            return json.dumps({
+                "success": True,
+                "message": "Workout updated successfully",
+                "workout_id": workout_id,
+            })
+
+        if function_name == "export_workout":
+            workout_id = arguments.get("workout_id", "unknown")
+            export_format = arguments.get("format", "yaml")
+            format_names = {
+                "yaml": "Garmin YAML",
+                "zwo": "Zwift ZWO",
+                "workoutkit": "Apple WorkoutKit",
+                "fit_metadata": "FIT metadata",
+            }
+            return json.dumps({
+                "success": True,
+                "format": export_format,
+                "format_name": format_names.get(export_format, export_format),
+                "workout_id": workout_id,
+                "content": f"<fake {export_format} content>",
+                "download_url": f"https://api.amakaflow.com/export/{workout_id}.{export_format}",
+            })
+
+        if function_name == "duplicate_workout":
+            workout_id = arguments.get("workout_id", "unknown")
+            new_title = arguments.get("new_title", "Workout (Copy)")
+            return json.dumps({
+                "success": True,
+                "message": "Workout duplicated successfully",
+                "original_id": workout_id,
+                "new_workout": {
+                    "id": f"w-dup-{workout_id}",
+                    "title": new_title,
+                },
+            })
+
+        if function_name == "log_workout_completion":
+            workout_id = arguments.get("workout_id", "unknown")
+            return json.dumps({
+                "success": True,
+                "message": "Workout completion logged",
+                "workout_id": workout_id,
+                "completion_id": f"comp-{workout_id}-1",
+            })
+
+        if function_name == "get_workout_history":
+            return json.dumps({
+                "success": True,
+                "completions": [
+                    {
+                        "workout_title": "Morning HIIT",
+                        "completed_at": "2024-01-15T08:30:00Z",
+                        "duration_minutes": 30,
+                        "rating": 4,
+                    },
+                    {
+                        "workout_title": "Leg Day",
+                        "completed_at": "2024-01-14T17:00:00Z",
+                        "duration_minutes": 45,
+                        "rating": 5,
+                    },
+                ],
+            })
+
+        if function_name == "get_workout_details":
+            workout_id = arguments.get("workout_id", "unknown")
+            return json.dumps({
+                "success": True,
+                "workout": {
+                    "id": workout_id,
+                    "title": "Test Workout",
+                    "description": "A test workout for E2E testing",
+                    "exercise_count": 5,
+                    "tags": ["strength", "test"],
+                    "exercises": [
+                        {"name": "Squats", "sets": 3, "reps": 10},
+                        {"name": "Lunges", "sets": 3, "reps": 12},
+                        {"name": "Deadlifts", "sets": 3, "reps": 8},
+                    ],
+                },
+            })
+
         return f"Unknown function '{function_name}'"
 
     def set_result(self, function_name: str, result: str) -> None:

@@ -1110,3 +1110,936 @@ class TestImportFromImage:
         parsed = json.loads(result)
         assert parsed["error"] is True
         assert "taking too long" in parsed["message"]
+
+
+# =============================================================================
+# Phase 3: Workout Management Handler Tests
+# =============================================================================
+
+
+class TestEditWorkout:
+    """Unit tests for edit_workout handler."""
+
+    def test_success(self, dispatcher, context):
+        """Verify successful workout edit."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "w-123", "title": "Updated Title"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "edit_workout",
+                {
+                    "workout_id": "w-123",
+                    "operations": [
+                        {"op": "replace", "path": "/title", "value": "Updated Title"}
+                    ],
+                },
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["workout_id"] == "w-123"
+        assert "updated successfully" in data["message"].lower()
+
+        # Verify PATCH method and endpoint
+        call_args = mock_req.call_args
+        assert call_args[0][0] == "PATCH"
+        assert "/workouts/w-123" in call_args[0][1]
+
+    def test_missing_workout_id(self, dispatcher, context):
+        """Verify error when workout_id is missing."""
+        result = dispatcher.execute(
+            "edit_workout",
+            {"operations": [{"op": "replace", "path": "/title", "value": "New"}]},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_id" in parsed["message"]
+
+    def test_missing_operations(self, dispatcher, context):
+        """Verify error when operations array is missing."""
+        result = dispatcher.execute(
+            "edit_workout",
+            {"workout_id": "w-123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "operations" in parsed["message"]
+
+    def test_empty_operations_array(self, dispatcher, context):
+        """Verify error when operations array is empty."""
+        result = dispatcher.execute(
+            "edit_workout",
+            {"workout_id": "w-123", "operations": []},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "operations" in parsed["message"]
+
+    def test_invalid_operation_type(self, dispatcher, context):
+        """Verify error when operation type is invalid."""
+        result = dispatcher.execute(
+            "edit_workout",
+            {
+                "workout_id": "w-123",
+                "operations": [{"op": "delete", "path": "/exercises/0"}],
+            },
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "Invalid operation" in parsed["message"]
+
+    def test_missing_path_in_operation(self, dispatcher, context):
+        """Verify error when operation is missing path."""
+        result = dispatcher.execute(
+            "edit_workout",
+            {
+                "workout_id": "w-123",
+                "operations": [{"op": "replace", "value": "New Title"}],
+            },
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "path" in parsed["message"]
+
+    def test_multiple_operations(self, dispatcher, context):
+        """Verify multiple operations are sent correctly."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "w-123"}
+        mock_response.raise_for_status = MagicMock()
+
+        operations = [
+            {"op": "replace", "path": "/title", "value": "New Title"},
+            {"op": "add", "path": "/tags/-", "value": "strength"},
+            {"op": "remove", "path": "/exercises/0"},
+        ]
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "edit_workout",
+                {"workout_id": "w-123", "operations": operations},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        body = call_args[1]["json"]
+        assert len(body["operations"]) == 3
+
+    def test_auth_forwarded(self, dispatcher, context):
+        """Verify auth token is forwarded in request."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "w-123"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "edit_workout",
+                {
+                    "workout_id": "w-123",
+                    "operations": [{"op": "replace", "path": "/title", "value": "X"}],
+                },
+                context,
+            )
+
+        call_kwargs = mock_req.call_args
+        assert call_kwargs[1]["headers"]["Authorization"] == "Bearer test-token"
+        assert call_kwargs[1]["headers"]["X-User-Id"] == "user-1"
+
+    def test_404_workout_not_found(self, dispatcher, context):
+        """Verify 404 error is handled gracefully."""
+        response = MagicMock()
+        response.status_code = 404
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "edit_workout",
+                {
+                    "workout_id": "w-nonexistent",
+                    "operations": [{"op": "replace", "path": "/title", "value": "X"}],
+                },
+                context,
+            )
+        assert "not found" in result.lower()
+
+    def test_timeout_error(self, dispatcher, context):
+        """Verify timeout is handled gracefully."""
+        with patch.object(
+            dispatcher._client, "request", side_effect=httpx.TimeoutException("timeout")
+        ):
+            result = dispatcher.execute(
+                "edit_workout",
+                {
+                    "workout_id": "w-123",
+                    "operations": [{"op": "replace", "path": "/title", "value": "X"}],
+                },
+                context,
+            )
+        assert "taking too long" in result
+
+
+class TestExportWorkout:
+    """Unit tests for export_workout handler."""
+
+    def test_success_yaml(self, dispatcher, context):
+        """Verify successful YAML export."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "content": "steps:\n  - warmup: 5min",
+            "download_url": "https://api.example.com/export/w-123.yaml",
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "export_workout",
+                {"workout_id": "w-123", "format": "yaml"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["format"] == "yaml"
+        assert data["format_name"] == "Garmin YAML"
+        assert data["workout_id"] == "w-123"
+        assert "content" in data
+
+        # Verify GET method and query param
+        call_args = mock_req.call_args
+        assert call_args[0][0] == "GET"
+        assert "/export/w-123" in call_args[0][1]
+        assert call_args[1]["params"]["export_format"] == "yaml"
+
+    def test_success_zwo(self, dispatcher, context):
+        """Verify successful Zwift ZWO export."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"content": "<workout_file>..."}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "export_workout",
+                {"workout_id": "w-123", "format": "zwo"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["format"] == "zwo"
+        assert data["format_name"] == "Zwift ZWO"
+
+    def test_success_workoutkit(self, dispatcher, context):
+        """Verify successful Apple WorkoutKit export."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"content": "{...}"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "export_workout",
+                {"workout_id": "w-123", "format": "workoutkit"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["format"] == "workoutkit"
+        assert data["format_name"] == "Apple WorkoutKit"
+
+    def test_success_fit_metadata(self, dispatcher, context):
+        """Verify successful FIT metadata export."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"content": "..."}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "export_workout",
+                {"workout_id": "w-123", "format": "fit_metadata"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["format"] == "fit_metadata"
+        assert data["format_name"] == "FIT metadata"
+
+    def test_missing_workout_id(self, dispatcher, context):
+        """Verify error when workout_id is missing."""
+        result = dispatcher.execute(
+            "export_workout",
+            {"format": "yaml"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_id" in parsed["message"]
+
+    def test_missing_format(self, dispatcher, context):
+        """Verify error when format is missing."""
+        result = dispatcher.execute(
+            "export_workout",
+            {"workout_id": "w-123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "format" in parsed["message"]
+
+    def test_invalid_format(self, dispatcher, context):
+        """Verify error when format is invalid."""
+        result = dispatcher.execute(
+            "export_workout",
+            {"workout_id": "w-123", "format": "pdf"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "Invalid format" in parsed["message"]
+        assert "pdf" in parsed["message"]
+
+    def test_404_workout_not_found(self, dispatcher, context):
+        """Verify 404 error is handled gracefully."""
+        response = MagicMock()
+        response.status_code = 404
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "export_workout",
+                {"workout_id": "w-nonexistent", "format": "yaml"},
+                context,
+            )
+        assert "not found" in result.lower()
+
+
+class TestDuplicateWorkout:
+    """Unit tests for duplicate_workout handler."""
+
+    def test_success_basic(self, dispatcher, context):
+        """Verify basic workout duplication."""
+        # Mock GET for original workout
+        get_response = MagicMock()
+        get_response.json.return_value = {
+            "id": "w-original",
+            "title": "Original Workout",
+            "exercises": [{"name": "Squats"}],
+        }
+        get_response.raise_for_status = MagicMock()
+
+        # Mock POST for saving duplicate
+        post_response = MagicMock()
+        post_response.json.return_value = {
+            "workout": {"id": "w-new", "title": "Original Workout (Copy)"}
+        }
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            result = dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-original"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["original_id"] == "w-original"
+        assert "new_workout" in data
+        assert data["new_workout"]["id"] == "w-new"
+
+    def test_success_with_new_title(self, dispatcher, context):
+        """Verify duplication with custom title."""
+        get_response = MagicMock()
+        get_response.json.return_value = {"id": "w-1", "title": "Original"}
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {
+            "workout": {"id": "w-new", "title": "Custom Title"}
+        }
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            result = dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-1", "new_title": "Custom Title"},
+                context,
+            )
+
+        # Verify the POST request used the custom title
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+        assert body["title"] == "Custom Title"
+
+    def test_default_title_is_copy_suffix(self, dispatcher, context):
+        """Verify default title has ' (Copy)' suffix when no new_title provided."""
+        get_response = MagicMock()
+        get_response.json.return_value = {"id": "w-1", "title": "My Workout"}
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {"workout": {"id": "w-new", "title": "My Workout (Copy)"}}
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-1"},
+                context,
+            )
+
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+        assert body["title"] == "My Workout (Copy)"
+
+    def test_success_with_modifications(self, dispatcher, context):
+        """Verify duplication with modifications applied."""
+        get_response = MagicMock()
+        get_response.json.return_value = {
+            "id": "w-1",
+            "title": "Original",
+            "difficulty": "beginner",
+        }
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {"workout": {"id": "w-new"}}
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            dispatcher.execute(
+                "duplicate_workout",
+                {
+                    "workout_id": "w-1",
+                    "modifications": {"difficulty": "advanced", "tags": ["modified"]},
+                },
+                context,
+            )
+
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+        assert body["difficulty"] == "advanced"
+        assert body["tags"] == ["modified"]
+
+    def test_removes_id_fields_from_copy(self, dispatcher, context):
+        """Verify id, workout_id, created_at, updated_at are removed from copy."""
+        get_response = MagicMock()
+        get_response.json.return_value = {
+            "id": "w-1",
+            "workout_id": "w-1",
+            "title": "Original",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-15T00:00:00Z",
+        }
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {"workout": {"id": "w-new"}}
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-1"},
+                context,
+            )
+
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+        assert "id" not in body
+        assert "workout_id" not in body
+        assert "created_at" not in body
+        assert "updated_at" not in body
+
+    def test_missing_workout_id(self, dispatcher, context):
+        """Verify error when workout_id is missing."""
+        result = dispatcher.execute(
+            "duplicate_workout",
+            {},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_id" in parsed["message"]
+
+    def test_original_not_found(self, dispatcher, context):
+        """Verify 404 when original workout doesn't exist."""
+        response = MagicMock()
+        response.status_code = 404
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-nonexistent"},
+                context,
+            )
+        assert "not found" in result.lower()
+
+
+class TestLogWorkoutCompletion:
+    """Unit tests for log_workout_completion handler."""
+
+    def test_success_minimal(self, dispatcher, context):
+        """Verify successful completion logging with only workout_id."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "comp-1", "workout_id": "w-123"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "log_workout_completion",
+                {"workout_id": "w-123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["workout_id"] == "w-123"
+        assert "completion_id" in data
+
+        # Verify POST method and endpoint
+        call_args = mock_req.call_args
+        assert call_args[0][0] == "POST"
+        assert "/workouts/complete" in call_args[0][1]
+
+    def test_success_with_all_fields(self, dispatcher, context):
+        """Verify successful completion logging with all optional fields."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "comp-1"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "log_workout_completion",
+                {
+                    "workout_id": "w-123",
+                    "duration_minutes": 45,
+                    "notes": "Felt great, increased weights",
+                    "rating": 5,
+                },
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+        # Verify all fields were sent in request
+        call_args = mock_req.call_args
+        body = call_args[1]["json"]
+        assert body["workout_id"] == "w-123"
+        assert body["duration_minutes"] == 45
+        assert body["notes"] == "Felt great, increased weights"
+        assert body["rating"] == 5
+
+    def test_missing_workout_id(self, dispatcher, context):
+        """Verify error when workout_id is missing."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"duration_minutes": 30},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_id" in parsed["message"]
+
+    def test_rating_boundary_min_valid(self, dispatcher, context):
+        """Verify rating=1 is accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "comp-1"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "log_workout_completion",
+                {"workout_id": "w-123", "rating": 1},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_rating_boundary_max_valid(self, dispatcher, context):
+        """Verify rating=5 is accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "comp-1"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "log_workout_completion",
+                {"workout_id": "w-123", "rating": 5},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_rating_below_min_rejected(self, dispatcher, context):
+        """Verify rating=0 is rejected."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"workout_id": "w-123", "rating": 0},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "Rating" in parsed["message"] or "rating" in parsed["message"]
+
+    def test_rating_above_max_rejected(self, dispatcher, context):
+        """Verify rating=6 is rejected."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"workout_id": "w-123", "rating": 6},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+
+    def test_negative_rating_rejected(self, dispatcher, context):
+        """Verify negative rating is rejected."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"workout_id": "w-123", "rating": -1},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+
+    def test_404_workout_not_found(self, dispatcher, context):
+        """Verify 404 when workout doesn't exist."""
+        response = MagicMock()
+        response.status_code = 404
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "log_workout_completion",
+                {"workout_id": "w-nonexistent"},
+                context,
+            )
+        assert "not found" in result.lower()
+
+
+class TestGetWorkoutHistory:
+    """Unit tests for get_workout_history handler."""
+
+    def test_success_with_completions(self, dispatcher, context):
+        """Verify successful history retrieval with results."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "completions": [
+                {
+                    "workout_title": "Morning HIIT",
+                    "completed_at": "2024-01-15T08:30:00Z",
+                    "duration_minutes": 30,
+                    "rating": 4,
+                },
+                {
+                    "workout_title": "Leg Day",
+                    "completed_at": "2024-01-14T17:00:00Z",
+                    "duration_minutes": 45,
+                    "rating": 5,
+                },
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "get_workout_history",
+                {},
+                context,
+            )
+
+        assert "2 workout completion" in result
+        assert "Morning HIIT" in result
+        assert "Leg Day" in result
+        assert "30 min" in result
+        assert "4/5" in result
+
+        # Verify GET method and endpoint
+        call_args = mock_req.call_args
+        assert call_args[0][0] == "GET"
+        assert "/workouts/completions" in call_args[0][1]
+
+    def test_no_completions_found(self, dispatcher, context):
+        """Verify empty response message when no completions."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"completions": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "get_workout_history",
+                {},
+                context,
+            )
+
+        assert "No workout completions found" in result
+
+    def test_default_limit_is_10(self, dispatcher, context):
+        """Verify default limit is 10 when not specified."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"completions": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "get_workout_history",
+                {},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["params"]["limit"] == 10
+
+    def test_limit_capped_at_50(self, dispatcher, context):
+        """Verify limit is capped at 50 for safety."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"completions": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "get_workout_history",
+                {"limit": 100},  # Request 100
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["params"]["limit"] == 50  # Should be capped at 50
+
+    def test_date_filters_passed(self, dispatcher, context):
+        """Verify date filters are passed to API."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"completions": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "get_workout_history",
+                {
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-01-31",
+                },
+                context,
+            )
+
+        call_args = mock_req.call_args
+        params = call_args[1]["params"]
+        assert params["start_date"] == "2024-01-01"
+        assert params["end_date"] == "2024-01-31"
+
+    def test_response_formatting_without_optional_fields(self, dispatcher, context):
+        """Verify response formatting when optional fields are missing."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "completions": [
+                {
+                    "workout_title": "Basic Workout",
+                    "completed_at": "2024-01-10",
+                    # No duration_minutes or rating
+                },
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "get_workout_history",
+                {},
+                context,
+            )
+
+        assert "Basic Workout" in result
+        assert "2024-01-10" in result
+        # Should not crash when optional fields are missing
+
+    def test_alternative_response_structure(self, dispatcher, context):
+        """Verify handler handles 'results' key as alternative to 'completions'."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "results": [  # Some APIs use 'results' instead of 'completions'
+                {"title": "Workout 1", "date": "2024-01-10"},
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "get_workout_history",
+                {},
+                context,
+            )
+
+        assert "1 workout completion" in result
+
+
+class TestGetWorkoutDetails:
+    """Unit tests for get_workout_details handler."""
+
+    def test_success(self, dispatcher, context):
+        """Verify successful workout details retrieval."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": "w-123",
+            "title": "Full Body Workout",
+            "description": "A comprehensive full body routine",
+            "tags": ["strength", "full-body"],
+            "estimated_duration_minutes": 45,
+            "exercises": [
+                {"name": "Squats", "sets": 3, "reps": 10},
+                {"name": "Push-ups", "sets": 3, "reps": 15},
+                {"name": "Rows", "sets": 3, "reps": 12},
+            ],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "get_workout_details",
+                {"workout_id": "w-123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["workout"]["id"] == "w-123"
+        assert data["workout"]["title"] == "Full Body Workout"
+        assert data["workout"]["exercise_count"] == 3
+        assert data["workout"]["tags"] == ["strength", "full-body"]
+        assert data["workout"]["estimated_duration_minutes"] == 45
+        assert len(data["workout"]["exercises"]) == 3
+        assert data["workout"]["exercises"][0]["name"] == "Squats"
+
+        # Verify GET method and endpoint
+        call_args = mock_req.call_args
+        assert call_args[0][0] == "GET"
+        assert "/workouts/w-123" in call_args[0][1]
+
+    def test_missing_workout_id(self, dispatcher, context):
+        """Verify error when workout_id is missing."""
+        result = dispatcher.execute(
+            "get_workout_details",
+            {},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_id" in parsed["message"]
+
+    def test_404_not_found(self, dispatcher, context):
+        """Verify 404 error is handled gracefully."""
+        response = MagicMock()
+        response.status_code = 404
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "get_workout_details",
+                {"workout_id": "w-nonexistent"},
+                context,
+            )
+        assert "not found" in result.lower()
+
+    def test_exercise_list_capped_at_20(self, dispatcher, context):
+        """Verify exercise list is truncated to 20 items."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": "w-123",
+            "title": "Long Workout",
+            "description": "",
+            "tags": [],
+            "exercises": [{"name": f"Exercise {i}"} for i in range(30)],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "get_workout_details",
+                {"workout_id": "w-123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["workout"]["exercise_count"] == 30  # Total count should be accurate
+        assert len(data["workout"]["exercises"]) == 20  # But list is capped
+
+    def test_optional_fields_handling(self, dispatcher, context):
+        """Verify handling when optional fields are missing."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": "w-123",
+            "title": "Minimal Workout",
+            # No description, tags, duration, or exercises
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "get_workout_details",
+                {"workout_id": "w-123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["workout"]["id"] == "w-123"
+        assert data["workout"]["description"] == ""
+        assert data["workout"]["tags"] == []
+        assert data["workout"]["exercise_count"] == 0
+        assert "estimated_duration_minutes" not in data["workout"]  # Optional
+
+    def test_auth_forwarded(self, dispatcher, context):
+        """Verify auth token is forwarded."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "w-123", "title": "Test"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "get_workout_details",
+                {"workout_id": "w-123"},
+                context,
+            )
+
+        call_kwargs = mock_req.call_args
+        assert call_kwargs[1]["headers"]["Authorization"] == "Bearer test-token"
+        assert call_kwargs[1]["headers"]["X-User-Id"] == "user-1"

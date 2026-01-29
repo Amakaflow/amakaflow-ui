@@ -13,7 +13,7 @@ from application.ports.chat_session_repository import ChatSessionRepository
 from application.ports.rate_limit_repository import RateLimitRepository
 from backend.services.ai_client import AIClient
 from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
-from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS
+from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS
 from backend.services.feature_flag_service import FeatureFlagService
 
 logger = logging.getLogger(__name__)
@@ -161,8 +161,8 @@ class StreamChatUseCase:
         current_tool: Optional[Dict[str, Any]] = None
         tool_input_json = ""
 
-        # Combine Phase 1 and Phase 2 tools for Claude
-        tools = PHASE_1_TOOLS + PHASE_2_TOOLS
+        # Combine Phase 1, Phase 2, and Phase 3 tools for Claude
+        tools = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS
 
         for event in self._ai_client.stream_chat(
             messages=anthropic_messages,

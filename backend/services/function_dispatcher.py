@@ -95,6 +95,13 @@ class FunctionDispatcher:
             "import_from_instagram": self._import_from_instagram,
             "import_from_pinterest": self._import_from_pinterest,
             "import_from_image": self._import_from_image,
+            # Phase 3
+            "edit_workout": self._edit_workout,
+            "export_workout": self._export_workout,
+            "duplicate_workout": self._duplicate_workout,
+            "log_workout_completion": self._log_workout_completion,
+            "get_workout_history": self._get_workout_history,
+            "get_workout_details": self._get_workout_details,
         }
 
     def close(self) -> None:
@@ -607,5 +614,295 @@ class FunctionDispatcher:
         exercises = workout.get("exercises", [])
         if exercises:
             response["workout"]["exercise_count"] = len(exercises)
+
+        return json.dumps(response)
+
+    # --- Phase 3: Workout Management Handlers ---
+
+    def _edit_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Edit a workout via JSON Patch operations."""
+        workout_id = args.get("workout_id")
+        operations = args.get("operations", [])
+
+        if not workout_id:
+            return self._error_response(
+                "validation_error", "Missing required field: workout_id"
+            )
+
+        if not operations:
+            return self._error_response(
+                "validation_error", "Missing required field: operations"
+            )
+
+        # Validate operations format
+        for op in operations:
+            if op.get("op") not in ("replace", "add", "remove"):
+                return self._error_response(
+                    "validation_error",
+                    f"Invalid operation: {op.get('op')}. Must be replace, add, or remove."
+                )
+            if not op.get("path"):
+                return self._error_response(
+                    "validation_error", "Each operation must have a path."
+                )
+
+        result = self._call_api(
+            "PATCH",
+            f"{self._mapper_url}/workouts/{workout_id}",
+            ctx,
+            json={"operations": operations},
+        )
+
+        return json.dumps({
+            "success": True,
+            "message": "Workout updated successfully",
+            "workout_id": workout_id,
+        })
+
+    def _export_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Export a workout to a specific format."""
+        workout_id = args.get("workout_id")
+        export_format = args.get("format")
+
+        if not workout_id:
+            return self._error_response(
+                "validation_error", "Missing required field: workout_id"
+            )
+
+        if not export_format:
+            return self._error_response(
+                "validation_error", "Missing required field: format"
+            )
+
+        valid_formats = {"yaml", "zwo", "workoutkit", "fit_metadata"}
+        if export_format not in valid_formats:
+            return self._error_response(
+                "validation_error",
+                f"Invalid format: {export_format}. Valid formats: {', '.join(valid_formats)}"
+            )
+
+        result = self._call_api(
+            "GET",
+            f"{self._mapper_url}/export/{workout_id}",
+            ctx,
+            params={"export_format": export_format},
+        )
+
+        # Return the export content/URL depending on the API response
+        format_names = {
+            "yaml": "Garmin YAML",
+            "zwo": "Zwift ZWO",
+            "workoutkit": "Apple WorkoutKit",
+            "fit_metadata": "FIT metadata",
+        }
+
+        return json.dumps({
+            "success": True,
+            "format": export_format,
+            "format_name": format_names.get(export_format, export_format),
+            "workout_id": workout_id,
+            "content": result.get("content"),
+            "download_url": result.get("download_url"),
+        })
+
+    def _duplicate_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Create a copy of an existing workout with optional modifications."""
+        workout_id = args.get("workout_id")
+        new_title = args.get("new_title")
+        modifications = args.get("modifications", {})
+
+        if not workout_id:
+            return self._error_response(
+                "validation_error", "Missing required field: workout_id"
+            )
+
+        # First, get the original workout
+        original = self._call_api(
+            "GET",
+            f"{self._mapper_url}/workouts/{workout_id}",
+            ctx,
+        )
+
+        # Prepare the duplicate with modifications
+        workout_data = original.copy()
+
+        # Remove ID so a new one is generated
+        workout_data.pop("id", None)
+        workout_data.pop("workout_id", None)
+        workout_data.pop("created_at", None)
+        workout_data.pop("updated_at", None)
+
+        # Apply new title if provided
+        if new_title:
+            workout_data["title"] = new_title
+        else:
+            original_title = workout_data.get("title", "Workout")
+            workout_data["title"] = f"{original_title} (Copy)"
+
+        # Apply any modifications
+        workout_data.update(modifications)
+
+        # Save as new workout
+        result = self._call_api(
+            "POST",
+            f"{self._mapper_url}/workouts/save",
+            ctx,
+            json=workout_data,
+        )
+
+        new_workout = result.get("workout", result)
+        return json.dumps({
+            "success": True,
+            "message": "Workout duplicated successfully",
+            "original_id": workout_id,
+            "new_workout": {
+                "id": new_workout.get("id") or new_workout.get("workout_id"),
+                "title": new_workout.get("title"),
+            },
+        })
+
+    def _log_workout_completion(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Record a workout completion with optional metrics."""
+        workout_id = args.get("workout_id")
+
+        if not workout_id:
+            return self._error_response(
+                "validation_error", "Missing required field: workout_id"
+            )
+
+        # Validate rating if provided
+        rating = args.get("rating")
+        if rating is not None and (rating < 1 or rating > 5):
+            return self._error_response(
+                "validation_error", "Rating must be between 1 and 5"
+            )
+
+        body: Dict[str, Any] = {"workout_id": workout_id}
+
+        if args.get("duration_minutes"):
+            body["duration_minutes"] = args["duration_minutes"]
+        if args.get("notes"):
+            body["notes"] = args["notes"]
+        if rating is not None:
+            body["rating"] = rating
+
+        result = self._call_api(
+            "POST",
+            f"{self._mapper_url}/workouts/complete",
+            ctx,
+            json=body,
+        )
+
+        return json.dumps({
+            "success": True,
+            "message": "Workout completion logged",
+            "workout_id": workout_id,
+            "completion_id": result.get("id") or result.get("completion_id"),
+        })
+
+    def _get_workout_history(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Get user's workout completion history."""
+        # Cap limit at 50 for safety, default to 10
+        limit = min(args.get("limit", 10), 50)
+
+        params: Dict[str, Any] = {"limit": limit}
+
+        if args.get("start_date"):
+            params["start_date"] = args["start_date"]
+        if args.get("end_date"):
+            params["end_date"] = args["end_date"]
+
+        result = self._call_api(
+            "GET",
+            f"{self._mapper_url}/workouts/completions",
+            ctx,
+            params=params,
+        )
+
+        completions = result.get("completions", result.get("results", []))
+
+        if not completions:
+            return "No workout completions found for the specified period."
+
+        # Format response for Claude
+        lines = [f"Found {len(completions)} workout completion(s):"]
+        for i, c in enumerate(completions, 1):
+            title = c.get("workout_title") or c.get("title", "Workout")
+            date = c.get("completed_at", c.get("date", "Unknown date"))
+            duration = c.get("duration_minutes")
+            rating = c.get("rating")
+
+            line = f"{i}. {title} - {date}"
+            if duration:
+                line += f" ({duration} min)"
+            if rating:
+                line += f" - {rating}/5"
+            lines.append(line)
+
+        return "\n".join(lines)
+
+    def _get_workout_details(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Get detailed information about a specific workout."""
+        workout_id = args.get("workout_id")
+
+        if not workout_id:
+            return self._error_response(
+                "validation_error", "Missing required field: workout_id"
+            )
+
+        result = self._call_api(
+            "GET",
+            f"{self._mapper_url}/workouts/{workout_id}",
+            ctx,
+        )
+
+        # Format workout details for Claude
+        title = result.get("title", "Untitled Workout")
+        description = result.get("description", "")
+        exercises = result.get("exercises", [])
+        tags = result.get("tags", [])
+        duration = result.get("estimated_duration_minutes")
+
+        response: Dict[str, Any] = {
+            "success": True,
+            "workout": {
+                "id": workout_id,
+                "title": title,
+                "description": description,
+                "exercise_count": len(exercises),
+                "tags": tags,
+            },
+        }
+
+        if duration:
+            response["workout"]["estimated_duration_minutes"] = duration
+
+        # Include exercise summaries
+        if exercises:
+            exercise_list = []
+            for ex in exercises[:20]:  # Cap at 20 for response size
+                ex_summary = {
+                    "name": ex.get("name", "Unknown"),
+                }
+                if ex.get("sets"):
+                    ex_summary["sets"] = ex["sets"]
+                if ex.get("reps"):
+                    ex_summary["reps"] = ex["reps"]
+                if ex.get("duration"):
+                    ex_summary["duration"] = ex["duration"]
+                exercise_list.append(ex_summary)
+            response["workout"]["exercises"] = exercise_list
 
         return json.dumps(response)
