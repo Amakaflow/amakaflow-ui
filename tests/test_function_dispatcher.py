@@ -1603,6 +1603,89 @@ class TestDuplicateWorkout:
             )
         assert "not found" in result.lower()
 
+    def test_modifications_filtered_to_safe_fields(self, dispatcher, context):
+        """Verify dangerous fields in modifications are filtered out."""
+        get_response = MagicMock()
+        get_response.json.return_value = {
+            "id": "w-1",
+            "user_id": "original-user",
+            "title": "Original",
+        }
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {"workout": {"id": "w-new"}}
+        post_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            dispatcher.execute(
+                "duplicate_workout",
+                {
+                    "workout_id": "w-1",
+                    "modifications": {
+                        "user_id": "attacker-user",  # Should be filtered
+                        "id": "custom-id",  # Should be filtered
+                        "created_at": "2020-01-01",  # Should be filtered
+                        "title": "Safe Title",  # Should be allowed
+                        "description": "Safe description",  # Should be allowed
+                        "tags": ["allowed"],  # Should be allowed
+                    },
+                },
+                context,
+            )
+
+        # Verify the POST request body
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+
+        # Safe fields should be present
+        assert body["title"] == "Safe Title"
+        assert body["description"] == "Safe description"
+        assert body["tags"] == ["allowed"]
+
+        # Dangerous fields should NOT be present (filtered out or removed earlier)
+        assert body.get("user_id") != "attacker-user"
+        assert body.get("id") != "custom-id"
+        assert "created_at" not in body
+
+    def test_modifications_allows_expected_fields(self, dispatcher, context):
+        """Verify all expected safe modification fields are allowed."""
+        get_response = MagicMock()
+        get_response.json.return_value = {"id": "w-1", "title": "Original"}
+        get_response.raise_for_status = MagicMock()
+
+        post_response = MagicMock()
+        post_response.json.return_value = {"workout": {"id": "w-new"}}
+        post_response.raise_for_status = MagicMock()
+
+        allowed_modifications = {
+            "title": "New Title",
+            "description": "New description",
+            "tags": ["tag1", "tag2"],
+            "difficulty": "advanced",
+            "exercises": [{"name": "Squats"}],
+            "estimated_duration_minutes": 60,
+            "equipment": ["dumbbells"],
+            "notes": "Some notes",
+            "category": "strength",
+        }
+
+        with patch.object(dispatcher._client, "request") as mock_req:
+            mock_req.side_effect = [get_response, post_response]
+            dispatcher.execute(
+                "duplicate_workout",
+                {"workout_id": "w-1", "modifications": allowed_modifications},
+                context,
+            )
+
+        post_call = mock_req.call_args_list[1]
+        body = post_call[1]["json"]
+
+        # All allowed fields should be present
+        for key, value in allowed_modifications.items():
+            assert body[key] == value, f"Expected {key}={value} in body"
+
 
 class TestLogWorkoutCompletion:
     """Unit tests for log_workout_completion handler."""
@@ -1736,6 +1819,30 @@ class TestLogWorkoutCompletion:
         parsed = json.loads(result)
         assert parsed["error"] is True
         assert parsed["code"] == "validation_error"
+
+    def test_float_rating_rejected(self, dispatcher, context):
+        """Verify float rating is rejected (must be integer)."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"workout_id": "w-123", "rating": 3.5},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "integer" in parsed["message"].lower()
+
+    def test_string_rating_rejected(self, dispatcher, context):
+        """Verify string rating is rejected (must be integer)."""
+        result = dispatcher.execute(
+            "log_workout_completion",
+            {"workout_id": "w-123", "rating": "five"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "integer" in parsed["message"].lower()
 
     def test_404_workout_not_found(self, dispatcher, context):
         """Verify 404 when workout doesn't exist."""

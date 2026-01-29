@@ -745,8 +745,17 @@ class FunctionDispatcher:
             original_title = workout_data.get("title", "Workout")
             workout_data["title"] = f"{original_title} (Copy)"
 
-        # Apply any modifications
-        workout_data.update(modifications)
+        # Apply modifications (filtered to safe fields only)
+        # This prevents overriding dangerous fields like user_id
+        allowed_modification_fields = {
+            "title", "description", "tags", "difficulty", "exercises",
+            "estimated_duration_minutes", "equipment", "notes", "category",
+        }
+        safe_modifications = {
+            k: v for k, v in modifications.items()
+            if k in allowed_modification_fields
+        }
+        workout_data.update(safe_modifications)
 
         # Save as new workout
         result = self._call_api(
@@ -778,12 +787,13 @@ class FunctionDispatcher:
                 "validation_error", "Missing required field: workout_id"
             )
 
-        # Validate rating if provided
+        # Validate rating if provided (must be integer 1-5)
         rating = args.get("rating")
-        if rating is not None and (rating < 1 or rating > 5):
-            return self._error_response(
-                "validation_error", "Rating must be between 1 and 5"
-            )
+        if rating is not None:
+            if not isinstance(rating, int) or rating < 1 or rating > 5:
+                return self._error_response(
+                    "validation_error", "Rating must be an integer between 1 and 5"
+                )
 
         body: Dict[str, Any] = {"workout_id": workout_id}
 
