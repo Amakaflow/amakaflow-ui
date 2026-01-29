@@ -265,6 +265,25 @@ class StreamChatUseCase:
                         "content": result,
                         "is_error": True,
                     })
+                    # Persist error tool result
+                    try:
+                        self._message_repo.create({
+                            "session_id": session_id,
+                            "role": "tool_result",
+                            "content": result,
+                            "tool_use_id": tool_use["id"],
+                            "tool_calls": [{
+                                "name": tool_use["name"],
+                                "input": tool_use.get("input", {}),
+                                "is_error": True,
+                            }],
+                        })
+                    except Exception as e:
+                        logger.error(
+                            "Failed to persist tool error for %s: %s",
+                            tool_use["name"],
+                            e
+                        )
                     continue
 
                 # Build assistant content block
@@ -297,13 +316,32 @@ class StreamChatUseCase:
                     "content": result_content,
                 })
 
-                # Track for persistence
+                # Track for persistence (backward compatibility)
                 all_tool_calls.append({
                     "id": tool_use["id"],
                     "name": tool_use["name"],
                     "input": tool_use["input"],
                     "result": result,
                 })
+
+                # Persist tool result as separate message for audit trail
+                try:
+                    self._message_repo.create({
+                        "session_id": session_id,
+                        "role": "tool_result",
+                        "content": result_content,
+                        "tool_use_id": tool_use["id"],
+                        "tool_calls": [{
+                            "name": tool_use["name"],
+                            "input": tool_use["input"],
+                        }],
+                    })
+                except Exception as e:
+                    logger.error(
+                        "Failed to persist tool result for %s: %s",
+                        tool_use["name"],
+                        e
+                    )
 
             # Only loop back to Claude if it expects tool results
             # If stop_reason is "end_turn", Claude already provided final response
@@ -501,12 +539,21 @@ class StreamChatUseCase:
         Handles tool call history by reconstructing tool_use and tool_result
         blocks from persisted tool_calls data, ensuring Claude has full context
         when resuming sessions.
+
+        Note: Messages with role='tool_result' are skipped here since they are
+        stored for audit purposes. Tool results are reconstructed from the
+        tool_calls JSONB on assistant messages for backward compatibility.
         """
         messages = []
         for msg in history:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             tool_calls = msg.get("tool_calls")
+
+            # Skip tool_result messages - these are for audit trail only.
+            # Tool results are reconstructed from assistant.tool_calls below.
+            if role == "tool_result":
+                continue
 
             if role == "user" and content:
                 messages.append({"role": "user", "content": content})

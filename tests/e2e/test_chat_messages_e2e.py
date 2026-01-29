@@ -604,3 +604,158 @@ class TestGetSessionMessagesDataIntegrity:
         cursor_id = data["messages"][-1]["id"]
         # Note: The current implementation returns messages BEFORE the cursor,
         # not AFTER. For infinite scroll loading older messages, this is correct.
+
+
+# ============================================================================
+# Tool Result Persistence Tests (AMA-502)
+# ============================================================================
+
+
+class TestGetSessionMessagesToolResults:
+    """Tests for tool_result messages in GET /messages (AMA-502)."""
+
+    def test_tool_result_message_included_in_response(
+        self,
+        client: TestClient,
+        session_repo: FakeChatSessionRepository,
+        message_repo: FakeChatMessageRepository,
+    ):
+        """GET /messages returns tool_result messages with correct schema."""
+        session = session_repo.create(TEST_USER_ID, "Tool Chat")
+
+        # User message
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "user",
+            "content": "Find workouts",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        # Tool result message (as created by AMA-502)
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "tool_result",
+            "content": "Found: Leg Day (ID: w-1)",
+            "tool_use_id": "toolu_abc123",
+            "tool_calls": [{"name": "search_workout_library", "input": {"query": "legs"}}],
+            "tool_results": None,
+        })
+
+        # Assistant message
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "assistant",
+            "content": "Here are the workouts I found.",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        response = client.get(f"/chat/sessions/{session['id']}/messages")
+
+        assert response.status_code == 200
+        messages = response.json()["messages"]
+
+        # All 3 messages should be returned
+        assert len(messages) == 3
+
+        # Verify tool_result message is present with expected fields
+        tool_result = next((m for m in messages if m["role"] == "tool_result"), None)
+        assert tool_result is not None
+        assert tool_result["tool_use_id"] == "toolu_abc123"
+        assert "Found: Leg Day" in tool_result["content"]
+        assert tool_result["tool_calls"][0]["name"] == "search_workout_library"
+
+    def test_multiple_tool_results_in_session(
+        self,
+        client: TestClient,
+        session_repo: FakeChatSessionRepository,
+        message_repo: FakeChatMessageRepository,
+    ):
+        """Multiple tool_result messages are returned in correct order."""
+        session = session_repo.create(TEST_USER_ID, "Multi-Tool Chat")
+
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "user",
+            "content": "Search and add to calendar",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        # First tool result
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "tool_result",
+            "content": "Found: Leg Day",
+            "tool_use_id": "toolu_search",
+            "tool_calls": [{"name": "search_workout_library", "input": {"query": "legs"}}],
+            "tool_results": None,
+        })
+
+        # Second tool result
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "tool_result",
+            "content": "Added to calendar",
+            "tool_use_id": "toolu_calendar",
+            "tool_calls": [{"name": "add_workout_to_calendar", "input": {"date": "2024-01-15"}}],
+            "tool_results": None,
+        })
+
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "assistant",
+            "content": "Done!",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        response = client.get(f"/chat/sessions/{session['id']}/messages")
+
+        assert response.status_code == 200
+        messages = response.json()["messages"]
+        assert len(messages) == 4
+
+        # Verify tool_results are in order
+        tool_results = [m for m in messages if m["role"] == "tool_result"]
+        assert len(tool_results) == 2
+        assert tool_results[0]["tool_use_id"] == "toolu_search"
+        assert tool_results[1]["tool_use_id"] == "toolu_calendar"
+
+    def test_tool_error_message_has_is_error_flag(
+        self,
+        client: TestClient,
+        session_repo: FakeChatSessionRepository,
+        message_repo: FakeChatMessageRepository,
+    ):
+        """Tool error messages include is_error flag in tool_calls."""
+        session = session_repo.create(TEST_USER_ID, "Error Chat")
+
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "user",
+            "content": "Search workouts",
+            "tool_calls": None,
+            "tool_results": None,
+        })
+
+        # Tool error message (parse error case)
+        message_repo.create({
+            "session_id": session["id"],
+            "role": "tool_result",
+            "content": "Error: Invalid tool arguments received. Please try again.",
+            "tool_use_id": "toolu_error",
+            "tool_calls": [{"name": "search", "input": {}, "is_error": True}],
+            "tool_results": None,
+        })
+
+        response = client.get(f"/chat/sessions/{session['id']}/messages")
+
+        assert response.status_code == 200
+        messages = response.json()["messages"]
+
+        error_msg = next((m for m in messages if m["role"] == "tool_result"), None)
+        assert error_msg is not None
+        assert "Error" in error_msg["content"]
+        assert error_msg["tool_calls"][0]["is_error"] is True

@@ -136,6 +136,7 @@ class ChatMessage(BaseModel):
     content: Optional[str]
     tool_calls: Optional[Any] = None
     tool_results: Optional[Any] = None
+    tool_use_id: Optional[str] = None  # AMA-502: Links tool_result to tool_use block
     created_at: datetime
 
 
@@ -183,8 +184,9 @@ async def get_session_messages(
                 id=m["id"],
                 role=m["role"],
                 content=m["content"],
-                tool_calls=m["tool_calls"],
-                tool_results=m["tool_results"],
+                tool_calls=m.get("tool_calls"),
+                tool_results=m.get("tool_results"),
+                tool_use_id=m.get("tool_use_id"),  # AMA-502
                 created_at=m["created_at"],
             )
             for m in messages
