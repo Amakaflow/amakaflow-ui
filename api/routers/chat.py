@@ -2,23 +2,26 @@
 
 POST /chat/stream returns an SSE event stream via sse-starlette.
 GET /chat/sessions returns a paginated list of user's chat sessions.
+GET /chat/sessions/{session_id}/messages returns messages for a session.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from api.deps import (
     get_auth_context,
+    get_chat_message_repository,
     get_chat_session_repository,
     get_current_user,
     get_stream_chat_use_case,
     AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase
+from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -91,3 +94,68 @@ async def list_sessions(
         )
         for s in sessions
     ]
+
+
+class ChatMessage(BaseModel):
+    """A single chat message."""
+
+    id: str
+    role: str
+    content: Optional[str]
+    tool_calls: Optional[Any] = None
+    tool_results: Optional[Any] = None
+    created_at: datetime
+
+
+class ChatMessagesResponse(BaseModel):
+    """Response for listing chat messages."""
+
+    messages: List[ChatMessage]
+    has_more: bool
+
+
+@router.get("/sessions/{session_id}/messages", response_model=ChatMessagesResponse)
+async def get_session_messages(
+    session_id: str,
+    user_id: str = Depends(get_current_user),
+    session_repo: SupabaseChatSessionRepository = Depends(get_chat_session_repository),
+    message_repo: SupabaseChatMessageRepository = Depends(get_chat_message_repository),
+    limit: int = Query(50, ge=1, le=200),
+    before: Optional[str] = Query(None, description="Cursor: message ID to fetch messages before"),
+) -> ChatMessagesResponse:
+    """Get messages for a specific chat session.
+
+    Returns messages in chronological order (oldest first).
+    Supports cursor-based pagination via the `before` parameter.
+
+    Args:
+        session_id: The session ID to fetch messages for.
+        limit: Maximum number of messages to return (1-200, default 50).
+        before: Optional cursor - message ID to fetch messages before.
+
+    Returns:
+        ChatMessagesResponse with messages and has_more flag.
+
+    Raises:
+        HTTPException 404: If session not found or doesn't belong to user.
+    """
+    session = session_repo.get(session_id, user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    messages = message_repo.list_for_session(session_id, limit=limit, before=before)
+
+    return ChatMessagesResponse(
+        messages=[
+            ChatMessage(
+                id=m["id"],
+                role=m["role"],
+                content=m["content"],
+                tool_calls=m["tool_calls"],
+                tool_results=m["tool_results"],
+                created_at=m["created_at"],
+            )
+            for m in messages
+        ],
+        has_more=len(messages) == limit,
+    )

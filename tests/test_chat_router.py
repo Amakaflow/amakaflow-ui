@@ -12,11 +12,13 @@ from backend.auth import get_current_user as backend_get_current_user
 from api.deps import (
     get_current_user as deps_get_current_user,
     get_auth_context,
+    get_chat_message_repository,
     get_chat_session_repository,
     get_stream_chat_use_case,
     AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
+from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 
 
@@ -339,5 +341,244 @@ class TestListSessions:
         mock_repo.list_for_user.assert_called_once_with(
             TEST_USER_ID, limit=20, offset=0
         )
+
+        chat_app.dependency_overrides.clear()
+
+
+class TestGetSessionMessages:
+    """Tests for GET /chat/sessions/{session_id}/messages endpoint."""
+
+    @pytest.fixture
+    def mock_session_repo(self):
+        repo = MagicMock(spec=SupabaseChatSessionRepository)
+        repo.get.return_value = {
+            "id": "sess-1",
+            "user_id": TEST_USER_ID,
+            "title": "Test Session",
+            "created_at": "2026-01-29T10:00:00+00:00",
+            "updated_at": "2026-01-29T12:00:00+00:00",
+        }
+        return repo
+
+    @pytest.fixture
+    def mock_message_repo(self):
+        repo = MagicMock(spec=SupabaseChatMessageRepository)
+        repo.list_for_session.return_value = [
+            {
+                "id": "msg-1",
+                "session_id": "sess-1",
+                "user_id": TEST_USER_ID,
+                "role": "user",
+                "content": "Hello",
+                "tool_calls": None,
+                "tool_results": None,
+                "created_at": "2026-01-29T10:00:00+00:00",
+            },
+            {
+                "id": "msg-2",
+                "session_id": "sess-1",
+                "user_id": TEST_USER_ID,
+                "role": "assistant",
+                "content": "Hi there!",
+                "tool_calls": None,
+                "tool_results": None,
+                "created_at": "2026-01-29T10:00:01+00:00",
+            },
+        ]
+        return repo
+
+    @pytest.fixture
+    def messages_client(self, chat_app, mock_session_repo, mock_message_repo):
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+        yield TestClient(chat_app)
+        chat_app.dependency_overrides.clear()
+
+    def test_unauthenticated_returns_401(self, chat_app):
+        """No auth override → 401."""
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/sess-1/messages")
+        assert response.status_code == 401
+
+    def test_session_not_found_returns_404(self, chat_app, mock_message_repo):
+        """Non-existent session → 404."""
+        mock_session_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_session_repo.get.return_value = None
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/non-existent/messages")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Session not found"
+
+        chat_app.dependency_overrides.clear()
+
+    def test_returns_messages_in_order(self, messages_client):
+        response = messages_client.get("/chat/sessions/sess-1/messages")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["messages"]) == 2
+        assert data["messages"][0]["id"] == "msg-1"
+        assert data["messages"][0]["role"] == "user"
+        assert data["messages"][1]["id"] == "msg-2"
+        assert data["messages"][1]["role"] == "assistant"
+
+    def test_returns_correct_fields(self, messages_client):
+        response = messages_client.get("/chat/sessions/sess-1/messages")
+        assert response.status_code == 200
+        msg = response.json()["messages"][0]
+        assert "id" in msg
+        assert "role" in msg
+        assert "content" in msg
+        assert "tool_calls" in msg
+        assert "tool_results" in msg
+        assert "created_at" in msg
+
+    def test_has_more_true_when_at_limit(self, chat_app, mock_session_repo):
+        """has_more=True when message count equals limit."""
+        mock_message_repo = MagicMock(spec=SupabaseChatMessageRepository)
+        # Return exactly 5 messages when limit is 5
+        mock_message_repo.list_for_session.return_value = [
+            {
+                "id": f"msg-{i}",
+                "session_id": "sess-1",
+                "user_id": TEST_USER_ID,
+                "role": "user",
+                "content": f"Message {i}",
+                "tool_calls": None,
+                "tool_results": None,
+                "created_at": f"2026-01-29T10:00:0{i}+00:00",
+            }
+            for i in range(5)
+        ]
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/sess-1/messages?limit=5")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["messages"]) == 5
+        assert data["has_more"] is True
+
+        chat_app.dependency_overrides.clear()
+
+    def test_has_more_false_when_under_limit(self, messages_client):
+        """has_more=False when message count is less than limit."""
+        response = messages_client.get("/chat/sessions/sess-1/messages?limit=50")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["messages"]) == 2
+        assert data["has_more"] is False
+
+    def test_pagination_limit(self, messages_client, mock_message_repo):
+        messages_client.get("/chat/sessions/sess-1/messages?limit=10")
+        mock_message_repo.list_for_session.assert_called_once_with(
+            "sess-1", limit=10, before=None
+        )
+
+    def test_pagination_cursor(self, messages_client, mock_message_repo):
+        messages_client.get("/chat/sessions/sess-1/messages?before=msg-5")
+        mock_message_repo.list_for_session.assert_called_once_with(
+            "sess-1", limit=50, before="msg-5"
+        )
+
+    def test_limit_validation_min(self, messages_client):
+        response = messages_client.get("/chat/sessions/sess-1/messages?limit=0")
+        assert response.status_code == 422
+
+    def test_limit_validation_max(self, messages_client):
+        response = messages_client.get("/chat/sessions/sess-1/messages?limit=201")
+        assert response.status_code == 422
+
+    def test_empty_session_returns_empty_list(self, chat_app, mock_session_repo):
+        """Session with no messages returns empty list."""
+        mock_message_repo = MagicMock(spec=SupabaseChatMessageRepository)
+        mock_message_repo.list_for_session.return_value = []
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/sess-1/messages")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["messages"] == []
+        assert data["has_more"] is False
+
+        chat_app.dependency_overrides.clear()
+
+    def test_verifies_session_ownership(self, chat_app, mock_message_repo):
+        """Session belonging to different user returns 404."""
+        mock_session_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        # get() returns None when session doesn't belong to user
+        mock_session_repo.get.return_value = None
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/other-user-session/messages")
+
+        assert response.status_code == 404
+        # Verify get was called with both session_id and user_id
+        mock_session_repo.get.assert_called_once_with("other-user-session", TEST_USER_ID)
+
+        chat_app.dependency_overrides.clear()
+
+    def test_returns_tool_calls(self, chat_app, mock_session_repo):
+        """Messages with tool_calls are serialized correctly."""
+        mock_message_repo = MagicMock(spec=SupabaseChatMessageRepository)
+        mock_message_repo.list_for_session.return_value = [
+            {
+                "id": "msg-1",
+                "session_id": "sess-1",
+                "user_id": TEST_USER_ID,
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{"name": "get_weather", "arguments": {"city": "NYC"}}],
+                "tool_results": None,
+                "created_at": "2026-01-29T10:00:00+00:00",
+            },
+            {
+                "id": "msg-2",
+                "session_id": "sess-1",
+                "user_id": TEST_USER_ID,
+                "role": "tool",
+                "content": None,
+                "tool_calls": None,
+                "tool_results": [{"name": "get_weather", "result": {"temp": 72}}],
+                "created_at": "2026-01-29T10:00:01+00:00",
+            },
+        ]
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        chat_app.dependency_overrides[get_chat_message_repository] = lambda: mock_message_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions/sess-1/messages")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["messages"][0]["tool_calls"] == [{"name": "get_weather", "arguments": {"city": "NYC"}}]
+        assert data["messages"][1]["tool_results"] == [{"name": "get_weather", "result": {"temp": 72}}]
 
         chat_app.dependency_overrides.clear()

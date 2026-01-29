@@ -43,6 +43,7 @@ from backend.services.ai_client import StreamEvent
 from api.deps import (
     get_current_user as deps_get_current_user,
     get_auth_context,
+    get_chat_message_repository,
     get_chat_session_repository,
     get_stream_chat_use_case,
     get_generate_embeddings_use_case,
@@ -129,11 +130,42 @@ class FakeChatMessageRepository:
         return msg
 
     def list_for_session(
-        self, session_id: str, limit: int = 100
+        self,
+        session_id: str,
+        limit: int = 100,
+        before: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        return [
+        """List messages for a session with optional cursor-based pagination.
+
+        Args:
+            session_id: The session ID to fetch messages for.
+            limit: Maximum number of messages to return.
+            before: Optional cursor - message ID to fetch messages before.
+
+        Returns:
+            List of messages in chronological order (oldest first).
+        """
+        # Filter by session
+        session_messages = [
             m for m in self._messages if m.get("session_id") == session_id
-        ][:limit]
+        ]
+
+        # Sort by created_at ascending (chronological)
+        session_messages.sort(key=lambda m: m.get("created_at", ""))
+
+        # Apply cursor filter if provided
+        if before:
+            # Cursor must exist within THIS session (security: prevent cross-session leaks)
+            cursor_msg = next((m for m in session_messages if m["id"] == before), None)
+            if not cursor_msg:
+                # Invalid cursor: message doesn't exist in this session
+                return []
+            cursor_time = cursor_msg.get("created_at", "")
+            session_messages = [
+                m for m in session_messages if m.get("created_at", "") < cursor_time
+            ]
+
+        return session_messages[:limit]
 
     def reset(self) -> None:
         self._messages.clear()
@@ -819,6 +851,10 @@ def _override_chat_session_repository() -> FakeChatSessionRepository:
     return _session_repo
 
 
+def _override_chat_message_repository() -> FakeChatMessageRepository:
+    return _message_repo
+
+
 @pytest.fixture(scope="module")
 def app():
     """Create the FastAPI app with all dependency overrides."""
@@ -827,6 +863,7 @@ def app():
     application.dependency_overrides[deps_get_current_user] = _override_auth
     application.dependency_overrides[get_auth_context] = _override_auth_context
     application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
+    application.dependency_overrides[get_chat_message_repository] = _override_chat_message_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
@@ -839,6 +876,7 @@ def noauth_app():
     """App WITHOUT auth overrides -- for testing auth rejection paths."""
     application = create_app(settings=_test_settings)
     application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
+    application.dependency_overrides[get_chat_message_repository] = _override_chat_message_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
