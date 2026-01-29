@@ -1330,3 +1330,260 @@ class TestStreamChatTTS:
 
         # Verify reset was called
         mock_tts_settings_repo.reset_daily_chars_if_needed.assert_called_once_with("user-1")
+
+
+class TestStreamChatContext:
+    """Tests for context-aware system prompt injection."""
+
+    def test_context_injected_into_system_prompt_workout_detail(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Context about workout detail page is injected into system prompt."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Tell me about this workout",
+            context={
+                "current_page": "workout_detail",
+                "selected_workout_id": "workout-abc123",
+            },
+        ))
+
+        # Check that AI client received system prompt with context
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        assert "workout ID: workout-abc123" in system_prompt
+        assert "Current Context" in system_prompt
+
+    def test_context_injected_into_system_prompt_calendar(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Context about calendar page is injected into system prompt."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Schedule something for this day",
+            context={
+                "current_page": "calendar",
+                "selected_date": "2026-02-15",
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        assert "2026-02-15" in system_prompt
+        assert "calendar" in system_prompt.lower()
+
+    def test_context_injected_into_system_prompt_library(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Context about library page is injected into system prompt."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="What workouts do I have?",
+            context={
+                "current_page": "library",
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        assert "library" in system_prompt.lower()
+
+    def test_no_context_uses_base_system_prompt(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """No context results in base system prompt without context section."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Hello",
+            context=None,
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Should have base prompt but no context section
+        assert "fitness coach" in system_prompt.lower()
+        assert "Current Context" not in system_prompt
+
+    def test_empty_context_uses_base_system_prompt(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Empty context dict results in base system prompt."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Hello",
+            context={},
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Should have base prompt but no context section
+        assert "fitness coach" in system_prompt.lower()
+        assert "Current Context" not in system_prompt
+
+    def test_backwards_compatible_without_context(self, use_case, mock_ai_client):
+        """Execute works without context parameter (backwards compatible)."""
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        # Should work normally
+        event_types = [e.event for e in events]
+        assert "message_start" in event_types
+        assert "message_end" in event_types
+
+    def test_workout_detail_without_workout_id_no_context_injection(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """workout_detail page without selected_workout_id does not inject partial context."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Is this workout good for beginners?",
+            context={
+                "current_page": "workout_detail",
+                # No selected_workout_id - incomplete context
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Should NOT inject context without the workout ID
+        assert "Current Context" not in system_prompt
+        assert "workout ID" not in system_prompt
+
+    def test_calendar_without_date_still_adds_context(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Calendar page without selected_date still adds general calendar context."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="What should I do today?",
+            context={
+                "current_page": "calendar",
+                # No selected_date
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Should add general calendar context
+        assert "Current Context" in system_prompt
+        assert "calendar" in system_prompt.lower()
+
+    def test_unknown_page_type_no_context_injection(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Unknown current_page values are gracefully ignored (forward compatible)."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Help me with something",
+            context={
+                "current_page": "future_unknown_page",
+                "selected_workout_id": "some-id",
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Unknown page should not inject any context
+        assert "Current Context" not in system_prompt
+        assert "future_unknown_page" not in system_prompt
+
+    def test_context_with_all_fields_uses_current_page(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """When all context fields are provided, current_page determines which is used."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="What is this?",
+            context={
+                "current_page": "workout_detail",
+                "selected_workout_id": "workout-abc123",
+                "selected_date": "2024-01-15",  # Also provided but should be ignored
+            },
+        ))
+
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        system_prompt = call_kwargs["system"]
+
+        # Should use workout context based on current_page
+        assert "workout ID: workout-abc123" in system_prompt
+        # Should NOT include calendar date context
+        assert "2024-01-15" not in system_prompt

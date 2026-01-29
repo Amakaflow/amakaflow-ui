@@ -10,7 +10,8 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+import re
 from sse_starlette.sse import EventSourceResponse
 
 from api.deps import (
@@ -28,11 +29,40 @@ from infrastructure.db.chat_session_repository import SupabaseChatSessionReposit
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+class ChatContext(BaseModel):
+    """Context about what the user is currently viewing in the app."""
+
+    current_page: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Current page type, e.g., 'workout_detail', 'library', 'calendar'",
+    )
+    selected_workout_id: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="ID of the currently selected workout",
+    )
+    selected_date: Optional[str] = Field(
+        None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="ISO date string (YYYY-MM-DD) for calendar context",
+    )
+
+    @field_validator("selected_workout_id")
+    @classmethod
+    def validate_workout_id_format(cls, v: Optional[str]) -> Optional[str]:
+        """Ensure workout ID contains only safe characters (alphanumeric, hyphens, underscores)."""
+        if v is not None and not re.match(r"^[\w-]+$", v):
+            raise ValueError("Invalid workout ID format: must be alphanumeric with hyphens/underscores only")
+        return v
+
+
 class ChatRequest(BaseModel):
     """Request body for chat streaming."""
 
     message: str = Field(..., min_length=1, max_length=10000)
     session_id: Optional[str] = None
+    context: Optional[ChatContext] = None
 
 
 @router.post("/stream")
@@ -58,6 +88,7 @@ def stream_chat(
             message=body.message,
             session_id=body.session_id,
             auth_token=auth.auth_token,
+            context=body.context.model_dump() if body.context else None,
         ):
             yield {"event": sse_event.event, "data": sse_event.data}
 

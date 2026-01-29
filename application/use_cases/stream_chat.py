@@ -87,6 +87,7 @@ class StreamChatUseCase:
         message: str,
         session_id: Optional[str] = None,
         auth_token: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Generator[SSEEvent, None, None]:
         """Stream a chat response.
 
@@ -95,6 +96,7 @@ class StreamChatUseCase:
             message: User's message text.
             session_id: Optional existing session ID; creates new if None.
             auth_token: Optional auth token for forwarding to external services.
+            context: Optional context about what the user is viewing in the app.
 
         Yields:
             SSEEvent objects for the EventSourceResponse.
@@ -160,7 +162,10 @@ class StreamChatUseCase:
         yield _sse("message_start", {"session_id": session_id})
 
         # 6. Create function context for tool execution
-        context = FunctionContext(user_id=user_id, auth_token=auth_token)
+        fn_context = FunctionContext(user_id=user_id, auth_token=auth_token)
+
+        # 6b. Build context-aware system prompt
+        system_prompt = self._build_system_prompt(context)
 
         # 7. Stream from Claude with multi-turn tool loop
         # Per Anthropic protocol: tool results must be fed back to Claude for synthesis
@@ -186,7 +191,7 @@ class StreamChatUseCase:
 
             for event in self._ai_client.stream_chat(
                 messages=anthropic_messages,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 tools=tools,
                 user_id=user_id,
             ):
@@ -272,7 +277,7 @@ class StreamChatUseCase:
 
                 # Execute tool
                 result = self._dispatcher.execute(
-                    tool_use["name"], tool_use["input"], context
+                    tool_use["name"], tool_use["input"], fn_context
                 )
 
                 # Yield result to client
@@ -423,6 +428,50 @@ class StreamChatUseCase:
             message_end_data["voice_error"] = voice_error
 
         yield _sse("message_end", message_end_data)
+
+    def _build_system_prompt(self, context: Optional[Dict[str, Any]]) -> str:
+        """Build the system prompt with optional context injection.
+
+        Args:
+            context: Optional context about what the user is viewing.
+
+        Returns:
+            The system prompt, potentially enhanced with contextual information.
+        """
+        prompt = SYSTEM_PROMPT
+
+        if not context:
+            return prompt
+
+        current_page = context.get("current_page")
+        selected_workout_id = context.get("selected_workout_id")
+        selected_date = context.get("selected_date")
+
+        context_parts = []
+
+        if current_page == "workout_detail" and selected_workout_id:
+            context_parts.append(
+                f"The user is currently viewing workout ID: {selected_workout_id}. "
+                "When they refer to 'this workout' or 'this', they mean this workout."
+            )
+        elif current_page == "library":
+            context_parts.append(
+                "The user is browsing their workout library."
+            )
+        elif current_page == "calendar" and selected_date:
+            context_parts.append(
+                f"The user is viewing their calendar for: {selected_date}. "
+                "When they refer to 'this day' or 'today', they mean this date."
+            )
+        elif current_page == "calendar":
+            context_parts.append(
+                "The user is viewing their workout calendar."
+            )
+
+        if context_parts:
+            prompt += "\n\n## Current Context\n" + "\n".join(context_parts)
+
+        return prompt
 
     def _parse_tool_input(self, json_str: str) -> tuple[Dict[str, Any], bool]:
         """Parse accumulated JSON string into tool input dict.
