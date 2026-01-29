@@ -8,8 +8,13 @@ import base64
 import io
 import json
 import logging
+import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.ports.function_rate_limit_repository import FunctionRateLimitRepository
+    from backend.services.feature_flag_service import FeatureFlagService
 from urllib.parse import urlparse
 
 import httpx
@@ -49,6 +54,12 @@ PINTEREST_ALLOWED_DOMAINS: Set[str] = {
 # Maximum image size: 10MB
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
+# =============================================================================
+# Security: ID validation pattern (prevents path traversal)
+# =============================================================================
+# Accepts UUIDs and alphanumeric IDs with hyphens/underscores (1-64 chars)
+ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,13 +88,23 @@ class FunctionDispatcher:
         calendar_api_url: str,
         ingestor_api_url: str,
         timeout: float = 30.0,
+        strava_sync_api_url: Optional[str] = None,
+        garmin_sync_api_url: Optional[str] = None,
+        function_rate_limit_repo: Optional["FunctionRateLimitRepository"] = None,
+        feature_flag_service: Optional["FeatureFlagService"] = None,
+        sync_rate_limit_per_hour: int = 3,
     ):
         self._mapper_url = mapper_api_url
         self._calendar_url = calendar_api_url
         self._ingestor_url = ingestor_api_url
+        self._strava_sync_url = strava_sync_api_url or "http://localhost:8004"
+        self._garmin_sync_url = garmin_sync_api_url or "http://localhost:8005"
         self._client = httpx.Client(timeout=timeout)
+        self._rate_limit_repo = function_rate_limit_repo
+        self._feature_flags = feature_flag_service
+        self._sync_rate_limit = sync_rate_limit_per_hour
 
-        self._handlers = {
+        self._handlers: Dict[str, Callable[[Dict[str, Any], FunctionContext], str]] = {
             # Phase 1
             "search_workout_library": self._search_workout_library,
             "add_workout_to_calendar": self._add_workout_to_calendar,
@@ -102,6 +123,13 @@ class FunctionDispatcher:
             "log_workout_completion": self._log_workout_completion,
             "get_workout_history": self._get_workout_history,
             "get_workout_details": self._get_workout_details,
+            # Phase 4
+            "get_calendar_events": self._get_calendar_events,
+            "reschedule_workout": self._reschedule_workout,
+            "cancel_scheduled_workout": self._cancel_scheduled_workout,
+            "sync_strava": self._sync_strava,
+            "sync_garmin": self._sync_garmin,
+            "get_strava_activities": self._get_strava_activities,
         }
 
     def close(self) -> None:
@@ -202,6 +230,55 @@ class FunctionDispatcher:
             return self._error_response(
                 "validation_error", "Invalid URL format"
             )
+
+    def _validate_id(
+        self, value: Optional[str], field_name: str
+    ) -> Optional[str]:
+        """Validate ID format to prevent path traversal attacks.
+
+        Args:
+            value: ID value to validate.
+            field_name: Field name for error messages.
+
+        Returns:
+            Error response string if invalid, None if valid.
+        """
+        if not value or not value.strip():
+            return self._error_response(
+                "validation_error", f"Missing required field: {field_name}"
+            )
+
+        if not ID_PATTERN.match(value.strip()):
+            return self._error_response(
+                "validation_error", f"Invalid {field_name} format"
+            )
+
+        return None  # Valid
+
+    def _validate_id_list(
+        self, values: Optional[List[str]], field_name: str
+    ) -> Optional[str]:
+        """Validate a list of IDs.
+
+        Args:
+            values: List of ID values to validate.
+            field_name: Field name for error messages.
+
+        Returns:
+            Error response string if invalid, None if valid.
+        """
+        if not values or len(values) == 0:
+            return self._error_response(
+                "validation_error", f"Missing required field: {field_name}"
+            )
+
+        for value in values:
+            if not value or not ID_PATTERN.match(str(value).strip()):
+                return self._error_response(
+                    "validation_error", f"Invalid ID format in {field_name}"
+                )
+
+        return None  # Valid
 
     def _call_api(
         self,
@@ -916,3 +993,271 @@ class FunctionDispatcher:
             response["workout"]["exercises"] = exercise_list
 
         return json.dumps(response)
+
+    # --- Phase 4: Calendar & Sync Handlers ---
+
+    def _get_calendar_events(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Get scheduled workouts from the user's calendar."""
+        start_date = args.get("start_date")
+        end_date = args.get("end_date")
+
+        if not start_date or not end_date:
+            return self._error_response(
+                "validation_error",
+                "Missing required fields: start_date and end_date are required.",
+            )
+
+        result = self._call_api(
+            "GET",
+            f"{self._calendar_url}/calendar",
+            ctx,
+            params={"start": start_date, "end": end_date},
+        )
+
+        events = result.get("events", result.get("results", []))
+        if not events:
+            return f"No workouts scheduled between {start_date} and {end_date}."
+
+        lines = [f"Found {len(events)} scheduled workout(s):"]
+        for i, event in enumerate(events, 1):
+            title = event.get("title") or event.get("workout_title", "Workout")
+            date = event.get("scheduled_date") or event.get("date", "Unknown date")
+            time = event.get("scheduled_time") or event.get("time")
+            event_id = event.get("id") or event.get("event_id")
+
+            line = f"{i}. {title} - {date}"
+            if time:
+                line += f" at {time}"
+            if event_id:
+                line += f" (ID: {event_id})"
+            lines.append(line)
+
+        return "\n".join(lines)
+
+    def _reschedule_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Reschedule a workout on the calendar."""
+        event_id = args.get("event_id")
+        new_date = args.get("new_date")
+        new_time = args.get("new_time")
+
+        # Validate event_id format (prevents path traversal)
+        validation_error = self._validate_id(event_id, "event_id")
+        if validation_error:
+            return validation_error
+
+        if not new_date and not new_time:
+            return self._error_response(
+                "validation_error",
+                "At least one of new_date or new_time must be provided.",
+            )
+
+        # Build update payload
+        body: Dict[str, Any] = {}
+        if new_date:
+            body["scheduled_date"] = new_date
+        if new_time:
+            body["scheduled_time"] = new_time
+
+        self._call_api(
+            "PUT",
+            f"{self._calendar_url}/calendar/{event_id}",
+            ctx,
+            json=body,
+        )
+
+        message = "Workout rescheduled"
+        if new_date:
+            message += f" to {new_date}"
+        if new_time:
+            message += f" at {new_time}"
+
+        return json.dumps({
+            "success": True,
+            "message": message,
+            "event_id": event_id,
+        })
+
+    def _cancel_scheduled_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Cancel a scheduled workout from the calendar."""
+        event_id = args.get("event_id")
+        confirm = args.get("confirm", False)
+
+        # Validate event_id format (prevents path traversal)
+        validation_error = self._validate_id(event_id, "event_id")
+        if validation_error:
+            return validation_error
+
+        if not confirm:
+            return self._error_response(
+                "confirmation_required",
+                "Please confirm cancellation by setting confirm to true.",
+            )
+
+        # First, get the event to show what's being cancelled
+        try:
+            event = self._call_api(
+                "GET",
+                f"{self._calendar_url}/calendar/{event_id}",
+                ctx,
+            )
+            event_title = event.get("title") or event.get("workout_title", "Workout")
+        except FunctionExecutionError:
+            event_title = "Workout"
+
+        # Delete the event
+        self._call_api(
+            "DELETE",
+            f"{self._calendar_url}/calendar/{event_id}",
+            ctx,
+        )
+
+        return json.dumps({
+            "success": True,
+            "message": f"Cancelled: {event_title}",
+            "event_id": event_id,
+        })
+
+    def _sync_strava(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Sync activities from Strava."""
+        days_back = min(args.get("days_back", 7), 30)  # Cap at 30 days
+
+        # Check rate limit
+        if self._rate_limit_repo:
+            allowed, count, limit = self._rate_limit_repo.check_and_increment(
+                ctx.user_id, "sync_strava", self._sync_rate_limit, window_hours=1
+            )
+            if not allowed:
+                return self._error_response(
+                    "rate_limit_exceeded",
+                    f"Strava sync is limited to {limit} times per hour. "
+                    f"You've used {count}/{limit}. Please try again later.",
+                )
+
+        result = self._call_api(
+            "POST",
+            f"{self._strava_sync_url}/strava/sync",
+            ctx,
+            json={"days_back": days_back},
+        )
+
+        synced_count = result.get("synced_count", 0)
+        activities = result.get("activities", [])
+
+        if synced_count == 0:
+            return "No new activities found to sync from Strava."
+
+        lines = [f"Synced {synced_count} activity(ies) from Strava:"]
+        for activity in activities[:10]:  # Cap display at 10
+            name = activity.get("name", "Activity")
+            activity_type = activity.get("type", "")
+            distance = activity.get("distance_km")
+            duration = activity.get("duration_minutes")
+
+            line = f"- {name}"
+            if activity_type:
+                line += f" ({activity_type})"
+            if distance:
+                line += f" - {distance:.1f}km"
+            if duration:
+                line += f", {duration}min"
+            lines.append(line)
+
+        if len(activities) > 10:
+            lines.append(f"... and {len(activities) - 10} more")
+
+        return "\n".join(lines)
+
+    def _sync_garmin(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Sync workout data from Garmin."""
+        # Check feature flag FIRST (fail fast on authorization)
+        if self._feature_flags:
+            if not self._feature_flags.is_function_enabled(ctx.user_id, "garmin_sync"):
+                return self._error_response(
+                    "feature_disabled",
+                    "Garmin sync is currently in beta. Please check back later.",
+                )
+
+        workout_ids = args.get("workout_ids", [])
+
+        # Validate workout_ids format (prevents injection)
+        validation_error = self._validate_id_list(workout_ids, "workout_ids")
+        if validation_error:
+            return validation_error
+
+        # Check rate limit
+        if self._rate_limit_repo:
+            allowed, count, limit = self._rate_limit_repo.check_and_increment(
+                ctx.user_id, "sync_garmin", self._sync_rate_limit, window_hours=1
+            )
+            if not allowed:
+                return self._error_response(
+                    "rate_limit_exceeded",
+                    f"Garmin sync is limited to {limit} times per hour. "
+                    f"You've used {count}/{limit}. Please try again later.",
+                )
+
+        result = self._call_api(
+            "POST",
+            f"{self._garmin_sync_url}/garmin/sync",
+            ctx,
+            json={"workout_ids": workout_ids},
+        )
+
+        synced_count = result.get("synced_count", 0)
+        return json.dumps({
+            "success": True,
+            "message": f"Synced {synced_count} workout(s) from Garmin",
+            "synced_count": synced_count,
+        })
+
+    def _get_strava_activities(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Get recent activities from Strava."""
+        # Cap limit at 30, default to 10
+        limit = min(args.get("limit", 10), 30)
+
+        result = self._call_api(
+            "GET",
+            f"{self._strava_sync_url}/strava/activities",
+            ctx,
+            params={"limit": limit, "userId": ctx.user_id},
+        )
+
+        activities = result if isinstance(result, list) else result.get("activities", result.get("results", []))
+        if not activities:
+            return "No recent Strava activities found."
+
+        lines = [f"Found {len(activities)} recent Strava activity(ies):"]
+        for i, activity in enumerate(activities[:limit], 1):
+            name = activity.get("name", "Activity")
+            activity_type = activity.get("type", "")
+            date = activity.get("start_date", "")
+            distance = activity.get("distance", 0) / 1000  # Convert m to km
+            elapsed_time = activity.get("elapsed_time", 0)
+            duration_min = elapsed_time // 60
+
+            line = f"{i}. {name}"
+            if activity_type:
+                line += f" ({activity_type})"
+            if date:
+                # Simplify date display
+                date_display = date[:10] if len(date) >= 10 else date
+                line += f" - {date_display}"
+            if distance > 0:
+                line += f" - {distance:.1f}km"
+            if duration_min > 0:
+                line += f", {duration_min}min"
+            lines.append(line)
+
+        return "\n".join(lines)

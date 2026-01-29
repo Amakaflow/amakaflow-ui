@@ -1,1 +1,1 @@
-# E2E test package for AmakaFlow Chat API
+"""E2E tests for chat-api."""

@@ -33,6 +33,7 @@ from infrastructure.db.embedding_repository import SupabaseEmbeddingRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.rate_limit_repository import SupabaseRateLimitRepository
+from infrastructure.db.function_rate_limit_repository import SupabaseFunctionRateLimitRepository
 
 # Services
 from backend.services.embedding_service import EmbeddingService
@@ -260,6 +261,13 @@ def get_rate_limit_repository(
     return SupabaseRateLimitRepository(client)
 
 
+def get_function_rate_limit_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseFunctionRateLimitRepository:
+    """Get function rate limit repository instance."""
+    return SupabaseFunctionRateLimitRepository(client)
+
+
 # =============================================================================
 # Service Providers
 # =============================================================================
@@ -288,23 +296,32 @@ def get_ai_client() -> AIClient:
     )
 
 
-@lru_cache
-def get_function_dispatcher() -> FunctionDispatcher:
-    """Get cached function dispatcher for tool execution."""
-    settings = _get_settings()
-    return FunctionDispatcher(
-        mapper_api_url=settings.mapper_api_url,
-        calendar_api_url=settings.calendar_api_url,
-        ingestor_api_url=settings.workout_ingestor_api_url,
-        timeout=settings.function_timeout_seconds,
-    )
-
-
 def get_feature_flag_service(
     client: Client = Depends(get_supabase_client_required),
 ) -> FeatureFlagService:
     """Get feature flag service instance."""
     return FeatureFlagService(client)
+
+
+def get_function_dispatcher(
+    function_rate_limit_repo: SupabaseFunctionRateLimitRepository = Depends(
+        get_function_rate_limit_repository
+    ),
+    feature_flags: FeatureFlagService = Depends(get_feature_flag_service),
+    settings: Settings = Depends(get_settings),
+) -> FunctionDispatcher:
+    """Get function dispatcher for tool execution with rate limiting and feature flags."""
+    return FunctionDispatcher(
+        mapper_api_url=settings.mapper_api_url,
+        calendar_api_url=settings.calendar_api_url,
+        ingestor_api_url=settings.workout_ingestor_api_url,
+        timeout=settings.function_timeout_seconds,
+        strava_sync_api_url=settings.strava_sync_api_url,
+        garmin_sync_api_url=settings.garmin_sync_api_url,
+        function_rate_limit_repo=function_rate_limit_repo,
+        feature_flag_service=feature_flags,
+        sync_rate_limit_per_hour=settings.sync_rate_limit_per_hour,
+    )
 
 
 # =============================================================================
@@ -368,6 +385,7 @@ __all__ = [
     "get_chat_session_repository",
     "get_chat_message_repository",
     "get_rate_limit_repository",
+    "get_function_rate_limit_repository",
     # Services
     "get_embedding_service",
     "get_ai_client",

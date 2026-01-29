@@ -5,7 +5,7 @@ Ensures tool schemas are valid and match dispatcher handlers.
 
 import pytest
 
-from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS, ALL_TOOLS
+from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS, PHASE_4_TOOLS, ALL_TOOLS
 from backend.services.function_dispatcher import FunctionDispatcher
 
 
@@ -87,9 +87,10 @@ class TestToolSchemaDispatcherAlignment:
         )
 
     def test_all_tools_is_combination_of_phases(self):
-        """ALL_TOOLS should be Phase 1 + Phase 2 + Phase 3."""
-        assert len(ALL_TOOLS) == len(PHASE_1_TOOLS) + len(PHASE_2_TOOLS) + len(PHASE_3_TOOLS)
-        assert ALL_TOOLS == PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS
+        """ALL_TOOLS should be Phase 1 + Phase 2 + Phase 3 + Phase 4."""
+        expected_count = len(PHASE_1_TOOLS) + len(PHASE_2_TOOLS) + len(PHASE_3_TOOLS) + len(PHASE_4_TOOLS)
+        assert len(ALL_TOOLS) == expected_count
+        assert ALL_TOOLS == PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS
 
 
 class TestToolSchemaContent:
@@ -246,6 +247,63 @@ class TestPhase3ToolSchemaContent:
 
         assert "workout_id" in tool["input_schema"]["properties"]
         assert tool["input_schema"]["required"] == ["workout_id"]
+
+
+class TestPhase4ToolSchemaContent:
+    """Verify Phase 4 calendar & sync tool schemas are correct."""
+
+    def test_get_calendar_events_schema(self):
+        """Verify get_calendar_events has required date params."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "get_calendar_events")
+
+        assert "start_date" in tool["input_schema"]["properties"]
+        assert "end_date" in tool["input_schema"]["properties"]
+        assert set(tool["input_schema"]["required"]) == {"start_date", "end_date"}
+
+    def test_reschedule_workout_schema(self):
+        """Verify reschedule_workout has event_id required and optional date/time."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "reschedule_workout")
+
+        assert "event_id" in tool["input_schema"]["properties"]
+        assert "new_date" in tool["input_schema"]["properties"]
+        assert "new_time" in tool["input_schema"]["properties"]
+        assert tool["input_schema"]["required"] == ["event_id"]
+
+    def test_cancel_scheduled_workout_schema(self):
+        """Verify cancel_scheduled_workout requires event_id and confirm."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "cancel_scheduled_workout")
+
+        assert "event_id" in tool["input_schema"]["properties"]
+        assert "confirm" in tool["input_schema"]["properties"]
+        confirm_prop = tool["input_schema"]["properties"]["confirm"]
+        assert confirm_prop["type"] == "boolean"
+        assert set(tool["input_schema"]["required"]) == {"event_id", "confirm"}
+
+    def test_sync_strava_schema(self):
+        """Verify sync_strava has optional days_back param."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "sync_strava")
+
+        assert "days_back" in tool["input_schema"]["properties"]
+        # No required fields
+        assert "required" not in tool["input_schema"] or not tool["input_schema"]["required"]
+
+    def test_sync_garmin_schema(self):
+        """Verify sync_garmin requires workout_ids array."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "sync_garmin")
+
+        assert "workout_ids" in tool["input_schema"]["properties"]
+        workout_ids_prop = tool["input_schema"]["properties"]["workout_ids"]
+        assert workout_ids_prop["type"] == "array"
+        assert workout_ids_prop["items"]["type"] == "string"
+        assert tool["input_schema"]["required"] == ["workout_ids"]
+
+    def test_get_strava_activities_schema(self):
+        """Verify get_strava_activities has optional limit param."""
+        tool = next(t for t in PHASE_4_TOOLS if t["name"] == "get_strava_activities")
+
+        assert "limit" in tool["input_schema"]["properties"]
+        # No required fields
+        assert "required" not in tool["input_schema"] or not tool["input_schema"]["required"]
 
 
 class TestSafetyBoundaries:

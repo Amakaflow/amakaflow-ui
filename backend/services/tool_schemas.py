@@ -359,5 +359,124 @@ PHASE_3_TOOLS: List[Dict[str, Any]] = [
     },
 ]
 
+PHASE_4_TOOLS: List[Dict[str, Any]] = [
+    {
+        "name": "get_calendar_events",
+        "description": (
+            "Get scheduled workouts from the user's calendar for a date range. "
+            "Returns workout events with IDs that can be used for rescheduling or cancellation."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date in ISO format (YYYY-MM-DD)",
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End date in ISO format (YYYY-MM-DD)",
+                },
+            },
+            "required": ["start_date", "end_date"],
+        },
+    },
+    {
+        "name": "reschedule_workout",
+        "description": (
+            "Reschedule a workout on the user's calendar to a new date and/or time."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "ID of the calendar event to reschedule",
+                },
+                "new_date": {
+                    "type": "string",
+                    "description": "New date in ISO format (YYYY-MM-DD)",
+                },
+                "new_time": {
+                    "type": "string",
+                    "description": "New time in HH:MM format (optional)",
+                },
+            },
+            "required": ["event_id"],
+        },
+    },
+    {
+        "name": "cancel_scheduled_workout",
+        "description": (
+            "Cancel a scheduled workout from the user's calendar. "
+            "Requires confirmation to prevent accidental cancellations."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "ID of the calendar event to cancel",
+                },
+                "confirm": {
+                    "type": "boolean",
+                    "description": "Must be true to confirm cancellation",
+                },
+            },
+            "required": ["event_id", "confirm"],
+        },
+    },
+    {
+        "name": "sync_strava",
+        "description": (
+            "Sync recent activities from the user's connected Strava account. "
+            "Rate limited to 3 syncs per hour. Imports activities as workout completions."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days_back": {
+                    "type": "integer",
+                    "description": "Number of days to sync (default: 7, max: 30)",
+                },
+            },
+        },
+    },
+    {
+        "name": "sync_garmin",
+        "description": (
+            "Sync workout data from the user's connected Garmin account. "
+            "Rate limited to 3 syncs per hour. Currently in beta."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "workout_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of workout IDs to sync from Garmin",
+                },
+            },
+            "required": ["workout_ids"],
+        },
+    },
+    {
+        "name": "get_strava_activities",
+        "description": (
+            "Get recent activities from the user's connected Strava account. "
+            "Returns activity summaries including distance, time, and type."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum activities to return (default: 10, max: 30)",
+                },
+            },
+        },
+    },
+]
+
 # Combined list for convenience
-ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS
+ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS

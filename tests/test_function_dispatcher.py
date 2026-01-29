@@ -2150,3 +2150,507 @@ class TestGetWorkoutDetails:
         call_kwargs = mock_req.call_args
         assert call_kwargs[1]["headers"]["Authorization"] == "Bearer test-token"
         assert call_kwargs[1]["headers"]["X-User-Id"] == "user-1"
+
+
+# =============================================================================
+# Phase 4: Calendar & Sync Handler Tests (AMA-428)
+# =============================================================================
+
+
+@pytest.fixture
+def dispatcher_with_sync():
+    """Create a FunctionDispatcher with sync API URLs."""
+    return FunctionDispatcher(
+        mapper_api_url="http://mapper-api",
+        calendar_api_url="http://calendar-api",
+        ingestor_api_url="http://ingestor-api",
+        strava_sync_api_url="http://strava-sync-api",
+        garmin_sync_api_url="http://garmin-sync-api",
+        timeout=5.0,
+    )
+
+
+@pytest.fixture
+def mock_rate_limit_repo():
+    """Create a mock rate limit repository."""
+    repo = MagicMock()
+    repo.check_and_increment.return_value = (True, 1, 3)  # allowed, count, limit
+    repo.get_remaining.return_value = 2
+    return repo
+
+
+@pytest.fixture
+def mock_feature_flags():
+    """Create a mock feature flag service."""
+    service = MagicMock()
+    service.is_function_enabled.return_value = True
+    return service
+
+
+@pytest.fixture
+def dispatcher_with_deps(mock_rate_limit_repo, mock_feature_flags):
+    """Create a FunctionDispatcher with all Phase 4 dependencies."""
+    return FunctionDispatcher(
+        mapper_api_url="http://mapper-api",
+        calendar_api_url="http://calendar-api",
+        ingestor_api_url="http://ingestor-api",
+        strava_sync_api_url="http://strava-sync-api",
+        garmin_sync_api_url="http://garmin-sync-api",
+        function_rate_limit_repo=mock_rate_limit_repo,
+        feature_flag_service=mock_feature_flags,
+        sync_rate_limit_per_hour=3,
+        timeout=5.0,
+    )
+
+
+class TestGetCalendarEvents:
+    def test_success(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "events": [
+                {
+                    "id": "evt-1",
+                    "title": "Morning Run",
+                    "scheduled_date": "2024-02-15",
+                    "scheduled_time": "07:00",
+                },
+                {
+                    "id": "evt-2",
+                    "title": "Leg Day",
+                    "scheduled_date": "2024-02-16",
+                },
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher_with_sync.execute(
+                "get_calendar_events",
+                {"start_date": "2024-02-15", "end_date": "2024-02-20"},
+                context,
+            )
+
+        assert "Found 2 scheduled workout(s)" in result
+        assert "Morning Run" in result
+        assert "Leg Day" in result
+        assert "evt-1" in result
+
+        call_args = mock_req.call_args
+        assert "calendar" in call_args[0][1]
+        assert call_args[1]["params"]["start"] == "2024-02-15"
+        assert call_args[1]["params"]["end"] == "2024-02-20"
+
+    def test_no_events(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"events": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response):
+            result = dispatcher_with_sync.execute(
+                "get_calendar_events",
+                {"start_date": "2024-02-15", "end_date": "2024-02-20"},
+                context,
+            )
+
+        assert "No workouts scheduled" in result
+
+    def test_missing_dates(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "get_calendar_events",
+            {},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "start_date" in parsed["message"] or "end_date" in parsed["message"]
+
+    def test_missing_start_date_only(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "get_calendar_events",
+            {"end_date": "2024-02-20"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+
+
+class TestRescheduleWorkout:
+    def test_success_new_date(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher_with_sync.execute(
+                "reschedule_workout",
+                {"event_id": "evt-1", "new_date": "2024-02-20"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert "2024-02-20" in data["message"]
+        assert data["event_id"] == "evt-1"
+
+        call_args = mock_req.call_args
+        assert "calendar/evt-1" in call_args[0][1]
+        assert call_args[1]["json"]["scheduled_date"] == "2024-02-20"
+
+    def test_success_new_time(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher_with_sync.execute(
+                "reschedule_workout",
+                {"event_id": "evt-1", "new_time": "14:00"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert "14:00" in data["message"]
+
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["scheduled_time"] == "14:00"
+
+    def test_success_both_date_and_time(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response):
+            result = dispatcher_with_sync.execute(
+                "reschedule_workout",
+                {"event_id": "evt-1", "new_date": "2024-02-20", "new_time": "14:00"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert "2024-02-20" in data["message"]
+        assert "14:00" in data["message"]
+
+    def test_missing_event_id(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "reschedule_workout",
+            {"new_date": "2024-02-20"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "event_id" in parsed["message"]
+
+    def test_missing_new_date_and_time(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "reschedule_workout",
+            {"event_id": "evt-1"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "new_date" in parsed["message"] or "new_time" in parsed["message"]
+
+
+class TestCancelScheduledWorkout:
+    def test_success(self, dispatcher_with_sync, context):
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = {"title": "Morning Run"}
+        mock_get_response.raise_for_status = MagicMock()
+
+        mock_delete_response = MagicMock()
+        mock_delete_response.json.return_value = {"success": True}
+        mock_delete_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher_with_sync._client,
+            "request",
+            side_effect=[mock_get_response, mock_delete_response],
+        ):
+            result = dispatcher_with_sync.execute(
+                "cancel_scheduled_workout",
+                {"event_id": "evt-1", "confirm": True},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert "Morning Run" in data["message"]
+        assert data["event_id"] == "evt-1"
+
+    def test_missing_event_id(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "cancel_scheduled_workout",
+            {"confirm": True},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "event_id" in parsed["message"]
+
+    def test_missing_confirmation(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "cancel_scheduled_workout",
+            {"event_id": "evt-1"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "confirmation_required"
+
+    def test_confirm_false_rejected(self, dispatcher_with_sync, context):
+        result = dispatcher_with_sync.execute(
+            "cancel_scheduled_workout",
+            {"event_id": "evt-1", "confirm": False},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "confirmation_required"
+
+
+class TestSyncStrava:
+    def test_success(self, dispatcher_with_deps, context, mock_rate_limit_repo):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "synced_count": 2,
+            "activities": [
+                {
+                    "name": "Morning Run",
+                    "type": "Run",
+                    "distance_km": 5.2,
+                    "duration_minutes": 30,
+                },
+                {
+                    "name": "Evening Ride",
+                    "type": "Ride",
+                    "distance_km": 15.0,
+                    "duration_minutes": 45,
+                },
+            ],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_deps._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher_with_deps.execute(
+                "sync_strava",
+                {"days_back": 7},
+                context,
+            )
+
+        assert "Synced 2 activity(ies)" in result
+        assert "Morning Run" in result
+        assert "Evening Ride" in result
+
+        call_args = mock_req.call_args
+        assert "strava/sync" in call_args[0][1]
+        assert call_args[1]["json"]["days_back"] == 7
+
+        # Verify rate limit was checked
+        mock_rate_limit_repo.check_and_increment.assert_called_once_with(
+            context.user_id, "sync_strava", 3, window_hours=1
+        )
+
+    def test_no_activities(self, dispatcher_with_deps, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"synced_count": 0, "activities": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_deps._client, "request", return_value=mock_response):
+            result = dispatcher_with_deps.execute(
+                "sync_strava",
+                {},
+                context,
+            )
+
+        assert "No new activities found" in result
+
+    def test_days_back_capped_at_30(self, dispatcher_with_deps, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"synced_count": 0, "activities": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_deps._client, "request", return_value=mock_response) as mock_req:
+            dispatcher_with_deps.execute(
+                "sync_strava",
+                {"days_back": 100},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["days_back"] == 30  # Capped
+
+    def test_rate_limit_exceeded(self, dispatcher_with_deps, context, mock_rate_limit_repo):
+        mock_rate_limit_repo.check_and_increment.return_value = (False, 3, 3)  # Not allowed
+
+        result = dispatcher_with_deps.execute(
+            "sync_strava",
+            {},
+            context,
+        )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "rate_limit_exceeded"
+        assert "3 times per hour" in parsed["message"]
+
+
+class TestSyncGarmin:
+    def test_success(self, dispatcher_with_deps, context, mock_rate_limit_repo, mock_feature_flags):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"synced_count": 2}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_deps._client, "request", return_value=mock_response):
+            result = dispatcher_with_deps.execute(
+                "sync_garmin",
+                {"workout_ids": ["w-1", "w-2"]},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["synced_count"] == 2
+
+        # Verify feature flag was checked
+        mock_feature_flags.is_function_enabled.assert_called_once_with(context.user_id, "garmin_sync")
+
+    def test_missing_workout_ids(self, dispatcher_with_deps, context):
+        result = dispatcher_with_deps.execute(
+            "sync_garmin",
+            {},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "workout_ids" in parsed["message"]
+
+    def test_feature_disabled(self, dispatcher_with_deps, context, mock_feature_flags):
+        mock_feature_flags.is_function_enabled.return_value = False
+
+        result = dispatcher_with_deps.execute(
+            "sync_garmin",
+            {"workout_ids": ["w-1"]},
+            context,
+        )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "feature_disabled"
+        assert "beta" in parsed["message"].lower()
+
+    def test_rate_limit_exceeded(self, dispatcher_with_deps, context, mock_rate_limit_repo, mock_feature_flags):
+        mock_rate_limit_repo.check_and_increment.return_value = (False, 3, 3)
+
+        result = dispatcher_with_deps.execute(
+            "sync_garmin",
+            {"workout_ids": ["w-1"]},
+            context,
+        )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "rate_limit_exceeded"
+
+
+class TestGetStravaActivities:
+    def test_success(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "id": 12345,
+                "name": "Morning Run",
+                "type": "Run",
+                "start_date": "2024-02-15T07:00:00Z",
+                "distance": 5200,  # meters
+                "elapsed_time": 1800,  # seconds
+            },
+            {
+                "id": 12346,
+                "name": "Evening Ride",
+                "type": "Ride",
+                "start_date": "2024-02-15T18:00:00Z",
+                "distance": 15000,
+                "elapsed_time": 2700,
+            },
+        ]
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher_with_sync.execute(
+                "get_strava_activities",
+                {"limit": 10},
+                context,
+            )
+
+        assert "Found 2 recent Strava activity(ies)" in result
+        assert "Morning Run" in result
+        assert "Evening Ride" in result
+        assert "5.2km" in result  # Converted from meters
+
+        call_args = mock_req.call_args
+        assert "strava/activities" in call_args[0][1]
+        assert call_args[1]["params"]["limit"] == 10
+
+    def test_no_activities(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response):
+            result = dispatcher_with_sync.execute(
+                "get_strava_activities",
+                {},
+                context,
+            )
+
+        assert "No recent Strava activities found" in result
+
+    def test_default_limit_is_10(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            dispatcher_with_sync.execute(
+                "get_strava_activities",
+                {},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["params"]["limit"] == 10
+
+    def test_limit_capped_at_30(self, dispatcher_with_sync, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response) as mock_req:
+            dispatcher_with_sync.execute(
+                "get_strava_activities",
+                {"limit": 100},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["params"]["limit"] == 30  # Capped
+
+    def test_handles_dict_response(self, dispatcher_with_sync, context):
+        """Test that handler works with dict response format."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "activities": [
+                {"id": 1, "name": "Test", "type": "Run", "start_date": "", "distance": 0, "elapsed_time": 0}
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher_with_sync._client, "request", return_value=mock_response):
+            result = dispatcher_with_sync.execute(
+                "get_strava_activities",
+                {},
+                context,
+            )
+
+        assert "Found 1 recent Strava activity" in result

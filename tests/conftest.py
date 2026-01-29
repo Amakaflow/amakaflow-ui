@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Generator
+from typing import Dict, Generator, List
 from unittest.mock import MagicMock
 
 import pytest
@@ -174,3 +174,111 @@ def mock_function_dispatcher():
     dispatcher = MagicMock(spec=FunctionDispatcher)
     dispatcher.execute.return_value = "Mock result"
     return dispatcher
+
+
+# ---------------------------------------------------------------------------
+# Fake Services for E2E Tests
+# ---------------------------------------------------------------------------
+
+
+class FakeFunctionRateLimitRepository:
+    """In-memory fake for function rate limit repository.
+
+    Tracks call counts per user/function for testing rate limit behavior.
+    """
+
+    def __init__(self):
+        self._counts: Dict[str, int] = {}
+
+    def _key(self, user_id: str, function_name: str) -> str:
+        return f"{user_id}:{function_name}"
+
+    def check_and_increment(
+        self, user_id: str, function_name: str, limit: int, window_hours: int = 1
+    ) -> tuple:
+        """Check rate limit and increment counter."""
+        key = self._key(user_id, function_name)
+        current = self._counts.get(key, 0)
+
+        if current >= limit:
+            return (False, current, limit)
+
+        self._counts[key] = current + 1
+        return (True, current + 1, limit)
+
+    def get_remaining(
+        self, user_id: str, function_name: str, limit: int, window_hours: int = 1
+    ) -> int:
+        """Get remaining calls in window."""
+        key = self._key(user_id, function_name)
+        current = self._counts.get(key, 0)
+        return max(0, limit - current)
+
+    def reset(self):
+        """Reset all counters (for test isolation)."""
+        self._counts.clear()
+
+    def set_count(self, user_id: str, function_name: str, count: int):
+        """Set a specific count (for test setup)."""
+        key = self._key(user_id, function_name)
+        self._counts[key] = count
+
+
+class FakeFeatureFlagService:
+    """In-memory fake for feature flag service.
+
+    Allows tests to control which features are enabled.
+    """
+
+    def __init__(self):
+        self._enabled_functions: Dict[str, List[str]] = {}
+        self._chat_enabled: Dict[str, bool] = {}
+        self._default_enabled = True
+
+    def is_function_enabled(self, user_id: str, function_name: str) -> bool:
+        """Check if function is enabled for user."""
+        if user_id in self._enabled_functions:
+            return function_name in self._enabled_functions[user_id]
+        return self._default_enabled
+
+    def is_chat_enabled(self, user_id: str) -> bool:
+        """Check if chat is enabled for user."""
+        return self._chat_enabled.get(user_id, True)
+
+    def get_rate_limit_for_user(self, user_id: str) -> int:
+        """Get monthly rate limit for user."""
+        return 50  # Default free tier
+
+    def set_function_enabled(self, user_id: str, function_name: str, enabled: bool):
+        """Configure function enablement for test setup."""
+        if user_id not in self._enabled_functions:
+            self._enabled_functions[user_id] = []
+        if enabled and function_name not in self._enabled_functions[user_id]:
+            self._enabled_functions[user_id].append(function_name)
+        elif not enabled and function_name in self._enabled_functions[user_id]:
+            self._enabled_functions[user_id].remove(function_name)
+
+    def set_chat_enabled(self, user_id: str, enabled: bool):
+        """Configure chat enablement for test setup."""
+        self._chat_enabled[user_id] = enabled
+
+    def disable_all_for_user(self, user_id: str):
+        """Disable all functions for a user."""
+        self._enabled_functions[user_id] = []
+
+    def enable_all_for_user(self, user_id: str):
+        """Remove user-specific restrictions (use defaults)."""
+        if user_id in self._enabled_functions:
+            del self._enabled_functions[user_id]
+
+
+@pytest.fixture
+def fake_rate_limit_repo():
+    """Provide fake rate limit repository for E2E tests."""
+    return FakeFunctionRateLimitRepository()
+
+
+@pytest.fixture
+def fake_feature_flag_service():
+    """Provide fake feature flag service for E2E tests."""
+    return FakeFeatureFlagService()

@@ -193,9 +193,25 @@ class Settings(BaseSettings):
         default="http://localhost:8003",
         description="Base URL for workout-ingestor-api service",
     )
+    strava_sync_api_url: str = Field(
+        default="http://localhost:8004",
+        description="Base URL for strava-sync-api service",
+    )
+    garmin_sync_api_url: str = Field(
+        default="http://localhost:8005",
+        description="Base URL for garmin-sync-api service",
+    )
     function_timeout_seconds: float = Field(
         default=60.0,
         description="Timeout for external function calls (increased for content ingestion)",
+    )
+
+    # -------------------------------------------------------------------------
+    # Function Rate Limits
+    # -------------------------------------------------------------------------
+    sync_rate_limit_per_hour: int = Field(
+        default=3,
+        description="Maximum sync operations (Strava/Garmin) per hour per user",
     )
 
     # -------------------------------------------------------------------------
