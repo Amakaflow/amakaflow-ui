@@ -162,59 +162,172 @@ class StreamChatUseCase:
         # 6. Create function context for tool execution
         context = FunctionContext(user_id=user_id, auth_token=auth_token)
 
-        # 7. Stream from Claude
+        # 7. Stream from Claude with multi-turn tool loop
+        # Per Anthropic protocol: tool results must be fed back to Claude for synthesis
         full_text = ""
-        tool_calls: List[Dict[str, Any]] = []
+        all_tool_calls: List[Dict[str, Any]] = []  # For persistence
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_latency_ms = 0
+        ai_call_count = 0
         end_data: Dict[str, Any] = {}
-
-        # Track current tool block for accumulating partial_json
-        current_tool: Optional[Dict[str, Any]] = None
-        tool_input_json = ""
 
         # Combine Phase 1, Phase 2, and Phase 3 tools for Claude
         tools = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS
 
-        for event in self._ai_client.stream_chat(
-            messages=anthropic_messages,
-            system=SYSTEM_PROMPT,
-            tools=tools,
-            user_id=user_id,
-        ):
-            if event.event == "content_delta":
-                text = event.data.get("text", "")
-                partial_json = event.data.get("partial_json", "")
+        # Maximum tool loop iterations to prevent infinite loops
+        MAX_TOOL_ITERATIONS = 10
 
-                if current_tool and partial_json:
-                    # Accumulating tool arguments
-                    tool_input_json += partial_json
-                elif text:
-                    # Normal text response
-                    full_text += text
-                    yield _sse("content_delta", event.data)
+        for iteration in range(MAX_TOOL_ITERATIONS):
+            # Track tool blocks for this iteration
+            current_tool: Optional[Dict[str, Any]] = None
+            tool_input_json = ""
+            tool_uses_this_turn: List[Dict[str, Any]] = []
 
-            elif event.event == "function_call":
-                # Starting a new tool block
-                # First, execute previous tool if one was pending
-                if current_tool:
-                    yield from self._execute_tool(current_tool, tool_input_json, context)
+            for event in self._ai_client.stream_chat(
+                messages=anthropic_messages,
+                system=SYSTEM_PROMPT,
+                tools=tools,
+                user_id=user_id,
+            ):
+                if event.event == "content_delta":
+                    text = event.data.get("text", "")
+                    partial_json = event.data.get("partial_json", "")
 
-                # Start tracking new tool
-                current_tool = event.data
-                tool_input_json = ""
-                tool_calls.append(event.data)
-                yield _sse("function_call", event.data)
+                    if current_tool and partial_json:
+                        # Accumulating tool arguments
+                        tool_input_json += partial_json
+                    elif text:
+                        # Normal text response
+                        full_text += text
+                        yield _sse("content_delta", event.data)
 
-            elif event.event == "message_end":
-                # Execute any pending tool before ending
-                if current_tool:
-                    yield from self._execute_tool(current_tool, tool_input_json, context)
-                    current_tool = None
+                elif event.event == "function_call":
+                    # Finalize previous tool if pending
+                    if current_tool:
+                        tool_input, parse_ok = self._parse_tool_input(tool_input_json)
+                        current_tool["input"] = tool_input
+                        current_tool["_parse_error"] = not parse_ok
+                        tool_uses_this_turn.append(current_tool)
 
-                end_data = event.data
+                    # Start tracking new tool
+                    current_tool = event.data.copy()
+                    tool_input_json = ""
+                    yield _sse("function_call", event.data)
 
-            elif event.event == "error":
-                yield _sse("error", event.data)
-                return
+                elif event.event == "message_end":
+                    # Finalize pending tool
+                    if current_tool:
+                        tool_input, parse_ok = self._parse_tool_input(tool_input_json)
+                        current_tool["input"] = tool_input
+                        current_tool["_parse_error"] = not parse_ok
+                        tool_uses_this_turn.append(current_tool)
+                        current_tool = None
+
+                    end_data = event.data
+                    total_input_tokens += end_data.get("input_tokens", 0)
+                    total_output_tokens += end_data.get("output_tokens", 0)
+                    total_latency_ms += end_data.get("latency_ms", 0)
+                    ai_call_count += 1
+
+                elif event.event == "error":
+                    yield _sse("error", event.data)
+                    return
+
+            # Check if we should continue the tool loop
+            stop_reason = end_data.get("stop_reason", "end_turn")
+
+            if not tool_uses_this_turn:
+                break
+
+            # Execute tools and yield results to client
+            tool_results: List[Dict[str, Any]] = []
+            assistant_content: List[Dict[str, Any]] = []
+
+            for tool_use in tool_uses_this_turn:
+                # Check for parse error
+                if tool_use.get("_parse_error"):
+                    result = "Error: Invalid tool arguments received. Please try again."
+                    yield _sse("function_result", {
+                        "tool_use_id": tool_use["id"],
+                        "name": tool_use["name"],
+                        "result": result,
+                    })
+                    # Build tool_result for error case
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_use["id"],
+                        "content": result,
+                        "is_error": True,
+                    })
+                    continue
+
+                # Build assistant content block
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tool_use["id"],
+                    "name": tool_use["name"],
+                    "input": tool_use["input"],
+                })
+
+                # Execute tool
+                result = self._dispatcher.execute(
+                    tool_use["name"], tool_use["input"], context
+                )
+
+                # Yield result to client
+                yield _sse("function_result", {
+                    "tool_use_id": tool_use["id"],
+                    "name": tool_use["name"],
+                    "result": result,
+                })
+
+                # Build tool_result content block
+                result_content = (
+                    json.dumps(result) if not isinstance(result, str) else result
+                )
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use["id"],
+                    "content": result_content,
+                })
+
+                # Track for persistence
+                all_tool_calls.append({
+                    "id": tool_use["id"],
+                    "name": tool_use["name"],
+                    "input": tool_use["input"],
+                    "result": result,
+                })
+
+            # Only loop back to Claude if it expects tool results
+            # If stop_reason is "end_turn", Claude already provided final response
+            if stop_reason != "tool_use":
+                break
+
+            # Append messages for next Claude call
+            anthropic_messages.append({"role": "assistant", "content": assistant_content})
+            anthropic_messages.append({"role": "user", "content": tool_results})
+
+            logger.debug(
+                "Tool loop iteration %d: executed %d tools, continuing...",
+                iteration + 1,
+                len(tool_uses_this_turn),
+            )
+        else:
+            # Loop exhausted MAX_TOOL_ITERATIONS without Claude finishing
+            if tool_uses_this_turn and stop_reason == "tool_use":
+                logger.warning(
+                    "Tool loop hit MAX_TOOL_ITERATIONS (%d) for user %s, session %s",
+                    MAX_TOOL_ITERATIONS,
+                    user_id,
+                    session_id,
+                )
+
+        # Update end_data with total tokens and latency
+        end_data["input_tokens"] = total_input_tokens
+        end_data["output_tokens"] = total_output_tokens
+        end_data["latency_ms"] = total_latency_ms
 
         # 8. Persist assistant message
         try:
@@ -222,7 +335,7 @@ class StreamChatUseCase:
                 "session_id": session_id,
                 "role": "assistant",
                 "content": full_text,
-                "tool_calls": tool_calls if tool_calls else None,
+                "tool_calls": all_tool_calls if all_tool_calls else None,
                 "model": end_data.get("model"),
                 "input_tokens": end_data.get("input_tokens"),
                 "output_tokens": end_data.get("output_tokens"),
@@ -231,9 +344,10 @@ class StreamChatUseCase:
         except Exception as e:
             logger.error("Failed to persist assistant message: %s", e)
 
-        # 9. Increment rate limit
+        # 9. Increment rate limit based on AI calls (each iteration counts)
         try:
-            self._rate_limit_repo.increment(user_id)
+            for _ in range(ai_call_count):
+                self._rate_limit_repo.increment(user_id)
         except Exception as e:
             logger.error("Failed to increment rate limit: %s", e)
 
@@ -310,54 +424,82 @@ class StreamChatUseCase:
 
         yield _sse("message_end", message_end_data)
 
-    def _execute_tool(
-        self,
-        tool: Dict[str, Any],
-        json_str: str,
-        ctx: FunctionContext,
-    ) -> Generator[SSEEvent, None, None]:
-        """Parse tool arguments and execute via dispatcher.
+    def _parse_tool_input(self, json_str: str) -> tuple[Dict[str, Any], bool]:
+        """Parse accumulated JSON string into tool input dict.
 
         Args:
-            tool: Tool info with 'id' and 'name'.
             json_str: Accumulated JSON string of tool arguments.
-            ctx: Function context with user info and auth.
 
-        Yields:
-            SSEEvent for the function result.
+        Returns:
+            Tuple of (parsed dict, success bool). Returns ({}, True) for empty input.
         """
+        if not json_str:
+            return {}, True
         try:
-            args = json.loads(json_str) if json_str else {}
+            return json.loads(json_str), True
         except json.JSONDecodeError:
-            # Don't log raw json_str as it may contain sensitive user data
             logger.warning(
-                "Failed to parse tool arguments for %s (length: %d)",
-                tool.get("name"),
-                len(json_str) if json_str else 0,
+                "Failed to parse tool arguments (length: %d)",
+                len(json_str),
             )
-            # Return explicit error to Claude so it can recover
-            yield _sse("function_result", {
-                "tool_use_id": tool["id"],
-                "name": tool["name"],
-                "result": "Error: Invalid tool arguments received. Please try again.",
-            })
-            return
-
-        result = self._dispatcher.execute(tool["name"], args, ctx)
-        yield _sse("function_result", {
-            "tool_use_id": tool["id"],
-            "name": tool["name"],
-            "result": result,
-        })
+            return {}, False
 
     def _build_messages(
         self, history: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Convert DB messages to Anthropic message format."""
+        """Convert DB messages to Anthropic message format.
+
+        Handles tool call history by reconstructing tool_use and tool_result
+        blocks from persisted tool_calls data, ensuring Claude has full context
+        when resuming sessions.
+        """
         messages = []
         for msg in history:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            if role in ("user", "assistant") and content:
-                messages.append({"role": role, "content": content})
+            tool_calls = msg.get("tool_calls")
+
+            if role == "user" and content:
+                messages.append({"role": "user", "content": content})
+
+            elif role == "assistant":
+                # Check if this message had tool calls
+                if tool_calls:
+                    # Reconstruct assistant message with tool_use blocks
+                    assistant_content: List[Dict[str, Any]] = []
+
+                    # Add text content if present
+                    if content:
+                        assistant_content.append({
+                            "type": "text",
+                            "text": content,
+                        })
+
+                    # Add tool_use blocks
+                    for tc in tool_calls:
+                        assistant_content.append({
+                            "type": "tool_use",
+                            "id": tc["id"],
+                            "name": tc["name"],
+                            "input": tc.get("input", {}),
+                        })
+
+                    messages.append({"role": "assistant", "content": assistant_content})
+
+                    # Add user message with tool_result blocks
+                    tool_results = []
+                    for tc in tool_calls:
+                        result = tc.get("result", "")
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tc["id"],
+                            "content": result if isinstance(result, str) else json.dumps(result),
+                        })
+
+                    messages.append({"role": "user", "content": tool_results})
+
+                elif content:
+                    # Simple text-only assistant message
+                    messages.append({"role": "assistant", "content": content})
+
         return messages

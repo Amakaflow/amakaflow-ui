@@ -99,7 +99,7 @@ class AIClient:
                             elif hasattr(delta, "partial_json"):
                                 yield StreamEvent(
                                     event="content_delta",
-                                    data={"text": delta.partial_json},
+                                    data={"partial_json": delta.partial_json},
                                 )
 
                     elif event.type == "content_block_start":
@@ -120,6 +120,9 @@ class AIClient:
                         if usage:
                             output_tokens = usage
 
+                # Get final message for stop_reason
+                final_message = stream.get_final_message()
+                stop_reason = getattr(final_message, "stop_reason", "end_turn")
                 latency_ms = round((time.time() - start_time) * 1000)
 
                 yield StreamEvent(
@@ -129,6 +132,7 @@ class AIClient:
                         "input_tokens": input_tokens,
                         "output_tokens": output_tokens,
                         "latency_ms": latency_ms,
+                        "stop_reason": stop_reason,
                     },
                 )
 

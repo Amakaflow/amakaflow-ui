@@ -356,6 +356,640 @@ class TestStreamChatToolCalls:
         assert context.user_id == "user-1"
         assert context.auth_token == "Bearer my-secret-token"
 
+    def test_multi_turn_tool_loop_feeds_result_to_claude(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify tool results are fed back to Claude when stop_reason is 'tool_use'.
+
+        This is the key test for AMA-495: when Claude calls a tool with stop_reason='tool_use',
+        the result must be fed back to Claude for synthesis into a natural language response.
+        """
+        mock_ai_client = MagicMock()
+
+        # First call: Claude calls a tool and expects the result (stop_reason='tool_use')
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "leg workouts"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",  # Claude expects tool result
+            }),
+        ]
+
+        # Second call: Claude synthesizes the tool result into natural language
+        second_response = [
+            StreamEvent(event="content_delta", data={"text": "I found "}),
+            StreamEvent(event="content_delta", data={"text": "3 great leg workouts for you!"}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 50,
+                "latency_ms": 800,
+                "stop_reason": "end_turn",  # Claude is done
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [
+            iter(first_response),
+            iter(second_response),
+        ]
+
+        # Real dispatcher returns strings, not dicts
+        mock_function_dispatcher.execute.return_value = json.dumps({
+            "workouts": [
+                {"id": "w-1", "name": "Leg Day Blast"},
+                {"id": "w-2", "name": "Lower Body Strength"},
+                {"id": "w-3", "name": "Quad Burner"},
+            ]
+        })
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Find me leg workouts"))
+        event_types = [e.event for e in events]
+
+        # Should have: message_start, function_call, function_result, content_delta(s), message_end
+        assert "message_start" in event_types
+        assert "function_call" in event_types
+        assert "function_result" in event_types
+        assert "content_delta" in event_types
+        assert "message_end" in event_types
+
+        # stream_chat should be called TWICE - once for initial request, once with tool results
+        assert mock_ai_client.stream_chat.call_count == 2
+
+        # Second call should include tool result in messages
+        second_call_args = mock_ai_client.stream_chat.call_args_list[1]
+        messages = second_call_args[1]["messages"]
+
+        # Should have: original user message, assistant tool_use, user tool_result
+        assert len(messages) >= 3
+        # Last message should be the tool_result
+        assert messages[-1]["role"] == "user"
+        assert messages[-1]["content"][0]["type"] == "tool_result"
+
+        # Verify the final text response was streamed
+        content_deltas = [e for e in events if e.event == "content_delta"]
+        full_text = "".join(json.loads(e.data)["text"] for e in content_deltas)
+        assert "leg workouts" in full_text.lower()
+
+    def test_tool_loop_respects_max_iterations(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify tool loop exits after MAX_TOOL_ITERATIONS to prevent infinite loops."""
+        mock_ai_client = MagicMock()
+
+        # Create a response that always requests another tool call
+        def create_tool_response(idx):
+            return iter([
+                StreamEvent(event="function_call", data={"id": f"tool-{idx}", "name": "some_tool"}),
+                StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 100,
+                    "output_tokens": 20,
+                    "latency_ms": 500,
+                    "stop_reason": "tool_use",  # Always request more
+                }),
+            ])
+
+        # Return the same tool-requesting response many times
+        mock_ai_client.stream_chat.side_effect = [create_tool_response(i) for i in range(15)]
+        mock_function_dispatcher.execute.return_value = "result"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Do something"))
+
+        # Should cap at MAX_TOOL_ITERATIONS (10) - so 10 calls to stream_chat
+        assert mock_ai_client.stream_chat.call_count == 10
+
+    def test_token_aggregation_across_iterations(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify tokens are summed across all tool loop iterations."""
+        mock_ai_client = MagicMock()
+
+        # First turn: tool call
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "get_data"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 25,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Second turn: final response
+        second_response = [
+            StreamEvent(event="content_delta", data={"text": "Here is the data."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 150,
+                "output_tokens": 30,
+                "latency_ms": 600,
+                "stop_reason": "end_turn",
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [iter(first_response), iter(second_response)]
+        mock_function_dispatcher.execute.return_value = "data result"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Get data"))
+
+        # Find message_end and verify aggregated tokens
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Total should be: (100 + 25) + (150 + 30) = 305
+        assert data["tokens_used"] == 305
+
+    def test_multi_iteration_message_threading(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify messages accumulate correctly across multiple iterations."""
+        mock_ai_client = MagicMock()
+
+        # First turn: tool call
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"q": "test"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Second turn: another tool call
+        second_response = [
+            StreamEvent(event="function_call", data={"id": "tool-2", "name": "fetch"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"id": "123"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 25,
+                "latency_ms": 600,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Third turn: final response
+        third_response = [
+            StreamEvent(event="content_delta", data={"text": "Done!"}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 300,
+                "output_tokens": 10,
+                "latency_ms": 400,
+                "stop_reason": "end_turn",
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [
+            iter(first_response),
+            iter(second_response),
+            iter(third_response),
+        ]
+        mock_function_dispatcher.execute.side_effect = ["search result", "fetch result"]
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Search and fetch"))
+
+        # Should have 3 calls to stream_chat
+        assert mock_ai_client.stream_chat.call_count == 3
+
+        # Verify third call has accumulated messages
+        third_call_args = mock_ai_client.stream_chat.call_args_list[2]
+        messages = third_call_args[1]["messages"]
+
+        # Should have: user msg, assistant tool_use, user tool_result,
+        #              assistant tool_use, user tool_result
+        assert len(messages) >= 5
+
+        # Verify message structure
+        # First assistant message should have tool_use for "search"
+        assistant_msgs = [m for m in messages if m["role"] == "assistant"]
+        assert len(assistant_msgs) == 2
+        assert assistant_msgs[0]["content"][0]["name"] == "search"
+        assert assistant_msgs[1]["content"][0]["name"] == "fetch"
+
+        # User messages after assistant should have tool_result
+        user_msgs = [m for m in messages if m["role"] == "user"]
+        # First is original message, rest are tool_results
+        assert any(
+            isinstance(m["content"], list) and m["content"][0]["type"] == "tool_result"
+            for m in user_msgs
+        )
+
+    def test_error_during_second_iteration(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify loop exits gracefully when error occurs in subsequent iteration."""
+        mock_ai_client = MagicMock()
+
+        # First turn: tool call succeeds
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "get_data"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Second turn: error
+        second_response = [
+            StreamEvent(event="error", data={
+                "type": "api_error",
+                "message": "Service unavailable",
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [iter(first_response), iter(second_response)]
+        mock_function_dispatcher.execute.return_value = "data"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Get data"))
+        event_types = [e.event for e in events]
+
+        # Should have function_result from first iteration, then error
+        assert "function_result" in event_types
+        assert "error" in event_types
+
+        # Should NOT have message_end (error exits early)
+        assert event_types[-1] == "error"
+
+    def test_parallel_tools_in_single_turn(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify multiple tools called in one turn are all executed and fed back."""
+        mock_ai_client = MagicMock()
+
+        # First turn: Claude calls TWO tools
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "get_weather"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"city": "NYC"}'}),
+            StreamEvent(event="function_call", data={"id": "tool-2", "name": "get_time"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"tz": "EST"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 40,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Second turn: Claude synthesizes both results
+        second_response = [
+            StreamEvent(event="content_delta", data={"text": "NYC is 72F and it's 3pm EST."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 30,
+                "latency_ms": 600,
+                "stop_reason": "end_turn",
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [iter(first_response), iter(second_response)]
+        mock_function_dispatcher.execute.side_effect = ["72F sunny", "3:00 PM"]
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Weather and time in NYC"))
+
+        # Should have 2 function_call and 2 function_result events
+        function_calls = [e for e in events if e.event == "function_call"]
+        function_results = [e for e in events if e.event == "function_result"]
+        assert len(function_calls) == 2
+        assert len(function_results) == 2
+
+        # Dispatcher should be called twice
+        assert mock_function_dispatcher.execute.call_count == 2
+
+        # Second stream_chat call should have both tool_results
+        second_call_args = mock_ai_client.stream_chat.call_args_list[1]
+        messages = second_call_args[1]["messages"]
+        tool_result_msg = next(
+            m for m in messages
+            if m["role"] == "user" and isinstance(m["content"], list)
+        )
+        assert len(tool_result_msg["content"]) == 2
+        assert all(c["type"] == "tool_result" for c in tool_result_msg["content"])
+
+    def test_empty_tool_uses_with_tool_use_stop_reason(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify loop exits when stop_reason is tool_use but no tools were called."""
+        mock_ai_client = MagicMock()
+
+        # Malformed response: stop_reason=tool_use but no tool calls
+        response = [
+            StreamEvent(event="content_delta", data={"text": "Let me think..."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",  # Unusual: tool_use but no tools
+            }),
+        ]
+
+        mock_ai_client.stream_chat.return_value = iter(response)
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        # Should complete without error
+        event_types = [e.event for e in events]
+        assert "message_start" in event_types
+        assert "message_end" in event_types
+        assert "error" not in event_types
+
+        # Should NOT loop (no tools to execute)
+        assert mock_ai_client.stream_chat.call_count == 1
+
+        # Dispatcher should not be called
+        mock_function_dispatcher.execute.assert_not_called()
+
+    def test_tool_persistence_across_iterations(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify all tool calls from all iterations are persisted."""
+        mock_ai_client = MagicMock()
+
+        # First turn: tool call
+        first_response = [
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"q": "a"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "latency_ms": 500,
+                "stop_reason": "tool_use",
+            }),
+        ]
+
+        # Second turn: another tool call
+        second_response = [
+            StreamEvent(event="function_call", data={"id": "tool-2", "name": "fetch"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"id": "1"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 150,
+                "output_tokens": 25,
+                "latency_ms": 600,
+                "stop_reason": "end_turn",
+            }),
+        ]
+
+        mock_ai_client.stream_chat.side_effect = [iter(first_response), iter(second_response)]
+        mock_function_dispatcher.execute.side_effect = ["result1", "result2"]
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(user_id="user-1", message="Search and fetch"))
+
+        # Check the assistant message was persisted with all tool calls
+        create_calls = mock_message_repo.create.call_args_list
+        assistant_msg = create_calls[1][0][0]  # Second call is assistant message
+
+        assert assistant_msg["role"] == "assistant"
+        assert assistant_msg["tool_calls"] is not None
+        assert len(assistant_msg["tool_calls"]) == 2
+
+        # Verify both tools are captured
+        tool_names = [tc["name"] for tc in assistant_msg["tool_calls"]]
+        assert "search" in tool_names
+        assert "fetch" in tool_names
+
+        # Verify results are captured
+        tool_results = [tc["result"] for tc in assistant_msg["tool_calls"]]
+        assert "result1" in tool_results
+        assert "result2" in tool_results
+
+    def test_rate_limit_incremented_per_ai_call(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify rate limit is incremented once per AI call, not once per request."""
+        mock_ai_client = MagicMock()
+
+        # Two AI calls: tool call + synthesis
+        mock_ai_client.stream_chat.side_effect = [
+            iter([
+                StreamEvent(event="function_call", data={"id": "tool-1", "name": "search"}),
+                StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 100,
+                    "output_tokens": 20,
+                    "latency_ms": 500,
+                    "stop_reason": "tool_use",
+                }),
+            ]),
+            iter([
+                StreamEvent(event="content_delta", data={"text": "Done"}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 150,
+                    "output_tokens": 30,
+                    "latency_ms": 600,
+                    "stop_reason": "end_turn",
+                }),
+            ]),
+        ]
+        mock_function_dispatcher.execute.return_value = "result"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(user_id="user-1", message="Search"))
+
+        # Rate limit should be incremented twice (once per AI call)
+        assert mock_rate_limit_repo.increment.call_count == 2
+
+    def test_latency_aggregation_across_iterations(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Verify latency_ms is summed across all iterations."""
+        mock_ai_client = MagicMock()
+
+        mock_ai_client.stream_chat.side_effect = [
+            iter([
+                StreamEvent(event="function_call", data={"id": "tool-1", "name": "search"}),
+                StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 100,
+                    "output_tokens": 20,
+                    "latency_ms": 500,  # First call: 500ms
+                    "stop_reason": "tool_use",
+                }),
+            ]),
+            iter([
+                StreamEvent(event="content_delta", data={"text": "Done"}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 150,
+                    "output_tokens": 30,
+                    "latency_ms": 700,  # Second call: 700ms
+                    "stop_reason": "end_turn",
+                }),
+            ]),
+        ]
+        mock_function_dispatcher.execute.return_value = "result"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Search"))
+
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Total latency: 500 + 700 = 1200ms
+        assert data["latency_ms"] == 1200
+
+    def test_session_continuation_with_tool_history(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_ai_client, mock_function_dispatcher
+    ):
+        """Verify tool call history is reconstructed when resuming a session."""
+        # Set up existing session with tool call history
+        mock_session_repo.get.return_value = {"id": "sess-existing", "title": "Prior chat"}
+
+        # Message history includes a prior assistant message with tool_calls
+        mock_message_repo.list_for_session.return_value = [
+            {"role": "user", "content": "Find leg workouts"},
+            {
+                "role": "assistant",
+                "content": "I found some workouts for you.",
+                "tool_calls": [
+                    {
+                        "id": "prev-tool-1",
+                        "name": "search_workout_library",
+                        "input": {"query": "legs"},
+                        "result": "Found: Leg Day (ID: w-1)",
+                    }
+                ],
+            },
+            {"role": "user", "content": "Schedule the first one"},
+        ]
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        list(use_case.execute(
+            user_id="user-1",
+            message="Schedule the first one",
+            session_id="sess-existing",
+        ))
+
+        # Check that AI client received reconstructed tool history
+        call_kwargs = mock_ai_client.stream_chat.call_args[1]
+        messages = call_kwargs["messages"]
+
+        # Should have: user msg, assistant with tool_use, user with tool_result, user msg
+        assert len(messages) >= 4
+
+        # Find the assistant message with tool_use
+        assistant_with_tool = next(
+            (m for m in messages if m["role"] == "assistant" and isinstance(m["content"], list)),
+            None
+        )
+        assert assistant_with_tool is not None
+        assert any(c.get("type") == "tool_use" for c in assistant_with_tool["content"])
+        assert any(c.get("name") == "search_workout_library" for c in assistant_with_tool["content"])
+
+        # Find the user message with tool_result
+        user_with_result = next(
+            (m for m in messages if m["role"] == "user" and isinstance(m["content"], list)),
+            None
+        )
+        assert user_with_result is not None
+        assert any(c.get("type") == "tool_result" for c in user_with_result["content"])
+
 
 class TestStreamChatErrorHandling:
     def test_session_creation_failure(

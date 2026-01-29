@@ -155,13 +155,19 @@ class FakeRateLimitRepository:
 class FakeAIClient:
     """Deterministic AI client that yields predictable SSE events.
 
-    Supports configurable responses per test by setting .response_events.
+    Supports configurable responses per test:
+    - Set .response_events for single-turn responses
+    - Set .response_sequences for multi-turn tool loops (list of response lists)
+
     Thread-safe for sequential test execution (not concurrent).
     """
 
     def __init__(self) -> None:
         self.response_events: Optional[List[StreamEvent]] = None
+        self.response_sequences: Optional[List[List[StreamEvent]]] = None
+        self._sequence_index: int = 0
         self.last_call_kwargs: Optional[Dict[str, Any]] = None
+        self.all_call_kwargs: List[Dict[str, Any]] = []
         self.call_count: int = 0
 
     def stream_chat(
@@ -174,14 +180,26 @@ class FakeAIClient:
         user_id: Optional[str] = None,
     ) -> Generator[StreamEvent, None, None]:
         self.call_count += 1
-        self.last_call_kwargs = {
+        call_kwargs = {
             "messages": messages,
             "system": system,
             "model": model,
             "tools": tools,
             "user_id": user_id,
         }
+        self.last_call_kwargs = call_kwargs
+        self.all_call_kwargs.append(call_kwargs)
 
+        # Multi-turn: use response_sequences if configured
+        if self.response_sequences is not None:
+            if self._sequence_index < len(self.response_sequences):
+                events = self.response_sequences[self._sequence_index]
+                self._sequence_index += 1
+                yield from events
+                return
+            # Fallback if more calls than sequences (shouldn't happen in tests)
+
+        # Single-turn: use response_events if configured
         if self.response_events is not None:
             yield from self.response_events
             return
@@ -194,11 +212,15 @@ class FakeAIClient:
             "input_tokens": 120,
             "output_tokens": 30,
             "latency_ms": 850,
+            "stop_reason": "end_turn",
         })
 
     def reset(self) -> None:
         self.response_events = None
+        self.response_sequences = None
+        self._sequence_index = 0
         self.last_call_kwargs = None
+        self.all_call_kwargs.clear()
         self.call_count = 0
 
 
