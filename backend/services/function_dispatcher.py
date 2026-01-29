@@ -648,7 +648,7 @@ class FunctionDispatcher:
                     "validation_error", "Each operation must have a path."
                 )
 
-        result = self._call_api(
+        self._call_api(
             "PATCH",
             f"{self._mapper_url}/workouts/{workout_id}",
             ctx,
