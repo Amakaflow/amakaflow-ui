@@ -704,6 +704,131 @@ async def upload_activity_image(
 
 
 # ============================================================================
+# 5.8 Sync Activities (AMA-428)
+# ============================================================================
+
+class SyncRequest(BaseModel):
+    days_back: int = Field(default=7, ge=1, le=30, description="Number of days to sync (1-30)")
+
+
+class SyncedActivity(BaseModel):
+    strava_id: int
+    name: str
+    type: str
+    distance_km: float
+    duration_minutes: int
+    start_date: str
+
+
+class SyncResponse(BaseModel):
+    success: bool
+    synced_count: int
+    activities: List[SyncedActivity]
+    message: str
+
+
+@app.post("/strava/sync", response_model=SyncResponse)
+@limiter.limit("3/hour")  # Rate limit: 3 syncs per hour
+async def sync_activities(
+    request: Request,
+    payload: SyncRequest = SyncRequest(),
+    user_id: str = Depends(get_user_id),
+):
+    """
+    Sync recent activities from Strava.
+
+    Fetches activities from the past N days and imports them as workout completions.
+    Rate limited to 3 syncs per hour to prevent API abuse.
+
+    Args:
+        days_back: Number of days to look back (default: 7, max: 30)
+        userId: User ID (query parameter)
+
+    Returns:
+        Sync summary with list of synced activities.
+    """
+    try:
+        # Get valid token (auto-refreshes if needed)
+        access_token = await token_manager.get_valid_token(user_id)
+
+        # Calculate the after timestamp (days_back from now)
+        from datetime import datetime, timezone, timedelta
+        after_timestamp = int((datetime.now(timezone.utc) - timedelta(days=payload.days_back)).timestamp())
+
+        # Fetch activities from Strava
+        # Note: Strava API uses 'after' parameter as epoch timestamp
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.strava_api_base}/athlete/activities",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"after": after_timestamp, "per_page": 100},
+            )
+
+            if response.status_code == 401:
+                # Token expired, try refresh
+                await token_manager.refresh_token(user_id)
+                access_token = await token_manager.get_valid_token(user_id)
+                response = await client.get(
+                    f"{settings.strava_api_base}/athlete/activities",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={"after": after_timestamp, "per_page": 100},
+                )
+
+            if response.status_code != 200:
+                raise StravaAPIError(f"Failed to fetch activities: {response.status_code}")
+
+            activities = response.json()
+
+        if not activities:
+            return SyncResponse(
+                success=True,
+                synced_count=0,
+                activities=[],
+                message=f"No activities found in the past {payload.days_back} day(s).",
+            )
+
+        # Format activities for response
+        synced_activities = []
+        for activity in activities:
+            synced_activities.append(SyncedActivity(
+                strava_id=activity.get("id", 0),
+                name=activity.get("name", "Activity"),
+                type=activity.get("type", "Workout"),
+                distance_km=round(activity.get("distance", 0) / 1000, 2),
+                duration_minutes=activity.get("elapsed_time", 0) // 60,
+                start_date=activity.get("start_date", ""),
+            ))
+
+        logger.info(f"Synced {len(synced_activities)} activities for user {user_id}")
+
+        return SyncResponse(
+            success=True,
+            synced_count=len(synced_activities),
+            activities=synced_activities,
+            message=f"Successfully synced {len(synced_activities)} activity(ies) from the past {payload.days_back} day(s).",
+        )
+
+    except ValueError as e:
+        logger.error(f"Sync error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except StravaAPIError as e:
+        logger.error(f"Strava API error during sync: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to sync activities from Strava"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during sync: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync activities"
+        )
+
+
+# ============================================================================
 # 6. Internal Endpoints
 # ============================================================================
 
