@@ -43,6 +43,7 @@ from backend.services.ai_client import StreamEvent
 from api.deps import (
     get_current_user as deps_get_current_user,
     get_auth_context,
+    get_chat_session_repository,
     get_stream_chat_use_case,
     get_generate_embeddings_use_case,
     get_settings,
@@ -79,11 +80,13 @@ class FakeChatSessionRepository:
 
     def create(self, user_id: str, title: Optional[str] = None) -> Dict[str, Any]:
         sid = f"sess-{uuid.uuid4().hex[:8]}"
+        now = datetime.utcnow().isoformat()
         session = {
             "id": sid,
             "user_id": user_id,
             "title": title or "New Chat",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": now,
+            "updated_at": now,
         }
         self._sessions[sid] = session
         return session
@@ -97,13 +100,17 @@ class FakeChatSessionRepository:
     def update_title(self, session_id: str, title: str) -> None:
         if session_id in self._sessions:
             self._sessions[session_id]["title"] = title
+            self._sessions[session_id]["updated_at"] = datetime.utcnow().isoformat()
 
     def list_for_user(
-        self, user_id: str, limit: int = 50, offset: int = 0
+        self, user_id: str, limit: int = 20, offset: int = 0
     ) -> List[Dict[str, Any]]:
-        return [
+        user_sessions = [
             s for s in self._sessions.values() if s["user_id"] == user_id
-        ][:limit]
+        ]
+        # Sort by updated_at DESC to match real repository behavior
+        user_sessions.sort(key=lambda s: s.get("updated_at", ""), reverse=True)
+        return user_sessions[offset:offset + limit]
 
     def reset(self) -> None:
         self._sessions.clear()
@@ -808,6 +815,10 @@ def _reset_fakes():
     yield
 
 
+def _override_chat_session_repository() -> FakeChatSessionRepository:
+    return _session_repo
+
+
 @pytest.fixture(scope="module")
 def app():
     """Create the FastAPI app with all dependency overrides."""
@@ -815,6 +826,7 @@ def app():
     application.dependency_overrides[backend_get_current_user] = _override_auth
     application.dependency_overrides[deps_get_current_user] = _override_auth
     application.dependency_overrides[get_auth_context] = _override_auth_context
+    application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
@@ -826,6 +838,7 @@ def app():
 def noauth_app():
     """App WITHOUT auth overrides -- for testing auth rejection paths."""
     application = create_app(settings=_test_settings)
+    application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings

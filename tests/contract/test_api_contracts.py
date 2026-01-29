@@ -16,10 +16,12 @@ import pytest
 from backend.services.ai_client import StreamEvent
 from tests.e2e.conftest import (
     FakeAIClient,
+    FakeChatSessionRepository,
     parse_sse_events,
     extract_event_types,
     find_events,
     TEST_USER_ID,
+    _session_repo,
 )
 
 # Note: Fixtures (app, client, ai_client, _reset_fakes) are discovered
@@ -752,3 +754,128 @@ class TestPhase2FunctionResultContracts:
         # The result should be valid JSON
         result = json.loads(fr["result"])
         assert "success" in result
+
+
+# =============================================================================
+# Chat Sessions Response Contracts
+# =============================================================================
+
+
+CHAT_SESSION_SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "title": {},  # Can be string or null, skip type check
+        "created_at": {"type": "string"},
+        "updated_at": {"type": "string"},
+    },
+    "required": ["id", "created_at", "updated_at"],
+}
+
+
+@pytest.mark.contract
+class TestChatSessionsContract:
+    """Contract tests for GET /chat/sessions response format."""
+
+    def test_sessions_response_is_list(self, client, session_repo):
+        """Response should be a JSON array."""
+        # Create some sessions
+        session_repo.create(TEST_USER_ID, "Chat 1")
+        session_repo.create(TEST_USER_ID, "Chat 2")
+
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+
+    def test_session_summary_schema(self, client, session_repo):
+        """Each session in response should match ChatSessionSummary schema."""
+        session_repo.create(TEST_USER_ID, "Test Chat")
+
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) >= 1
+
+        for session in data:
+            errors = validate_schema(session, CHAT_SESSION_SUMMARY_SCHEMA)
+            assert not errors, f"Schema validation failed: {errors}"
+
+    def test_session_has_required_fields(self, client, session_repo):
+        """Each session must have id, created_at, updated_at."""
+        session_repo.create(TEST_USER_ID, "Required Fields Test")
+
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        session = response.json()[0]
+
+        assert "id" in session
+        assert "created_at" in session
+        assert "updated_at" in session
+        assert isinstance(session["id"], str)
+        assert isinstance(session["created_at"], str)
+        assert isinstance(session["updated_at"], str)
+
+    def test_session_title_can_be_null(self, client, session_repo):
+        """Title field should accept null values."""
+        # Create session then manually set title to None
+        sess = session_repo.create(TEST_USER_ID, None)
+        session_repo._sessions[sess["id"]]["title"] = None
+
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        # Find our session
+        our_session = next((s for s in data if s["id"] == sess["id"]), None)
+        assert our_session is not None
+        assert our_session["title"] is None
+
+    def test_empty_sessions_returns_empty_list(self, client):
+        """Empty session list should return empty array, not null."""
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
+        assert isinstance(data, list)
+
+    def test_datetime_format_is_iso8601(self, client, session_repo):
+        """Datetime fields should be in ISO 8601 format."""
+        session_repo.create(TEST_USER_ID, "DateTime Test")
+
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        session = response.json()[0]
+
+        # ISO 8601 format check (should contain T separator)
+        assert "T" in session["created_at"]
+        assert "T" in session["updated_at"]
+
+    def test_pagination_params_accepted(self, client, session_repo):
+        """Endpoint should accept limit and offset query params."""
+        for i in range(5):
+            session_repo.create(TEST_USER_ID, f"Chat {i}")
+
+        response = client.get("/chat/sessions?limit=2&offset=1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+
+    def test_invalid_limit_returns_422(self, client):
+        """Invalid limit should return validation error."""
+        response = client.get("/chat/sessions?limit=0")
+        assert response.status_code == 422
+
+        response = client.get("/chat/sessions?limit=101")
+        assert response.status_code == 422
+
+    def test_invalid_offset_returns_422(self, client):
+        """Negative offset should return validation error."""
+        response = client.get("/chat/sessions?offset=-1")
+        assert response.status_code == 422

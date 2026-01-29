@@ -38,13 +38,13 @@ class SupabaseChatSessionRepository:
         ).execute()
 
     def list_for_user(
-        self, user_id: str, limit: int = 50, offset: int = 0
+        self, user_id: str, limit: int = 20, offset: int = 0
     ) -> List[Dict[str, Any]]:
         result = (
             self._client.table(self.TABLE)
             .select("*")
             .eq("user_id", user_id)
-            .order("created_at", desc=True)
+            .order("updated_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()
         )

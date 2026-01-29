@@ -12,10 +12,12 @@ from backend.auth import get_current_user as backend_get_current_user
 from api.deps import (
     get_current_user as deps_get_current_user,
     get_auth_context,
+    get_chat_session_repository,
     get_stream_chat_use_case,
     AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
+from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 
 
 TEST_USER_ID = "test-user-456"
@@ -199,5 +201,143 @@ class TestChatRateLimit:
         events = _parse_sse_events(response.text)
         assert events[0][0] == "error"
         assert events[0][1]["type"] == "rate_limit_exceeded"
+
+        chat_app.dependency_overrides.clear()
+
+
+class TestListSessions:
+    """Tests for GET /chat/sessions endpoint."""
+
+    @pytest.fixture
+    def mock_session_repo(self):
+        repo = MagicMock(spec=SupabaseChatSessionRepository)
+        repo.list_for_user.return_value = [
+            {
+                "id": "sess-1",
+                "title": "First chat",
+                "created_at": "2026-01-29T10:00:00+00:00",
+                "updated_at": "2026-01-29T12:00:00+00:00",
+            },
+            {
+                "id": "sess-2",
+                "title": "Second chat",
+                "created_at": "2026-01-28T10:00:00+00:00",
+                "updated_at": "2026-01-29T11:00:00+00:00",
+            },
+        ]
+        return repo
+
+    @pytest.fixture
+    def sessions_client(self, chat_app, mock_session_repo):
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_session_repo
+        yield TestClient(chat_app)
+        chat_app.dependency_overrides.clear()
+
+    def test_unauthenticated_returns_401(self, chat_app):
+        """No auth override → 401."""
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions")
+        assert response.status_code == 401
+
+    def test_authenticated_returns_sessions(self, sessions_client):
+        response = sessions_client.get("/chat/sessions")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["id"] == "sess-1"
+        assert data[0]["title"] == "First chat"
+
+    def test_returns_correct_fields(self, sessions_client):
+        response = sessions_client.get("/chat/sessions")
+        assert response.status_code == 200
+        session = response.json()[0]
+        assert "id" in session
+        assert "title" in session
+        assert "created_at" in session
+        assert "updated_at" in session
+
+    def test_pagination_limit(self, sessions_client, mock_session_repo):
+        sessions_client.get("/chat/sessions?limit=10")
+        mock_session_repo.list_for_user.assert_called_once_with(
+            TEST_USER_ID, limit=10, offset=0
+        )
+
+    def test_pagination_offset(self, sessions_client, mock_session_repo):
+        sessions_client.get("/chat/sessions?limit=5&offset=10")
+        mock_session_repo.list_for_user.assert_called_once_with(
+            TEST_USER_ID, limit=5, offset=10
+        )
+
+    def test_limit_validation_min(self, sessions_client):
+        response = sessions_client.get("/chat/sessions?limit=0")
+        assert response.status_code == 422
+
+    def test_limit_validation_max(self, sessions_client):
+        response = sessions_client.get("/chat/sessions?limit=101")
+        assert response.status_code == 422
+
+    def test_offset_validation_negative(self, sessions_client):
+        response = sessions_client.get("/chat/sessions?offset=-1")
+        assert response.status_code == 422
+
+    def test_empty_sessions_returns_empty_list(self, chat_app):
+        mock_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_repo.list_for_user.return_value = []
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+        chat_app.dependency_overrides.clear()
+
+    def test_null_title_returns_successfully(self, chat_app):
+        """Session with null title should serialize correctly."""
+        mock_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_repo.list_for_user.return_value = [
+            {
+                "id": "sess-null-title",
+                "title": None,
+                "created_at": "2026-01-29T10:00:00+00:00",
+                "updated_at": "2026-01-29T12:00:00+00:00",
+            },
+        ]
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_repo
+
+        client = TestClient(chat_app)
+        response = client.get("/chat/sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["title"] is None
+
+        chat_app.dependency_overrides.clear()
+
+    def test_default_pagination_values(self, chat_app):
+        """Endpoint uses default limit=20, offset=0 when not specified."""
+        mock_repo = MagicMock(spec=SupabaseChatSessionRepository)
+        mock_repo.list_for_user.return_value = []
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_chat_session_repository] = lambda: mock_repo
+
+        client = TestClient(chat_app)
+        client.get("/chat/sessions")
+
+        mock_repo.list_for_user.assert_called_once_with(
+            TEST_USER_ID, limit=20, offset=0
+        )
 
         chat_app.dependency_overrides.clear()
