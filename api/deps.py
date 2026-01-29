@@ -34,10 +34,12 @@ from infrastructure.db.chat_session_repository import SupabaseChatSessionReposit
 from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.rate_limit_repository import SupabaseRateLimitRepository
 from infrastructure.db.function_rate_limit_repository import SupabaseFunctionRateLimitRepository
+from infrastructure.db.tts_settings_repository import SupabaseTTSSettingsRepository
 
 # Services
 from backend.services.embedding_service import EmbeddingService
 from backend.services.ai_client import AIClient
+from backend.services.tts_service import TTSService
 
 # Use cases
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
@@ -324,6 +326,34 @@ def get_function_dispatcher(
     )
 
 
+@lru_cache
+def get_tts_service() -> Optional[TTSService]:
+    """
+    Get cached TTS service instance.
+
+    Returns None if ElevenLabs API key is not configured or TTS is disabled.
+    """
+    settings = _get_settings()
+    if not settings.elevenlabs_api_key or not settings.tts_enabled:
+        return None
+    return TTSService(
+        api_key=settings.elevenlabs_api_key,
+        default_voice_id=settings.tts_default_voice_id,
+        daily_char_limit=settings.tts_daily_char_limit,
+    )
+
+
+def get_tts_settings_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseTTSSettingsRepository:
+    """Get TTS settings repository instance."""
+    settings = _get_settings()
+    return SupabaseTTSSettingsRepository(
+        client=client,
+        daily_char_limit=settings.tts_daily_char_limit,
+    )
+
+
 # =============================================================================
 # Use Case Providers
 # =============================================================================
@@ -349,9 +379,13 @@ def get_stream_chat_use_case(
     ai_client: AIClient = Depends(get_ai_client),
     dispatcher: FunctionDispatcher = Depends(get_function_dispatcher),
     feature_flags: FeatureFlagService = Depends(get_feature_flag_service),
+    tts_settings_repo: SupabaseTTSSettingsRepository = Depends(get_tts_settings_repository),
     settings: Settings = Depends(get_settings),
 ) -> StreamChatUseCase:
-    """Get stream chat use case."""
+    """Get stream chat use case with optional TTS support."""
+    # Get TTS service (may be None if not configured)
+    tts_service = get_tts_service()
+
     return StreamChatUseCase(
         session_repo=session_repo,
         message_repo=message_repo,
@@ -360,6 +394,8 @@ def get_stream_chat_use_case(
         function_dispatcher=dispatcher,
         feature_flag_service=feature_flags,
         monthly_limit=settings.rate_limit_free,
+        tts_service=tts_service,
+        tts_settings_repo=tts_settings_repo,
     )
 
 
@@ -386,11 +422,13 @@ __all__ = [
     "get_chat_message_repository",
     "get_rate_limit_repository",
     "get_function_rate_limit_repository",
+    "get_tts_settings_repository",
     # Services
     "get_embedding_service",
     "get_ai_client",
     "get_function_dispatcher",
     "get_feature_flag_service",
+    "get_tts_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",

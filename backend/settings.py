@@ -215,6 +215,26 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # TTS Configuration (ElevenLabs)
+    # -------------------------------------------------------------------------
+    elevenlabs_api_key: Optional[str] = Field(
+        default=None,
+        description="ElevenLabs API key for text-to-speech",
+    )
+    tts_enabled: bool = Field(
+        default=True,
+        description="Global TTS feature flag",
+    )
+    tts_default_voice_id: str = Field(
+        default="21m00Tcm4TlvDq8ikWAM",
+        description="Default ElevenLabs voice ID (Rachel)",
+    )
+    tts_daily_char_limit: int = Field(
+        default=50000,
+        description="Daily TTS character limit per user",
+    )
+
+    # -------------------------------------------------------------------------
     # Validators
     # -------------------------------------------------------------------------
     @property

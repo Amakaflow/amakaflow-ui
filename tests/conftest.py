@@ -282,3 +282,62 @@ def fake_rate_limit_repo():
 def fake_feature_flag_service():
     """Provide fake feature flag service for E2E tests."""
     return FakeFeatureFlagService()
+
+
+# ---------------------------------------------------------------------------
+# TTS Mock Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_tts_service():
+    """Mock TTS service for testing."""
+    from backend.services.tts_service import TTSResult, VoiceInfo
+
+    service = MagicMock()
+
+    # Default successful synthesis
+    service.synthesize.return_value = TTSResult(
+        success=True,
+        audio_data=b"fake-audio-data" * 100,
+        duration_ms=2500,
+        chars_used=50,
+        provider="elevenlabs",
+        voice_id="test-voice",
+    )
+
+    # Default voices list
+    service.get_available_voices.return_value = [
+        VoiceInfo(
+            voice_id="voice-1",
+            name="Rachel",
+            preview_url="https://example.com/preview1.mp3",
+            labels={"accent": "american", "gender": "female"},
+        ),
+    ]
+
+    # Default limit check - allowed
+    service.check_daily_limit.return_value = (True, 40000)
+
+    return service
+
+
+@pytest.fixture
+def mock_tts_settings_repo():
+    """Mock TTS settings repository for testing."""
+    from infrastructure.db.tts_settings_repository import TTSSettings
+
+    repo = MagicMock()
+
+    repo.get_settings.return_value = TTSSettings(
+        tts_enabled=True,
+        tts_voice_id=None,
+        tts_speed=1.0,
+        tts_pitch=1.0,
+        auto_play_responses=True,
+        tts_daily_chars_used=0,
+    )
+
+    repo.increment_daily_chars.return_value = 50
+
+    return repo

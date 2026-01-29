@@ -8,6 +8,8 @@ import pytest
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
 from backend.services.ai_client import StreamEvent
 from backend.services.function_dispatcher import FunctionDispatcher
+from backend.services.tts_service import TTSResult
+from infrastructure.db.tts_settings_repository import TTSSettings
 
 
 @pytest.fixture
@@ -378,3 +380,319 @@ class TestStreamChatErrorHandling:
         data = json.loads(events[0].data)
         assert data["type"] == "internal_error"
         assert "session" in data["message"].lower()
+
+
+class TestStreamChatTTS:
+    """Tests for TTS integration in StreamChatUseCase."""
+
+    @pytest.fixture
+    def mock_tts_service(self):
+        """Mock TTS service that returns successful synthesis."""
+        service = MagicMock()
+        service.synthesize.return_value = TTSResult(
+            success=True,
+            audio_data=b"fake-audio-data-bytes",
+            duration_ms=2500,
+            chars_used=25,
+            provider="elevenlabs",
+            voice_id="test-voice-id",
+        )
+        service.check_daily_limit.return_value = (True, 40000)
+        return service
+
+    @pytest.fixture
+    def mock_tts_settings_repo(self):
+        """Mock TTS settings repository with TTS enabled."""
+        repo = MagicMock()
+        repo.get_settings.return_value = TTSSettings(
+            tts_enabled=True,
+            tts_voice_id="user-voice-id",
+            tts_speed=1.25,
+            tts_pitch=1.0,
+            auto_play_responses=True,
+            tts_daily_chars_used=5000,
+        )
+        repo.increment_daily_chars.return_value = 5025
+        return repo
+
+    @pytest.fixture
+    def tts_use_case(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_ai_client,
+        mock_function_dispatcher,
+        mock_tts_service,
+        mock_tts_settings_repo,
+    ):
+        """StreamChatUseCase with TTS service and settings repo."""
+        return StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            monthly_limit=50,
+            tts_service=mock_tts_service,
+            tts_settings_repo=mock_tts_settings_repo,
+        )
+
+    def test_tts_synthesis_when_enabled(self, tts_use_case, mock_tts_service):
+        """TTS audio is included in message_end when tts_enabled=True."""
+        events = list(tts_use_case.execute(user_id="user-1", message="Hello"))
+
+        # Find message_end event
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Should have voice_response
+        assert "voice_response" in data
+        assert data["voice_response"] is not None
+        assert "audio_base64" in data["voice_response"]
+        assert "duration_ms" in data["voice_response"]
+        assert "voice_id" in data["voice_response"]
+        assert "chars_used" in data["voice_response"]
+
+        # Verify TTS service was called
+        mock_tts_service.synthesize.assert_called_once()
+
+    def test_tts_skipped_when_disabled(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_ai_client,
+        mock_function_dispatcher,
+        mock_tts_service,
+    ):
+        """No TTS synthesis when tts_enabled=False."""
+        mock_tts_settings_repo = MagicMock()
+        mock_tts_settings_repo.get_settings.return_value = TTSSettings(
+            tts_enabled=False,  # Disabled
+            tts_voice_id=None,
+            tts_speed=1.0,
+            tts_pitch=1.0,
+            auto_play_responses=False,
+            tts_daily_chars_used=0,
+        )
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            tts_service=mock_tts_service,
+            tts_settings_repo=mock_tts_settings_repo,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        # Find message_end event
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Should NOT have voice_response (TTS disabled)
+        assert "voice_response" not in data or data.get("voice_response") is None
+
+        # TTS service should NOT have been called
+        mock_tts_service.synthesize.assert_not_called()
+
+    def test_tts_daily_limit_exceeded_returns_voice_error(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_ai_client,
+        mock_function_dispatcher,
+        mock_tts_settings_repo,
+    ):
+        """voice_error returned when daily TTS limit is reached."""
+        mock_tts_service = MagicMock()
+        mock_tts_service.check_daily_limit.return_value = (False, 100)  # Not allowed, 100 remaining
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            tts_service=mock_tts_service,
+            tts_settings_repo=mock_tts_settings_repo,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Should have voice_error
+        assert data.get("voice_response") is None
+        assert "voice_error" in data
+        assert "limit" in data["voice_error"].lower()
+
+        # TTS synthesis should NOT have been called
+        mock_tts_service.synthesize.assert_not_called()
+
+    def test_tts_synthesis_failure_returns_voice_error(
+        self, tts_use_case, mock_tts_service
+    ):
+        """voice_error returned when TTS synthesis fails."""
+        mock_tts_service.synthesize.return_value = TTSResult(
+            success=False,
+            audio_data=None,
+            duration_ms=None,
+            chars_used=0,
+            provider="elevenlabs",
+            voice_id="test-voice",
+            error="ElevenLabs API rate limit exceeded",
+        )
+
+        events = list(tts_use_case.execute(user_id="user-1", message="Hello"))
+
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # Should have voice_error, not voice_response
+        assert data.get("voice_response") is None
+        assert "voice_error" in data
+        assert data["voice_error"] == "ElevenLabs API rate limit exceeded"
+
+    def test_tts_skipped_when_empty_response(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_function_dispatcher,
+        mock_tts_service,
+        mock_tts_settings_repo,
+    ):
+        """No TTS synthesis when AI response is empty."""
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            # No content_delta events, just message_end
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 0,
+                "latency_ms": 500,
+            }),
+        ])
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            tts_service=mock_tts_service,
+            tts_settings_repo=mock_tts_settings_repo,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+
+        # No voice_response when there's no text
+        assert "voice_response" not in data or data.get("voice_response") is None
+
+        # TTS service should NOT have been called (no text to synthesize)
+        mock_tts_service.synthesize.assert_not_called()
+
+    def test_tts_uses_user_settings(self, tts_use_case, mock_tts_service, mock_tts_settings_repo):
+        """TTS uses voice_id and speed from user settings."""
+        list(tts_use_case.execute(user_id="user-1", message="Hello"))
+
+        # Verify synthesize was called with user's settings
+        mock_tts_service.synthesize.assert_called_once()
+        call_kwargs = mock_tts_service.synthesize.call_args[1]
+
+        assert call_kwargs["voice_id"] == "user-voice-id"
+        assert call_kwargs["speed"] == 1.25
+
+    def test_tts_tracks_daily_usage(self, tts_use_case, mock_tts_settings_repo):
+        """TTS usage is tracked after successful synthesis."""
+        list(tts_use_case.execute(user_id="user-1", message="Hello"))
+
+        # Verify increment was called with chars_used from result
+        mock_tts_settings_repo.increment_daily_chars.assert_called_once_with("user-1", 25)
+
+    def test_tts_exception_handled_gracefully(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_ai_client,
+        mock_function_dispatcher,
+        mock_tts_settings_repo,
+    ):
+        """Exception in TTS does not break chat response."""
+        mock_tts_service = MagicMock()
+        mock_tts_service.check_daily_limit.return_value = (True, 40000)
+        mock_tts_service.synthesize.side_effect = Exception("Unexpected TTS error")
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            tts_service=mock_tts_service,
+            tts_settings_repo=mock_tts_settings_repo,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        # Should still complete successfully
+        event_types = [e.event for e in events]
+        assert "message_start" in event_types
+        assert "message_end" in event_types
+        assert "error" not in event_types  # Chat should NOT fail
+
+        # message_end should have voice_error
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+        assert data.get("voice_response") is None
+        assert "voice_error" in data
+
+    def test_tts_not_called_when_service_is_none(
+        self,
+        mock_session_repo,
+        mock_message_repo,
+        mock_rate_limit_repo,
+        mock_ai_client,
+        mock_function_dispatcher,
+    ):
+        """Chat works normally when TTS service is None (not configured)."""
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+            tts_service=None,  # Not configured
+            tts_settings_repo=None,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Hello"))
+
+        # Should complete normally
+        event_types = [e.event for e in events]
+        assert "message_start" in event_types
+        assert "message_end" in event_types
+
+        # No voice_response in message_end
+        end_event = next(e for e in events if e.event == "message_end")
+        data = json.loads(end_event.data)
+        assert "voice_response" not in data
+
+    def test_tts_resets_daily_counter_if_needed(
+        self, tts_use_case, mock_tts_settings_repo
+    ):
+        """Daily counter is reset before checking limits."""
+        list(tts_use_case.execute(user_id="user-1", message="Hello"))
+
+        # Verify reset was called
+        mock_tts_settings_repo.reset_daily_chars_if_needed.assert_called_once_with("user-1")

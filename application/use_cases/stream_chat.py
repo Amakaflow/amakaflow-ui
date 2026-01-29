@@ -1,12 +1,14 @@
 """Use case: Stream a chat response via SSE.
 
 Orchestrates: rate limit check -> session management -> Claude streaming -> persistence.
+Updated in AMA-442 to support TTS voice responses.
 """
 
+import base64
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
 
 from application.ports.chat_message_repository import ChatMessageRepository
 from application.ports.chat_session_repository import ChatSessionRepository
@@ -15,6 +17,10 @@ from backend.services.ai_client import AIClient
 from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
 from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS
 from backend.services.feature_flag_service import FeatureFlagService
+
+if TYPE_CHECKING:
+    from backend.services.tts_service import TTSService
+    from infrastructure.db.tts_settings_repository import SupabaseTTSSettingsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +68,8 @@ class StreamChatUseCase:
         function_dispatcher: FunctionDispatcher,
         feature_flag_service: Optional[FeatureFlagService] = None,
         monthly_limit: int = 50,
+        tts_service: Optional["TTSService"] = None,
+        tts_settings_repo: Optional["SupabaseTTSSettingsRepository"] = None,
     ) -> None:
         self._session_repo = session_repo
         self._message_repo = message_repo
@@ -70,6 +78,8 @@ class StreamChatUseCase:
         self._dispatcher = function_dispatcher
         self._feature_flags = feature_flag_service
         self._monthly_limit = monthly_limit
+        self._tts_service = tts_service
+        self._tts_settings_repo = tts_settings_repo
 
     def execute(
         self,
@@ -237,12 +247,68 @@ class StreamChatUseCase:
             except Exception as e:
                 logger.error("Failed to auto-title session: %s", e)
 
-        # 11. Yield message_end
-        yield _sse("message_end", {
+        # 11. Generate TTS if enabled
+        voice_response = None
+        voice_error = None
+
+        if self._tts_service and self._tts_settings_repo and full_text:
+            try:
+                tts_settings = self._tts_settings_repo.get_settings(user_id)
+
+                if tts_settings.tts_enabled:
+                    # Reset daily counter if needed
+                    self._tts_settings_repo.reset_daily_chars_if_needed(user_id)
+
+                    # Check daily limit before synthesizing
+                    chars_needed = len(full_text)
+                    allowed, remaining = self._tts_service.check_daily_limit(
+                        tts_settings.tts_daily_chars_used, chars_needed
+                    )
+
+                    if allowed:
+                        # Synthesize the response
+                        tts_result = self._tts_service.synthesize(
+                            text=full_text,
+                            voice_id=tts_settings.tts_voice_id,
+                            speed=tts_settings.tts_speed,
+                        )
+
+                        if tts_result.success:
+                            # Track usage
+                            self._tts_settings_repo.increment_daily_chars(
+                                user_id, tts_result.chars_used
+                            )
+
+                            voice_response = {
+                                "audio_base64": base64.b64encode(
+                                    tts_result.audio_data
+                                ).decode("utf-8"),
+                                "duration_ms": tts_result.duration_ms,
+                                "voice_id": tts_result.voice_id,
+                                "chars_used": tts_result.chars_used,
+                            }
+                        else:
+                            voice_error = tts_result.error
+                    else:
+                        voice_error = f"Daily TTS limit reached. {remaining} characters remaining."
+            except Exception as e:
+                logger.error("TTS synthesis failed: %s", e)
+                voice_error = "TTS synthesis failed"
+
+        # 12. Yield message_end with optional voice response
+        message_end_data: Dict[str, Any] = {
             "session_id": session_id,
             "tokens_used": end_data.get("input_tokens", 0) + end_data.get("output_tokens", 0),
             "latency_ms": end_data.get("latency_ms", 0),
-        })
+        }
+
+        if voice_response:
+            message_end_data["voice_response"] = voice_response
+        elif voice_error:
+            message_end_data["voice_response"] = None
+            message_end_data["voice_error"] = voice_error
+
+        yield _sse("message_end", message_end_data)
 
     def _execute_tool(
         self,

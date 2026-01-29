@@ -51,6 +51,8 @@ from api.deps import (
 from application.use_cases.stream_chat import StreamChatUseCase
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
 from backend.services.function_dispatcher import FunctionContext
+from backend.services.tts_service import TTSResult, VoiceInfo
+from infrastructure.db.tts_settings_repository import TTSSettings, TTSSettingsUpdate
 
 
 # ============================================================================
@@ -520,6 +522,175 @@ class FakeFunctionDispatcher:
         self.error_results.clear()
 
 
+class FakeTTSService:
+    """Deterministic TTS service for E2E tests.
+
+    Returns predictable audio data. Supports configuration for failure simulation.
+    """
+
+    # Fake MP3 header + padding (valid enough for testing)
+    FAKE_AUDIO = b'\xff\xfb\x90\x00' + b'\x00' * 1000
+
+    def __init__(self) -> None:
+        self.call_count: int = 0
+        self.last_call: Optional[Dict[str, Any]] = None
+        self.should_fail: bool = False
+        self.fail_error: str = "TTS service error"
+        self.daily_char_limit: int = 50_000
+
+    def synthesize(
+        self,
+        text: str,
+        voice_id: Optional[str] = None,
+        speed: float = 1.0,
+    ) -> TTSResult:
+        self.call_count += 1
+        self.last_call = {"text": text, "voice_id": voice_id, "speed": speed}
+
+        if self.should_fail:
+            return TTSResult(
+                success=False,
+                audio_data=None,
+                duration_ms=None,
+                chars_used=0,
+                provider="elevenlabs-fake",
+                voice_id=voice_id or "default-voice",
+                error=self.fail_error,
+            )
+
+        return TTSResult(
+            success=True,
+            audio_data=self.FAKE_AUDIO,
+            duration_ms=len(text) * 50,  # ~50ms per char
+            chars_used=len(text),
+            provider="elevenlabs-fake",
+            voice_id=voice_id or "default-voice",
+        )
+
+    def synthesize_streaming(
+        self,
+        text: str,
+        voice_id: Optional[str] = None,
+        speed: float = 1.0,
+        chunk_size: int = 4096,
+    ) -> Generator[bytes, None, None]:
+        if self.should_fail:
+            return
+        # Yield fake audio in chunks
+        audio = self.FAKE_AUDIO * 3
+        for i in range(0, len(audio), chunk_size):
+            yield audio[i:i + chunk_size]
+
+    def get_available_voices(self) -> List[VoiceInfo]:
+        return [
+            VoiceInfo(
+                voice_id="voice-rachel",
+                name="Rachel",
+                preview_url="https://example.com/rachel.mp3",
+                labels={"accent": "american", "gender": "female"},
+            ),
+            VoiceInfo(
+                voice_id="voice-adam",
+                name="Adam",
+                preview_url="https://example.com/adam.mp3",
+                labels={"accent": "british", "gender": "male"},
+            ),
+        ]
+
+    def check_daily_limit(
+        self,
+        chars_used: int,
+        chars_needed: int,
+    ) -> tuple:
+        remaining = self.daily_char_limit - chars_used
+        allowed = chars_needed <= remaining
+        return (allowed, max(0, remaining))
+
+    def set_failure(self, should_fail: bool, error: str = "TTS service error") -> None:
+        """Test helper to simulate TTS failure."""
+        self.should_fail = should_fail
+        self.fail_error = error
+
+    def reset(self) -> None:
+        self.call_count = 0
+        self.last_call = None
+        self.should_fail = False
+        self.fail_error = "TTS service error"
+        self.daily_char_limit = 50_000
+
+
+class FakeTTSSettingsRepository:
+    """In-memory TTS settings repository for E2E tests."""
+
+    def __init__(self) -> None:
+        self._settings: Dict[str, TTSSettings] = {}
+        self._usage: Dict[str, int] = {}
+        self._reset_dates: Dict[str, date] = {}
+
+    def get_settings(self, user_id: str) -> TTSSettings:
+        if user_id not in self._settings:
+            return TTSSettings(
+                tts_enabled=True,
+                tts_voice_id=None,
+                tts_speed=1.0,
+                tts_pitch=1.0,
+                auto_play_responses=True,
+                tts_daily_chars_used=self._usage.get(user_id, 0),
+            )
+        settings = self._settings[user_id]
+        # Update with current usage
+        return TTSSettings(
+            tts_enabled=settings.tts_enabled,
+            tts_voice_id=settings.tts_voice_id,
+            tts_speed=settings.tts_speed,
+            tts_pitch=settings.tts_pitch,
+            auto_play_responses=settings.auto_play_responses,
+            tts_daily_chars_used=self._usage.get(user_id, 0),
+        )
+
+    def update_settings(self, user_id: str, update: TTSSettingsUpdate) -> TTSSettings:
+        current = self._settings.get(user_id, TTSSettings())
+
+        updated = TTSSettings(
+            tts_enabled=update.tts_enabled if update.tts_enabled is not None else current.tts_enabled,
+            tts_voice_id=update.tts_voice_id if update.tts_voice_id is not None else current.tts_voice_id,
+            tts_speed=update.tts_speed if update.tts_speed is not None else current.tts_speed,
+            tts_pitch=update.tts_pitch if update.tts_pitch is not None else current.tts_pitch,
+            auto_play_responses=(
+                update.auto_play_responses
+                if update.auto_play_responses is not None
+                else current.auto_play_responses
+            ),
+            tts_daily_chars_used=self._usage.get(user_id, 0),
+        )
+        self._settings[user_id] = updated
+        return updated
+
+    def increment_daily_chars(self, user_id: str, chars: int) -> int:
+        current = self._usage.get(user_id, 0)
+        new_total = current + chars
+        self._usage[user_id] = new_total
+        return new_total
+
+    def reset_daily_chars_if_needed(self, user_id: str) -> None:
+        # In tests, we control this manually - no automatic date reset
+        pass
+
+    def set_settings(self, user_id: str, settings: TTSSettings) -> None:
+        """Test helper to preset settings."""
+        self._settings[user_id] = settings
+        self._usage[user_id] = settings.tts_daily_chars_used
+
+    def set_usage(self, user_id: str, chars: int) -> None:
+        """Test helper to preset usage."""
+        self._usage[user_id] = chars
+
+    def reset(self) -> None:
+        self._settings.clear()
+        self._usage.clear()
+        self._reset_dates.clear()
+
+
 # ============================================================================
 # Shared fake instances (reset per test)
 # ============================================================================
@@ -531,6 +702,8 @@ _ai_client = FakeAIClient()
 _embedding_repo = FakeEmbeddingRepository()
 _embedding_service = FakeEmbeddingService()
 _function_dispatcher = FakeFunctionDispatcher()
+_tts_service = FakeTTSService()
+_tts_settings_repo = FakeTTSSettingsRepository()
 
 
 # ============================================================================
@@ -579,6 +752,8 @@ def _override_stream_chat_use_case() -> StreamChatUseCase:
         ai_client=_ai_client,
         function_dispatcher=_function_dispatcher,
         monthly_limit=_test_settings.rate_limit_free,
+        tts_service=_tts_service,
+        tts_settings_repo=_tts_settings_repo,
     )
 
 
@@ -605,6 +780,8 @@ def _reset_fakes():
     _embedding_repo.reset()
     _embedding_service.reset()
     _function_dispatcher.reset()
+    _tts_service.reset()
+    _tts_settings_repo.reset()
     yield
 
 
@@ -678,6 +855,16 @@ def embedding_service() -> FakeEmbeddingService:
 @pytest.fixture
 def function_dispatcher() -> FakeFunctionDispatcher:
     return _function_dispatcher
+
+
+@pytest.fixture
+def tts_service() -> FakeTTSService:
+    return _tts_service
+
+
+@pytest.fixture
+def tts_settings_repo() -> FakeTTSSettingsRepository:
+    return _tts_settings_repo
 
 
 # ============================================================================
