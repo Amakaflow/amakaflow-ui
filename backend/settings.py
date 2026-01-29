@@ -194,8 +194,8 @@ class Settings(BaseSettings):
         description="Base URL for workout-ingestor-api service",
     )
     function_timeout_seconds: float = Field(
-        default=30.0,
-        description="Timeout for external function calls",
+        default=60.0,
+        description="Timeout for external function calls (increased for content ingestion)",
     )
 
     # -------------------------------------------------------------------------

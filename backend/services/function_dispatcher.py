@@ -1,15 +1,53 @@
-"""FunctionDispatcher for executing Phase 1 tool functions.
+"""FunctionDispatcher for executing tool functions.
 
 Dispatches tool calls to external services (mapper-api, calendar-api, workout-ingestor-api)
 with synchronous HTTP calls using httpx.
 """
 
+import base64
+import io
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
+from urllib.parse import urlparse
 
 import httpx
+
+
+# =============================================================================
+# Security: Allowed domains for content ingestion (SSRF prevention)
+# =============================================================================
+
+YOUTUBE_ALLOWED_DOMAINS: Set[str] = {
+    "youtube.com",
+    "www.youtube.com",
+    "youtu.be",
+    "m.youtube.com",
+}
+
+TIKTOK_ALLOWED_DOMAINS: Set[str] = {
+    "tiktok.com",
+    "www.tiktok.com",
+    "vm.tiktok.com",
+    "m.tiktok.com",
+}
+
+INSTAGRAM_ALLOWED_DOMAINS: Set[str] = {
+    "instagram.com",
+    "www.instagram.com",
+    "m.instagram.com",
+}
+
+PINTEREST_ALLOWED_DOMAINS: Set[str] = {
+    "pinterest.com",
+    "www.pinterest.com",
+    "pin.it",
+    "m.pinterest.com",
+}
+
+# Maximum image size: 10MB
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +84,17 @@ class FunctionDispatcher:
         self._client = httpx.Client(timeout=timeout)
 
         self._handlers = {
+            # Phase 1
             "search_workout_library": self._search_workout_library,
             "add_workout_to_calendar": self._add_workout_to_calendar,
             "generate_ai_workout": self._generate_ai_workout,
             "navigate_to_page": self._navigate_to_page,
+            # Phase 2
+            "import_from_youtube": self._import_from_youtube,
+            "import_from_tiktok": self._import_from_tiktok,
+            "import_from_instagram": self._import_from_instagram,
+            "import_from_pinterest": self._import_from_pinterest,
+            "import_from_image": self._import_from_image,
         }
 
     def close(self) -> None:
@@ -104,6 +149,53 @@ class FunctionDispatcher:
         """
         return json.dumps({"error": True, "code": code, "message": message})
 
+    def _validate_url(
+        self, url: Optional[str], allowed_domains: Set[str], platform: str
+    ) -> Optional[str]:
+        """Validate URL is non-empty and from allowed domains (SSRF prevention).
+
+        Args:
+            url: URL to validate.
+            allowed_domains: Set of allowed domain names.
+            platform: Platform name for error messages.
+
+        Returns:
+            Error response string if invalid, None if valid.
+        """
+        if not url or not url.strip():
+            return self._error_response(
+                "validation_error", "URL cannot be empty"
+            )
+
+        try:
+            parsed = urlparse(url.strip())
+
+            # Must be http or https
+            if parsed.scheme not in ("http", "https"):
+                return self._error_response(
+                    "validation_error",
+                    "Invalid URL. Must start with http:// or https://"
+                )
+
+            # Domain must be in allowed list
+            domain = parsed.netloc.lower()
+            # Strip port if present
+            if ":" in domain:
+                domain = domain.split(":")[0]
+
+            if domain not in allowed_domains:
+                return self._error_response(
+                    "validation_error",
+                    f"Invalid {platform} URL. Please provide a valid {platform} link."
+                )
+
+            return None  # Valid
+
+        except Exception:
+            return self._error_response(
+                "validation_error", "Invalid URL format"
+            )
+
     def _call_api(
         self,
         method: str,
@@ -150,6 +242,55 @@ class FunctionDispatcher:
             raise FunctionExecutionError(f"Service error ({e.response.status_code})")
         except httpx.RequestError:
             raise FunctionExecutionError("Unable to connect to the service.")
+
+    def _call_multipart_api(
+        self,
+        url: str,
+        context: FunctionContext,
+        files: Dict[str, Any],
+        data: Dict[str, Any],
+        error_context: str = "processing",
+    ) -> Dict[str, Any]:
+        """HTTP multipart POST with error handling and auth forwarding.
+
+        Args:
+            url: Full URL to call.
+            context: User context for auth header.
+            files: Files dict for multipart upload.
+            data: Form data dict.
+            error_context: Context string for error messages (e.g., "Image processing").
+
+        Returns:
+            Parsed JSON response.
+
+        Raises:
+            FunctionExecutionError: On API errors with user-friendly messages.
+        """
+        headers: Dict[str, str] = {}
+        if context.auth_token:
+            headers["Authorization"] = context.auth_token
+        headers["X-User-Id"] = context.user_id
+
+        try:
+            response = self._client.post(url, files=files, data=data, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            raise FunctionExecutionError(
+                f"{error_context} is taking too long. Please try again."
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise FunctionExecutionError(
+                    "Authentication error. Please try logging in again."
+                )
+            raise FunctionExecutionError(
+                f"{error_context} failed ({e.response.status_code})"
+            )
+        except httpx.RequestError:
+            raise FunctionExecutionError(
+                f"Unable to connect to the {error_context.lower()} service."
+            )
 
     # --- Function Handlers ---
 
@@ -261,3 +402,210 @@ class FunctionDispatcher:
             nav["workout_id"] = workout_id
 
         return json.dumps(nav)
+
+    # --- Phase 2: Content Ingestion Handlers ---
+
+    def _import_from_youtube(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import a workout from a YouTube video URL."""
+        url = args.get("url")
+
+        # Validate URL domain (SSRF prevention)
+        validation_error = self._validate_url(url, YOUTUBE_ALLOWED_DOMAINS, "YouTube")
+        if validation_error:
+            return validation_error
+
+        body: Dict[str, Any] = {"url": url.strip()}
+        if args.get("skip_cache"):
+            body["skip_cache"] = True
+
+        result = self._call_api(
+            "POST",
+            f"{self._ingestor_url}/ingest/youtube",
+            ctx,
+            json=body,
+        )
+
+        return self._format_ingestion_result(result, "YouTube video")
+
+    def _import_from_tiktok(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import a workout from a TikTok video URL."""
+        url = args.get("url")
+
+        # Validate URL domain (SSRF prevention)
+        validation_error = self._validate_url(url, TIKTOK_ALLOWED_DOMAINS, "TikTok")
+        if validation_error:
+            return validation_error
+
+        # Default to "auto" mode (audio first, vision fallback)
+        mode = args.get("mode", "auto")
+        body: Dict[str, Any] = {"url": url.strip(), "mode": mode}
+
+        result = self._call_api(
+            "POST",
+            f"{self._ingestor_url}/ingest/tiktok",
+            ctx,
+            json=body,
+        )
+
+        return self._format_ingestion_result(result, "TikTok video")
+
+    def _import_from_instagram(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import a workout from an Instagram post URL."""
+        url = args.get("url")
+
+        # Validate URL domain (SSRF prevention)
+        validation_error = self._validate_url(url, INSTAGRAM_ALLOWED_DOMAINS, "Instagram")
+        if validation_error:
+            return validation_error
+
+        body: Dict[str, Any] = {"url": url.strip()}
+
+        result = self._call_api(
+            "POST",
+            f"{self._ingestor_url}/ingest/instagram_test",
+            ctx,
+            json=body,
+        )
+
+        return self._format_ingestion_result(result, "Instagram post")
+
+    def _import_from_pinterest(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import workouts from a Pinterest pin or board URL."""
+        url = args.get("url")
+
+        # Validate URL domain (SSRF prevention)
+        validation_error = self._validate_url(url, PINTEREST_ALLOWED_DOMAINS, "Pinterest")
+        if validation_error:
+            return validation_error
+
+        body: Dict[str, Any] = {"url": url.strip()}
+
+        result = self._call_api(
+            "POST",
+            f"{self._ingestor_url}/ingest/pinterest",
+            ctx,
+            json=body,
+        )
+
+        # Pinterest can return multiple workouts for boards
+        if "workouts" in result:
+            workouts = result["workouts"]
+            total = result.get("total", len(workouts))
+            return json.dumps({
+                "success": True,
+                "multiple_workouts": True,
+                "total": total,
+                "workouts": [
+                    {
+                        "title": w.get("title", "Untitled"),
+                        "id": w.get("id"),
+                    }
+                    for w in workouts
+                ],
+            })
+
+        # Single workout response
+        return self._format_ingestion_result(result, "Pinterest")
+
+    def _import_from_image(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import a workout from an uploaded image using vision AI."""
+        image_data = args.get("image_data")
+        if not image_data:
+            return self._error_response(
+                "validation_error", "Missing required field: image_data"
+            )
+
+        # Validate image size before decoding (base64 is ~33% larger than binary)
+        # Check encoded length to prevent memory exhaustion
+        max_encoded_size = int(MAX_IMAGE_SIZE_BYTES * 1.4)
+        if len(image_data) > max_encoded_size:
+            return self._error_response(
+                "validation_error",
+                "Image too large. Maximum size is 10MB."
+            )
+
+        filename = args.get("filename", "workout_image.jpg")
+
+        # Decode base64 to bytes
+        try:
+            image_bytes = base64.b64decode(image_data)
+        except Exception:
+            return self._error_response(
+                "validation_error", "Invalid base64 image data"
+            )
+
+        # Double-check decoded size
+        if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
+            return self._error_response(
+                "validation_error",
+                "Image too large. Maximum size is 10MB."
+            )
+
+        # Determine content type from filename
+        content_type = "image/jpeg"
+        if filename.lower().endswith(".png"):
+            content_type = "image/png"
+        elif filename.lower().endswith(".webp"):
+            content_type = "image/webp"
+        elif filename.lower().endswith(".gif"):
+            content_type = "image/gif"
+
+        # Send as multipart/form-data
+        files = {"file": (filename, io.BytesIO(image_bytes), content_type)}
+        data = {"vision_provider": "openai", "vision_model": "gpt-4o-mini"}
+
+        result = self._call_multipart_api(
+            f"{self._ingestor_url}/ingest/image_vision",
+            ctx,
+            files=files,
+            data=data,
+            error_context="Image processing",
+        )
+
+        return self._format_ingestion_result(result, "image")
+
+    def _format_ingestion_result(
+        self, result: Dict[str, Any], source: str
+    ) -> str:
+        """Format ingestion result into a user-friendly response.
+
+        Args:
+            result: API response from ingestor.
+            source: Human-readable source description.
+
+        Returns:
+            JSON string with success/error info and workout details.
+        """
+        if not result.get("success", True):
+            error_msg = result.get("error", "Failed to extract workout")
+            return self._error_response("ingestion_failed", error_msg)
+
+        workout = result.get("workout", {})
+        title = workout.get("title") or workout.get("name", "Imported Workout")
+        workout_id = workout.get("id")
+
+        response: Dict[str, Any] = {
+            "success": True,
+            "source": source,
+            "workout": {
+                "title": title,
+                "id": workout_id,
+            },
+        }
+
+        # Include exercise count if available
+        exercises = workout.get("exercises", [])
+        if exercises:
+            response["workout"]["exercise_count"] = len(exercises)
+
+        return json.dumps(response)

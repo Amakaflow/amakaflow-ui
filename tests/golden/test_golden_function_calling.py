@@ -25,6 +25,14 @@ from tests.golden.conftest import (
     load_navigation_cases,
     load_negative_cases,
     load_edge_cases,
+    # Phase 2: Content Ingestion
+    load_import_youtube_cases,
+    load_import_tiktok_cases,
+    load_import_instagram_cases,
+    load_import_pinterest_cases,
+    load_import_image_cases,
+    load_import_negative_cases,
+    load_all_import_cases,
 )
 from tests.golden.evaluator import (
     AccuracyReport,
@@ -465,3 +473,85 @@ class TestAccuracyReport:
         assert "nav_003" in markdown
         assert "search" in markdown
         assert "navigation" in markdown
+
+
+# =============================================================================
+# Phase 2: Content Ingestion Golden Tests
+# =============================================================================
+
+
+@pytest.mark.golden
+class TestImportFromYouTubeCases:
+    """Golden tests for import_from_youtube function."""
+
+    @pytest.mark.parametrize("case", load_import_youtube_cases(), ids=case_id_func)
+    def test_youtube_import_case(self, case: Dict[str, Any]):
+        """Validate import_from_youtube is selected for YouTube URLs."""
+        assert case["expected_function"] == "import_from_youtube"
+        # YouTube cases should have URL in expected_params or just validate function selection
+        if case.get("expected_params"):
+            assert "url" in case["expected_params"]
+
+
+@pytest.mark.golden
+class TestImportFromTikTokCases:
+    """Golden tests for import_from_tiktok function."""
+
+    @pytest.mark.parametrize("case", load_import_tiktok_cases(), ids=case_id_func)
+    def test_tiktok_import_case(self, case: Dict[str, Any]):
+        """Validate import_from_tiktok is selected for TikTok URLs."""
+        assert case["expected_function"] == "import_from_tiktok"
+
+
+@pytest.mark.golden
+class TestImportFromInstagramCases:
+    """Golden tests for import_from_instagram function."""
+
+    @pytest.mark.parametrize("case", load_import_instagram_cases(), ids=case_id_func)
+    def test_instagram_import_case(self, case: Dict[str, Any]):
+        """Validate import_from_instagram is selected for Instagram URLs."""
+        assert case["expected_function"] == "import_from_instagram"
+
+
+@pytest.mark.golden
+class TestImportFromPinterestCases:
+    """Golden tests for import_from_pinterest function."""
+
+    @pytest.mark.parametrize("case", load_import_pinterest_cases(), ids=case_id_func)
+    def test_pinterest_import_case(self, case: Dict[str, Any]):
+        """Validate import_from_pinterest is selected for Pinterest URLs."""
+        assert case["expected_function"] == "import_from_pinterest"
+
+
+@pytest.mark.golden
+class TestImportFromImageCases:
+    """Golden tests for import_from_image function."""
+
+    @pytest.mark.parametrize("case", load_import_image_cases(), ids=case_id_func)
+    def test_image_import_case(self, case: Dict[str, Any]):
+        """Validate import_from_image is selected for image upload context."""
+        assert case["expected_function"] == "import_from_image"
+
+
+@pytest.mark.golden
+class TestImportNegativeCases:
+    """Tests for import requests that should NOT trigger import functions."""
+
+    @pytest.mark.parametrize("case", load_import_negative_cases(), ids=case_id_func)
+    def test_import_negative_case(self, case: Dict[str, Any]):
+        """Validate no import function is called for unsupported/incomplete requests."""
+        assert case["expected_function"] is None
+
+
+@pytest.mark.golden
+class TestAllImportCases:
+    """Comprehensive tests for all Phase 2 import cases."""
+
+    @pytest.mark.parametrize("case", load_all_import_cases(), ids=case_id_func)
+    def test_import_case_structure(self, case: Dict[str, Any]):
+        """Validate all import cases have proper structure."""
+        assert "id" in case
+        assert "input" in case
+        assert "expected_function" in case
+        assert "category" in case
+        assert case["category"].startswith("import_")

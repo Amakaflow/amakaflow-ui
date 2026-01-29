@@ -444,3 +444,669 @@ class TestFunctionDispatcherLifecycle:
                     raise ValueError("test error")
 
             mock_client.close.assert_called_once()
+
+
+# =============================================================================
+# Phase 2: Content Ingestion Handler Tests
+# =============================================================================
+
+
+class TestImportFromYouTube:
+    def test_success(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "id": "w-yt-1",
+                "title": "30 Min Full Body HIIT",
+                "exercises": [{"name": "Burpees"}, {"name": "Squats"}],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=abc123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["source"] == "YouTube video"
+        assert data["workout"]["title"] == "30 Min Full Body HIIT"
+        assert data["workout"]["exercise_count"] == 2
+
+        # Verify correct endpoint called
+        call_args = mock_req.call_args
+        assert "ingest/youtube" in call_args[0][1]
+        assert call_args[1]["json"]["url"] == "https://youtube.com/watch?v=abc123"
+
+    def test_skip_cache(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=abc", "skip_cache": True},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["skip_cache"] is True
+
+    def test_missing_url(self, dispatcher, context):
+        result = dispatcher.execute("import_from_youtube", {}, context)
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "empty" in parsed["message"].lower() or "url" in parsed["message"].lower()
+
+    def test_ingestion_failed(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": False,
+            "error": "Video not accessible",
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=private"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "ingestion_failed"
+        assert "Video not accessible" in parsed["message"]
+
+
+class TestImportFromTikTok:
+    def test_success_auto_mode(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-tt-1", "title": "Quick Ab Routine"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_tiktok",
+                {"url": "https://tiktok.com/@user/video/123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["source"] == "TikTok video"
+
+        # Verify default mode is "auto"
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["mode"] == "auto"
+
+    def test_custom_mode(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "import_from_tiktok",
+                {"url": "https://tiktok.com/@user/video/123", "mode": "hybrid"},
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["mode"] == "hybrid"
+
+    def test_missing_url(self, dispatcher, context):
+        result = dispatcher.execute("import_from_tiktok", {}, context)
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "empty" in parsed["message"].lower() or "url" in parsed["message"].lower()
+
+
+class TestImportFromInstagram:
+    def test_success(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "id": "w-ig-1",
+                "title": "Glute Workout",
+                "exercises": [{"name": "Hip Thrusts"}],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_instagram",
+                {"url": "https://instagram.com/p/ABC123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["source"] == "Instagram post"
+
+        # Verify correct endpoint called
+        call_args = mock_req.call_args
+        assert "ingest/instagram_test" in call_args[0][1]
+
+    def test_missing_url(self, dispatcher, context):
+        result = dispatcher.execute("import_from_instagram", {}, context)
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+
+
+class TestImportFromPinterest:
+    def test_single_workout(self, dispatcher, context):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-pin-1", "title": "Yoga Flow"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_pinterest",
+                {"url": "https://pinterest.com/pin/123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["source"] == "Pinterest"
+
+    def test_multiple_workouts_from_board(self, dispatcher, context):
+        """Verify Pinterest board returns multiple workouts."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "total": 3,
+            "workouts": [
+                {"id": "w-1", "title": "Workout 1"},
+                {"id": "w-2", "title": "Workout 2"},
+                {"id": "w-3", "title": "Workout 3"},
+            ],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_pinterest",
+                {"url": "https://pinterest.com/user/board"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["multiple_workouts"] is True
+        assert data["total"] == 3
+        assert len(data["workouts"]) == 3
+        assert data["workouts"][0]["title"] == "Workout 1"
+        assert data["workouts"][0]["id"] == "w-1"
+
+    def test_missing_url(self, dispatcher, context):
+        result = dispatcher.execute("import_from_pinterest", {}, context)
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+
+
+# =============================================================================
+# Phase 2: URL Edge Cases and Validation
+# =============================================================================
+
+
+class TestPhase2URLEdgeCases:
+    """Test URL handling edge cases for content ingestion."""
+
+    def test_youtube_short_url(self, dispatcher, context):
+        """Verify youtu.be short URLs are accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "Short URL Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtu.be/abc123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+        # Verify URL was passed through correctly
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["url"] == "https://youtu.be/abc123"
+
+    def test_youtube_www_url(self, dispatcher, context):
+        """Verify www.youtube.com URLs are accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "WWW URL Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://www.youtube.com/watch?v=test123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_tiktok_vm_url(self, dispatcher, context):
+        """Verify vm.tiktok.com redirect URLs are accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "VM URL Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_tiktok",
+                {"url": "https://vm.tiktok.com/ZMRxyz123/"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+        # Verify URL was passed through
+        call_args = mock_req.call_args
+        assert "vm.tiktok.com" in call_args[1]["json"]["url"]
+
+    def test_instagram_reel_url(self, dispatcher, context):
+        """Verify Instagram Reel URLs are accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "Reel Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_instagram",
+                {"url": "https://instagram.com/reel/ABC123XYZ"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_pinterest_www_url(self, dispatcher, context):
+        """Verify www.pinterest.com URLs are accepted."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "Pinterest Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_pinterest",
+                {"url": "https://www.pinterest.com/pin/123456789"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_url_with_query_params(self, dispatcher, context):
+        """Verify URLs with query parameters are handled."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "Workout with Params"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=test&t=120&feature=share"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+        # Verify full URL was passed
+        call_args = mock_req.call_args
+        assert "feature=share" in call_args[1]["json"]["url"]
+
+
+class TestPhase2SecurityValidation:
+    """Test security validations for content ingestion (SSRF prevention)."""
+
+    def test_youtube_rejects_invalid_domain(self, dispatcher, context):
+        """Verify YouTube handler rejects non-YouTube URLs (SSRF prevention)."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "https://evil.com/watch?v=abc123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "YouTube" in parsed["message"]
+
+    def test_youtube_rejects_internal_url(self, dispatcher, context):
+        """Verify YouTube handler rejects internal network URLs."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "http://169.254.169.254/metadata"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+
+    def test_youtube_rejects_localhost(self, dispatcher, context):
+        """Verify YouTube handler rejects localhost URLs."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "http://localhost:8000/admin"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+
+    def test_tiktok_rejects_invalid_domain(self, dispatcher, context):
+        """Verify TikTok handler rejects non-TikTok URLs."""
+        result = dispatcher.execute(
+            "import_from_tiktok",
+            {"url": "https://malicious-site.com/video/123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "TikTok" in parsed["message"]
+
+    def test_instagram_rejects_invalid_domain(self, dispatcher, context):
+        """Verify Instagram handler rejects non-Instagram URLs."""
+        result = dispatcher.execute(
+            "import_from_instagram",
+            {"url": "https://notinstagram.com/p/ABC123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "Instagram" in parsed["message"]
+
+    def test_pinterest_rejects_invalid_domain(self, dispatcher, context):
+        """Verify Pinterest handler rejects non-Pinterest URLs."""
+        result = dispatcher.execute(
+            "import_from_pinterest",
+            {"url": "https://fakepinterest.com/pin/123"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "Pinterest" in parsed["message"]
+
+    def test_rejects_ftp_protocol(self, dispatcher, context):
+        """Verify handlers reject non-HTTP protocols."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "ftp://youtube.com/video"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "http" in parsed["message"].lower()
+
+    def test_rejects_javascript_protocol(self, dispatcher, context):
+        """Verify handlers reject javascript: URLs."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "javascript:alert('xss')"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+
+    def test_image_size_limit_encoded(self, dispatcher, context):
+        """Verify image handler rejects oversized base64 data."""
+        import base64
+
+        # Create data larger than 10MB limit (base64 encoded)
+        # 15MB * 1.4 = ~21MB encoded, definitely over limit
+        oversized_data = "x" * (15 * 1024 * 1024)
+
+        result = dispatcher.execute(
+            "import_from_image",
+            {"image_data": oversized_data},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "10MB" in parsed["message"] or "too large" in parsed["message"].lower()
+
+
+class TestPhase2PayloadEdgeCases:
+    """Test payload handling edge cases."""
+
+    def test_empty_url_returns_error(self, dispatcher, context):
+        """Verify empty URL returns validation error."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": ""},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "empty" in parsed["message"].lower()
+
+    def test_whitespace_url_returns_error(self, dispatcher, context):
+        """Verify whitespace-only URL returns validation error."""
+        result = dispatcher.execute(
+            "import_from_youtube",
+            {"url": "   "},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "empty" in parsed["message"].lower()
+
+    def test_large_base64_image(self, dispatcher, context):
+        """Verify large base64 images don't crash."""
+        import base64
+
+        # Create 1MB of fake image data
+        large_data = b"x" * (1024 * 1024)
+        large_base64 = base64.b64encode(large_data).decode()
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"id": "w-1", "title": "Large Image Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_image",
+                {"image_data": large_base64},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+
+    def test_webp_content_type_detection(self, dispatcher, context):
+        """Verify .webp file extension is detected correctly."""
+        import base64
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        fake_image = base64.b64encode(b"webp data").decode()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response) as mock_post:
+            dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image, "filename": "workout.webp"},
+                context,
+            )
+
+        call_args = mock_post.call_args
+        files = call_args[1]["files"]
+        # files["file"] is tuple of (filename, BytesIO, content_type)
+        assert files["file"][2] == "image/webp"
+
+    def test_gif_content_type_detection(self, dispatcher, context):
+        """Verify .gif file extension is detected correctly."""
+        import base64
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        fake_image = base64.b64encode(b"gif data").decode()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response) as mock_post:
+            dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image, "filename": "workout.gif"},
+                context,
+            )
+
+        call_args = mock_post.call_args
+        files = call_args[1]["files"]
+        assert files["file"][2] == "image/gif"
+
+    def test_uppercase_extension_detection(self, dispatcher, context):
+        """Verify uppercase file extensions are handled."""
+        import base64
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        fake_image = base64.b64encode(b"png data").decode()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response) as mock_post:
+            dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image, "filename": "WORKOUT.PNG"},
+                context,
+            )
+
+        call_args = mock_post.call_args
+        files = call_args[1]["files"]
+        assert files["file"][2] == "image/png"
+
+
+class TestImportFromImage:
+    def test_success(self, dispatcher, context):
+        import base64
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "id": "w-img-1",
+                "title": "Screenshot Workout",
+                "exercises": [{"name": "Push-ups"}, {"name": "Sit-ups"}],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        # Create fake base64 image data
+        fake_image = base64.b64encode(b"fake image bytes").decode()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response) as mock_post:
+            result = dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image, "filename": "workout.jpg"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["source"] == "image"
+        assert data["workout"]["exercise_count"] == 2
+
+        # Verify multipart request
+        call_args = mock_post.call_args
+        assert "ingest/image_vision" in call_args[0][0]
+        assert "files" in call_args[1]
+        assert "data" in call_args[1]
+        assert call_args[1]["data"]["vision_provider"] == "openai"
+
+    def test_missing_image_data(self, dispatcher, context):
+        result = dispatcher.execute("import_from_image", {}, context)
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "image_data" in parsed["message"]
+
+    def test_invalid_base64(self, dispatcher, context):
+        result = dispatcher.execute(
+            "import_from_image",
+            {"image_data": "not-valid-base64!!!"},
+            context,
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "Invalid base64" in parsed["message"]
+
+    def test_content_type_from_filename(self, dispatcher, context):
+        """Verify content type is derived from filename extension."""
+        import base64
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"success": True, "workout": {"title": "Test"}}
+        mock_response.raise_for_status = MagicMock()
+
+        fake_image = base64.b64encode(b"fake").decode()
+
+        with patch.object(dispatcher._client, "post", return_value=mock_response) as mock_post:
+            dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image, "filename": "workout.png"},
+                context,
+            )
+
+        call_args = mock_post.call_args
+        files = call_args[1]["files"]
+        # files["file"] is a tuple of (filename, BytesIO, content_type)
+        assert files["file"][2] == "image/png"
+
+    def test_timeout_error(self, dispatcher, context):
+        import base64
+
+        fake_image = base64.b64encode(b"fake").decode()
+
+        with patch.object(
+            dispatcher._client, "post", side_effect=httpx.TimeoutException("timeout")
+        ):
+            result = dispatcher.execute(
+                "import_from_image",
+                {"image_data": fake_image},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "taking too long" in parsed["message"]

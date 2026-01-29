@@ -110,3 +110,110 @@ PHASE_1_TOOLS: List[Dict[str, Any]] = [
         },
     },
 ]
+
+PHASE_2_TOOLS: List[Dict[str, Any]] = [
+    {
+        "name": "import_from_youtube",
+        "description": (
+            "Import a workout from a YouTube video URL. The video transcript will be "
+            "analyzed to extract exercises, sets, reps, and timing."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "YouTube video URL",
+                },
+                "skip_cache": {
+                    "type": "boolean",
+                    "description": "Bypass cache for fresh extraction (default: false)",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "import_from_tiktok",
+        "description": (
+            "Import a workout from a TikTok video URL. The video will be processed "
+            "using audio transcription and/or vision analysis to extract the workout."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "TikTok video URL",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["oembed", "auto", "hybrid"],
+                    "description": (
+                        "Extraction mode: 'oembed' for metadata only, 'auto' for audio "
+                        "first with vision fallback (default), 'hybrid' for both"
+                    ),
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "import_from_instagram",
+        "description": (
+            "Import a workout from an Instagram post URL. The image or video will be "
+            "analyzed using OCR and vision to extract workout details."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Instagram post URL",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "import_from_pinterest",
+        "description": (
+            "Import workouts from a Pinterest pin or board URL. For boards, multiple "
+            "workouts may be returned. Each image will be analyzed to extract exercises."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Pinterest pin or board URL",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "import_from_image",
+        "description": (
+            "Import a workout from an uploaded image. The image will be analyzed using "
+            "vision AI to extract exercises, sets, reps, and other workout details."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Original filename (optional, helps with format detection)",
+                },
+            },
+            "required": ["image_data"],
+        },
+    },
+]
+
+# Combined list for convenience
+ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS

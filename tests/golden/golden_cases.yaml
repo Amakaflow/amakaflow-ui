@@ -491,3 +491,200 @@ cases:
     expected_function: generate_ai_workout
     category: edge_case
     description: "Generate then schedule - prioritize generation"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_YOUTUBE (5 cases)
+  # =============================================================================
+
+  - id: import_youtube_001
+    input: "Import this YouTube workout video https://youtube.com/watch?v=abc123"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtube.com/watch?v=abc123"
+    category: import_youtube
+    description: "Direct YouTube URL import"
+
+  - id: import_youtube_002
+    input: "Can you grab the workout from this video? https://youtu.be/xyz789"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtu.be/xyz789"
+    category: import_youtube
+    description: "Short YouTube URL with conversational text"
+
+  - id: import_youtube_003
+    input: "Save this YouTube fitness routine to my library https://www.youtube.com/watch?v=test"
+    expected_function: import_from_youtube
+    category: import_youtube
+    description: "YouTube import with www prefix"
+
+  - id: import_youtube_004
+    input: "Extract the exercises from https://youtube.com/watch?v=workout123 and bypass the cache"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtube.com/watch?v=workout123"
+      skip_cache: true
+    category: import_youtube
+    description: "YouTube import with skip_cache"
+
+  - id: import_youtube_005
+    input: "I found a great HIIT video on YouTube, here's the link: https://youtube.com/watch?v=hiit"
+    expected_function: import_from_youtube
+    category: import_youtube
+    description: "Conversational YouTube import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_TIKTOK (5 cases)
+  # =============================================================================
+
+  - id: import_tiktok_001
+    input: "Import this TikTok workout https://tiktok.com/@user/video/123456"
+    expected_function: import_from_tiktok
+    expected_params:
+      url: "https://tiktok.com/@user/video/123456"
+    category: import_tiktok
+    description: "Direct TikTok URL import"
+
+  - id: import_tiktok_002
+    input: "Save this TikTok fitness video https://vm.tiktok.com/abc123"
+    expected_function: import_from_tiktok
+    category: import_tiktok
+    description: "TikTok short URL import"
+
+  - id: import_tiktok_003
+    input: "Import this TikTok and use vision mode: https://tiktok.com/@fitness/video/789"
+    expected_function: import_from_tiktok
+    expected_params:
+      mode: "hybrid"
+    category: import_tiktok
+    description: "TikTok with mode preference"
+
+  - id: import_tiktok_004
+    input: "Get the workout from this TikTok using audio transcription https://tiktok.com/@coach/video/456"
+    expected_function: import_from_tiktok
+    expected_params:
+      mode: "auto"
+    category: import_tiktok
+    description: "TikTok with audio mode preference"
+
+  - id: import_tiktok_005
+    input: "This TikTok has a great ab routine, import it https://tiktok.com/@abs/video/111"
+    expected_function: import_from_tiktok
+    category: import_tiktok
+    description: "Conversational TikTok import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_INSTAGRAM (4 cases)
+  # =============================================================================
+
+  - id: import_instagram_001
+    input: "Import the workout from this Instagram post https://instagram.com/p/ABC123"
+    expected_function: import_from_instagram
+    expected_params:
+      url: "https://instagram.com/p/ABC123"
+    category: import_instagram
+    description: "Instagram post import"
+
+  - id: import_instagram_002
+    input: "Save this IG workout https://www.instagram.com/reel/XYZ789"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Instagram reel import"
+
+  - id: import_instagram_003
+    input: "Extract exercises from this Instagram: https://instagram.com/p/workout123"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Instagram with extract intent"
+
+  - id: import_instagram_004
+    input: "I saw this workout on IG, can you import it? https://instagram.com/p/fit"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Conversational Instagram import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_PINTEREST (4 cases)
+  # =============================================================================
+
+  - id: import_pinterest_001
+    input: "Import workouts from this Pinterest board https://pinterest.com/user/fitness-board"
+    expected_function: import_from_pinterest
+    expected_params:
+      url: "https://pinterest.com/user/fitness-board"
+    category: import_pinterest
+    description: "Pinterest board import"
+
+  - id: import_pinterest_002
+    input: "Save this workout pin https://pinterest.com/pin/123456789"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest single pin import"
+
+  - id: import_pinterest_003
+    input: "Get all the workouts from my Pinterest board: https://pinterest.com/me/workout-ideas"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest board with all intent"
+
+  - id: import_pinterest_004
+    input: "Import from https://www.pinterest.com/pin/workout"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest with www prefix"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_IMAGE (4 cases)
+  # =============================================================================
+
+  - id: import_image_001
+    input: "I uploaded an image of my workout plan, can you import it?"
+    expected_function: import_from_image
+    category: import_image
+    description: "Image upload context"
+
+  - id: import_image_002
+    input: "Here's a screenshot of the exercises I want to save"
+    expected_function: import_from_image
+    category: import_image
+    description: "Screenshot import context"
+
+  - id: import_image_003
+    input: "Import the workout from this photo"
+    expected_function: import_from_image
+    category: import_image
+    description: "Photo import context"
+
+  - id: import_image_004
+    input: "Can you read this workout image and save the exercises?"
+    expected_function: import_from_image
+    category: import_image
+    description: "Image with read intent"
+
+  # =============================================================================
+  # PHASE 2: NEGATIVE CASES - NO IMPORT FUNCTION EXPECTED (4 cases)
+  # =============================================================================
+
+  - id: import_negative_001
+    input: "Import a workout"
+    expected_function: null
+    category: import_negative
+    description: "Generic import without source - needs clarification"
+
+  - id: import_negative_002
+    input: "https://facebook.com/video/123"
+    expected_function: null
+    category: import_negative
+    description: "Unsupported platform URL"
+
+  - id: import_negative_003
+    input: "Get the workout from the video I watched yesterday"
+    expected_function: null
+    category: import_negative
+    description: "No URL provided - needs clarification"
+
+  - id: import_negative_004
+    input: "Import from Vimeo https://vimeo.com/123"
+    expected_function: null
+    category: import_negative
+    description: "Unsupported video platform"

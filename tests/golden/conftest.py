@@ -103,3 +103,47 @@ def load_negative_cases() -> List[Dict[str, Any]]:
 def load_edge_cases() -> List[Dict[str, Any]]:
     """Load only edge case tests."""
     return [c for c in _cached_golden_cases() if c.get("category") == "edge_case"]
+
+
+# Phase 2: Content Ingestion case loaders
+def load_import_youtube_cases() -> List[Dict[str, Any]]:
+    """Load only import_from_youtube test cases."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_youtube"]
+
+
+def load_import_tiktok_cases() -> List[Dict[str, Any]]:
+    """Load only import_from_tiktok test cases."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_tiktok"]
+
+
+def load_import_instagram_cases() -> List[Dict[str, Any]]:
+    """Load only import_from_instagram test cases."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_instagram"]
+
+
+def load_import_pinterest_cases() -> List[Dict[str, Any]]:
+    """Load only import_from_pinterest test cases."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_pinterest"]
+
+
+def load_import_image_cases() -> List[Dict[str, Any]]:
+    """Load only import_from_image test cases."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_image"]
+
+
+def load_import_negative_cases() -> List[Dict[str, Any]]:
+    """Load only import negative test cases (no function expected)."""
+    return [c for c in _cached_golden_cases() if c.get("category") == "import_negative"]
+
+
+def load_all_import_cases() -> List[Dict[str, Any]]:
+    """Load all Phase 2 import test cases."""
+    import_categories = {
+        "import_youtube",
+        "import_tiktok",
+        "import_instagram",
+        "import_pinterest",
+        "import_image",
+        "import_negative",
+    }
+    return [c for c in _cached_golden_cases() if c.get("category") in import_categories]

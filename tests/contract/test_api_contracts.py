@@ -501,3 +501,254 @@ class TestFunctionResultContract:
         assert "action" in data
         assert data["action"] == "navigate"
         assert "page" in data
+
+
+# =============================================================================
+# Phase 2: Content Ingestion Response Contracts
+# =============================================================================
+
+
+# Response schemas for Phase 2
+INGESTION_SUCCESS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "success": {"type": "boolean"},
+        "source": {"type": "string"},
+        "workout": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "id": {"type": "string"},
+                "exercise_count": {"type": "integer"},
+            },
+            "required": ["title"],
+        },
+    },
+    "required": ["success"],
+}
+
+PINTEREST_MULTI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "success": {"type": "boolean"},
+        "multiple_workouts": {"type": "boolean"},
+        "total": {"type": "integer"},
+        "workouts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "id": {"type": "string"},
+                },
+                "required": ["title"],
+            },
+        },
+    },
+    "required": ["success", "multiple_workouts", "total", "workouts"],
+}
+
+
+@pytest.mark.contract
+class TestPhase2ResponseContracts:
+    """Contract tests for Phase 2 content ingestion response formats."""
+
+    @pytest.mark.smoke
+    def test_youtube_success_response_contract(self):
+        """YouTube success response matches schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        result = dispatcher.execute(
+            function_name="import_from_youtube",
+            arguments={"url": "https://youtube.com/watch?v=test"},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, INGESTION_SUCCESS_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+        assert data["source"] == "YouTube video"
+        assert "workout" in data
+        assert "title" in data["workout"]
+
+    def test_tiktok_success_response_contract(self):
+        """TikTok success response matches schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        result = dispatcher.execute(
+            function_name="import_from_tiktok",
+            arguments={"url": "https://tiktok.com/@user/video/123"},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, INGESTION_SUCCESS_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+        assert data["source"] == "TikTok video"
+
+    def test_instagram_success_response_contract(self):
+        """Instagram success response matches schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        result = dispatcher.execute(
+            function_name="import_from_instagram",
+            arguments={"url": "https://instagram.com/p/ABC123"},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, INGESTION_SUCCESS_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+        assert data["source"] == "Instagram post"
+
+    def test_pinterest_single_response_contract(self):
+        """Pinterest single pin response matches schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        result = dispatcher.execute(
+            function_name="import_from_pinterest",
+            arguments={"url": "https://pinterest.com/pin/123"},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, INGESTION_SUCCESS_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+
+    @pytest.mark.smoke
+    def test_pinterest_multi_response_contract(self):
+        """Pinterest board response matches multi-workout schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        # Use board URL to trigger multi-workout response
+        result = dispatcher.execute(
+            function_name="import_from_pinterest",
+            arguments={"url": "https://pinterest.com/user/board/fitness"},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, PINTEREST_MULTI_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+        assert data["multiple_workouts"] is True
+        assert data["total"] >= 1
+        assert isinstance(data["workouts"], list)
+        assert all("title" in w for w in data["workouts"])
+
+    def test_image_success_response_contract(self):
+        """Image import success response matches schema."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+        import base64
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        fake_image = base64.b64encode(b"test").decode()
+        result = dispatcher.execute(
+            function_name="import_from_image",
+            arguments={"image_data": fake_image},
+            context=context,
+        )
+
+        data = json.loads(result)
+        errors = validate_schema(data, INGESTION_SUCCESS_SCHEMA)
+        assert not errors, f"Schema validation failed: {errors}"
+        assert data["success"] is True
+        assert data["source"] == "image"
+
+    def test_all_ingestion_responses_have_success_field(self):
+        """All ingestion responses must have success boolean field."""
+        from tests.e2e.conftest import FakeFunctionDispatcher
+        from backend.services.function_dispatcher import FunctionContext
+        import base64
+
+        dispatcher = FakeFunctionDispatcher()
+        context = FunctionContext(user_id="test-user", auth_token="Bearer test")
+
+        ingestion_functions = [
+            ("import_from_youtube", {"url": "https://youtube.com/watch?v=test"}),
+            ("import_from_tiktok", {"url": "https://tiktok.com/@user/video/123"}),
+            ("import_from_instagram", {"url": "https://instagram.com/p/ABC"}),
+            ("import_from_pinterest", {"url": "https://pinterest.com/pin/123"}),
+            ("import_from_image", {"image_data": base64.b64encode(b"test").decode()}),
+        ]
+
+        for func_name, args in ingestion_functions:
+            result = dispatcher.execute(func_name, args, context)
+            data = json.loads(result)
+            assert "success" in data, f"{func_name} response missing 'success' field"
+            assert isinstance(data["success"], bool), f"{func_name} 'success' must be boolean"
+
+
+@pytest.mark.contract
+class TestPhase2FunctionResultContracts:
+    """Contract tests for Phase 2 function_result SSE events."""
+
+    def test_ingestion_function_result_format(self, client, ai_client):
+        """Verify ingestion function_result events have correct format."""
+        ai_client.response_events = [
+            StreamEvent(
+                event="function_call",
+                data={"id": "toolu_contract_1", "name": "import_from_youtube"},
+            ),
+            StreamEvent(
+                event="content_delta",
+                data={"partial_json": '{"url": "https://youtube.com/watch?v=test"}'},
+            ),
+            StreamEvent(
+                event="message_end",
+                data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "latency_ms": 800,
+                },
+            ),
+        ]
+
+        response = client.post(
+            "/chat/stream",
+            json={"message": "Import YouTube video"},
+        )
+
+        assert response.status_code == 200
+        events = parse_sse_events(response.text)
+
+        # Find function_result event
+        fr_events = find_events(events, "function_result")
+        assert len(fr_events) >= 1
+
+        fr = fr_events[0]["data"]
+        # Validate function_result schema
+        errors = validate_schema(fr, SSE_FUNCTION_RESULT_SCHEMA)
+        assert not errors, f"function_result schema validation failed: {errors}"
+
+        # The result should be valid JSON
+        result = json.loads(fr["result"])
+        assert "success" in result

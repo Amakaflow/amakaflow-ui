@@ -79,6 +79,47 @@ GENERAL_MESSAGES = [
     "How do I use this?",
 ]
 
+# Phase 2: Content Ingestion Messages
+IMPORT_YOUTUBE_MESSAGES = [
+    "Import this YouTube workout https://youtube.com/watch?v=abc123",
+    "Save this YouTube video https://youtu.be/xyz789",
+    "Get the workout from https://www.youtube.com/watch?v=test",
+    "Import workout from this YouTube link https://youtube.com/watch?v=hiit",
+]
+
+IMPORT_TIKTOK_MESSAGES = [
+    "Import this TikTok workout https://tiktok.com/@fitness/video/123",
+    "Save this TikTok https://vm.tiktok.com/abc123",
+    "Get the exercises from this TikTok https://tiktok.com/@user/video/456",
+]
+
+IMPORT_INSTAGRAM_MESSAGES = [
+    "Import from this Instagram post https://instagram.com/p/ABC123",
+    "Save this IG workout https://instagram.com/reel/XYZ789",
+    "Get workout from https://www.instagram.com/p/test123",
+]
+
+IMPORT_PINTEREST_MESSAGES = [
+    "Import workouts from this Pinterest board https://pinterest.com/user/fitness-board",
+    "Save this workout pin https://pinterest.com/pin/123456789",
+    "Get exercises from https://www.pinterest.com/user/workout-ideas",
+]
+
+IMPORT_IMAGE_MESSAGES = [
+    "I uploaded a screenshot of my workout, can you import it?",
+    "Here's an image of the exercises I want to save",
+    "Import the workout from this photo",
+]
+
+# Combined import messages
+ALL_IMPORT_MESSAGES = (
+    IMPORT_YOUTUBE_MESSAGES
+    + IMPORT_TIKTOK_MESSAGES
+    + IMPORT_INSTAGRAM_MESSAGES
+    + IMPORT_PINTEREST_MESSAGES
+    + IMPORT_IMAGE_MESSAGES
+)
+
 
 def random_message() -> str:
     """Get a random message from all categories."""
@@ -245,6 +286,31 @@ class ChatAPIUser(HttpUser):
             else:
                 response.failure(f"Status {response.status_code}")
 
+    @task(1)
+    def send_import_request(self):
+        """Send a content import request (Phase 2 - heavier operation)."""
+        message = random.choice(ALL_IMPORT_MESSAGES)
+
+        payload: Dict[str, Any] = {"message": message}
+
+        # Reuse session 50% of the time for imports
+        if self.session_id and random.random() < 0.5:
+            payload["session_id"] = self.session_id
+
+        with self.client.post(
+            "/chat/stream",
+            json=payload,
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=65,  # Allow for 60s ingestion timeout
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            elif response.status_code == 429:
+                response.failure("Rate limited")
+            else:
+                response.failure(f"Status {response.status_code}")
+
 
 class HeavyAPIUser(HttpUser):
     """Simulates a power user making frequent requests.
@@ -312,6 +378,123 @@ class HeavyAPIUser(HttpUser):
             json={"message": message},
             headers={"Authorization": self.auth_token},
             catch_response=True,
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status {response.status_code}")
+
+
+class ImportHeavyUser(HttpUser):
+    """Simulates users heavily using content import features.
+
+    This user class represents import-heavy usage patterns:
+    - Frequent YouTube/TikTok/Instagram imports
+    - Pinterest board imports (multi-workout)
+    - Image uploads
+    - Longer timeouts expected
+    """
+
+    wait_time = between(3, 8)  # Slower rate due to heavier operations
+
+    def on_start(self):
+        """Initialize user state."""
+        self.session_id: Optional[str] = None
+        self.auth_token = f"Bearer import-user-{random.randint(1000, 9999)}"
+
+    @task(3)
+    def import_youtube(self):
+        """Import from YouTube (most common import source)."""
+        message = random.choice(IMPORT_YOUTUBE_MESSAGES)
+
+        with self.client.post(
+            "/chat/stream",
+            json={"message": message},
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=65,
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status {response.status_code}")
+
+    @task(2)
+    def import_tiktok(self):
+        """Import from TikTok."""
+        message = random.choice(IMPORT_TIKTOK_MESSAGES)
+
+        with self.client.post(
+            "/chat/stream",
+            json={"message": message},
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=65,
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status {response.status_code}")
+
+    @task(2)
+    def import_instagram(self):
+        """Import from Instagram."""
+        message = random.choice(IMPORT_INSTAGRAM_MESSAGES)
+
+        with self.client.post(
+            "/chat/stream",
+            json={"message": message},
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=65,
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status {response.status_code}")
+
+    @task(1)
+    def import_pinterest_board(self):
+        """Import from Pinterest board (multi-workout, heaviest operation)."""
+        message = random.choice(IMPORT_PINTEREST_MESSAGES)
+
+        start_time = time.time()
+
+        with self.client.post(
+            "/chat/stream",
+            json={"message": message},
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=90,  # Boards can take longer
+        ) as response:
+            if response.status_code == 200:
+                elapsed = time.time() - start_time
+
+                # Track long-running imports as custom metric
+                events.request.fire(
+                    request_type="IMPORT",
+                    name="pinterest_board_import",
+                    response_time=elapsed * 1000,
+                    response_length=len(response.text),
+                    exception=None,
+                    context={},
+                )
+
+                response.success()
+            else:
+                response.failure(f"Status {response.status_code}")
+
+    @task(1)
+    def import_image(self):
+        """Import from image (simulated - no actual base64)."""
+        message = random.choice(IMPORT_IMAGE_MESSAGES)
+
+        with self.client.post(
+            "/chat/stream",
+            json={"message": message},
+            headers={"Authorization": self.auth_token},
+            catch_response=True,
+            timeout=65,
         ) as response:
             if response.status_code == 200:
                 response.success()

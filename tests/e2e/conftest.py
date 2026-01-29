@@ -344,6 +344,78 @@ class FakeFunctionDispatcher:
                 nav["workout_id"] = workout_id
             return json.dumps(nav)
 
+        # Phase 2: Content Ingestion handlers
+        if function_name == "import_from_youtube":
+            url = arguments.get("url", "")
+            return json.dumps({
+                "success": True,
+                "source": "YouTube video",
+                "workout": {
+                    "title": f"Imported from {url[:30]}..." if len(url) > 30 else f"Imported from {url}",
+                    "id": "w-yt-fake-1",
+                    "exercise_count": 8,
+                },
+            })
+
+        if function_name == "import_from_tiktok":
+            mode = arguments.get("mode", "auto")
+            return json.dumps({
+                "success": True,
+                "source": "TikTok video",
+                "mode_used": mode,
+                "workout": {
+                    "title": "TikTok Fitness Routine",
+                    "id": "w-tt-fake-1",
+                    "exercise_count": 5,
+                },
+            })
+
+        if function_name == "import_from_instagram":
+            return json.dumps({
+                "success": True,
+                "source": "Instagram post",
+                "workout": {
+                    "title": "IG Workout Import",
+                    "id": "w-ig-fake-1",
+                    "exercise_count": 6,
+                },
+            })
+
+        if function_name == "import_from_pinterest":
+            url = arguments.get("url", "")
+            # Simulate board vs pin detection
+            if "/board" in url or url.count("/") > 4:
+                return json.dumps({
+                    "success": True,
+                    "multiple_workouts": True,
+                    "total": 3,
+                    "workouts": [
+                        {"title": "Pin Workout 1", "id": "w-pin-1"},
+                        {"title": "Pin Workout 2", "id": "w-pin-2"},
+                        {"title": "Pin Workout 3", "id": "w-pin-3"},
+                    ],
+                })
+            return json.dumps({
+                "success": True,
+                "source": "Pinterest",
+                "workout": {
+                    "title": "Pinterest Pin Workout",
+                    "id": "w-pin-single",
+                    "exercise_count": 4,
+                },
+            })
+
+        if function_name == "import_from_image":
+            return json.dumps({
+                "success": True,
+                "source": "image",
+                "workout": {
+                    "title": "Imported from Screenshot",
+                    "id": "w-img-fake-1",
+                    "exercise_count": 10,
+                },
+            })
+
         return f"Unknown function '{function_name}'"
 
     def set_result(self, function_name: str, result: str) -> None:
