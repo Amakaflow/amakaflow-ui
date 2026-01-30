@@ -5,7 +5,7 @@ import {
   ProgramGenerationStatusResponse,
 } from '@/types/program-wizard';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_PROGRAM_API_URL || 'http://localhost:8000';
 
 export class ProgramGenerationApiClient {
   /**

@@ -1368,7 +1368,7 @@ export function StructureWorkout({
                   );
                 }
               })()}
-              {process.env.NODE_ENV === 'development' && (
+              {import.meta.env.DEV && (
                 <Button
                   onClick={() => {
                     navigator.clipboard.writeText(JSON.stringify(workoutWithIds, null, 2));
