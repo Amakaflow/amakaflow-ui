@@ -8,3 +8,5 @@ select = ["E", "F", "W"]
 "tests/**/conftest.py" = ["E402", "F401"]
 # Test files often import fixtures/fakes that appear unused to static analysis
 "tests/**/*.py" = ["F401", "F841"]
+# Scripts must modify sys.path before importing backend modules
+"scripts/**/*.py" = ["E402"]
