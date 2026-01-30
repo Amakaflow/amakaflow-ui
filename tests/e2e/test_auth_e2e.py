@@ -30,9 +30,11 @@ from backend.main import create_app
 from backend.settings import Settings
 from api.deps import (
     get_stream_chat_use_case,
+    get_async_stream_chat_use_case,
     get_settings,
 )
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
 from tests.e2e.conftest import (
     TEST_USER_ID,
     TEST_AUTH_SECRET,
@@ -63,6 +65,21 @@ def _make_mock_stream_use_case() -> MagicMock:
     return uc
 
 
+def _make_mock_async_stream_use_case() -> MagicMock:
+    """Mock async use case that yields a minimal SSE stream."""
+    async def _mock_execute(*args, **kwargs):
+        yield SSEEvent(event="message_start", data=json.dumps({"session_id": "s-1"}))
+        yield SSEEvent(event="content_delta", data=json.dumps({"text": "OK"}))
+        yield SSEEvent(
+            event="message_end",
+            data=json.dumps({"session_id": "s-1", "tokens_used": 10, "latency_ms": 100}),
+        )
+
+    uc = MagicMock(spec=AsyncStreamChatUseCase)
+    uc.execute = _mock_execute
+    return uc
+
+
 @pytest.fixture
 def auth_settings():
     return Settings(
@@ -80,6 +97,7 @@ def auth_app(auth_settings):
     app = create_app(settings=auth_settings)
     app.dependency_overrides[get_settings] = lambda: auth_settings
     app.dependency_overrides[get_stream_chat_use_case] = _make_mock_stream_use_case
+    app.dependency_overrides[get_async_stream_chat_use_case] = _make_mock_async_stream_use_case
     from api.deps import get_generate_embeddings_use_case
     app.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     yield app
@@ -261,6 +279,28 @@ class TestAPIKeyAuth:
             mock_uc = _make_mock_stream_use_case()
             auth_app.dependency_overrides[get_stream_chat_use_case] = lambda: mock_uc
 
+            # Also mock async use case to capture calls
+            captured_user_id = []
+
+            async def _mock_async_execute(*args, **kwargs):
+                captured_user_id.append(kwargs.get("user_id"))
+                yield SSEEvent(
+                    event="message_start", data=json.dumps({"session_id": "s-1"})
+                )
+                yield SSEEvent(event="content_delta", data=json.dumps({"text": "OK"}))
+                yield SSEEvent(
+                    event="message_end",
+                    data=json.dumps(
+                        {"session_id": "s-1", "tokens_used": 10, "latency_ms": 100}
+                    ),
+                )
+
+            async_mock_uc = MagicMock(spec=AsyncStreamChatUseCase)
+            async_mock_uc.execute = _mock_async_execute
+            auth_app.dependency_overrides[get_async_stream_chat_use_case] = (
+                lambda: async_mock_uc
+            )
+
             test_client = TestClient(auth_app)
             response = test_client.post(
                 "/chat/stream",
@@ -268,10 +308,7 @@ class TestAPIKeyAuth:
                 headers={"X-API-Key": "sk_test_valid:user_custom_123"},
             )
             assert response.status_code == 200
-            mock_uc.execute.assert_called_once()
-            call_kwargs = mock_uc.execute.call_args
-            assert call_kwargs[1]["user_id"] == "user_custom_123" or \
-                   call_kwargs[0][0] == "user_custom_123" if call_kwargs[0] else True
+            assert captured_user_id[0] == "user_custom_123"
 
     def test_no_api_keys_configured(self, auth_client):
         """No API_KEYS env var configured returns 401."""

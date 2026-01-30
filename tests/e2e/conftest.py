@@ -46,11 +46,13 @@ from api.deps import (
     get_chat_message_repository,
     get_chat_session_repository,
     get_stream_chat_use_case,
+    get_async_stream_chat_use_case,
     get_generate_embeddings_use_case,
     get_settings,
     AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
 from backend.services.function_dispatcher import FunctionContext
 from backend.services.tts_service import TTSResult, VoiceInfo
@@ -602,6 +604,10 @@ class FakeFunctionDispatcher:
         self.error_results.clear()
         self.delay_seconds = 0.0
 
+    def close(self) -> None:
+        """Close resources (no-op for fake, but matches real dispatcher interface)."""
+        pass
+
 
 class FakeTTSService:
     """Deterministic TTS service for E2E tests.
@@ -773,6 +779,250 @@ class FakeTTSSettingsRepository:
 
 
 # ============================================================================
+# Async Fakes (for AMA-505 async streaming pipeline)
+# ============================================================================
+
+
+class FakeAsyncAIClient:
+    """Async AI client that delegates to sync FakeAIClient.
+
+    Shares state with sync fake so tests can use either fixture.
+    Uses async generator to wrap the sync generator.
+    """
+
+    def __init__(self, sync_client: FakeAIClient) -> None:
+        self._sync = sync_client
+
+    async def stream_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        system: str,
+        model: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        max_tokens: int = 4096,
+        user_id: Optional[str] = None,
+    ):
+        """Async generator version that delegates to sync stream_chat."""
+        for event in self._sync.stream_chat(
+            messages=messages,
+            system=system,
+            model=model,
+            tools=tools,
+            max_tokens=max_tokens,
+            user_id=user_id,
+        ):
+            yield event
+
+    @property
+    def response_events(self):
+        return self._sync.response_events
+
+    @response_events.setter
+    def response_events(self, value):
+        self._sync.response_events = value
+
+    @property
+    def response_sequences(self):
+        return self._sync.response_sequences
+
+    @response_sequences.setter
+    def response_sequences(self, value):
+        self._sync.response_sequences = value
+
+    @property
+    def call_count(self):
+        return self._sync.call_count
+
+    @property
+    def last_call_kwargs(self):
+        return self._sync.last_call_kwargs
+
+    @property
+    def all_call_kwargs(self):
+        return self._sync.all_call_kwargs
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+class FakeAsyncFunctionDispatcher:
+    """Async function dispatcher that delegates to sync FakeFunctionDispatcher.
+
+    Shares state with sync fake so tests can use either fixture.
+
+    Note: For heartbeat testing, the async endpoint uses the async use case which
+    has its own HEARTBEAT_INTERVAL_SECONDS constant. Tests that patch the sync
+    module's constant need to also patch the async module's constant.
+    """
+
+    def __init__(self, sync_dispatcher: FakeFunctionDispatcher) -> None:
+        self._sync = sync_dispatcher
+
+    async def execute(
+        self,
+        function_name: str,
+        arguments: Dict[str, Any],
+        context: FunctionContext,
+    ) -> str:
+        import asyncio
+
+        # Capture delay before sync execute (which will sleep synchronously)
+        delay = self._sync.delay_seconds
+
+        # Use async sleep if delay is configured (for proper async heartbeat testing)
+        if delay > 0:
+            # Temporarily disable sync delay so it doesn't block
+            self._sync.delay_seconds = 0
+            try:
+                await asyncio.sleep(delay)
+            finally:
+                # Restore for future calls even if exception occurs
+                self._sync.delay_seconds = delay
+
+        return self._sync.execute(function_name, arguments, context)
+
+    def set_result(self, function_name: str, result: str) -> None:
+        """Configure custom result for a function (test helper)."""
+        self._sync.set_result(function_name, result)
+
+    def set_error(self, function_name: str, error_message: str) -> None:
+        """Configure error response for a function (test helper)."""
+        self._sync.set_error(function_name, error_message)
+
+    @property
+    def delay_seconds(self):
+        return self._sync.delay_seconds
+
+    @delay_seconds.setter
+    def delay_seconds(self, value):
+        self._sync.delay_seconds = value
+
+    @property
+    def call_count(self):
+        return self._sync.call_count
+
+    @property
+    def last_call(self):
+        return self._sync.last_call
+
+    @property
+    def all_calls(self):
+        return self._sync.all_calls
+
+    async def close(self) -> None:
+        """Close async resources (no-op for fake)."""
+        pass
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+class FakeAsyncChatSessionRepository:
+    """Async version that delegates to sync FakeChatSessionRepository.
+
+    Shares state with sync fake so tests can use either fixture.
+    """
+
+    def __init__(self, sync_repo: FakeChatSessionRepository) -> None:
+        self._sync = sync_repo
+
+    async def create(self, user_id: str, title: Optional[str] = None) -> Dict[str, Any]:
+        return self._sync.create(user_id, title)
+
+    async def get(self, session_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        return self._sync.get(session_id, user_id)
+
+    async def update_title(self, session_id: str, title: str) -> None:
+        return self._sync.update_title(session_id, title)
+
+    async def list_for_user(
+        self, user_id: str, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        return self._sync.list_for_user(user_id, limit, offset)
+
+    async def delete(self, session_id: str, user_id: str) -> bool:
+        return self._sync.delete(session_id, user_id)
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+class FakeAsyncChatMessageRepository:
+    """Async version that delegates to sync FakeChatMessageRepository.
+
+    Shares state with sync fake so tests can use either fixture.
+    """
+
+    def __init__(self, sync_repo: FakeChatMessageRepository) -> None:
+        self._sync = sync_repo
+
+    async def create(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        return self._sync.create(message)
+
+    async def list_for_session(
+        self,
+        session_id: str,
+        limit: int = 100,
+        before: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        return self._sync.list_for_session(session_id, limit, before)
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+class FakeAsyncRateLimitRepository:
+    """Async version that delegates to sync FakeRateLimitRepository.
+
+    Shares state with sync fake so tests can use either fixture.
+    """
+
+    def __init__(self, sync_repo: FakeRateLimitRepository) -> None:
+        self._sync = sync_repo
+
+    async def get_monthly_usage(self, user_id: str) -> int:
+        return self._sync.get_monthly_usage(user_id)
+
+    async def increment(self, user_id: str) -> int:
+        return self._sync.increment(user_id)
+
+    def set_usage(self, user_id: str, count: int) -> None:
+        """Test helper to preset usage."""
+        self._sync.set_usage(user_id, count)
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+class FakeAsyncTTSSettingsRepository:
+    """Async version that delegates to sync FakeTTSSettingsRepository.
+
+    Shares state with sync fake so tests can use either fixture.
+    """
+
+    def __init__(self, sync_repo: FakeTTSSettingsRepository) -> None:
+        self._sync = sync_repo
+
+    async def get_settings(self, user_id: str) -> TTSSettings:
+        return self._sync.get_settings(user_id)
+
+    async def update_settings(self, user_id: str, update: TTSSettingsUpdate) -> TTSSettings:
+        return self._sync.update_settings(user_id, update)
+
+    async def increment_daily_chars(self, user_id: str, chars: int) -> int:
+        return self._sync.increment_daily_chars(user_id, chars)
+
+    async def reset_daily_chars_if_needed(self, user_id: str) -> None:
+        self._sync.reset_daily_chars_if_needed(user_id)
+
+    def set_usage(self, user_id: str, chars: int) -> None:
+        self._sync.set_usage(user_id, chars)
+
+    def reset(self) -> None:
+        self._sync.reset()
+
+
+# ============================================================================
 # Shared fake instances (reset per test)
 # ============================================================================
 
@@ -785,6 +1035,14 @@ _embedding_service = FakeEmbeddingService()
 _function_dispatcher = FakeFunctionDispatcher()
 _tts_service = FakeTTSService()
 _tts_settings_repo = FakeTTSSettingsRepository()
+
+# Async fakes (AMA-505) - delegate to sync fakes for shared state
+_async_session_repo = FakeAsyncChatSessionRepository(_session_repo)
+_async_message_repo = FakeAsyncChatMessageRepository(_message_repo)
+_async_rate_limit_repo = FakeAsyncRateLimitRepository(_rate_limit_repo)
+_async_ai_client = FakeAsyncAIClient(_ai_client)
+_async_function_dispatcher = FakeAsyncFunctionDispatcher(_function_dispatcher)
+_async_tts_settings_repo = FakeAsyncTTSSettingsRepository(_tts_settings_repo)
 
 
 # ============================================================================
@@ -838,6 +1096,20 @@ def _override_stream_chat_use_case() -> StreamChatUseCase:
     )
 
 
+def _override_async_stream_chat_use_case() -> AsyncStreamChatUseCase:
+    """Override for async streaming use case (AMA-505)."""
+    return AsyncStreamChatUseCase(
+        session_repo=_async_session_repo,
+        message_repo=_async_message_repo,
+        rate_limit_repo=_async_rate_limit_repo,
+        ai_client=_async_ai_client,
+        function_dispatcher=_async_function_dispatcher,
+        monthly_limit=_test_settings.rate_limit_free,
+        tts_service=_tts_service,
+        tts_settings_repo=_async_tts_settings_repo,
+    )
+
+
 def _override_generate_embeddings_use_case() -> GenerateEmbeddingsUseCase:
     return GenerateEmbeddingsUseCase(
         repository=_embedding_repo,
@@ -853,7 +1125,11 @@ def _override_generate_embeddings_use_case() -> GenerateEmbeddingsUseCase:
 
 @pytest.fixture(autouse=True)
 def _reset_fakes():
-    """Reset all in-memory fakes before each test."""
+    """Reset all in-memory fakes before each test.
+
+    Sync fakes are reset directly. Async fakes delegate to sync fakes,
+    so they are automatically reset when the sync fakes are reset.
+    """
     _session_repo.reset()
     _message_repo.reset()
     _rate_limit_repo.reset()
@@ -884,6 +1160,7 @@ def app():
     application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
     application.dependency_overrides[get_chat_message_repository] = _override_chat_message_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
+    application.dependency_overrides[get_async_stream_chat_use_case] = _override_async_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
     yield application
@@ -897,6 +1174,7 @@ def noauth_app():
     application.dependency_overrides[get_chat_session_repository] = _override_chat_session_repository
     application.dependency_overrides[get_chat_message_repository] = _override_chat_message_repository
     application.dependency_overrides[get_stream_chat_use_case] = _override_stream_chat_use_case
+    application.dependency_overrides[get_async_stream_chat_use_case] = _override_async_stream_chat_use_case
     application.dependency_overrides[get_generate_embeddings_use_case] = _override_generate_embeddings_use_case
     application.dependency_overrides[get_settings] = _override_settings
     yield application
@@ -958,6 +1236,41 @@ def tts_service() -> FakeTTSService:
 @pytest.fixture
 def tts_settings_repo() -> FakeTTSSettingsRepository:
     return _tts_settings_repo
+
+
+# ============================================================================
+# Async fake fixtures (AMA-505)
+# ============================================================================
+
+
+@pytest.fixture
+def async_session_repo() -> FakeAsyncChatSessionRepository:
+    return _async_session_repo
+
+
+@pytest.fixture
+def async_message_repo() -> FakeAsyncChatMessageRepository:
+    return _async_message_repo
+
+
+@pytest.fixture
+def async_rate_limit_repo() -> FakeAsyncRateLimitRepository:
+    return _async_rate_limit_repo
+
+
+@pytest.fixture
+def async_ai_client() -> FakeAsyncAIClient:
+    return _async_ai_client
+
+
+@pytest.fixture
+def async_function_dispatcher() -> FakeAsyncFunctionDispatcher:
+    return _async_function_dispatcher
+
+
+@pytest.fixture
+def async_tts_settings_repo() -> FakeAsyncTTSSettingsRepository:
+    return _async_tts_settings_repo
 
 
 # ============================================================================

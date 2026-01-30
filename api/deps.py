@@ -11,12 +11,14 @@ Architecture:
 - Services and use cases are wired through dependency chains
 """
 
+import asyncio
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 
 from fastapi import Depends, Header
 from supabase import Client, create_client
+from supabase import AsyncClient, create_async_client
 
 from backend.settings import Settings, get_settings as _get_settings
 from backend.services.function_dispatcher import FunctionDispatcher
@@ -28,7 +30,7 @@ from backend.auth import (
     get_optional_user as _get_optional_user,
 )
 
-# Repositories
+# Repositories (sync)
 from infrastructure.db.embedding_repository import SupabaseEmbeddingRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
@@ -36,14 +38,23 @@ from infrastructure.db.rate_limit_repository import SupabaseRateLimitRepository
 from infrastructure.db.function_rate_limit_repository import SupabaseFunctionRateLimitRepository
 from infrastructure.db.tts_settings_repository import SupabaseTTSSettingsRepository
 
+# Repositories (async)
+from infrastructure.db.async_chat_session_repository import AsyncSupabaseChatSessionRepository
+from infrastructure.db.async_chat_message_repository import AsyncSupabaseChatMessageRepository
+from infrastructure.db.async_rate_limit_repository import AsyncSupabaseRateLimitRepository
+from infrastructure.db.async_function_rate_limit_repository import AsyncSupabaseFunctionRateLimitRepository
+from infrastructure.db.async_tts_settings_repository import AsyncSupabaseTTSSettingsRepository
+
 # Services
 from backend.services.embedding_service import EmbeddingService
-from backend.services.ai_client import AIClient
+from backend.services.ai_client import AIClient, AsyncAIClient
 from backend.services.tts_service import TTSService
+from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 
 # Use cases
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
 from application.use_cases.stream_chat import StreamChatUseCase
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
 
 
 # =============================================================================
@@ -104,6 +115,72 @@ def get_supabase_client_required() -> Client:
     from fastapi import HTTPException
 
     client = get_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not available. Supabase credentials not configured.",
+        )
+    return client
+
+
+# =============================================================================
+# Async Supabase Client Provider
+# =============================================================================
+
+# Async singleton state (lru_cache doesn't work with async functions)
+_async_supabase_client: Optional[AsyncClient] = None
+_async_supabase_lock = asyncio.Lock()
+
+
+async def get_supabase_async_client() -> Optional[AsyncClient]:
+    """
+    Get async Supabase client instance (thread-safe singleton).
+
+    Creates an async Supabase client using credentials from settings.
+    Returns None if credentials are not configured.
+
+    Uses asyncio.Lock to ensure only one client is created even under
+    concurrent access.
+
+    Returns:
+        AsyncClient: Async Supabase client instance, or None if not configured
+    """
+    global _async_supabase_client
+
+    if _async_supabase_client is not None:
+        return _async_supabase_client
+
+    async with _async_supabase_lock:
+        # Double-check pattern: another coroutine may have initialized while we waited
+        if _async_supabase_client is not None:
+            return _async_supabase_client
+
+        settings = _get_settings()
+        if not settings.supabase_url or not settings.supabase_key:
+            return None
+
+        _async_supabase_client = await create_async_client(
+            settings.supabase_url, settings.supabase_key
+        )
+        return _async_supabase_client
+
+
+async def get_supabase_async_client_required() -> AsyncClient:
+    """
+    Get async Supabase client instance, raising if not configured.
+
+    Use this dependency when the endpoint requires async database access.
+    Raises HTTPException 503 if database is not available.
+
+    Returns:
+        AsyncClient: Async Supabase client instance
+
+    Raises:
+        HTTPException: 503 if Supabase is not configured
+    """
+    from fastapi import HTTPException
+
+    client = await get_supabase_async_client()
     if client is None:
         raise HTTPException(
             status_code=503,
@@ -271,6 +348,50 @@ def get_function_rate_limit_repository(
 
 
 # =============================================================================
+# Async Repository Providers
+# =============================================================================
+
+
+async def get_async_chat_session_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+) -> AsyncSupabaseChatSessionRepository:
+    """Get async chat session repository instance."""
+    return AsyncSupabaseChatSessionRepository(client)
+
+
+async def get_async_chat_message_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+) -> AsyncSupabaseChatMessageRepository:
+    """Get async chat message repository instance."""
+    return AsyncSupabaseChatMessageRepository(client)
+
+
+async def get_async_rate_limit_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+) -> AsyncSupabaseRateLimitRepository:
+    """Get async rate limit repository instance."""
+    return AsyncSupabaseRateLimitRepository(client)
+
+
+async def get_async_function_rate_limit_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+) -> AsyncSupabaseFunctionRateLimitRepository:
+    """Get async function rate limit repository instance."""
+    return AsyncSupabaseFunctionRateLimitRepository(client)
+
+
+async def get_async_tts_settings_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+    settings: Settings = Depends(get_settings),
+) -> AsyncSupabaseTTSSettingsRepository:
+    """Get async TTS settings repository instance."""
+    return AsyncSupabaseTTSSettingsRepository(
+        client=client,
+        daily_char_limit=settings.tts_daily_char_limit,
+    )
+
+
+# =============================================================================
 # Service Providers
 # =============================================================================
 
@@ -355,6 +476,46 @@ def get_tts_settings_repository(
 
 
 # =============================================================================
+# Async Service Providers
+# =============================================================================
+
+
+@lru_cache
+def get_async_ai_client() -> AsyncAIClient:
+    """Get cached async AI client instance."""
+    settings = _get_settings()
+    if not settings.anthropic_api_key:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+    return AsyncAIClient(
+        api_key=settings.anthropic_api_key,
+        helicone_api_key=settings.helicone_api_key,
+        helicone_enabled=settings.helicone_enabled,
+        default_model=settings.default_model,
+    )
+
+
+async def get_async_function_dispatcher(
+    function_rate_limit_repo: AsyncSupabaseFunctionRateLimitRepository = Depends(
+        get_async_function_rate_limit_repository
+    ),
+    feature_flags: FeatureFlagService = Depends(get_feature_flag_service),
+    settings: Settings = Depends(get_settings),
+) -> AsyncFunctionDispatcher:
+    """Get async function dispatcher for tool execution with rate limiting and feature flags."""
+    return AsyncFunctionDispatcher(
+        mapper_api_url=settings.mapper_api_url,
+        calendar_api_url=settings.calendar_api_url,
+        ingestor_api_url=settings.workout_ingestor_api_url,
+        timeout=settings.function_timeout_seconds,
+        strava_sync_api_url=settings.strava_sync_api_url,
+        garmin_sync_api_url=settings.garmin_sync_api_url,
+        function_rate_limit_repo=function_rate_limit_repo,
+        feature_flag_service=feature_flags,
+        sync_rate_limit_per_hour=settings.sync_rate_limit_per_hour,
+    )
+
+
+# =============================================================================
 # Use Case Providers
 # =============================================================================
 
@@ -399,6 +560,33 @@ def get_stream_chat_use_case(
     )
 
 
+async def get_async_stream_chat_use_case(
+    session_repo: AsyncSupabaseChatSessionRepository = Depends(get_async_chat_session_repository),
+    message_repo: AsyncSupabaseChatMessageRepository = Depends(get_async_chat_message_repository),
+    rate_limit_repo: AsyncSupabaseRateLimitRepository = Depends(get_async_rate_limit_repository),
+    ai_client: AsyncAIClient = Depends(get_async_ai_client),
+    dispatcher: AsyncFunctionDispatcher = Depends(get_async_function_dispatcher),
+    feature_flags: FeatureFlagService = Depends(get_feature_flag_service),
+    tts_settings_repo: AsyncSupabaseTTSSettingsRepository = Depends(get_async_tts_settings_repository),
+    settings: Settings = Depends(get_settings),
+) -> AsyncStreamChatUseCase:
+    """Get async stream chat use case with optional TTS support."""
+    # Get TTS service (may be None if not configured)
+    tts_service = get_tts_service()
+
+    return AsyncStreamChatUseCase(
+        session_repo=session_repo,
+        message_repo=message_repo,
+        rate_limit_repo=rate_limit_repo,
+        ai_client=ai_client,
+        function_dispatcher=dispatcher,
+        feature_flag_service=feature_flags,
+        monthly_limit=settings.rate_limit_free,
+        tts_service=tts_service,
+        tts_settings_repo=tts_settings_repo,
+    )
+
+
 # =============================================================================
 # Exports
 # =============================================================================
@@ -406,9 +594,12 @@ def get_stream_chat_use_case(
 __all__ = [
     # Settings
     "get_settings",
-    # Database
+    # Database (sync)
     "get_supabase_client",
     "get_supabase_client_required",
+    # Database (async)
+    "get_supabase_async_client",
+    "get_supabase_async_client_required",
     # Authentication
     "AuthContext",
     "get_auth_context",
@@ -416,20 +607,30 @@ __all__ = [
     "get_optional_user",
     # AI
     "get_ai_client_factory",
-    # Repositories
+    # Repositories (sync)
     "get_embedding_repository",
     "get_chat_session_repository",
     "get_chat_message_repository",
     "get_rate_limit_repository",
     "get_function_rate_limit_repository",
     "get_tts_settings_repository",
-    # Services
+    # Repositories (async)
+    "get_async_chat_session_repository",
+    "get_async_chat_message_repository",
+    "get_async_rate_limit_repository",
+    "get_async_function_rate_limit_repository",
+    "get_async_tts_settings_repository",
+    # Services (sync)
     "get_embedding_service",
     "get_ai_client",
     "get_function_dispatcher",
     "get_feature_flag_service",
     "get_tts_service",
+    # Services (async)
+    "get_async_ai_client",
+    "get_async_function_dispatcher",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",
+    "get_async_stream_chat_use_case",
 ]

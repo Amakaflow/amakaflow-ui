@@ -19,10 +19,10 @@ from api.deps import (
     get_chat_message_repository,
     get_chat_session_repository,
     get_current_user,
-    get_stream_chat_use_case,
+    get_async_stream_chat_use_case,
     AuthContext,
 )
-from application.use_cases.stream_chat import StreamChatUseCase
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
 from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 
@@ -66,10 +66,10 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/stream")
-def stream_chat(
+async def stream_chat(
     body: ChatRequest,
     auth: AuthContext = Depends(get_auth_context),
-    use_case: StreamChatUseCase = Depends(get_stream_chat_use_case),
+    use_case: AsyncStreamChatUseCase = Depends(get_async_stream_chat_use_case),
 ):
     """Stream a chat response as Server-Sent Events.
 
@@ -78,12 +78,13 @@ def stream_chat(
     - content_delta: Incremental text
     - function_call: Tool invocation
     - function_result: Tool result
+    - heartbeat: Periodic heartbeat during long tool execution
     - message_end: Final stats
     - error: Error details
     """
 
-    def event_generator():
-        for sse_event in use_case.execute(
+    async def event_generator():
+        async for sse_event in use_case.execute(
             user_id=auth.user_id,
             message=body.message,
             session_id=body.session_id,

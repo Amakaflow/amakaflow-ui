@@ -48,11 +48,21 @@ from tests.e2e.conftest import (  # noqa: E402
     FakeChatMessageRepository,
     FakeRateLimitRepository,
     FakeFunctionDispatcher,
+    FakeAsyncChatSessionRepository,
+    FakeAsyncChatMessageRepository,
+    FakeAsyncRateLimitRepository,
+    FakeAsyncAIClient,
+    FakeAsyncFunctionDispatcher,
     _ai_client,
     _session_repo,
     _message_repo,
     _rate_limit_repo,
     _function_dispatcher,
+    _async_session_repo,
+    _async_message_repo,
+    _async_rate_limit_repo,
+    _async_ai_client,
+    _async_function_dispatcher,
     _make_test_settings,
     _override_auth,
     _override_auth_context,
@@ -64,9 +74,11 @@ from api.deps import (  # noqa: E402
     get_current_user as deps_get_current_user,
     get_auth_context,
     get_stream_chat_use_case,
+    get_async_stream_chat_use_case,
     get_settings,
 )
 from application.use_cases.stream_chat import StreamChatUseCase  # noqa: E402
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase  # noqa: E402
 
 
 # =============================================================================
@@ -289,6 +301,19 @@ def _override_settings():
     return _test_settings
 
 
+def _override_async_stream_chat_use_case_with_flags() -> AsyncStreamChatUseCase:
+    """Create AsyncStreamChatUseCase with FakeFeatureFlagService injected."""
+    return AsyncStreamChatUseCase(
+        session_repo=_async_session_repo,
+        message_repo=_async_message_repo,
+        rate_limit_repo=_async_rate_limit_repo,
+        ai_client=_async_ai_client,
+        function_dispatcher=_async_function_dispatcher,
+        feature_flag_service=_feature_flag_service,
+        monthly_limit=_test_settings.rate_limit_free,
+    )
+
+
 @pytest.fixture(scope="module")
 def feature_flag_app():
     """Create FastAPI app with feature flag service dependency override."""
@@ -298,6 +323,9 @@ def feature_flag_app():
     application.dependency_overrides[get_auth_context] = _override_auth_context
     application.dependency_overrides[get_stream_chat_use_case] = (
         _override_stream_chat_use_case_with_flags
+    )
+    application.dependency_overrides[get_async_stream_chat_use_case] = (
+        _override_async_stream_chat_use_case_with_flags
     )
     application.dependency_overrides[get_settings] = _override_settings
     yield application

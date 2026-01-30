@@ -15,9 +15,11 @@ from api.deps import (
     get_chat_message_repository,
     get_chat_session_repository,
     get_stream_chat_use_case,
+    get_async_stream_chat_use_case,
     AuthContext,
 )
 from application.use_cases.stream_chat import StreamChatUseCase, SSEEvent
+from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
 from infrastructure.db.chat_message_repository import SupabaseChatMessageRepository
 from infrastructure.db.chat_session_repository import SupabaseChatSessionRepository
 
@@ -60,11 +62,34 @@ def mock_stream_use_case():
 
 
 @pytest.fixture
-def chat_client(chat_app, mock_stream_use_case):
+def mock_async_stream_use_case():
+    calls = []
+
+    async def _mock_execute(*args, **kwargs):
+        calls.append(kwargs)
+        yield SSEEvent(event="message_start", data=json.dumps({"session_id": "sess-1"}))
+        yield SSEEvent(event="content_delta", data=json.dumps({"text": "Hello!"}))
+        yield SSEEvent(event="message_end", data=json.dumps({
+            "session_id": "sess-1",
+            "tokens_used": 150,
+            "latency_ms": 1000,
+        }))
+
+    uc = MagicMock(spec=AsyncStreamChatUseCase)
+    uc.execute = _mock_execute
+    uc.execute_calls = calls
+    return uc
+
+
+@pytest.fixture
+def chat_client(chat_app, mock_stream_use_case, mock_async_stream_use_case):
     chat_app.dependency_overrides[backend_get_current_user] = mock_auth
     chat_app.dependency_overrides[deps_get_current_user] = mock_auth
     chat_app.dependency_overrides[get_auth_context] = mock_auth_context
     chat_app.dependency_overrides[get_stream_chat_use_case] = lambda: mock_stream_use_case
+    chat_app.dependency_overrides[get_async_stream_chat_use_case] = (
+        lambda: mock_async_stream_use_case
+    )
     yield TestClient(chat_app)
     chat_app.dependency_overrides.clear()
 
@@ -147,21 +172,21 @@ class TestChatStream:
         assert "tokens_used" in end_data
         assert "latency_ms" in end_data
 
-    def test_with_session_id(self, chat_client, mock_stream_use_case):
+    def test_with_session_id(self, chat_client, mock_async_stream_use_case):
         response = chat_client.post(
             "/chat/stream",
             json={"message": "Hello", "session_id": "sess-existing"},
         )
         assert response.status_code == 200
-        mock_stream_use_case.execute.assert_called_once_with(
-            user_id=TEST_USER_ID,
-            message="Hello",
-            session_id="sess-existing",
-            auth_token="Bearer test-token",
-            context=None,
-        )
+        assert len(mock_async_stream_use_case.execute_calls) == 1
+        call = mock_async_stream_use_case.execute_calls[0]
+        assert call["user_id"] == TEST_USER_ID
+        assert call["message"] == "Hello"
+        assert call["session_id"] == "sess-existing"
+        assert call["auth_token"] == "Bearer test-token"
+        assert call["context"] is None
 
-    def test_with_context(self, chat_client, mock_stream_use_case):
+    def test_with_context(self, chat_client, mock_async_stream_use_case):
         """Context is passed to use case when provided."""
         response = chat_client.post(
             "/chat/stream",
@@ -175,17 +200,17 @@ class TestChatStream:
             },
         )
         assert response.status_code == 200
-        mock_stream_use_case.execute.assert_called_once_with(
-            user_id=TEST_USER_ID,
-            message="Tell me about this workout",
-            session_id="sess-1",
-            auth_token="Bearer test-token",
-            context={
-                "current_page": "workout_detail",
-                "selected_workout_id": "workout-abc123",
-                "selected_date": None,
-            },
-        )
+        assert len(mock_async_stream_use_case.execute_calls) == 1
+        call = mock_async_stream_use_case.execute_calls[0]
+        assert call["user_id"] == TEST_USER_ID
+        assert call["message"] == "Tell me about this workout"
+        assert call["session_id"] == "sess-1"
+        assert call["auth_token"] == "Bearer test-token"
+        assert call["context"] == {
+            "current_page": "workout_detail",
+            "selected_workout_id": "workout-abc123",
+            "selected_date": None,
+        }
 
     def test_empty_message_returns_422(self, chat_client):
         response = chat_client.post(
@@ -314,10 +339,27 @@ class TestChatRateLimit:
             ),
         ])
 
+        async def _mock_async_execute(*args, **kwargs):
+            yield SSEEvent(
+                event="error",
+                data=json.dumps({
+                    "type": "rate_limit_exceeded",
+                    "message": "Monthly limit reached.",
+                    "usage": 50,
+                    "limit": 50,
+                }),
+            )
+
+        async_mock_uc = MagicMock(spec=AsyncStreamChatUseCase)
+        async_mock_uc.execute = _mock_async_execute
+
         chat_app.dependency_overrides[backend_get_current_user] = mock_auth
         chat_app.dependency_overrides[deps_get_current_user] = mock_auth
         chat_app.dependency_overrides[get_auth_context] = mock_auth_context
         chat_app.dependency_overrides[get_stream_chat_use_case] = lambda: mock_uc
+        chat_app.dependency_overrides[get_async_stream_chat_use_case] = (
+            lambda: async_mock_uc
+        )
 
         test_client = TestClient(chat_app)
         response = test_client.post("/chat/stream", json={"message": "Hello"})

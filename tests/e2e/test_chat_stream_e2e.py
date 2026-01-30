@@ -752,7 +752,9 @@ class TestChatStreamHeartbeat:
         # Configure dispatcher to delay (simulating slow tool)
         function_dispatcher.delay_seconds = 0.5
 
-        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
+        # Patch both sync and async use case modules (endpoint uses async)
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3), \
+             patch("application.use_cases.async_stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
             response = client.post("/chat/stream", json={"message": "Search"})
 
         events = parse_sse_events(response.text)
@@ -767,6 +769,7 @@ class TestChatStreamHeartbeat:
         assert heartbeat["tool_name"] == "search_workout_library"
         assert "elapsed_seconds" in heartbeat
         assert isinstance(heartbeat["elapsed_seconds"], int)
+        assert 0 <= heartbeat["elapsed_seconds"] <= 10  # Reasonable bounds for test
 
     def test_heartbeat_preserves_event_sequence(
         self, client, ai_client, function_dispatcher
@@ -788,7 +791,9 @@ class TestChatStreamHeartbeat:
 
         function_dispatcher.delay_seconds = 0.5
 
-        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
+        # Patch both sync and async use case modules (endpoint uses async)
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3), \
+             patch("application.use_cases.async_stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
             response = client.post("/chat/stream", json={"message": "Import video"})
 
         events = parse_sse_events(response.text)
