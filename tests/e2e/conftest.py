@@ -361,7 +361,7 @@ class FakeFunctionDispatcher:
     """Deterministic function dispatcher for E2E tests.
 
     Returns predictable results for each tool. Can be configured per test.
-    Supports error injection and auth token capture for verification.
+    Supports error injection, auth token capture, and delay simulation for heartbeat testing.
     """
 
     def __init__(self) -> None:
@@ -370,6 +370,7 @@ class FakeFunctionDispatcher:
         self.all_calls: List[Dict[str, Any]] = []
         self.custom_results: Dict[str, str] = {}
         self.error_results: Dict[str, str] = {}
+        self.delay_seconds: float = 0.0  # For heartbeat testing (AMA-504)
 
     def execute(
         self,
@@ -377,6 +378,8 @@ class FakeFunctionDispatcher:
         arguments: Dict[str, Any],
         context: FunctionContext,
     ) -> str:
+        import time
+
         self.call_count += 1
         call_info = {
             "function_name": function_name,
@@ -386,6 +389,10 @@ class FakeFunctionDispatcher:
         }
         self.last_call = call_info
         self.all_calls.append(call_info)
+
+        # Simulate slow execution for heartbeat testing (AMA-504)
+        if self.delay_seconds > 0:
+            time.sleep(self.delay_seconds)
 
         # Return error if configured
         if function_name in self.error_results:
@@ -593,6 +600,7 @@ class FakeFunctionDispatcher:
         self.all_calls.clear()
         self.custom_results.clear()
         self.error_results.clear()
+        self.delay_seconds = 0.0
 
 
 class FakeTTSService:

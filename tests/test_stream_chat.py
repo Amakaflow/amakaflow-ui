@@ -1920,3 +1920,373 @@ class TestStreamChatContext:
         assert "workout ID: workout-abc123" in system_prompt
         # Should NOT include calendar date context
         assert "2024-01-15" not in system_prompt
+
+
+class TestStreamChatHeartbeat:
+    """Tests for SSE heartbeat during tool execution (AMA-504)."""
+
+    def test_fast_tool_no_heartbeat(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, mock_function_dispatcher
+    ):
+        """Fast tool execution (< 5s) should NOT emit heartbeat events."""
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
+            StreamEvent(event="content_delta", data={"text": "Here are your results."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "latency_ms": 1500,
+            }),
+        ])
+
+        # Fast execution - returns immediately
+        mock_function_dispatcher.execute.return_value = "Found workouts"
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        events = list(use_case.execute(user_id="user-1", message="Find leg workouts"))
+        event_types = [e.event for e in events]
+
+        # Should NOT have heartbeat events (tool completed quickly)
+        assert "heartbeat" not in event_types
+
+        # Should still have normal events
+        assert "function_call" in event_types
+        assert "function_result" in event_types
+        assert "message_end" in event_types
+
+    @pytest.mark.parametrize("heartbeat_interval", [0.5])  # Use 0.5s interval for faster tests
+    def test_slow_tool_emits_heartbeat(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo, heartbeat_interval
+    ):
+        """Slow tool execution (> heartbeat interval) should emit heartbeat events."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "import_from_youtube"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"url": "https://youtube.com/watch?v=abc"}'}),
+            StreamEvent(event="content_delta", data={"text": "Import complete."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "latency_ms": 8000,
+            }),
+        ])
+
+        # Slow execution - takes longer than heartbeat interval
+        def slow_execute(name, args, ctx):
+            time.sleep(0.7)  # Slightly longer than heartbeat_interval
+            return "Import successful"
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = slow_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", heartbeat_interval):
+            events = list(use_case.execute(user_id="user-1", message="Import from YouTube"))
+
+        event_types = [e.event for e in events]
+
+        # Should have at least one heartbeat event
+        assert "heartbeat" in event_types
+
+        # Check heartbeat event content
+        heartbeat = next(e for e in events if e.event == "heartbeat")
+        data = json.loads(heartbeat.data)
+
+        assert data["status"] == "executing_tool"
+        assert data["tool_name"] == "import_from_youtube"
+        assert "elapsed_seconds" in data
+
+    def test_heartbeat_shows_correct_tool_name(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+    ):
+        """Heartbeat event should contain the correct tool name."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "sync_strava"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "latency_ms": 6000,
+            }),
+        ])
+
+        def slow_execute(name, args, ctx):
+            time.sleep(0.7)
+            return "Sync complete"
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = slow_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.5):
+            events = list(use_case.execute(user_id="user-1", message="Sync my Strava"))
+
+        heartbeat = next(e for e in events if e.event == "heartbeat")
+        data = json.loads(heartbeat.data)
+
+        assert data["tool_name"] == "sync_strava"
+
+    def test_multiple_heartbeats_for_very_long_execution(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+    ):
+        """Very long tool execution should emit multiple heartbeats."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "import_from_youtube"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"url": "https://youtube.com/watch?v=abc"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "latency_ms": 12000,
+            }),
+        ])
+
+        # Takes 1.2s with 0.5s heartbeat interval - should get 2 heartbeats
+        def very_slow_execute(name, args, ctx):
+            time.sleep(1.2)
+            return "Import successful"
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = very_slow_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.5):
+            events = list(use_case.execute(user_id="user-1", message="Import from YouTube"))
+
+        heartbeats = [e for e in events if e.event == "heartbeat"]
+
+        # Should have at least 2 heartbeats (0.5s interval, 1.2s execution)
+        assert len(heartbeats) >= 2
+
+        # Check elapsed times are increasing
+        elapsed_times = [json.loads(hb.data)["elapsed_seconds"] for hb in heartbeats]
+        for i in range(1, len(elapsed_times)):
+            assert elapsed_times[i] >= elapsed_times[i - 1]
+
+    def test_heartbeat_does_not_affect_function_result(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+    ):
+        """Heartbeats should not affect the function_result event."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "cardio"}'}),
+            StreamEvent(event="content_delta", data={"text": "Found workouts."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "latency_ms": 6000,
+            }),
+        ])
+
+        expected_result = "Found: HIIT Cardio (ID: w-123)"
+
+        def slow_execute(name, args, ctx):
+            time.sleep(0.7)  # Slightly longer than patched heartbeat interval
+            return expected_result
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = slow_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.5):
+            events = list(use_case.execute(user_id="user-1", message="Find cardio workouts"))
+
+        # Verify function_result still has correct data
+        fr = next(e for e in events if e.event == "function_result")
+        data = json.loads(fr.data)
+
+        assert data["result"] == expected_result
+        assert data["name"] == "search_workout_library"
+
+    def test_tool_exception_during_heartbeat_loop(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+    ):
+        """Tool exception during heartbeat loop should propagate and not be swallowed."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        mock_ai_client.stream_chat.return_value = iter([
+            StreamEvent(event="function_call", data={"id": "tool-1", "name": "import_from_youtube"}),
+            StreamEvent(event="content_delta", data={"partial_json": '{"url": "https://youtube.com/watch?v=abc"}'}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "latency_ms": 1000,
+            }),
+        ])
+
+        # Tool that raises an exception after a delay (to ensure heartbeat loop runs)
+        def failing_execute(name, args, ctx):
+            time.sleep(0.7)  # Slightly longer than patched heartbeat interval
+            raise RuntimeError("Simulated tool failure")
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = failing_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.5):
+            events = list(use_case.execute(user_id="user-1", message="Import video"))
+
+        event_types = [e.event for e in events]
+
+        # Should have heartbeat before error (tool ran long enough)
+        assert "heartbeat" in event_types
+
+        # Should have function_result with error (exception caught and returned as error)
+        assert "function_result" in event_types
+        fr = next(e for e in events if e.event == "function_result")
+        fr_data = json.loads(fr.data)
+
+        # The result should be a JSON string with error info
+        result_data = json.loads(fr_data["result"])
+        assert result_data["error"] is True
+        assert result_data["code"] == "execution_error"
+        assert "Simulated tool failure" in result_data["message"]
+
+    def test_multiple_sequential_tools_with_heartbeats(
+        self, mock_session_repo, mock_message_repo, mock_rate_limit_repo
+    ):
+        """Multiple slow tools in sequence should each emit their own heartbeats."""
+        import time
+        from unittest.mock import patch
+
+        mock_ai_client = MagicMock()
+        # Two-turn tool loop: each tool call triggers heartbeats
+        mock_ai_client.stream_chat.side_effect = [
+            # First turn: first tool
+            iter([
+                StreamEvent(event="function_call", data={"id": "tool-1", "name": "search_workout_library"}),
+                StreamEvent(event="content_delta", data={"partial_json": '{"query": "legs"}'}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "latency_ms": 500,
+                    "stop_reason": "tool_use",
+                }),
+            ]),
+            # Second turn: second tool
+            iter([
+                StreamEvent(event="function_call", data={"id": "tool-2", "name": "add_workout_to_calendar"}),
+                StreamEvent(event="content_delta", data={"partial_json": '{"date": "2024-01-15"}'}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 150,
+                    "output_tokens": 60,
+                    "latency_ms": 600,
+                    "stop_reason": "tool_use",
+                }),
+            ]),
+            # Third turn: final response
+            iter([
+                StreamEvent(event="content_delta", data={"text": "Done!"}),
+                StreamEvent(event="message_end", data={
+                    "model": "claude-sonnet-4-20250514",
+                    "input_tokens": 200,
+                    "output_tokens": 10,
+                    "latency_ms": 200,
+                    "stop_reason": "end_turn",
+                }),
+            ]),
+        ]
+
+        # Each tool takes 0.7s (triggers heartbeat with 0.5s interval)
+        call_count = [0]
+
+        def slow_execute(name, args, ctx):
+            call_count[0] += 1
+            time.sleep(0.7)
+            if name == "search_workout_library":
+                return "Found leg workouts"
+            return "Added to calendar"
+
+        mock_function_dispatcher = MagicMock()
+        mock_function_dispatcher.execute.side_effect = slow_execute
+
+        use_case = StreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_function_dispatcher,
+        )
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.5):
+            events = list(use_case.execute(user_id="user-1", message="Find and schedule leg workout"))
+
+        # Both tools should have been called
+        assert call_count[0] == 2
+
+        # Should have heartbeats for both tools
+        heartbeats = [e for e in events if e.event == "heartbeat"]
+        assert len(heartbeats) >= 2  # At least one per slow tool
+
+        # Verify heartbeats have correct tool names
+        heartbeat_tool_names = [json.loads(hb.data)["tool_name"] for hb in heartbeats]
+        assert "search_workout_library" in heartbeat_tool_names
+        assert "add_workout_to_calendar" in heartbeat_tool_names

@@ -2,11 +2,14 @@
 
 Orchestrates: rate limit check -> session management -> Claude streaming -> persistence.
 Updated in AMA-442 to support TTS voice responses.
+Updated in AMA-504 to add heartbeats during tool execution.
 """
 
 import base64
 import json
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
 
@@ -23,6 +26,9 @@ if TYPE_CHECKING:
     from infrastructure.db.tts_settings_repository import SupabaseTTSSettingsRepository
 
 logger = logging.getLogger(__name__)
+
+# Heartbeat interval in seconds during tool execution (AMA-504)
+HEARTBEAT_INTERVAL_SECONDS = 5
 
 SYSTEM_PROMPT = """You are an expert fitness coach and workout planning assistant for AmakaFlow.
 
@@ -294,10 +300,43 @@ class StreamChatUseCase:
                     "input": tool_use["input"],
                 })
 
-                # Execute tool
-                result = self._dispatcher.execute(
-                    tool_use["name"], tool_use["input"], fn_context
-                )
+                # Execute tool with heartbeats (AMA-504)
+                # Run tool execution in background thread, yield heartbeats while waiting
+                tool_name = tool_use["name"]
+                tool_start_time = time.time()
+                result: str = ""
+
+                try:
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        future: Future = executor.submit(
+                            self._dispatcher.execute,
+                            tool_name,
+                            tool_use["input"],
+                            fn_context,
+                        )
+
+                        # Wait for completion, yielding heartbeats every HEARTBEAT_INTERVAL_SECONDS
+                        while True:
+                            try:
+                                # Wait for result with timeout
+                                result = future.result(timeout=HEARTBEAT_INTERVAL_SECONDS)
+                                break  # Tool completed successfully
+                            except TimeoutError:
+                                # Tool still running - yield heartbeat and continue waiting
+                                elapsed = int(time.time() - tool_start_time)
+                                yield _sse("heartbeat", {
+                                    "status": "executing_tool",
+                                    "tool_name": tool_name,
+                                    "elapsed_seconds": elapsed,
+                                })
+                except Exception as e:
+                    # Tool execution failed - return error result
+                    logger.exception("Tool %s failed", tool_name)
+                    result = json.dumps({
+                        "error": True,
+                        "code": "execution_error",
+                        "message": f"Tool execution failed: {e}",
+                    })
 
                 # Yield result to client
                 yield _sse("function_result", {

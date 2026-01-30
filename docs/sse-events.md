@@ -99,6 +99,38 @@ See [functions.md](./functions.md) for complete function documentation.
 
 ---
 
+### heartbeat
+
+Sent during long-running tool execution to keep the connection alive (AMA-504). Emitted every 5 seconds while a tool is executing.
+
+```json
+{
+  "status": "executing_tool",
+  "tool_name": "import_from_youtube",
+  "elapsed_seconds": 5
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Always `"executing_tool"` |
+| `tool_name` | string | Name of the currently executing tool |
+| `elapsed_seconds` | integer | Seconds since tool execution started |
+
+**Client Implementation:**
+
+```typescript
+case 'heartbeat':
+  setToolStatus({
+    executing: true,
+    toolName: data.tool_name,
+    elapsed: data.elapsed_seconds
+  });
+  break;
+```
+
+---
+
 ### function_result
 
 Result from a function execution.
@@ -191,8 +223,10 @@ message_start → content_delta* → message_end
 ### With Function Calls
 
 ```
-message_start → content_delta* → function_call → function_result → content_delta* → message_end
+message_start → content_delta* → function_call → heartbeat* → function_result → content_delta* → message_end
 ```
+
+**Note:** `heartbeat` events appear during long-running tool executions (>5 seconds). Fast tools complete without heartbeats.
 
 ### Error Flow
 
@@ -328,7 +362,7 @@ function handleFunctionResult(data: FunctionResult) {
 
 ## Timeouts and Reconnection
 
-- **Heartbeat:** The server sends a heartbeat ping every 30 seconds to keep the connection alive
+- **Tool Heartbeat (AMA-504):** During long-running tool executions, the server sends `heartbeat` events every 5 seconds to prevent connection timeouts
 - **Client timeout:** Recommended 60 second timeout for idle connections
 - **Reconnection:** If disconnected, create a new request (SSE does not support resumption)
 

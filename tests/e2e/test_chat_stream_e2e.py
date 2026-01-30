@@ -38,6 +38,7 @@ from tests.e2e.conftest import (
     FakeChatSessionRepository,
     FakeChatMessageRepository,
     FakeRateLimitRepository,
+    FakeFunctionDispatcher,
     parse_sse_events,
     extract_event_types,
     find_events,
@@ -713,3 +714,129 @@ class TestChatStreamRateLimitAtomicBehavior:
         # This test documents expected behavior - adjust if implementation differs
         current_usage = rate_limit_repo.get_monthly_usage(TEST_USER_ID)
         assert current_usage <= 6  # At most 1 increment (from the attempt)
+
+
+# ============================================================================
+# HEARTBEAT TESTS -- SSE heartbeat during tool execution (AMA-504)
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+class TestChatStreamHeartbeat:
+    """E2E tests for heartbeat events during tool execution (AMA-504).
+
+    These tests verify that heartbeat events are correctly serialized
+    in the HTTP SSE response and maintain the expected event sequence.
+    """
+
+    def test_heartbeat_event_format_in_sse_stream(
+        self, client, ai_client, function_dispatcher
+    ):
+        """Slow tool execution emits correctly formatted heartbeat SSE events."""
+        from unittest.mock import patch
+
+        # Configure AI to trigger a tool call
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-slow", "name": "search_workout_library"
+            }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "test"}'}),
+            StreamEvent(event="content_delta", data={"text": "Results found."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100, "output_tokens": 50, "latency_ms": 1000,
+            }),
+        ]
+
+        # Configure dispatcher to delay (simulating slow tool)
+        function_dispatcher.delay_seconds = 0.5
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
+            response = client.post("/chat/stream", json={"message": "Search"})
+
+        events = parse_sse_events(response.text)
+        types = extract_event_types(events)
+
+        # Verify heartbeat appears in stream
+        assert "heartbeat" in types
+
+        # Verify heartbeat event structure
+        heartbeat = find_events(events, "heartbeat")[0]["data"]
+        assert heartbeat["status"] == "executing_tool"
+        assert heartbeat["tool_name"] == "search_workout_library"
+        assert "elapsed_seconds" in heartbeat
+        assert isinstance(heartbeat["elapsed_seconds"], int)
+
+    def test_heartbeat_preserves_event_sequence(
+        self, client, ai_client, function_dispatcher
+    ):
+        """Heartbeats do not disrupt required SSE event sequence."""
+        from unittest.mock import patch
+
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-1", "name": "import_from_youtube"
+            }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"url": "https://youtube.com/watch?v=abc"}'}),
+            StreamEvent(event="content_delta", data={"text": "Import complete."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 150, "output_tokens": 60, "latency_ms": 1500,
+            }),
+        ]
+
+        function_dispatcher.delay_seconds = 0.5
+
+        with patch("application.use_cases.stream_chat.HEARTBEAT_INTERVAL_SECONDS", 0.3):
+            response = client.post("/chat/stream", json={"message": "Import video"})
+
+        events = parse_sse_events(response.text)
+        types = extract_event_types(events)
+
+        # Verify required event sequence
+        assert types[0] == "message_start"
+        assert types[-1] == "message_end"
+
+        # function_call must come before heartbeat(s) and function_result
+        fc_idx = types.index("function_call")
+        hb_idx = types.index("heartbeat")
+        fr_idx = types.index("function_result")
+
+        assert fc_idx < hb_idx, "function_call must come before heartbeat"
+        assert hb_idx < fr_idx, "heartbeat must come before function_result"
+
+        # Verify function_result still contains correct data
+        fr = find_events(events, "function_result")[0]["data"]
+        assert fr["name"] == "import_from_youtube"
+        assert "success" in fr["result"]  # FakeFunctionDispatcher returns JSON with success
+
+    def test_fast_tool_no_heartbeat_e2e(self, client, ai_client, function_dispatcher):
+        """Fast tool execution (< heartbeat interval) should NOT emit heartbeat events."""
+        ai_client.response_events = [
+            StreamEvent(event="function_call", data={
+                "id": "tool-fast", "name": "search_workout_library"
+            }),
+            StreamEvent(event="content_delta", data={"partial_json": '{"query": "quick"}'}),
+            StreamEvent(event="content_delta", data={"text": "Found workouts."}),
+            StreamEvent(event="message_end", data={
+                "model": "claude-sonnet-4-20250514",
+                "input_tokens": 100, "output_tokens": 50, "latency_ms": 500,
+            }),
+        ]
+
+        # No delay - tool completes immediately
+        function_dispatcher.delay_seconds = 0.0
+
+        response = client.post("/chat/stream", json={"message": "Quick search"})
+
+        events = parse_sse_events(response.text)
+        types = extract_event_types(events)
+
+        # Should NOT have heartbeat events
+        assert "heartbeat" not in types
+
+        # Should still have normal events
+        assert "function_call" in types
+        assert "function_result" in types
+        assert "message_end" in types
