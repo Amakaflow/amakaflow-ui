@@ -1,13 +1,15 @@
 /**
- * ChatPanel — floating chat overlay (bottom-right).
+ * ChatPanel — Right-side panel chat interface (AMA-508)
  *
- * - Trigger button: fixed bottom-right, circular with MessageSquare icon
- * - Panel: fixed position, ~400px wide, ~600px tall
- * - Header: "AI Assistant" title + clear/close buttons
- * - Message list: ScrollArea for messages with auto-scroll
- * - Input area: ChatInput component
- * - Mobile: full-screen mode via media query
- * - Feature flags: Respects beta rollout configuration (AMA-437)
+ * Full-height side panel (380px wide) that slides in from the right.
+ * Main content shrinks via ChatAwareLayout to prevent overlap.
+ *
+ * Features:
+ * - Smooth slide-in animation
+ * - Header with clear/close buttons
+ * - Scrollable message list with auto-scroll
+ * - ChatInput for sending messages
+ * - Respects feature flag beta rollout (AMA-437)
  */
 
 import { useRef, useEffect } from 'react';
@@ -54,11 +56,11 @@ export function ChatPanel() {
 
   return (
     <>
-      {/* Trigger button */}
+      {/* Trigger button - bottom left corner */}
       {!state.isOpen && (
         <button
           onClick={togglePanel}
-          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8"
+          className="fixed bottom-6 left-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
           aria-label="Open chat"
           data-testid="chat-trigger-button"
         >
@@ -66,12 +68,13 @@ export function ChatPanel() {
         </button>
       )}
 
-      {/* Chat panel */}
+
+      {/* Chat panel - Right side panel on desktop */}
       {state.isOpen && (
         <div
-          className="fixed bottom-0 right-0 z-50 flex flex-col bg-card border shadow-xl
-          w-full h-full
-          md:bottom-6 md:right-6 md:w-[400px] md:h-[600px] md:rounded-lg md:max-h-[calc(100vh-48px)]"
+          className="fixed z-50 flex flex-col overflow-hidden bg-card shadow-xl border-l
+            top-0 right-0 bottom-0 w-[380px]
+            animate-in slide-in-from-right duration-300"
           data-testid="chat-panel"
           role="dialog"
           aria-label="Chat with AI Assistant"
@@ -100,8 +103,8 @@ export function ChatPanel() {
                 size="icon"
                 className="h-7 w-7"
                 onClick={closePanel}
-                title="Close"
-                aria-label="Close"
+                title="Close panel"
+                aria-label="Close panel"
                 data-testid="chat-close-button"
               >
                 <X className="w-3.5 h-3.5" />
@@ -110,8 +113,8 @@ export function ChatPanel() {
           </div>
 
           {/* Messages area */}
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="p-4" data-testid="chat-messages-area">
+          <ScrollArea className="flex-1 min-h-0 w-full" type="always">
+            <div className="p-4 w-full" data-testid="chat-messages-area">
               {state.messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="chat-empty-state">
                   <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
