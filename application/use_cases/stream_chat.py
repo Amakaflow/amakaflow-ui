@@ -3,6 +3,7 @@
 Orchestrates: rate limit check -> session management -> Claude streaming -> persistence.
 Updated in AMA-442 to support TTS voice responses.
 Updated in AMA-504 to add heartbeats during tool execution.
+Updated in AMA-506 to add OpenTelemetry context propagation.
 """
 
 import base64
@@ -20,6 +21,7 @@ from backend.services.ai_client import AIClient
 from backend.services.function_dispatcher import FunctionContext, FunctionDispatcher
 from backend.services.tool_schemas import ALL_TOOLS
 from backend.services.feature_flag_service import FeatureFlagService
+from backend.observability import propagate_context_to_thread
 
 if TYPE_CHECKING:
     from backend.services.tts_service import TTSService
@@ -302,18 +304,22 @@ class StreamChatUseCase:
 
                 # Execute tool with heartbeats (AMA-504)
                 # Run tool execution in background thread, yield heartbeats while waiting
+                # Wrap with context propagation for OTel tracing (AMA-506)
                 tool_name = tool_use["name"]
                 tool_start_time = time.time()
                 result: str = ""
 
                 try:
                     with ThreadPoolExecutor(max_workers=1) as executor:
-                        future: Future = executor.submit(
-                            self._dispatcher.execute,
-                            tool_name,
-                            tool_use["input"],
-                            fn_context,
+                        # Wrap the dispatcher call to propagate trace context to thread
+                        wrapped_execute = propagate_context_to_thread(
+                            lambda: self._dispatcher.execute(
+                                tool_name,
+                                tool_use["input"],
+                                fn_context,
+                            )
                         )
+                        future: Future = executor.submit(wrapped_execute)
 
                         # Wait for completion, yielding heartbeats every HEARTBEAT_INTERVAL_SECONDS
                         while True:

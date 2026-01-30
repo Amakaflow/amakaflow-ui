@@ -3,6 +3,7 @@ Health check router.
 
 Part of AMA-429: Chat API service skeleton
 Updated in AMA-441: Add readiness probe and Sentry exclusion
+Updated in AMA-506: Add Prometheus /metrics endpoint
 
 This router provides health check endpoints for monitoring and load balancers.
 """
@@ -10,7 +11,7 @@ This router provides health check endpoints for monitoring and load balancers.
 import logging
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from backend.settings import Settings, get_settings
 
@@ -67,3 +68,24 @@ async def health_ready(settings: Settings = Depends(get_settings)):
         )
 
     return {"status": "ready", "service": "chat-api", "checks": checks}
+
+
+@router.get("/metrics")
+def metrics():
+    """
+    Prometheus metrics endpoint for scraping.
+
+    Returns metrics in Prometheus text format.
+    """
+    try:
+        from backend.observability import get_metrics_response
+        content = get_metrics_response()
+        return PlainTextResponse(
+            content=content,
+            media_type="text/plain; charset=utf-8",
+        )
+    except ImportError:
+        return PlainTextResponse(
+            content="# OpenTelemetry not configured\n",
+            media_type="text/plain; charset=utf-8",
+        )

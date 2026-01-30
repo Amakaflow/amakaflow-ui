@@ -37,3 +37,14 @@ pyyaml>=6.0.0,<7.0.0
 
 # Load testing (optional, for tests/load/)
 locust>=2.20.0,<3.0.0
+
+# OpenTelemetry (AMA-506)
+opentelemetry-api>=1.22.0
+opentelemetry-sdk>=1.22.0
+opentelemetry-exporter-otlp-proto-grpc>=1.22.0
+opentelemetry-exporter-otlp-proto-http>=1.22.0
+opentelemetry-exporter-prometheus>=0.43b0
+opentelemetry-instrumentation-fastapi>=0.43b0
+opentelemetry-instrumentation-httpx>=0.43b0
+opentelemetry-instrumentation-logging>=0.43b0
+opentelemetry-propagator-b3>=1.22.0

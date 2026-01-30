@@ -215,6 +215,38 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # OpenTelemetry (AMA-506)
+    # -------------------------------------------------------------------------
+    otel_enabled: bool = Field(
+        default=True,
+        description="Enable OpenTelemetry instrumentation",
+    )
+    otel_service_name: str = Field(
+        default="chat-api",
+        description="Service name for OpenTelemetry",
+    )
+    otel_exporter_otlp_endpoint: Optional[str] = Field(
+        default=None,
+        description="OTLP exporter endpoint (e.g., http://localhost:4317)",
+    )
+    otel_exporter_otlp_protocol: str = Field(
+        default="grpc",
+        description="OTLP exporter protocol: 'grpc' or 'http'",
+    )
+    otel_traces_sample_rate: float = Field(
+        default=1.0,
+        description="Trace sampling rate (0.0 to 1.0)",
+    )
+    otel_metrics_export_interval_ms: int = Field(
+        default=60000,
+        description="Metrics export interval in milliseconds",
+    )
+    otel_log_correlation: bool = Field(
+        default=True,
+        description="Enable trace ID correlation in logs",
+    )
+
+    # -------------------------------------------------------------------------
     # TTS Configuration (ElevenLabs)
     # -------------------------------------------------------------------------
     elevenlabs_api_key: Optional[str] = Field(

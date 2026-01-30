@@ -1333,3 +1333,80 @@ def extract_event_types(events: List[Dict[str, Any]]) -> List[str]:
 def find_events(events: List[Dict[str, Any]], event_type: str) -> List[Dict[str, Any]]:
     """Filter parsed SSE events to only those matching event_type."""
     return [e for e in events if e["event"] == event_type]
+
+
+# ============================================================================
+# OpenTelemetry fixtures for observability E2E tests (AMA-506)
+# ============================================================================
+
+from opentelemetry import trace, metrics
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+from backend.observability.metrics import ChatMetrics
+from tests.fixtures.otel import (
+    SpanCapture,
+    CapturedSpan,
+    get_metric_value,
+    get_histogram_count,
+)
+
+
+@pytest.fixture
+def e2e_span_capture() -> SpanCapture:
+    """Provide span capture with TracerProvider setup for E2E tests."""
+    capture = SpanCapture()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(capture._exporter))
+
+    original_provider = trace.get_tracer_provider()
+    trace.set_tracer_provider(provider)
+
+    yield capture
+
+    trace.set_tracer_provider(original_provider)
+    capture.clear()
+
+
+@pytest.fixture
+def e2e_metric_reader() -> InMemoryMetricReader:
+    """InMemoryMetricReader for E2E metric verification."""
+    reader = InMemoryMetricReader()
+    provider = MeterProvider(metric_readers=[reader])
+
+    original_provider = metrics.get_meter_provider()
+    metrics.set_meter_provider(provider)
+
+    # Reset ChatMetrics singletons
+    ChatMetrics._chat_requests_total = None
+    ChatMetrics._tool_execution_seconds = None
+    ChatMetrics._anthropic_ttft_seconds = None
+    ChatMetrics._anthropic_total_seconds = None
+    ChatMetrics._tokens_used_total = None
+    ChatMetrics._active_sse_connections = None
+    ChatMetrics._rate_limit_hits_total = None
+
+    yield reader
+
+    metrics.set_meter_provider(original_provider)
+
+
+# Alias functions for E2E tests (use shared implementation)
+def get_e2e_metric_value(
+    reader: InMemoryMetricReader,
+    name: str,
+    labels: Optional[Dict[str, str]] = None,
+) -> Optional[float]:
+    """Get metric value from reader for E2E tests."""
+    return get_metric_value(reader, name, labels)
+
+
+def get_e2e_histogram_count(
+    reader: InMemoryMetricReader,
+    name: str,
+    labels: Optional[Dict[str, str]] = None,
+) -> int:
+    """Get histogram observation count for E2E tests."""
+    return get_histogram_count(reader, name, labels)

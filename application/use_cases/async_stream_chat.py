@@ -4,6 +4,7 @@ Orchestrates: rate limit check -> session management -> Claude streaming -> pers
 Async version of StreamChatUseCase for non-blocking I/O operations.
 
 Part of AMA-505: Convert Streaming to Async Patterns
+Updated in AMA-506: Add OpenTelemetry tracing and metrics
 """
 
 import asyncio
@@ -21,6 +22,7 @@ from backend.services.async_function_dispatcher import (
 )
 from backend.services.tool_schemas import ALL_TOOLS
 from backend.services.feature_flag_service import FeatureFlagService
+from backend.observability import get_tracer, ChatMetrics, get_current_trace_id
 
 if TYPE_CHECKING:
     from backend.services.tts_service import TTSService
@@ -119,12 +121,37 @@ class AsyncStreamChatUseCase:
         Yields:
             SSEEvent objects for the EventSourceResponse.
         """
+        tracer = get_tracer()
+
+        with tracer.start_as_current_span(
+            "chat.stream",
+            attributes={
+                "user.id": user_id,
+                "session.id": session_id or "new",
+            },
+        ) as span:
+            async for event in self._execute_inner(
+                user_id, message, session_id, auth_token, context, span
+            ):
+                yield event
+
+    async def _execute_inner(
+        self,
+        user_id: str,
+        message: str,
+        session_id: Optional[str],
+        auth_token: Optional[str],
+        context: Optional[Dict[str, Any]],
+        span,
+    ) -> AsyncGenerator[SSEEvent, None]:
+        """Inner execute method wrapped by the span."""
         # 0. Feature flag check - is chat enabled for this user?
         if self._feature_flags and not self._feature_flags.is_chat_enabled(user_id):
             yield _sse("error", {
                 "type": "feature_disabled",
                 "message": "Chat is not available for your account. Please check back later.",
             })
+            ChatMetrics.chat_requests_total().add(1, {"status": "feature_disabled"})
             return
 
         # 1. Rate limit check with dynamic limit from feature flags
@@ -140,6 +167,8 @@ class AsyncStreamChatUseCase:
                 "usage": usage,
                 "limit": monthly_limit,
             })
+            ChatMetrics.chat_requests_total().add(1, {"status": "rate_limited"})
+            ChatMetrics.rate_limit_hits_total().add(1, {"limit_type": "monthly_messages"})
             return
 
         # 2. Session management
@@ -172,12 +201,19 @@ class AsyncStreamChatUseCase:
             "content": message,
         })
 
+        # Update span with actual session ID
+        span.set_attribute("session.id", session_id)
+
         # 4. Load conversation history
         history = await self._message_repo.list_for_session(session_id)
         anthropic_messages = self._build_messages(history)
 
-        # 5. Yield message_start
-        yield _sse("message_start", {"session_id": session_id})
+        # 5. Yield message_start with trace_id for client correlation
+        trace_id = get_current_trace_id()
+        message_start_data: Dict[str, Any] = {"session_id": session_id}
+        if trace_id:
+            message_start_data["trace_id"] = trace_id
+        yield _sse("message_start", message_start_data)
 
         # 6. Create function context for tool execution
         fn_context = FunctionContext(user_id=user_id, auth_token=auth_token)
@@ -377,6 +413,9 @@ class AsyncStreamChatUseCase:
         elif voice_error:
             message_end_data["voice_response"] = None
             message_end_data["voice_error"] = voice_error
+
+        # Record success metric
+        ChatMetrics.chat_requests_total().add(1, {"status": "success"})
 
         yield _sse("message_end", message_end_data)
 

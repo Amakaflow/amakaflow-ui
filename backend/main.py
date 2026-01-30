@@ -3,6 +3,7 @@ Application factory for FastAPI.
 
 Part of AMA-429: Chat API service skeleton
 Updated in AMA-441: Sentry release tags, SSE support, graceful shutdown
+Updated in AMA-506: OpenTelemetry tracing and metrics
 
 This module provides a factory function for creating FastAPI application instances.
 The factory pattern allows for:
@@ -34,6 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.settings import Settings, get_settings
+from backend.observability import configure_observability, shutdown_observability, ChatMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,11 @@ def sse_connect() -> int:
     global _sse_connection_count
     with _sse_lock:
         _sse_connection_count += 1
+        # Record metric for active SSE connections
+        try:
+            ChatMetrics.active_sse_connections().add(1)
+        except Exception:
+            pass  # Don't fail if metrics not initialized
         return _sse_connection_count
 
 
@@ -58,6 +65,11 @@ def sse_disconnect() -> int:
     global _sse_connection_count
     with _sse_lock:
         _sse_connection_count = max(0, _sse_connection_count - 1)
+        # Record metric for active SSE connections
+        try:
+            ChatMetrics.active_sse_connections().add(-1)
+        except Exception:
+            pass  # Don't fail if metrics not initialized
         return _sse_connection_count
 
 
@@ -84,6 +96,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     """
     if settings is None:
         settings = get_settings()
+
+    # Initialize OpenTelemetry observability (AMA-506)
+    configure_observability(settings)
 
     # Initialize Sentry for error tracking
     _init_sentry(settings)
@@ -197,6 +212,10 @@ def _register_shutdown(app: FastAPI, settings: Settings) -> None:
                 "Shutdown proceeding with %d SSE connections still active",
                 remaining,
             )
+
+        # Shutdown OpenTelemetry (AMA-506)
+        shutdown_observability()
+
         logger.info("chat-api shutdown complete")
 
     # Handle SIGTERM for Render graceful shutdown

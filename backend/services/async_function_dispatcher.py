@@ -4,6 +4,7 @@ Dispatches tool calls to external services (mapper-api, calendar-api, workout-in
 with async HTTP calls using httpx.AsyncClient.
 
 Part of AMA-505: Convert Streaming to Async Patterns
+Updated in AMA-506: Add OpenTelemetry tracing and metrics
 """
 
 import base64
@@ -11,8 +12,13 @@ import io
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+
+from opentelemetry.trace import SpanKind
+
+from backend.observability import get_tracer, ChatMetrics
 
 if TYPE_CHECKING:
     from infrastructure.db.async_function_rate_limit_repository import (
@@ -168,15 +174,49 @@ class AsyncFunctionDispatcher:
         """
         handler = self._handlers.get(function_name)
         if not handler:
+            ChatMetrics.tool_execution_seconds().record(
+                0, {"tool_name": function_name, "status": "unknown"}
+            )
             return self._error_response("unknown_function", f"Unknown function '{function_name}'")
 
-        try:
-            return await handler(arguments, context)
-        except FunctionExecutionError as e:
-            return self._error_response("execution_error", e.message)
-        except Exception:
-            logger.exception("Error in async function %s", function_name)
-            return self._error_response("internal_error", "An unexpected error occurred. Please try again.")
+        tracer = get_tracer()
+        start_time = time.time()
+
+        with tracer.start_as_current_span(
+            f"tool.{function_name}",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "tool.name": function_name,
+                "user.id": context.user_id,
+            },
+        ) as span:
+            try:
+                result = await handler(arguments, context)
+                duration = time.time() - start_time
+                ChatMetrics.tool_execution_seconds().record(
+                    duration, {"tool_name": function_name, "status": "success"}
+                )
+                span.set_attribute("tool.duration_seconds", duration)
+                return result
+            except FunctionExecutionError as e:
+                duration = time.time() - start_time
+                ChatMetrics.tool_execution_seconds().record(
+                    duration, {"tool_name": function_name, "status": "error"}
+                )
+                span.set_attribute("tool.duration_seconds", duration)
+                span.set_attribute("error.type", "execution_error")
+                span.set_attribute("error.message", e.message)
+                return self._error_response("execution_error", e.message)
+            except Exception as e:
+                duration = time.time() - start_time
+                ChatMetrics.tool_execution_seconds().record(
+                    duration, {"tool_name": function_name, "status": "error"}
+                )
+                span.set_attribute("tool.duration_seconds", duration)
+                span.set_attribute("error.type", "internal_error")
+                span.record_exception(e)
+                logger.exception("Error in async function %s", function_name)
+                return self._error_response("internal_error", "An unexpected error occurred. Please try again.")
 
     def _error_response(self, code: str, message: str) -> str:
         """Create a standardized error response for Claude."""
