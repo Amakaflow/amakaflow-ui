@@ -5,10 +5,14 @@
 #
 # Requires:
 #   - TEST_EMAIL environment variable (or uses default)
-#   - TEST_PASSWORD environment variable
+#   - TEST_PASSWORD environment variable (REQUIRED - will fail if not set)
 #
 # Note: This flow assumes the app has a login screen.
 # Skip this flow if using external auth (Clerk, Auth0, etc.)
+#
+# IMPORTANT: Set TEST_PASSWORD before running:
+#   export TEST_PASSWORD="your-test-password"
+#   maestro test flows/ios/auth.yaml
 
 appId: com.amakaflow.app
 
@@ -17,6 +21,8 @@ onFlowError:
 
 env:
   TEST_EMAIL: ${TEST_EMAIL:-test@example.com}
+  # Sentinel value ensures obvious failure if TEST_PASSWORD not set
+  TEST_PASSWORD: ${TEST_PASSWORD:-__TEST_PASSWORD_NOT_SET__}
 
 ---
 

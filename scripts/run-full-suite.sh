@@ -35,6 +35,16 @@
 
 set -euo pipefail
 
+# Require Bash 4.0+ for associative arrays
+if ((BASH_VERSINFO[0] < 4)); then
+  echo "Error: This script requires Bash 4.0 or higher"
+  echo "Current version: $BASH_VERSION"
+  echo ""
+  echo "On macOS, install with: brew install bash"
+  echo "Then run with: /opt/homebrew/bin/bash $0 $*"
+  exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -277,16 +287,17 @@ run_maestro_test() {
   fi
   maestro_cmd="$maestro_cmd $PROJECT_DIR/$flow_file"
 
-  # Run with timeout
-  if timeout "$TEST_TIMEOUT" bash -c "$maestro_cmd"; then
+  # Run with timeout - capture exit code before if statement
+  local exit_code=0
+  timeout "$TEST_TIMEOUT" bash -c "$maestro_cmd" || exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
     echo -e "  ${GREEN}✓${NC} PASSED: $flow_file"
+  elif [[ $exit_code -eq 124 ]]; then
+    echo -e "  ${RED}✗${NC} TIMEOUT: $flow_file (exceeded ${TEST_TIMEOUT}s)"
+    result=1
   else
-    local exit_code=$?
-    if [[ $exit_code -eq 124 ]]; then
-      echo -e "  ${RED}✗${NC} TIMEOUT: $flow_file (exceeded ${TEST_TIMEOUT}s)"
-    else
-      echo -e "  ${RED}✗${NC} FAILED: $flow_file"
-    fi
+    echo -e "  ${RED}✗${NC} FAILED: $flow_file (exit code: $exit_code)"
     result=1
   fi
 
