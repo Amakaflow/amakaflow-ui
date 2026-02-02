@@ -1,0 +1,27 @@
+# Artifacts (generated at runtime)
+artifacts/screenshots/*
+artifacts/logs/*
+artifacts/reports/*
+
+# Keep artifact directories
+!artifacts/screenshots/.gitkeep
+!artifacts/logs/.gitkeep
+!artifacts/reports/.gitkeep
+
+# Environment
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/

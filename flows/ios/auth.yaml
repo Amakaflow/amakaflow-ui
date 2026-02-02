@@ -1,0 +1,90 @@
+# iOS Authentication Flow
+# Tests login functionality
+#
+# Run: maestro test flows/ios/auth.yaml
+#
+# Requires:
+#   - TEST_EMAIL environment variable (or uses default)
+#   - TEST_PASSWORD environment variable
+#
+# Note: This flow assumes the app has a login screen.
+# Skip this flow if using external auth (Clerk, Auth0, etc.)
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-auth-error
+
+env:
+  TEST_EMAIL: ${TEST_EMAIL:-test@example.com}
+
+---
+
+# Launch app with clean state to trigger login
+- launchApp:
+    clearState: true
+    stopApp: true
+
+# Wait for login screen or home screen
+# (Home screen means user is already logged in)
+- extendedWaitUntil:
+    visible:
+      id: "login_screen"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/ios-auth-01-start
+
+# Check if we're on login screen
+- runFlow:
+    when:
+      visible:
+        id: "login_screen"
+    commands:
+      # Enter email
+      - tapOn:
+          id: "email_field"
+      - inputText: ${TEST_EMAIL}
+
+      - takeScreenshot: artifacts/screenshots/ios-auth-02-email-entered
+
+      # Enter password
+      - tapOn:
+          id: "password_field"
+      - inputText: ${TEST_PASSWORD}
+
+      - takeScreenshot: artifacts/screenshots/ios-auth-03-password-entered
+
+      # Tap login button
+      - tapOn:
+          id: "login_button"
+          retryTapIfNoChange: true
+
+      # Wait for home screen after login
+      - extendedWaitUntil:
+          visible:
+            id: "home_screen"
+          timeout: 15000
+
+      - takeScreenshot: artifacts/screenshots/ios-auth-04-logged-in
+
+# Verify we're on home screen (either already logged in or just logged in)
+- assertVisible:
+    id: "home_screen"
+
+# Verify user is authenticated (profile button visible)
+- assertVisible:
+    id: "user_profile_button"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/ios-auth-05-complete
+
+# Final assertions
+- assertVisible:
+    id: "home_screen"
+- assertNotVisible:
+    id: "login_screen"
+    optional: true
+- assertNotVisible:
+    id: "error_view"
+    optional: true

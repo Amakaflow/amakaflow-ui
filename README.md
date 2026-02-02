@@ -1,0 +1,277 @@
+# AmakaFlow Automation
+
+Autonomous test automation for the AmakaFlow fitness platform using OpenClaw (Claude Code) and Maestro.
+
+Supports: **Web** | **iOS** | **Android** | **watchOS** | **Wear OS**
+
+## Overview
+
+This repository contains declarative test scenarios that can be executed autonomously:
+- **Web tests**: Executed via OpenClaw's Browser tool (Playwright-backed)
+- **Mobile tests**: Executed via Maestro (declarative YAML flows)
+
+No coding required at runtime - tests are defined in Markdown/YAML and interpreted by the AI agent or Maestro.
+
+## Quick Start
+
+### Prerequisites
+
+```bash
+# 1. Install Maestro (for mobile tests)
+curl -Ls https://get.maestro.mobile.dev | bash
+
+# 2. Or run the setup script
+./scripts/setup-maestro.sh
+```
+
+### Running Tests
+
+```bash
+# Set API key (for web tests via OpenClaw)
+export ANTHROPIC_API_KEY=sk-...
+
+# Run smoke tests (all platforms)
+./scripts/run-full-suite.sh smoke
+
+# Run iOS only
+./scripts/run-full-suite.sh smoke ios
+
+# Run golden paths on Android
+./scripts/run-full-suite.sh golden android
+
+# Run everything
+./scripts/run-full-suite.sh full
+```
+
+## Test Suites
+
+| Suite | Web | iOS | Android | watchOS | Wear OS | Duration |
+|-------|-----|-----|---------|---------|---------|----------|
+| `smoke` | ✓ | ✓ | ✓ | - | - | ~3 min |
+| `health` | ✓ | - | - | - | - | ~30 sec |
+| `golden` | ✓ | ✓ | ✓ | ✓ | ✓ | ~15 min |
+| `api` | ✓ | - | - | - | - | ~5 min |
+| `ios` | - | ✓ | - | ✓ | - | ~10 min |
+| `android` | - | - | ✓ | - | ✓ | ~10 min |
+| `mobile` | - | ✓ | ✓ | ✓ | ✓ | ~20 min |
+| `full` | ✓ | ✓ | ✓ | ✓ | ✓ | ~30 min |
+
+## Platform Requirements
+
+### Web
+- Docker (optional, for containerized execution)
+- AmakaFlow services running on localhost
+
+### iOS / watchOS
+- macOS with Xcode
+- iOS Simulator booted (`xcrun simctl boot 'iPhone 15 Pro'`)
+- AmakaFlow iOS app installed on simulator
+- Maestro installed
+
+### Android / Wear OS
+- Android SDK with emulator
+- Android Emulator running (`emulator -avd Pixel_7_API_34 &`)
+- AmakaFlow Android app installed on emulator
+- Maestro installed
+
+## Directory Structure
+
+```
+amakaflow-automation/
+├── SOUL.md                    # QA persona definition
+├── AGENTS.md                  # Test execution protocol
+├── TOOLS.md                   # Tool permissions & limits
+├── openclaw.json              # OpenClaw configuration
+├── skills/
+│   └── test-runner/
+│       └── SKILL.md           # /test-runner command definition
+├── scenarios/
+│   ├── web/                   # Web test scenarios
+│   │   ├── health-checks.md
+│   │   ├── golden-paths.md
+│   │   ├── api-contracts.md
+│   │   └── smoke-suite.md
+│   └── mobile/
+│       ├── ios/
+│       │   ├── smoke.md
+│       │   ├── golden-paths.md
+│       │   └── watch/
+│       │       └── golden-paths.md
+│       └── android/
+│           ├── smoke.md
+│           ├── golden-paths.md
+│           └── wear/
+│               └── golden-paths.md
+├── flows/                     # Maestro flow files (executable)
+│   ├── ios/
+│   │   ├── smoke.yaml
+│   │   ├── golden-paths.yaml
+│   │   └── watch/
+│   │       ├── smoke.yaml
+│   │       └── golden-paths.yaml
+│   └── android/
+│       ├── smoke.yaml
+│       ├── golden-paths.yaml
+│       └── wear/
+│           ├── smoke.yaml
+│           └── golden-paths.yaml
+├── artifacts/                 # Test outputs (gitignored)
+│   ├── screenshots/
+│   ├── logs/
+│   └── reports/
+├── scripts/
+│   ├── run-full-suite.sh      # Main entry point
+│   └── setup-maestro.sh       # Environment setup
+└── docker-compose.yml         # Container config (web only)
+```
+
+## How It Works
+
+### Web Tests
+1. OpenClaw reads scenario markdown files
+2. Executes steps using Browser (Playwright) and Exec (curl) tools
+3. Captures screenshots after each action
+4. Generates JSON report
+
+### Mobile Tests
+1. Maestro reads YAML flow files
+2. Executes on connected simulator/emulator
+3. Takes screenshots at defined points
+4. Reports pass/fail per flow
+
+### Example Maestro Flow
+
+```yaml
+# flows/ios/smoke.yaml
+appId: com.amakaflow.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+- takeScreenshot: ios-smoke-01-launch
+- tapOn:
+    id: "workouts_tab"
+- takeScreenshot: ios-smoke-02-workouts
+```
+
+## Services Under Test
+
+| Service | Port | Health Endpoint |
+|---------|------|-----------------|
+| Web UI | 3000 | http://localhost:3000 |
+| Chat API | 8005 | /health, /health/ready |
+| Mapper API | 8001 | /health |
+| Calendar API | 8003 | /health |
+| Workout Ingestor | 8004 | /health |
+
+## Running Individual Flows
+
+```bash
+# Run single Maestro flow
+maestro test flows/ios/smoke.yaml
+
+# Run with specific device
+maestro test --device "iPhone 15 Pro" flows/ios/golden-paths.yaml
+
+# Interactive debugging
+maestro studio
+```
+
+## Artifacts
+
+After each run, find outputs in:
+
+- `artifacts/screenshots/` - Visual captures of each test step
+- `artifacts/logs/` - Execution logs with timestamps
+- `artifacts/reports/` - JSON pass/fail summaries
+
+Naming convention:
+- `{platform}-{scenario}-{step}-{timestamp}.png`
+- Example: `ios-smoke-01-launch-20240115-103000.png`
+
+## CI/CD Integration
+
+```yaml
+# GitHub Actions example
+jobs:
+  test-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services
+        run: docker compose -f ../docker-compose.yml up -d
+      - name: Run web tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: ./scripts/run-full-suite.sh smoke web
+
+  test-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Maestro
+        run: curl -Ls https://get.maestro.mobile.dev | bash
+      - name: Boot Simulator
+        run: xcrun simctl boot "iPhone 15 Pro"
+      - name: Install App
+        run: xcrun simctl install booted path/to/AmakaFlow.app
+      - name: Run iOS tests
+        run: ./scripts/run-full-suite.sh smoke ios
+
+  test-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Android
+        uses: android-actions/setup-android@v3
+      - name: Install Maestro
+        run: curl -Ls https://get.maestro.mobile.dev | bash
+      - name: Start Emulator
+        run: |
+          echo "y" | sdkmanager "system-images;android-34;google_apis;x86_64"
+          avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64"
+          emulator -avd test -no-audio -no-window &
+          adb wait-for-device
+      - name: Install App
+        run: adb install path/to/amakaflow.apk
+      - name: Run Android tests
+        run: ./scripts/run-full-suite.sh smoke android
+```
+
+## Troubleshooting
+
+### Maestro can't find elements
+- Use `maestro studio` to interactively inspect the app
+- Run `maestro hierarchy` to see element tree
+- Update accessibility IDs in the app code
+
+### Simulator not booted
+```bash
+# List available simulators
+xcrun simctl list devices
+
+# Boot specific simulator
+xcrun simctl boot "iPhone 15 Pro"
+```
+
+### Emulator not connected
+```bash
+# List available AVDs
+emulator -list-avds
+
+# Start emulator
+emulator -avd Pixel_7_API_34 &
+
+# Verify connection
+adb devices
+```
+
+## Contributing
+
+1. Add new scenarios to `scenarios/{platform}/` directory
+2. Add corresponding Maestro flows to `flows/{platform}/`
+3. Follow existing naming conventions
+4. Test locally before committing
+5. Keep scenarios focused and independent

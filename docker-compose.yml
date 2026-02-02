@@ -1,0 +1,108 @@
+services:
+  # =============================================================================
+  # OpenClaw Test Runner (Web Tests Only)
+  # =============================================================================
+  #
+  # NOTE: Mobile tests (iOS, Android, Watch) cannot run in Docker containers
+  # because they require native simulators/emulators. Use the run-full-suite.sh
+  # script directly on macOS for mobile testing.
+  #
+  # =============================================================================
+  openclaw-tester:
+    image: ghcr.io/anthropics/claude-code:latest
+    container_name: amakaflow-test-runner
+    working_dir: /workspace
+    volumes:
+      # Mount the automation workspace (read-only except artifacts)
+      - .:/workspace:ro
+      # Mount artifacts directory (writable)
+      - ./artifacts:/workspace/artifacts:rw
+      # Mount scenarios as read-only
+      - ./scenarios/web:/workspace/scenarios/web:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CI=true
+      - HEADLESS=true
+      # Web-only environment
+      - UI_URL=http://ui:3000
+      - CHAT_API_URL=http://chat:8005
+      - MAPPER_API_URL=http://mapper:8001
+      - CALENDAR_API_URL=http://calendar:8003
+      - INGESTOR_API_URL=http://workout-ingestor:8004
+    networks:
+      - amakaflow
+    # Run web test suite only
+    command: >
+      --workspace /workspace
+      --run "/test-runner ${TEST_SUITE:-smoke} --platform web"
+    # Health check to verify the container can reach services
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://ui:3000", "--max-time", "5"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # =============================================================================
+  # Standalone Web Test Runner (services on host machine)
+  # =============================================================================
+  openclaw-standalone:
+    image: ghcr.io/anthropics/claude-code:latest
+    container_name: amakaflow-test-standalone
+    working_dir: /workspace
+    profiles:
+      - standalone
+    volumes:
+      - .:/workspace:ro
+      - ./artifacts:/workspace/artifacts:rw
+      - ./scenarios/web:/workspace/scenarios/web:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CI=true
+      - HEADLESS=true
+      # Override URLs for host network access
+      - UI_URL=http://host.docker.internal:3000
+      - CHAT_API_URL=http://host.docker.internal:8005
+      - MAPPER_API_URL=http://host.docker.internal:8001
+      - CALENDAR_API_URL=http://host.docker.internal:8003
+      - INGESTOR_API_URL=http://host.docker.internal:8004
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      --workspace /workspace
+      --run "/test-runner ${TEST_SUITE:-smoke} --platform web"
+
+networks:
+  amakaflow:
+    external: true
+    name: amakaflow-dev-workspace_amakaflow
+
+# =============================================================================
+# USAGE
+# =============================================================================
+#
+# WEB TESTS ONLY - For mobile tests, run directly on macOS:
+#   ./scripts/run-full-suite.sh smoke ios
+#   ./scripts/run-full-suite.sh golden android
+#
+# Prerequisites:
+#   - AmakaFlow services running: cd ../amakaflow-dev-workspace && make start
+#   - ANTHROPIC_API_KEY environment variable set
+#
+# Run web smoke tests (default):
+#   docker compose run --rm openclaw-tester
+#
+# Run specific web suite:
+#   TEST_SUITE=health docker compose run --rm openclaw-tester
+#   TEST_SUITE=golden docker compose run --rm openclaw-tester
+#   TEST_SUITE=api docker compose run --rm openclaw-tester
+#
+# Run standalone (services on host):
+#   docker compose --profile standalone run --rm openclaw-standalone
+#
+# View artifacts:
+#   ls artifacts/screenshots/
+#   cat artifacts/logs/*.log
+#   cat artifacts/reports/*.json
+#
+# =============================================================================

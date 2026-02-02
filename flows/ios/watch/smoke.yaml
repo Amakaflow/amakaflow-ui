@@ -1,0 +1,53 @@
+# watchOS Smoke Test Flow
+# Validates watch app launches and basic functionality
+#
+# Run: maestro test flows/ios/watch/smoke.yaml
+# Note: Requires watchOS simulator paired with iOS simulator
+
+appId: com.amakaflow.app.watchkitapp
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/watchos-smoke-error
+
+---
+
+# Launch the watch app with clean state
+- launchApp:
+    clearState: true
+    stopApp: true
+
+# Wait for app to load
+- extendedWaitUntil:
+    visible:
+      id: "watch_main_screen"
+    timeout: 15000
+
+# Take screenshot of initial state
+- takeScreenshot: artifacts/screenshots/watchos-smoke-01-launch
+
+# Verify main screen loaded with specific assertions
+- assertVisible:
+    id: "watch_main_screen"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/watchos-smoke-02-main
+
+# Verify start workout button exists - MUST be present
+- assertVisible:
+    id: "start_workout_button"
+
+- takeScreenshot: artifacts/screenshots/watchos-smoke-03-ready
+
+# Final assertions
+- assertVisible:
+    id: "watch_main_screen"
+- assertVisible:
+    id: "start_workout_button"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true

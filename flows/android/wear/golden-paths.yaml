@@ -1,0 +1,153 @@
+# Wear OS Golden Paths Flow
+# Tests critical user journeys on Wear OS
+#
+# Run: maestro test flows/android/wear/golden-paths.yaml
+
+appId: com.amakaflow.companion.wear
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/wearos-golden-error
+
+---
+
+# ============================================
+# SETUP - Clean state for deterministic tests
+# ============================================
+
+- launchApp:
+    clearState: true
+    stopApp: true
+
+- extendedWaitUntil:
+    visible:
+      id: "wear_main_screen"
+    timeout: 15000
+
+- assertVisible:
+    id: "wear_main_screen"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-01-launch
+
+# ============================================
+# GOLDEN PATH 1: Start Workout
+# ============================================
+
+# Tap start workout - MUST work
+- tapOn:
+    id: "start_workout_button"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_active_view"
+    timeout: 5000
+
+- assertVisible:
+    id: "workout_active_view"
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-02-workout-started
+
+# Verify workout is active - MUST exist
+- assertVisible:
+    id: "workout_timer"
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-03-workout-active
+
+# ============================================
+# GOLDEN PATH 2: View Exercise
+# ============================================
+
+# View current exercise (optional - may not have exercises loaded)
+- tapOn:
+    id: "current_exercise"
+    optional: true
+    retryTapIfNoChange: true
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-04-exercise-detail
+
+# Swipe back
+- swipe:
+    direction: RIGHT
+
+# ============================================
+# GOLDEN PATH 3: Quick Log
+# ============================================
+
+# Open quick log - MUST work
+- tapOn:
+    id: "quick_log_button"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "quick_log_view"
+    timeout: 5000
+
+- assertVisible:
+    id: "quick_log_view"
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-05-quick-log
+
+# Log a set - MUST work
+- tapOn:
+    id: "log_set_button"
+    retryTapIfNoChange: true
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-06-set-logged
+
+# Close
+- back
+
+# ============================================
+# GOLDEN PATH 4: End Workout
+# ============================================
+
+# Tap end button - MUST work
+- tapOn:
+    id: "end_workout_button"
+    retryTapIfNoChange: true
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-07-end-confirm
+
+# Confirm end
+- tapOn:
+    text: "End"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_summary"
+    timeout: 5000
+
+- assertVisible:
+    id: "workout_summary"
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-08-summary
+
+# ============================================
+# FINAL STATE
+# ============================================
+
+# Dismiss summary
+- tapOn:
+    id: "done_button"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "wear_main_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/wearos-golden-09-complete
+
+# Final health check
+- assertVisible:
+    id: "wear_main_screen"
+- assertVisible:
+    id: "start_workout_button"
+- assertNotVisible:
+    id: "error_view"
+    optional: true

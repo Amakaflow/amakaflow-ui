@@ -1,0 +1,131 @@
+# Android Smoke Test Flow
+# Validates app launches and basic navigation works
+#
+# Run: maestro test flows/android/smoke.yaml
+
+appId: com.amakaflow.companion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/android-smoke-error
+
+---
+
+# Launch the app with clean state for isolation
+- launchApp:
+    clearState: true
+    stopApp: true
+
+# Wait for app to fully load - use specific element
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Take screenshot of initial state
+- takeScreenshot: artifacts/screenshots/android-smoke-01-launch
+
+# Verify home screen loaded with specific assertions
+- assertVisible:
+    id: "home_screen"
+- assertVisible:
+    id: "bottom_navigation"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+
+# Take screenshot of home
+- takeScreenshot: artifacts/screenshots/android-smoke-02-home
+
+# Navigate to Workouts tab - NOT optional
+- tapOn:
+    id: "nav_workouts"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workouts_screen"
+
+- takeScreenshot: artifacts/screenshots/android-smoke-03-workouts
+
+# Navigate to Calendar tab - NOT optional
+- tapOn:
+    id: "nav_calendar"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "calendar_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "calendar_screen"
+
+- takeScreenshot: artifacts/screenshots/android-smoke-04-calendar
+
+# Navigate to History tab - NOT optional
+- tapOn:
+    id: "nav_history"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "history_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "history_screen"
+
+- takeScreenshot: artifacts/screenshots/android-smoke-05-history
+
+# Navigate to More tab - NOT optional
+- tapOn:
+    id: "nav_more"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "more_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "more_screen"
+
+- takeScreenshot: artifacts/screenshots/android-smoke-06-more
+
+# Return to Home tab - NOT optional
+- tapOn:
+    id: "nav_home"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/android-smoke-07-complete
+
+# Final assertions - specific elements that MUST be present
+- assertVisible:
+    id: "home_screen"
+- assertVisible:
+    id: "bottom_navigation"
+- assertVisible:
+    id: "nav_home"
+- assertVisible:
+    id: "nav_workouts"
+- assertVisible:
+    id: "nav_calendar"
+- assertVisible:
+    id: "nav_history"
+- assertVisible:
+    id: "nav_more"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true

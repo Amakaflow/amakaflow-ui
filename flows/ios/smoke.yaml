@@ -1,0 +1,94 @@
+# iOS Smoke Test Flow
+# Validates app launches and basic navigation works
+#
+# Run: maestro test flows/ios/smoke.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-smoke-error
+
+---
+
+# Launch the app with clean state for isolation
+- launchApp:
+    clearState: true
+    stopApp: true
+
+# Wait for app to fully load - use specific element, not wildcard
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Take screenshot of initial state
+- takeScreenshot: artifacts/screenshots/ios-smoke-01-launch
+
+# Verify home screen loaded with specific assertions
+- assertVisible:
+    id: "home_screen"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+
+# Take screenshot of home
+- takeScreenshot: artifacts/screenshots/ios-smoke-02-home
+
+# Navigate to Workouts - NOT optional, this must work
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+# Wait for workouts screen to load
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workouts_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-smoke-03-workouts
+
+# Navigate to Settings - NOT optional
+- tapOn:
+    id: "settings_tab"
+    retryTapIfNoChange: true
+
+# Wait for settings screen
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "settings_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-smoke-04-settings
+
+# Return to home - NOT optional
+- tapOn:
+    id: "home_tab"
+    retryTapIfNoChange: true
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-smoke-05-complete
+
+# Final assertions - specific elements that MUST be present
+- assertVisible:
+    id: "home_tab"
+- assertVisible:
+    id: "workouts_tab"
+- assertVisible:
+    id: "settings_tab"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true
