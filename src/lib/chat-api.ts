@@ -64,6 +64,7 @@ export async function streamChat({
   onComplete,
 }: StreamChatOptions): Promise<void> {
   const url = `${API_URLS.CHAT}/chat/stream`;
+  console.log('[chat-api] streamChat called, url:', url);
 
   const body: Record<string, unknown> = { message };
   if (sessionId) {
@@ -85,17 +86,22 @@ export async function streamChat({
     return;
   }
 
+  console.log('[chat-api] Response received, status:', response.status, 'ok:', response.ok);
+
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText);
+    console.log('[chat-api] Response not ok, error:', errorText);
     onError?.(new Error(`Chat API error: ${response.status} — ${errorText}`));
     return;
   }
 
   if (!response.body) {
+    console.log('[chat-api] No response body');
     onError?.(new Error('Chat API returned no body'));
     return;
   }
 
+  console.log('[chat-api] Starting to read stream...');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -107,6 +113,9 @@ export async function streamChat({
 
       buffer += decoder.decode(value, { stream: true });
 
+      // Normalize line endings: convert \r\n to \n, then \r to \n
+      buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
       // SSE events are separated by double newlines
       const parts = buffer.split('\n\n');
       // Keep the last part (may be incomplete)
@@ -116,15 +125,21 @@ export async function streamChat({
         const trimmed = part.trim();
         if (!trimmed) continue;
 
+        console.log('[chat-api] Parsing SSE block:', trimmed.substring(0, 100));
         const event = parseSSEEvent(trimmed);
         if (event) {
+          console.log('[chat-api] Parsed event:', event.event);
           onEvent(event);
+        } else {
+          console.warn('[chat-api] Failed to parse SSE block');
         }
       }
     }
 
     // Process any remaining buffer
     if (buffer.trim()) {
+      // Normalize remaining buffer as well
+      buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const event = parseSSEEvent(buffer.trim());
       if (event) {
         onEvent(event);

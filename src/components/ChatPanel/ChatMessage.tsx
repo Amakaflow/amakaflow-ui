@@ -28,13 +28,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
 
   return (
     <div
-      className={cn('flex gap-2 mb-3', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-2 mb-3 min-w-0', isUser ? 'justify-end' : 'justify-start')}
       data-testid={`chat-message-${message.role}`}
       data-message-id={message.id}
     >
       <div
         className={cn(
-          'rounded-lg px-3 py-2 max-w-[85%] text-sm',
+          'rounded-lg px-3 py-2 max-w-[85%] min-w-0 text-sm overflow-hidden',
           isUser
             ? 'bg-primary text-primary-foreground'
             : 'bg-muted text-foreground',
@@ -63,45 +63,23 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         )}
 
         {/* Message content */}
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeSanitize]}
-              components={{
-                p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
-                code: ({ children, className }) => {
-                  const isBlock = className?.includes('language-');
-                  return isBlock ? (
-                    <code className="block bg-background/50 rounded p-2 overflow-x-auto text-xs my-2">
-                      {children}
-                    </code>
-                  ) : (
-                    <code className="bg-background/50 rounded px-1 py-0.5 text-xs">
-                      {children}
-                    </code>
-                  );
-                },
-                ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-                li: ({ children }) => <li className="mb-0.5">{children}</li>,
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-
-            {/* Streaming indicator */}
-            {isStreaming && !message.content && (
-              <span className="inline-flex gap-1" data-testid="chat-streaming-indicator">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
-              </span>
-            )}
-          </div>
-        )}
+        {message.content ? (
+          isUser ? (
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )
+        ) : isStreaming ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="animate-pulse">●</span>
+            <span className="animate-pulse delay-100">●</span>
+            <span className="animate-pulse delay-200">●</span>
+          </span>
+        ) : null}
 
         {/* Timestamp */}
         <p
