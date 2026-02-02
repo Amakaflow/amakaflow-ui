@@ -20,12 +20,12 @@ export function MobileChatDrawer() {
     <Drawer.Root
       open={state.isOpen}
       onOpenChange={(open) => !open && closePanel()}
-      shouldScaleBackground={false}
+      direction="bottom"
     >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40" />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-card rounded-t-xl focus:outline-none overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-card rounded-t-xl focus:outline-none"
           style={{
             height: '96dvh',
             maxHeight: '96dvh',
@@ -34,10 +34,8 @@ export function MobileChatDrawer() {
           aria-label="Chat with AI Assistant"
           data-testid="mobile-chat-drawer"
         >
-          {/* Drag handle */}
-          <div className="flex justify-center py-3 shrink-0">
-            <div className="w-12 h-1.5 bg-muted rounded-full" />
-          </div>
+          {/* Vaul drag handle - enables swipe to close */}
+          <Drawer.Handle className="mx-auto mt-4 mb-2 h-1.5 w-12 rounded-full bg-muted" />
 
           {/* Chat content - flex-1 to fill remaining height */}
           <div className="flex-1 min-h-0 overflow-hidden">
