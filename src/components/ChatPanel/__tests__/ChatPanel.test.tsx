@@ -1,6 +1,6 @@
 /**
  * Unit tests for ChatPanel component.
- * Mocks useChat context to control state.
+ * Mocks useChat context, useIsMobile, and useChatFeatureFlags to control state.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -38,9 +38,33 @@ vi.mock('../../../context/ChatContext', () => ({
   }),
 }));
 
+// Mock useIsMobile - default to desktop (false)
+let mockIsMobile = false;
+vi.mock('../../ui/use-mobile', () => ({
+  useIsMobile: () => mockIsMobile,
+}));
+
+// Mock useChatFeatureFlags to avoid Clerk dependency
+vi.mock('../../../hooks/useChatFeatureFlags', () => ({
+  useChatFeatureFlags: () => ({
+    flags: {
+      chat_enabled: true,
+      chat_beta_access: false,
+    },
+    isLoading: false,
+  }),
+  isChatAccessible: () => true,
+}));
+
+// Mock CHAT_BETA_PERIOD
+vi.mock('../../../lib/env', () => ({
+  CHAT_BETA_PERIOD: false,
+}));
+
 describe('ChatPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsMobile = false; // Reset to desktop mode
     mockState = {
       isOpen: false,
       sessionId: null,
@@ -128,5 +152,38 @@ describe('ChatPanel', () => {
     expect(panel).toHaveAttribute('role', 'dialog');
     expect(panel).toHaveAttribute('aria-label', 'Chat with AI Assistant');
     expect(panel).toHaveAttribute('aria-modal', 'false');
+  });
+
+  // Responsive behavior (AMA-522)
+  describe('responsive behavior', () => {
+    it('positions FAB bottom-left on desktop', () => {
+      render(<ChatPanel />);
+      const fab = screen.getByTestId('chat-trigger-button');
+      expect(fab.className).toContain('left-6');
+      expect(fab.className).not.toContain('right-4');
+    });
+
+    it('positions FAB bottom-right on mobile', () => {
+      mockIsMobile = true;
+      render(<ChatPanel />);
+      const fab = screen.getByTestId('chat-trigger-button');
+      expect(fab.className).toContain('right-4');
+      expect(fab.className).not.toContain('left-6');
+    });
+
+    it('shows desktop panel on desktop when open', () => {
+      mockState.isOpen = true;
+      render(<ChatPanel />);
+      expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
+      expect(screen.queryByTestId('mobile-chat-drawer')).not.toBeInTheDocument();
+    });
+
+    it('shows mobile drawer on mobile when open', () => {
+      mockIsMobile = true;
+      mockState.isOpen = true;
+      render(<ChatPanel />);
+      expect(screen.getByTestId('mobile-chat-drawer')).toBeInTheDocument();
+      expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
+    });
   });
 });
