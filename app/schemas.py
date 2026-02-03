@@ -4,7 +4,8 @@ Pydantic schemas for calendar API request/response validation.
 Updated with full calendar event fields for connected calendars,
 anchor workouts, and smart planner features.
 """
-from datetime import date, time
+from datetime import date, time, datetime
+from decimal import Decimal
 from typing import Optional, Literal, Any
 from uuid import UUID
 from pydantic import BaseModel, Field
@@ -193,3 +194,150 @@ class ProgramEventsResponse(BaseModel):
     program_id: UUID
     events: list[WorkoutEvent]
     total: int
+
+
+# ============================================
+# TRAINING PROGRAMS SCHEMAS (AMA-528)
+# ============================================
+
+# Type definitions for training programs
+ProgramGoalType = Literal[
+    "strength", "hypertrophy", "fat_loss", "endurance", "general_fitness"
+]
+
+PeriodizationType = Literal["linear", "undulating", "block", "conjugate"]
+
+ExperienceLevelType = Literal["beginner", "intermediate", "advanced"]
+
+ProgramStatusType = Literal["draft", "active", "paused", "completed", "archived"]
+
+
+class ProgramExercise(BaseModel):
+    """Schema for an exercise within a program workout."""
+    id: Optional[UUID] = None
+    exercise_order: int = 0
+    name: str
+    sets: int
+    reps: str  # Can be "8-12" or "8" or "AMRAP"
+    rest_seconds: int = 60
+    weight: Optional[float] = None
+    notes: Optional[str] = None
+    tempo: Optional[str] = None  # e.g., "3-1-2-0"
+    rpe: Optional[int] = Field(default=None, ge=1, le=10)
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProgramWorkout(BaseModel):
+    """Schema for a workout within a program week."""
+    id: UUID
+    week_id: UUID
+    user_id: Optional[str] = None
+    day_of_week: int = Field(ge=0, le=6)  # 0-6 (Sunday-Saturday)
+    name: str
+    workout_type: str
+    target_duration_minutes: Optional[int] = None
+    exercises: list[ProgramExercise] = []
+    is_completed: bool = False
+    completed_at: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProgramWeek(BaseModel):
+    """Schema for a week within a training program."""
+    id: UUID
+    program_id: UUID
+    user_id: Optional[str] = None
+    week_number: int = Field(ge=1)
+    focus: Optional[str] = None
+    intensity_percentage: Optional[int] = Field(default=None, ge=0, le=100)
+    volume_modifier: float = 1.0
+    is_deload: bool = False
+    workouts: list[ProgramWorkout] = []
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TrainingProgram(BaseModel):
+    """Schema for a complete training program."""
+    id: UUID
+    user_id: str
+    name: str
+    goal: ProgramGoalType
+    periodization_model: PeriodizationType
+    duration_weeks: int = Field(ge=1)
+    sessions_per_week: int = Field(ge=1, le=7)
+    experience_level: ExperienceLevelType
+    equipment_available: list[str] = []
+    time_per_session_minutes: int = Field(ge=1)
+    status: ProgramStatusType = "draft"
+    current_week: int = Field(default=1, ge=1)
+    weeks: list[ProgramWeek] = []
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Request schemas for training programs
+class TrainingProgramStatusUpdate(BaseModel):
+    """Schema for updating program status."""
+    user_id: str
+    status: ProgramStatusType
+
+
+class TrainingProgramProgressUpdate(BaseModel):
+    """Schema for updating program progress (current week)."""
+    user_id: str
+    current_week: int = Field(ge=1)
+
+
+class WorkoutCompleteUpdate(BaseModel):
+    """Schema for marking a workout complete/incomplete."""
+    user_id: str
+    is_completed: bool = True
+
+
+class TrainingProgramDelete(BaseModel):
+    """Schema for deleting a training program."""
+    user_id: str
+
+
+# Response schemas for training programs
+class TrainingProgramResponse(BaseModel):
+    """Response schema for a single training program."""
+    success: bool
+    program: Optional[TrainingProgram] = None
+    message: Optional[str] = None
+
+
+class TrainingProgramsListResponse(BaseModel):
+    """Response schema for listing training programs."""
+    success: bool
+    programs: list[TrainingProgram]
+    count: int
+
+
+class TrainingProgramStatusResponse(BaseModel):
+    """Response schema for status/progress updates."""
+    success: bool
+    message: str
+
+
+class WorkoutResponse(BaseModel):
+    """Response schema for a single workout."""
+    success: bool
+    workout: Optional[ProgramWorkout] = None
+    message: Optional[str] = None
