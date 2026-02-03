@@ -429,40 +429,71 @@ class FakeFunctionDispatcher:
             return json.dumps(nav)
 
         # Phase 2: Content Ingestion handlers
+        # AMA-529: Import tools now return preview_mode=True, persisted=False
+        # Workouts are NOT saved until save_imported_workout is called
         if function_name == "import_from_youtube":
             url = arguments.get("url", "")
+            title = f"Imported from {url[:30]}..." if len(url) > 30 else f"Imported from {url}"
             return json.dumps({
                 "success": True,
                 "source": "YouTube video",
+                "preview_mode": True,
+                "persisted": False,
+                "source_url": url,
                 "workout": {
-                    "title": f"Imported from {url[:30]}..." if len(url) > 30 else f"Imported from {url}",
-                    "id": "w-yt-fake-1",
+                    "title": title,
+                    "full_workout_data": {
+                        "title": title,
+                        "exercises": [
+                            {"name": "Squats", "sets": 3, "reps": 10},
+                            {"name": "Lunges", "sets": 3, "reps": 12},
+                            {"name": "Burpees", "sets": 3, "reps": 8},
+                        ],
+                    },
                     "exercise_count": 8,
+                    "exercise_names": ["Squats", "Lunges", "Burpees", "... and 5 more"],
                 },
+                "next_step": "Present this workout to the user and ask if they want to save it.",
             })
 
         if function_name == "import_from_tiktok":
+            url = arguments.get("url", "")
             mode = arguments.get("mode", "auto")
             return json.dumps({
                 "success": True,
                 "source": "TikTok video",
+                "preview_mode": True,
+                "persisted": False,
+                "source_url": url,
                 "mode_used": mode,
                 "workout": {
                     "title": "TikTok Fitness Routine",
-                    "id": "w-tt-fake-1",
+                    "full_workout_data": {
+                        "title": "TikTok Fitness Routine",
+                        "exercises": [{"name": "Jumping Jacks"}, {"name": "Mountain Climbers"}],
+                    },
                     "exercise_count": 5,
                 },
+                "next_step": "Present this workout to the user and ask if they want to save it.",
             })
 
         if function_name == "import_from_instagram":
+            url = arguments.get("url", "")
             return json.dumps({
                 "success": True,
                 "source": "Instagram post",
+                "preview_mode": True,
+                "persisted": False,
+                "source_url": url,
                 "workout": {
                     "title": "IG Workout Import",
-                    "id": "w-ig-fake-1",
+                    "full_workout_data": {
+                        "title": "IG Workout Import",
+                        "exercises": [{"name": "Push-ups"}, {"name": "Planks"}],
+                    },
                     "exercise_count": 6,
                 },
+                "next_step": "Present this workout to the user and ask if they want to save it.",
             })
 
         if function_name == "import_from_pinterest":
@@ -471,33 +502,78 @@ class FakeFunctionDispatcher:
             if "/board" in url or url.count("/") > 4:
                 return json.dumps({
                     "success": True,
+                    "preview_mode": True,
+                    "persisted": False,
                     "multiple_workouts": True,
                     "total": 3,
+                    "source_url": url,
                     "workouts": [
-                        {"title": "Pin Workout 1", "id": "w-pin-1"},
-                        {"title": "Pin Workout 2", "id": "w-pin-2"},
-                        {"title": "Pin Workout 3", "id": "w-pin-3"},
+                        {"title": "Pin Workout 1", "full_workout_data": {"title": "Pin Workout 1"}},
+                        {"title": "Pin Workout 2", "full_workout_data": {"title": "Pin Workout 2"}},
+                        {"title": "Pin Workout 3", "full_workout_data": {"title": "Pin Workout 3"}},
                     ],
+                    "next_step": "Present these workouts and ask which ones to save.",
                 })
             return json.dumps({
                 "success": True,
                 "source": "Pinterest",
+                "preview_mode": True,
+                "persisted": False,
+                "source_url": url,
                 "workout": {
                     "title": "Pinterest Pin Workout",
-                    "id": "w-pin-single",
+                    "full_workout_data": {"title": "Pinterest Pin Workout", "exercises": []},
                     "exercise_count": 4,
                 },
+                "next_step": "Present this workout to the user and ask if they want to save it.",
             })
 
         if function_name == "import_from_image":
+            filename = arguments.get("filename", "workout_image.jpg")
             return json.dumps({
                 "success": True,
                 "source": "image",
+                "preview_mode": True,
+                "persisted": False,
+                "source_url": f"uploaded:{filename}",
                 "workout": {
                     "title": "Imported from Screenshot",
-                    "id": "w-img-fake-1",
+                    "full_workout_data": {
+                        "title": "Imported from Screenshot",
+                        "exercises": [{"name": "Exercise 1"}, {"name": "Exercise 2"}],
+                    },
                     "exercise_count": 10,
                 },
+                "next_step": "Present this workout to the user and ask if they want to save it.",
+            })
+
+        # AMA-529: New save_imported_workout handler
+        if function_name == "save_imported_workout":
+            workout_data = arguments.get("workout_data", {})
+            source_url = arguments.get("source_url", "")
+            title = arguments.get("title_override") or workout_data.get("title", "Saved Workout")
+
+            # Validate required fields
+            if not workout_data:
+                return json.dumps({
+                    "error": True,
+                    "code": "validation_error",
+                    "message": "Missing required field: workout_data",
+                })
+            if not source_url:
+                return json.dumps({
+                    "error": True,
+                    "code": "validation_error",
+                    "message": "Missing required field: source_url",
+                })
+
+            return json.dumps({
+                "success": True,
+                "persisted": True,
+                "message": f"Workout '{title}' has been saved to your library!",
+                "workout_id": f"w-saved-{uuid.uuid4().hex[:8]}",
+                "title": title,
+                "location": "The workout is now available in your 'My Workouts' tab.",
             })
 
         # Phase 3: Workout Management handlers

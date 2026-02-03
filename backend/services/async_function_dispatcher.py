@@ -128,6 +128,7 @@ class AsyncFunctionDispatcher:
             "import_from_instagram": self._import_from_instagram,
             "import_from_pinterest": self._import_from_pinterest,
             "import_from_image": self._import_from_image,
+            "save_imported_workout": self._save_imported_workout,
             # Phase 3
             "edit_workout": self._edit_workout,
             "export_workout": self._export_workout,
@@ -463,14 +464,20 @@ class AsyncFunctionDispatcher:
     async def _import_from_youtube(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Import a workout from a YouTube video URL."""
+        """Import a workout from a YouTube video URL.
+
+        NOTE: This extracts the workout but does NOT save it to the user's library.
+        The AI must present the workout to the user and call save_imported_workout
+        after user confirmation.
+        """
         url = args.get("url")
 
         validation_error = self._validate_url(url, YOUTUBE_ALLOWED_DOMAINS, "YouTube")
         if validation_error:
             return validation_error
 
-        body: Dict[str, Any] = {"url": url.strip()}
+        cleaned_url = url.strip()
+        body: Dict[str, Any] = {"url": cleaned_url}
         if args.get("skip_cache"):
             body["skip_cache"] = True
 
@@ -481,20 +488,26 @@ class AsyncFunctionDispatcher:
             json=body,
         )
 
-        return self._format_ingestion_result(result, "YouTube video")
+        return self._format_ingestion_result(result, "YouTube video", source_url=cleaned_url)
 
     async def _import_from_tiktok(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Import a workout from a TikTok video URL."""
+        """Import a workout from a TikTok video URL.
+
+        NOTE: This extracts the workout but does NOT save it to the user's library.
+        The AI must present the workout to the user and call save_imported_workout
+        after user confirmation.
+        """
         url = args.get("url")
 
         validation_error = self._validate_url(url, TIKTOK_ALLOWED_DOMAINS, "TikTok")
         if validation_error:
             return validation_error
 
+        cleaned_url = url.strip()
         mode = args.get("mode", "auto")
-        body: Dict[str, Any] = {"url": url.strip(), "mode": mode}
+        body: Dict[str, Any] = {"url": cleaned_url, "mode": mode}
 
         result = await self._call_api(
             "POST",
@@ -503,19 +516,25 @@ class AsyncFunctionDispatcher:
             json=body,
         )
 
-        return self._format_ingestion_result(result, "TikTok video")
+        return self._format_ingestion_result(result, "TikTok video", source_url=cleaned_url)
 
     async def _import_from_instagram(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Import a workout from an Instagram post URL."""
+        """Import a workout from an Instagram post URL.
+
+        NOTE: This extracts the workout but does NOT save it to the user's library.
+        The AI must present the workout to the user and call save_imported_workout
+        after user confirmation.
+        """
         url = args.get("url")
 
         validation_error = self._validate_url(url, INSTAGRAM_ALLOWED_DOMAINS, "Instagram")
         if validation_error:
             return validation_error
 
-        body: Dict[str, Any] = {"url": url.strip()}
+        cleaned_url = url.strip()
+        body: Dict[str, Any] = {"url": cleaned_url}
 
         result = await self._call_api(
             "POST",
@@ -524,19 +543,25 @@ class AsyncFunctionDispatcher:
             json=body,
         )
 
-        return self._format_ingestion_result(result, "Instagram post")
+        return self._format_ingestion_result(result, "Instagram post", source_url=cleaned_url)
 
     async def _import_from_pinterest(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Import workouts from a Pinterest pin or board URL."""
+        """Import workouts from a Pinterest pin or board URL.
+
+        NOTE: This extracts the workout but does NOT save it to the user's library.
+        The AI must present the workout to the user and call save_imported_workout
+        after user confirmation.
+        """
         url = args.get("url")
 
         validation_error = self._validate_url(url, PINTEREST_ALLOWED_DOMAINS, "Pinterest")
         if validation_error:
             return validation_error
 
-        body: Dict[str, Any] = {"url": url.strip()}
+        cleaned_url = url.strip()
+        body: Dict[str, Any] = {"url": cleaned_url}
 
         result = await self._call_api(
             "POST",
@@ -551,18 +576,25 @@ class AsyncFunctionDispatcher:
             total = result.get("total", len(workouts))
             return json.dumps({
                 "success": True,
+                "preview_mode": True,
+                "persisted": False,
                 "multiple_workouts": True,
                 "total": total,
+                "source_url": cleaned_url,
                 "workouts": [
                     {
                         "title": w.get("title", "Untitled"),
-                        "id": w.get("id"),
+                        "full_workout_data": w,
                     }
                     for w in workouts
                 ],
+                "next_step": (
+                    "Present these workouts to the user and ask which ones they want to save. "
+                    "Call save_imported_workout for each workout they confirm."
+                ),
             })
 
-        return self._format_ingestion_result(result, "Pinterest")
+        return self._format_ingestion_result(result, "Pinterest", source_url=cleaned_url)
 
     async def _import_from_image(
         self, args: Dict[str, Any], ctx: FunctionContext
@@ -615,34 +647,165 @@ class AsyncFunctionDispatcher:
             error_context="Image processing",
         )
 
-        return self._format_ingestion_result(result, "image")
+        return self._format_ingestion_result(result, "image", source_url=f"uploaded:{filename}")
 
     def _format_ingestion_result(
-        self, result: Dict[str, Any], source: str
+        self, result: Dict[str, Any], source: str, source_url: Optional[str] = None
     ) -> str:
-        """Format ingestion result into a user-friendly response."""
+        """Format ingestion result into a user-friendly response.
+
+        Args:
+            result: API response from ingestor.
+            source: Human-readable source description.
+            source_url: Original URL the content was imported from.
+
+        Returns:
+            JSON string with success/error info and workout details.
+            NOTE: This returns preview_mode=true and persisted=false because
+            the workout has NOT been saved to the user's library yet.
+            The AI must call save_imported_workout after user confirmation.
+        """
         if not result.get("success", True):
             error_msg = result.get("error", "Failed to extract workout")
             return self._error_response("ingestion_failed", error_msg)
 
-        workout = result.get("workout", {})
+        # Handle both response formats from ingestor:
+        # 1. Nested: {"workout": {"title": ..., "blocks": ...}}
+        # 2. Root level: {"title": ..., "blocks": ...}
+        if "workout" in result:
+            workout = result["workout"]
+        elif "title" in result or "blocks" in result:
+            # Workout data is at root level - extract it
+            workout = {
+                k: v for k, v in result.items()
+                if k not in ("success", "error", "_provenance")
+            }
+        else:
+            workout = {}
+
         title = workout.get("title") or workout.get("name", "Imported Workout")
-        workout_id = workout.get("id")
 
         response: Dict[str, Any] = {
             "success": True,
             "source": source,
+            "preview_mode": True,
+            "persisted": False,
             "workout": {
                 "title": title,
-                "id": workout_id,
+                "full_workout_data": workout,  # Include full data for save_imported_workout
             },
+            "next_step": (
+                "Present this workout to the user and ask if they want to save it to their library. "
+                "If they confirm, call save_imported_workout with the workout_data."
+            ),
         }
 
+        # Include source_url for save_imported_workout
+        if source_url:
+            response["source_url"] = source_url
+
+        # Include blocks if available (for structured workouts)
+        blocks = workout.get("blocks", [])
+        if blocks:
+            response["workout"]["block_count"] = len(blocks)
+
+        # Include exercise count and details if available
+        # Check both root-level exercises and exercises nested in blocks
         exercises = workout.get("exercises", [])
+        if not exercises and blocks:
+            # Extract exercises from all blocks
+            for block in blocks:
+                block_exercises = block.get("exercises", [])
+                exercises.extend(block_exercises)
+
         if exercises:
             response["workout"]["exercise_count"] = len(exercises)
+            # Include exercise names for preview
+            response["workout"]["exercise_names"] = [
+                ex.get("name", "Unknown") for ex in exercises[:10]
+            ]
+            if len(exercises) > 10:
+                response["workout"]["exercise_names"].append(
+                    f"... and {len(exercises) - 10} more"
+                )
 
         return json.dumps(response)
+
+    async def _save_imported_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Save an extracted workout to the user's library.
+
+        This is the second step of the import flow:
+        1. User asks to import from YouTube/TikTok/etc
+        2. AI calls import_from_* which extracts but does NOT save
+        3. AI presents the workout to the user
+        4. User confirms they want to save it
+        5. AI calls this function to persist to the user's library
+
+        The workout will then appear in the user's "My Workouts" tab.
+        """
+        workout_data = args.get("workout_data")
+        source_url = args.get("source_url")
+        title_override = args.get("title_override")
+
+        if not workout_data:
+            return self._error_response(
+                "validation_error",
+                "Missing required field: workout_data. "
+                "Call import_from_youtube or similar first to extract workout data."
+            )
+
+        if not source_url:
+            return self._error_response(
+                "validation_error",
+                "Missing required field: source_url. "
+                "Provide the original URL the workout was imported from."
+            )
+
+        # Get the title from the workout data, or use the override
+        title = title_override or workout_data.get("title") or workout_data.get("name", "Imported Workout")
+
+        # Build the payload for the mapper API
+        save_payload: Dict[str, Any] = {
+            "profile_id": ctx.user_id,
+            "workout_data": workout_data,
+            "sources": [source_url],
+            "device": "web",
+            "title": title,
+        }
+
+        try:
+            result = await self._call_api(
+                "POST",
+                f"{self._mapper_url}/workouts/save",
+                ctx,
+                json=save_payload,
+            )
+        except FunctionExecutionError as e:
+            return self._error_response(
+                "save_failed",
+                f"Failed to save workout to library: {e.message}"
+            )
+
+        # Extract the saved workout ID
+        saved_workout = result.get("workout", result)
+        workout_id = saved_workout.get("id") or saved_workout.get("workout_id")
+
+        if not workout_id:
+            return self._error_response(
+                "save_failed",
+                "Workout was saved but no ID was returned. Please check your library."
+            )
+
+        return json.dumps({
+            "success": True,
+            "persisted": True,
+            "message": f"Workout '{title}' has been saved to your library!",
+            "workout_id": workout_id,
+            "title": title,
+            "location": "The workout is now available in your 'My Workouts' tab.",
+        })
 
     # --- Phase 3: Workout Management Handlers ---
 

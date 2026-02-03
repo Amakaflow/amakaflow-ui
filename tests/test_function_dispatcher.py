@@ -2654,3 +2654,428 @@ class TestGetStravaActivities:
             )
 
         assert "Found 1 recent Strava activity" in result
+
+
+# =============================================================================
+# AMA-529: Two-Phase Import Flow Tests
+# =============================================================================
+
+
+class TestSaveImportedWorkout:
+    """Unit tests for save_imported_workout handler (AMA-529).
+
+    This handler is the second step of the import flow:
+    1. import_from_* extracts workout (preview_mode=True, persisted=False)
+    2. save_imported_workout persists to library (persisted=True)
+    """
+
+    def test_success_basic(self, dispatcher, context):
+        """Verify successful save returns persisted=true and workout_id."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "workout": {
+                "id": "w-saved-123",
+                "title": "Leg Day Workout",
+            }
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Leg Day Workout", "exercises": []},
+                    "source_url": "https://youtube.com/watch?v=abc123",
+                },
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["persisted"] is True
+        assert data["workout_id"] == "w-saved-123"
+        assert "Leg Day Workout" in data["message"]
+
+    def test_success_with_title_override(self, dispatcher, context):
+        """Verify title_override is used instead of extracted title."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {"id": "w-123"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            result = dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Original Title"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                    "title_override": "Custom Name",
+                },
+                context,
+            )
+
+        # Verify the request body has the custom title
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["title"] == "Custom Name"
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["title"] == "Custom Name"
+
+    def test_extracts_title_from_workout_name(self, dispatcher, context):
+        """Verify title is extracted from workout_data.name if title not present."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {"id": "w-123"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"name": "Workout From Name Field"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert call_args[1]["json"]["title"] == "Workout From Name Field"
+
+    def test_missing_workout_data(self, dispatcher, context):
+        """Verify error when workout_data is missing."""
+        result = dispatcher.execute(
+            "save_imported_workout",
+            {"source_url": "https://youtube.com/watch?v=test"},
+            context,
+        )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "workout_data" in parsed["message"]
+
+    def test_missing_source_url(self, dispatcher, context):
+        """Verify error when source_url is missing."""
+        result = dispatcher.execute(
+            "save_imported_workout",
+            {"workout_data": {"title": "Test"}},
+            context,
+        )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "source_url" in parsed["message"]
+
+    def test_mapper_api_timeout(self, dispatcher, context):
+        """Verify timeout error is user-friendly."""
+        with patch.object(
+            dispatcher._client, "request", side_effect=httpx.TimeoutException("timeout")
+        ):
+            result = dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "save_failed"
+
+    def test_mapper_api_401(self, dispatcher, context):
+        """Verify auth error is handled."""
+        response = MagicMock()
+        response.status_code = 401
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+        ):
+            result = dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert "save_failed" in parsed["code"]
+
+    def test_mapper_api_no_workout_id_returned(self, dispatcher, context):
+        """Verify graceful handling when mapper-api returns no ID."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {}}  # No ID
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "save_failed"
+        assert "no ID" in parsed["message"]
+
+    def test_auth_token_forwarded(self, dispatcher, context):
+        """Verify auth token is forwarded to mapper-api."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {"id": "w-123"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        call_kwargs = mock_req.call_args
+        assert call_kwargs[1]["headers"]["Authorization"] == "Bearer test-token"
+        assert call_kwargs[1]["headers"]["X-User-Id"] == "user-1"
+
+    def test_profile_id_in_request_body(self, dispatcher, context):
+        """Verify user_id is included as profile_id in request body."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {"id": "w-123"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        call_kwargs = mock_req.call_args
+        body = call_kwargs[1]["json"]
+        assert body["profile_id"] == "user-1"
+        assert body["device"] == "web"
+        assert "https://youtube.com" in body["sources"][0]
+
+    def test_correct_endpoint_called(self, dispatcher, context):
+        """Verify correct mapper-api endpoint is called."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"workout": {"id": "w-123"}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+            dispatcher.execute(
+                "save_imported_workout",
+                {
+                    "workout_data": {"title": "Test"},
+                    "source_url": "https://youtube.com/watch?v=test",
+                },
+                context,
+            )
+
+        call_args = mock_req.call_args
+        assert "workouts/save" in call_args[0][1]
+        assert call_args[0][0] == "POST"
+
+
+class TestFormatIngestionResultPreviewMode:
+    """Tests for _format_ingestion_result preview mode flags (AMA-529).
+
+    After AMA-529, all import results include:
+    - preview_mode: True (workout extracted but not saved)
+    - persisted: False (workout not in user's library yet)
+    - next_step: Instructions for the AI
+    - full_workout_data: Complete data for save_imported_workout
+    """
+
+    def test_youtube_import_includes_preview_flags(self, dispatcher, context):
+        """Verify YouTube import includes preview_mode=true and persisted=false."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "title": "Test Workout",
+                "exercises": [{"name": "Squats"}],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=test"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+        assert "next_step" in data
+        assert "full_workout_data" in data["workout"]
+
+    def test_tiktok_import_includes_preview_flags(self, dispatcher, context):
+        """Verify TikTok import includes preview_mode=true and persisted=false."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"title": "TikTok Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_tiktok",
+                {"url": "https://tiktok.com/@user/video/123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+
+    def test_instagram_import_includes_preview_flags(self, dispatcher, context):
+        """Verify Instagram import includes preview_mode=true and persisted=false."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"title": "IG Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_instagram",
+                {"url": "https://instagram.com/p/ABC"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+
+    def test_pinterest_single_includes_preview_flags(self, dispatcher, context):
+        """Verify Pinterest single pin includes preview_mode=true."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"title": "Pinterest Workout"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_pinterest",
+                {"url": "https://pinterest.com/pin/123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+
+    def test_pinterest_board_includes_preview_flags(self, dispatcher, context):
+        """Verify Pinterest board (multiple) includes preview_mode=true."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workouts": [
+                {"title": "Workout 1"},
+                {"title": "Workout 2"},
+            ],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_pinterest",
+                {"url": "https://pinterest.com/user/board/fitness"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+        assert data["multiple_workouts"] is True
+
+    def test_source_url_included(self, dispatcher, context):
+        """Verify source_url is included for save_imported_workout."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"title": "Test"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=specific123"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["source_url"] == "https://youtube.com/watch?v=specific123"
+
+    def test_exercise_names_included_for_preview(self, dispatcher, context):
+        """Verify exercise names are included for user preview."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "title": "Full Body",
+                "exercises": [
+                    {"name": "Squats"},
+                    {"name": "Lunges"},
+                    {"name": "Push-ups"},
+                ],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=test"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert "exercise_names" in data["workout"]
+        assert "Squats" in data["workout"]["exercise_names"]
+        assert "Lunges" in data["workout"]["exercise_names"]
+        assert data["workout"]["exercise_count"] == 3
+
+    def test_image_import_includes_preview_flags(self, dispatcher, context):
+        """Verify image import includes preview_mode=true and persisted=false."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {"title": "Image Workout", "exercises": []},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        # Image import uses multipart POST, not regular request
+        with patch.object(dispatcher._client, "post", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_image",
+                {"image_data": "ZmFrZWltYWdl", "filename": "workout.jpg"},  # base64 of "fakeimage"
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["preview_mode"] is True
+        assert data["persisted"] is False
+        assert "source_url" in data
+        assert data["source_url"].startswith("uploaded:")
