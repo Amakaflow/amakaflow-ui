@@ -210,6 +210,7 @@ class TestChatStream:
             "current_page": "workout_detail",
             "selected_workout_id": "workout-abc123",
             "selected_date": None,
+            "pending_imports": None,
         }
 
     def test_empty_message_returns_422(self, chat_client):

@@ -320,7 +320,8 @@ class TestPinterestIngestionE2E:
         assert result["multiple_workouts"] is True
         assert result["total"] == 3
         assert len(result["workouts"]) == 3
-        assert all("title" in w and "id" in w for w in result["workouts"])
+        # After AMA-529 two-phase import, workouts have title and full_workout_data (not id)
+        assert all("title" in w for w in result["workouts"])
 
 
 @pytest.mark.integration

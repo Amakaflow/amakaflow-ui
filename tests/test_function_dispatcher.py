@@ -652,7 +652,7 @@ class TestImportFromPinterest:
         assert data["total"] == 3
         assert len(data["workouts"]) == 3
         assert data["workouts"][0]["title"] == "Workout 1"
-        assert data["workouts"][0]["id"] == "w-1"
+        # After AMA-529, workouts have full_workout_data instead of id
 
     def test_missing_url(self, dispatcher, context):
         result = dispatcher.execute("import_from_pinterest", {}, context)
@@ -2723,35 +2723,34 @@ class TestSaveImportedWorkout:
 
     def test_extracts_title_from_workout_name(self, dispatcher, context):
         """Verify title is extracted from workout_data.name if title not present."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"workout": {"id": "w-123"}}
-        mock_response.raise_for_status = MagicMock()
+        # Mock ingestor response (first call) with name but no title
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {
+            "workout": {"name": "Workout From Name Field", "blocks": []}
+        }
+        ingestor_response.raise_for_status = MagicMock()
 
-        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+        # Mock mapper-api save response (second call)
+        mapper_response = MagicMock()
+        mapper_response.json.return_value = {"workout": {"id": "w-123"}}
+        mapper_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", side_effect=[ingestor_response, mapper_response]
+        ) as mock_req:
             dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"name": "Workout From Name Field"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
-        call_args = mock_req.call_args
+        # Second call is to mapper-api, check it has the title from name
+        call_args = mock_req.call_args_list[1]
         assert call_args[1]["json"]["title"] == "Workout From Name Field"
 
-    def test_missing_workout_data(self, dispatcher, context):
-        """Verify error when workout_data is missing."""
-        result = dispatcher.execute(
-            "save_imported_workout",
-            {"source_url": "https://youtube.com/watch?v=test"},
-            context,
-        )
-
-        parsed = json.loads(result)
-        assert parsed["error"] is True
-        assert parsed["code"] == "validation_error"
-        assert "workout_data" in parsed["message"]
+    # NOTE: test_missing_workout_data was removed because the current
+    # implementation uses cache-keyed architecture where workout_data
+    # is fetched from the ingestor using source_url, not passed as an arg.
 
     def test_missing_source_url(self, dispatcher, context):
         """Verify error when source_url is missing."""
@@ -2768,15 +2767,20 @@ class TestSaveImportedWorkout:
 
     def test_mapper_api_timeout(self, dispatcher, context):
         """Verify timeout error is user-friendly."""
+        # Mock ingestor response (first call) to succeed
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
+
+        # Mock mapper-api call (second call) to timeout
         with patch.object(
-            dispatcher._client, "request", side_effect=httpx.TimeoutException("timeout")
+            dispatcher._client,
+            "request",
+            side_effect=[ingestor_response, httpx.TimeoutException("timeout")],
         ):
             result = dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
@@ -2786,19 +2790,25 @@ class TestSaveImportedWorkout:
 
     def test_mapper_api_401(self, dispatcher, context):
         """Verify auth error is handled."""
-        response = MagicMock()
-        response.status_code = 401
+        # Mock ingestor response (first call) to succeed
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
+
+        # Mock mapper-api call (second call) to return 401
+        error_response = MagicMock()
+        error_response.status_code = 401
         with patch.object(
             dispatcher._client,
             "request",
-            side_effect=httpx.HTTPStatusError("", request=MagicMock(), response=response),
+            side_effect=[
+                ingestor_response,
+                httpx.HTTPStatusError("", request=MagicMock(), response=error_response),
+            ],
         ):
             result = dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
@@ -2808,17 +2818,24 @@ class TestSaveImportedWorkout:
 
     def test_mapper_api_no_workout_id_returned(self, dispatcher, context):
         """Verify graceful handling when mapper-api returns no ID."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"workout": {}}  # No ID
-        mock_response.raise_for_status = MagicMock()
+        # Mock ingestor response (first call) with workout data
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
 
-        with patch.object(dispatcher._client, "request", return_value=mock_response):
+        # Mock mapper-api response (second call) with no ID
+        mapper_response = MagicMock()
+        mapper_response.json.return_value = {"workout": {}}  # No ID
+        mapper_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=[ingestor_response, mapper_response],
+        ):
             result = dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
@@ -2829,41 +2846,57 @@ class TestSaveImportedWorkout:
 
     def test_auth_token_forwarded(self, dispatcher, context):
         """Verify auth token is forwarded to mapper-api."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"workout": {"id": "w-123"}}
-        mock_response.raise_for_status = MagicMock()
+        # Mock ingestor response (first call)
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
 
-        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+        # Mock mapper-api response (second call)
+        mapper_response = MagicMock()
+        mapper_response.json.return_value = {"workout": {"id": "w-123"}}
+        mapper_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=[ingestor_response, mapper_response],
+        ) as mock_req:
             dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
-        call_kwargs = mock_req.call_args
+        # Second call is to mapper-api
+        call_kwargs = mock_req.call_args_list[1]
         assert call_kwargs[1]["headers"]["Authorization"] == "Bearer test-token"
         assert call_kwargs[1]["headers"]["X-User-Id"] == "user-1"
 
     def test_profile_id_in_request_body(self, dispatcher, context):
         """Verify user_id is included as profile_id in request body."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"workout": {"id": "w-123"}}
-        mock_response.raise_for_status = MagicMock()
+        # Mock ingestor response (first call)
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
 
-        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+        # Mock mapper-api response (second call)
+        mapper_response = MagicMock()
+        mapper_response.json.return_value = {"workout": {"id": "w-123"}}
+        mapper_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=[ingestor_response, mapper_response],
+        ) as mock_req:
             dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
-        call_kwargs = mock_req.call_args
+        # Second call is to mapper-api
+        call_kwargs = mock_req.call_args_list[1]
         body = call_kwargs[1]["json"]
         assert body["profile_id"] == "user-1"
         assert body["device"] == "web"
@@ -2871,21 +2904,29 @@ class TestSaveImportedWorkout:
 
     def test_correct_endpoint_called(self, dispatcher, context):
         """Verify correct mapper-api endpoint is called."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"workout": {"id": "w-123"}}
-        mock_response.raise_for_status = MagicMock()
+        # Mock ingestor response (first call)
+        ingestor_response = MagicMock()
+        ingestor_response.json.return_value = {"workout": {"title": "Test", "blocks": []}}
+        ingestor_response.raise_for_status = MagicMock()
 
-        with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
+        # Mock mapper-api response (second call)
+        mapper_response = MagicMock()
+        mapper_response.json.return_value = {"workout": {"id": "w-123"}}
+        mapper_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client,
+            "request",
+            side_effect=[ingestor_response, mapper_response],
+        ) as mock_req:
             dispatcher.execute(
                 "save_imported_workout",
-                {
-                    "workout_data": {"title": "Test"},
-                    "source_url": "https://youtube.com/watch?v=test",
-                },
+                {"source_url": "https://youtube.com/watch?v=test"},
                 context,
             )
 
-        call_args = mock_req.call_args
+        # Second call is to mapper-api
+        call_args = mock_req.call_args_list[1]
         assert "workouts/save" in call_args[0][1]
         assert call_args[0][0] == "POST"
 

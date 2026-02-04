@@ -81,7 +81,8 @@ When a user asks to import a workout from YouTube, TikTok, Instagram, Pinterest,
 2. After import_from_*, you MUST stop and wait for user confirmation
 3. import_from_* only EXTRACTS - never claim "saved" or "added to library" after import
 4. Only claim success after save_imported_workout returns persisted: true
-5. If you see a "Pending Import State" section below, the workout is already extracted - call save_imported_workout directly
+5. If you see a "Pending Import State" section below, the workout is already extracted
+   - call save_imported_workout directly
 
 ### Correct Example:
 ```
@@ -401,7 +402,10 @@ class AsyncStreamChatUseCase:
                         if result_dict.get("success") and not result_dict.get("persisted"):
                             # Extract workout info from the result
                             workout = result_dict.get("workout", {})
-                            source_url = tool_use["input"].get("url") or tool_use["input"].get("image_data", "image_upload")
+                            source_url = (
+                                tool_use["input"].get("url")
+                                or tool_use["input"].get("image_data", "image_upload")
+                            )
                             pending_imports.append({
                                 "source_url": source_url,
                                 "title": workout.get("title", "Untitled Workout"),
@@ -457,11 +461,13 @@ class AsyncStreamChatUseCase:
         end_data["output_tokens"] = total_output_tokens
         end_data["latency_ms"] = total_latency_ms
 
-        # 8-10: Fire-and-forget for non-critical persistence
-        # These run in the background while we yield message_end immediately
-        asyncio.create_task(self._persist_assistant_message(
+        # 8-10: Persistence - assistant message is CRITICAL (must complete before message_end)
+        # to prevent race conditions where next request loads stale history
+        await self._persist_assistant_message(
             session_id, full_text, all_tool_calls, end_data
-        ))
+        )
+
+        # Non-critical tasks can remain fire-and-forget
         asyncio.create_task(self._increment_rate_limit(user_id, ai_call_count))
         if is_new_session and message:
             asyncio.create_task(self._auto_title_session(session_id, message))
@@ -579,7 +585,11 @@ class AsyncStreamChatUseCase:
         all_tool_calls: List[Dict[str, Any]],
         end_data: Dict[str, Any],
     ) -> None:
-        """Fire-and-forget: persist assistant message."""
+        """Persist assistant message to database.
+
+        This is awaited synchronously (not fire-and-forget) to ensure
+        persistence completes before message_end is yielded to the client.
+        """
         try:
             await self._message_repo.create({
                 "session_id": session_id,
@@ -683,12 +693,15 @@ class AsyncStreamChatUseCase:
         if all_pending:
             prompt += "\n\n## Pending Import State\n"
             prompt += "The following workout(s) have been extracted and are awaiting user confirmation.\n"
-            prompt += "DO NOT call import_from_* again for these URLs. If user confirms, call save_imported_workout.\n\n"
+            prompt += "**IMPORTANT:** DO NOT call import_from_* again for these URLs.\n"
+            prompt += "When user confirms, call `save_imported_workout(source_url=\"<url>\")` with the URL below:\n\n"
             for imp in all_pending:
-                prompt += f"- **URL**: `{imp.get('source_url', 'unknown')}`\n"
+                url = imp.get('source_url', 'unknown')
+                prompt += f"- **Source URL**: `{url}`\n"
                 prompt += f"  **Title**: {imp.get('title', 'Untitled')}\n"
                 if imp.get('exercise_count'):
                     prompt += f"  **Exercises**: {imp['exercise_count']}\n"
+                prompt += f"  **To save**: `save_imported_workout(source_url=\"{url}\")`\n\n"
 
         if not context:
             return prompt

@@ -29,6 +29,14 @@ from infrastructure.db.chat_session_repository import SupabaseChatSessionReposit
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+class PendingImport(BaseModel):
+    """A workout that has been imported but not yet saved."""
+
+    source_url: str = Field(..., description="URL the workout was imported from")
+    title: Optional[str] = Field(None, description="Workout title")
+    exercise_count: Optional[int] = Field(None, description="Number of exercises")
+
+
 class ChatContext(BaseModel):
     """Context about what the user is currently viewing in the app."""
 
@@ -46,6 +54,10 @@ class ChatContext(BaseModel):
         None,
         pattern=r"^\d{4}-\d{2}-\d{2}$",
         description="ISO date string (YYYY-MM-DD) for calendar context",
+    )
+    pending_imports: Optional[List[PendingImport]] = Field(
+        None,
+        description="Workouts that have been imported but not yet saved to library",
     )
 
     @field_validator("selected_workout_id")

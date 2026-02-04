@@ -207,35 +207,36 @@ class TestAsyncStreamChat:
         assert data["latency_ms"] == 1500
 
     @pytest.mark.asyncio
-    async def test_message_end_returns_immediately(self, use_case, mock_message_repo):
-        """Verify message_end is returned before assistant persistence completes.
+    async def test_message_end_waits_for_assistant_persistence(self, use_case, mock_message_repo):
+        """Verify message_end is returned AFTER assistant message is persisted.
 
-        Note: User message is persisted synchronously before streaming begins,
-        which is intentional. Only assistant message and rate limit increment
-        are fire-and-forget.
+        This is critical to prevent race conditions where the next request
+        loads conversation history before the previous message's tool_calls
+        were persisted.
+
+        Note: Rate limit increment and auto-titling remain fire-and-forget
+        since they are not critical for conversation consistency.
         """
         call_count = 0
+        persistence_completed = False
 
-        async def slow_create_for_assistant(*args, **kwargs):
-            nonlocal call_count
+        async def track_create(*args, **kwargs):
+            nonlocal call_count, persistence_completed
             call_count += 1
-            # First call is user message (fast), subsequent calls are slow
+            # First call is user message (fast), second is assistant message
             if call_count == 1:
                 return {"id": "msg-user"}
-            await asyncio.sleep(1.0)
+            # Mark that persistence completed
+            persistence_completed = True
             return {"id": "msg-assistant"}
 
-        mock_message_repo.create.side_effect = slow_create_for_assistant
+        mock_message_repo.create.side_effect = track_create
 
-        import time
-        start = time.time()
         events = await collect_events(use_case.execute(user_id="user-1", message="Hello"))
-        elapsed = time.time() - start
 
-        # message_end should return quickly because assistant persistence
-        # is fire-and-forget (only user message is awaited)
-        assert elapsed < 0.5
+        # message_end should only be returned AFTER assistant persistence completes
         assert events[-1].event == "message_end"
+        assert persistence_completed, "Assistant message must be persisted before message_end"
 
 
 class TestAsyncStreamChatWithTools:
@@ -538,6 +539,86 @@ class TestAsyncStreamChatErrorHandling:
         assert data["type"] == "feature_disabled"
 
 
+class TestAsyncStreamChatPersistenceOrdering:
+    @pytest.mark.asyncio
+    async def test_tool_results_persisted_before_message_end(self):
+        """Verify tool results are persisted BEFORE message_end is yielded.
+
+        This prevents race conditions where the next request loads history
+        before the previous message's tool_calls were persisted.
+        """
+        # Setup mock repos
+        mock_session_repo = AsyncMock()
+        mock_message_repo = AsyncMock()
+        mock_rate_limit_repo = AsyncMock()
+        mock_ai_client = MagicMock()
+        mock_dispatcher = AsyncMock()
+
+        mock_session_repo.get.return_value = {"id": "test-session", "user_id": "user-1"}
+        mock_rate_limit_repo.get_monthly_usage.return_value = 0
+        mock_message_repo.list_for_session.return_value = []
+
+        # Track persistence order
+        persistence_order = []
+
+        async def track_message_create(data):
+            persistence_order.append(("message_create", data.get("role")))
+            return {"id": "msg-1"}
+
+        mock_message_repo.create.side_effect = track_message_create
+
+        # Simulate tool call response from Claude
+        async def mock_stream(*args, **kwargs):
+            yield StreamEvent(event="function_call", data={"id": "tool-1", "name": "import_from_youtube"})
+            yield StreamEvent(
+                event="content_delta",
+                data={"partial_json": '{"url": "https://youtube.com/watch?v=abc"}'},
+            )
+            yield StreamEvent(
+                event="message_end",
+                data={"stop_reason": "tool_use", "input_tokens": 100, "output_tokens": 50},
+            )
+
+        call_count = 0
+
+        async def mock_stream_second(*args, **kwargs):
+            yield StreamEvent(event="content_delta", data={"text": "Done!"})
+            yield StreamEvent(
+                event="message_end",
+                data={"stop_reason": "end_turn", "input_tokens": 100, "output_tokens": 50},
+            )
+
+        def stream_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return mock_stream(*args, **kwargs)
+            else:
+                return mock_stream_second(*args, **kwargs)
+
+        mock_ai_client.stream_chat = stream_side_effect
+
+        mock_dispatcher.execute.return_value = '{"success": true, "workout": {"title": "Test"}}'
+
+        use_case = AsyncStreamChatUseCase(
+            session_repo=mock_session_repo,
+            message_repo=mock_message_repo,
+            rate_limit_repo=mock_rate_limit_repo,
+            ai_client=mock_ai_client,
+            function_dispatcher=mock_dispatcher,
+        )
+
+        events = []
+        async for event in use_case.execute("user-1", "Import workout", "test-session"):
+            events.append(event)
+            if event.event == "message_end":
+                # At this point, assistant message should already be persisted
+                assert any(
+                    call[0] == "message_create" and call[1] == "assistant"
+                    for call in persistence_order
+                ), "Assistant message must be persisted BEFORE message_end is yielded"
+
+
 class TestAsyncStreamChatMessageBuilding:
     @pytest.mark.asyncio
     async def test_history_loaded_correctly(self, use_case, mock_message_repo):
@@ -582,3 +663,105 @@ class TestAsyncStreamChatMessageBuilding:
 
         # Flow should complete successfully with history
         assert events[-1].event == "message_end"
+
+    @pytest.mark.asyncio
+    async def test_tool_results_included_in_subsequent_turn_messages(self):
+        """Verify that when loading history, tool results from previous turns
+        are correctly reconstructed in the Anthropic message format.
+        """
+        use_case = AsyncStreamChatUseCase(
+            session_repo=AsyncMock(),
+            message_repo=AsyncMock(),
+            rate_limit_repo=AsyncMock(),
+            ai_client=AsyncMock(),
+            function_dispatcher=AsyncMock(),
+        )
+
+        # Simulate persisted history with tool calls
+        history = [
+            {
+                "role": "user",
+                "content": "Import https://youtube.com/watch?v=abc123",
+            },
+            {
+                "role": "assistant",
+                "content": "I found a workout!",
+                "tool_calls": [
+                    {
+                        "id": "tool-1",
+                        "name": "import_from_youtube",
+                        "input": {"url": "https://youtube.com/watch?v=abc123"},
+                        "result": '{"success": true, "workout": {"title": "Leg Day", "blocks": []}}'
+                    }
+                ]
+            },
+            {
+                "role": "user",
+                "content": "Yes, save it!",
+            },
+        ]
+
+        messages = use_case._build_messages(history)
+
+        # Should have 4 messages: user, assistant (with tool_use), user (tool_result), user
+        assert len(messages) == 4
+
+        # First message: user request
+        assert messages[0]["role"] == "user"
+        assert "Import" in messages[0]["content"]
+
+        # Second message: assistant with tool_use
+        assert messages[1]["role"] == "assistant"
+        assert isinstance(messages[1]["content"], list)
+        tool_use_block = next(b for b in messages[1]["content"] if b["type"] == "tool_use")
+        assert tool_use_block["name"] == "import_from_youtube"
+        assert tool_use_block["input"]["url"] == "https://youtube.com/watch?v=abc123"
+
+        # Third message: tool_result as user message
+        assert messages[2]["role"] == "user"
+        assert isinstance(messages[2]["content"], list)
+        tool_result_block = messages[2]["content"][0]
+        assert tool_result_block["type"] == "tool_result"
+        assert "Leg Day" in tool_result_block["content"]
+        assert tool_result_block["tool_use_id"] == "tool-1"
+
+        # Fourth message: user confirmation
+        assert messages[3]["role"] == "user"
+        assert "save it" in messages[3]["content"]
+
+
+class TestAsyncStreamChatPendingImports:
+    @pytest.mark.asyncio
+    async def test_pending_imports_include_full_workout_data(self):
+        """Verify pending imports include enough data for save_imported_workout.
+
+        The pending_imports must include source_url so Claude can call
+        save_imported_workout(source_url=...) without re-importing.
+        """
+        use_case = AsyncStreamChatUseCase(
+            session_repo=AsyncMock(),
+            message_repo=AsyncMock(),
+            rate_limit_repo=AsyncMock(),
+            ai_client=AsyncMock(),
+            function_dispatcher=AsyncMock(),
+        )
+
+        # Verify system prompt injection includes actionable info
+        pending = [
+            {
+                "source_url": "https://youtube.com/watch?v=abc123",
+                "title": "Leg Day",
+                "exercise_count": 5,
+            }
+        ]
+
+        prompt = use_case._build_system_prompt(None, pending)
+
+        # Must include the URL in a way Claude can extract and use
+        assert "https://youtube.com/watch?v=abc123" in prompt
+        assert "Leg Day" in prompt
+        # Must have clear instructions on how to save
+        assert "save_imported_workout" in prompt
+        assert "source_url" in prompt.lower() or "url" in prompt.lower()
+        # Must have explicit save command with the URL so Claude knows exactly what to call
+        assert 'save_imported_workout(source_url="https://youtube.com/watch?v=abc123")' in prompt
