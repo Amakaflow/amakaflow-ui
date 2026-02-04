@@ -780,37 +780,86 @@ class FunctionDispatcher:
     def _save_imported_workout(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Save an extracted workout to the user's library.
+        """Save an imported workout to the user's library.
 
-        This is the second step of the import flow:
+        Uses cache-keyed architecture: only requires source_url.
+        The workout data is fetched from the ingestor's cache automatically.
+        If cache has expired, re-ingests transparently.
+
+        Flow:
         1. User asks to import from YouTube/TikTok/etc
-        2. AI calls import_from_* which extracts but does NOT save
+        2. AI calls import_from_* which extracts and caches (but does NOT save)
         3. AI presents the workout to the user
         4. User confirms they want to save it
-        5. AI calls this function to persist to the user's library
-
-        The workout will then appear in the user's "My Workouts" tab.
+        5. AI calls this function with just source_url
+        6. This function fetches from cache and saves to library
         """
-        workout_data = args.get("workout_data")
         source_url = args.get("source_url")
         title_override = args.get("title_override")
-
-        if not workout_data:
-            return self._error_response(
-                "validation_error",
-                "Missing required field: workout_data. "
-                "Call import_from_youtube or similar first to extract workout data."
-            )
 
         if not source_url:
             return self._error_response(
                 "validation_error",
                 "Missing required field: source_url. "
-                "Provide the original URL the workout was imported from."
+                "Provide the URL the workout was imported from."
             )
 
-        # Extract title from workout data or use override
-        title = title_override or workout_data.get("title") or workout_data.get("name", "Imported Workout")
+        # Determine the ingest endpoint based on URL domain
+        parsed = urlparse(source_url)
+        domain = parsed.netloc.lower().replace("www.", "")
+
+        if any(d in domain for d in ["youtube.com", "youtu.be"]):
+            ingest_endpoint = "/ingest/youtube"
+            body: Dict[str, Any] = {"url": source_url}
+        elif "tiktok.com" in domain:
+            ingest_endpoint = "/ingest/tiktok"
+            body = {"url": source_url, "mode": "auto"}
+        elif "instagram.com" in domain:
+            ingest_endpoint = "/ingest/instagram_test"
+            body = {"url": source_url}
+        elif "pinterest.com" in domain or "pin.it" in domain:
+            ingest_endpoint = "/ingest/pinterest"
+            body = {"url": source_url}
+        else:
+            return self._error_response(
+                "validation_error",
+                f"Unsupported source URL domain: {domain}"
+            )
+
+        # Fetch workout data from ingestor (uses cache, fast if previously imported)
+        try:
+            ingest_result = self._call_api(
+                "POST",
+                f"{self._ingestor_url}{ingest_endpoint}",
+                ctx,
+                json=body,
+            )
+        except FunctionExecutionError as e:
+            return self._error_response(
+                "fetch_failed",
+                f"Failed to fetch workout data: {e.message}"
+            )
+
+        # Extract workout data from ingestor response (handle both formats)
+        if "workout" in ingest_result:
+            workout_data = ingest_result["workout"]
+        elif "title" in ingest_result or "blocks" in ingest_result:
+            workout_data = {
+                k: v for k, v in ingest_result.items()
+                if k not in ("success", "error", "_provenance")
+            }
+        else:
+            return self._error_response(
+                "fetch_failed",
+                "No workout data found in ingestor response."
+            )
+
+        # Get the title
+        title = (
+            title_override
+            or workout_data.get("title")
+            or workout_data.get("name", "Imported Workout")
+        )
 
         # Build the save payload for mapper-api
         save_payload: Dict[str, Any] = {

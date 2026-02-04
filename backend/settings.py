@@ -186,11 +186,11 @@ class Settings(BaseSettings):
         description="Base URL for mapper-api service",
     )
     calendar_api_url: str = Field(
-        default="http://localhost:8002",
+        default="http://localhost:8003",
         description="Base URL for calendar-api service",
     )
     workout_ingestor_api_url: str = Field(
-        default="http://localhost:8003",
+        default="http://localhost:8004",
         description="Base URL for workout-ingestor-api service",
     )
     strava_sync_api_url: str = Field(

@@ -60,6 +60,44 @@ Guidelines:
 - When tools are available, use them to look up the user's profile and workout history for personalized advice.
 - Keep responses concise but thorough. Use bullet points and structured formatting for workout plans.
 - If you're unsure about a medical condition, recommend consulting a healthcare professional.
+
+## CRITICAL: Workout Import Workflow (Two-Step Process)
+
+When a user asks to import a workout from YouTube, TikTok, Instagram, Pinterest, or an image:
+
+### Step 1: Extract and preview ONLY
+- Call the appropriate import tool (import_from_youtube, etc.) to extract the workout
+- Present the workout summary to the user
+- Ask: "Would you like me to save this to your library?"
+- **STOP HERE. DO NOT call save_imported_workout yet.**
+- **Wait for the user's next message to confirm.**
+
+### Step 2: Save ONLY after user confirms in a SEPARATE message
+- Only call `save_imported_workout` AFTER the user sends a new message confirming (e.g., "yes", "save it", "add it")
+- Pass ONLY the `source_url` - the backend fetches workout data from cache
+
+### STRICT RULES:
+1. **NEVER call both import_from_* and save_imported_workout in the same response**
+2. After import_from_*, you MUST stop and wait for user confirmation
+3. import_from_* only EXTRACTS - never claim "saved" or "added to library" after import
+4. Only claim success after save_imported_workout returns persisted: true
+5. If you see a "Pending Import State" section below, the workout is already extracted - call save_imported_workout directly
+
+### Correct Example:
+```
+User: "Import https://youtube.com/watch?v=abc123"
+You: [Call import_from_youtube] → "Found 'Leg Day' with 5 exercises. Save to library?"
+[STOP - wait for user]
+User: "Yes"
+You: [Call save_imported_workout] → "Saved to your library!"
+```
+
+### WRONG Example (DO NOT DO THIS):
+```
+User: "Import https://youtube.com/watch?v=abc123"
+You: [Call import_from_youtube] [Call save_imported_workout] → "Saved!"
+❌ WRONG - You called both tools without waiting for confirmation
+```
 """
 
 
@@ -229,6 +267,7 @@ class AsyncStreamChatUseCase:
         total_latency_ms = 0
         ai_call_count = 0
         end_data: Dict[str, Any] = {}
+        pending_imports: List[Dict[str, Any]] = []  # Track pending imports for prompt injection
 
         tools = ALL_TOOLS
         MAX_TOOL_ITERATIONS = 10
@@ -355,6 +394,35 @@ class AsyncStreamChatUseCase:
                     "result": result,
                 })
 
+                # Track pending imports for dynamic system prompt injection
+                if tool_name.startswith("import_from_"):
+                    try:
+                        result_dict = json.loads(result) if isinstance(result, str) else result
+                        if result_dict.get("success") and not result_dict.get("persisted"):
+                            # Extract workout info from the result
+                            workout = result_dict.get("workout", {})
+                            source_url = tool_use["input"].get("url") or tool_use["input"].get("image_data", "image_upload")
+                            pending_imports.append({
+                                "source_url": source_url,
+                                "title": workout.get("title", "Untitled Workout"),
+                                "exercise_count": len(workout.get("blocks", [])) if workout.get("blocks") else None,
+                            })
+                            logger.debug("Tracked pending import: %s", source_url)
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning("Failed to parse import result for pending tracking: %s", e)
+
+                # Clear pending import when successfully saved
+                elif tool_name == "save_imported_workout":
+                    try:
+                        result_dict = json.loads(result) if isinstance(result, str) else result
+                        if result_dict.get("success") and result_dict.get("persisted"):
+                            saved_url = tool_use["input"].get("source_url")
+                            if saved_url:
+                                pending_imports = [p for p in pending_imports if p.get("source_url") != saved_url]
+                                logger.debug("Cleared pending import after save: %s", saved_url)
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning("Failed to parse save result for pending tracking: %s", e)
+
                 # Fire-and-forget persistence
                 asyncio.create_task(self._persist_tool_result(
                     session_id, tool_use["id"], tool_name,
@@ -366,6 +434,10 @@ class AsyncStreamChatUseCase:
 
             anthropic_messages.append({"role": "assistant", "content": assistant_content})
             anthropic_messages.append({"role": "user", "content": tool_results})
+
+            # Update system prompt with pending imports for next iteration
+            if pending_imports:
+                system_prompt = self._build_system_prompt(context, pending_imports)
 
             logger.debug(
                 "Tool loop iteration %d: executed %d tools, continuing...",
@@ -401,12 +473,16 @@ class AsyncStreamChatUseCase:
         if self._tts_service and self._tts_settings_repo and full_text:
             voice_response, voice_error = await self._generate_tts(user_id, full_text)
 
-        # 12. Yield message_end with optional voice response
+        # 12. Yield message_end with optional voice response and pending imports
         message_end_data: Dict[str, Any] = {
             "session_id": session_id,
             "tokens_used": end_data.get("input_tokens", 0) + end_data.get("output_tokens", 0),
             "latency_ms": end_data.get("latency_ms", 0),
         }
+
+        # Include pending imports for frontend to track and send back on next request
+        if pending_imports:
+            message_end_data["pending_imports"] = pending_imports
 
         if voice_response:
             message_end_data["voice_response"] = voice_response
@@ -586,9 +662,33 @@ class AsyncStreamChatUseCase:
 
         return voice_response, voice_error
 
-    def _build_system_prompt(self, context: Optional[Dict[str, Any]]) -> str:
-        """Build the system prompt with optional context injection."""
+    def _build_system_prompt(
+        self,
+        context: Optional[Dict[str, Any]],
+        pending_imports: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Build the system prompt with optional context and pending import injection."""
         prompt = SYSTEM_PROMPT
+
+        # Merge pending imports from context (frontend-tracked) with current session
+        all_pending = list(pending_imports) if pending_imports else []
+        if context and context.get("pending_imports"):
+            # Frontend can send pending imports from previous conversation turns
+            for imp in context["pending_imports"]:
+                # Avoid duplicates by source_url
+                if not any(p.get("source_url") == imp.get("source_url") for p in all_pending):
+                    all_pending.append(imp)
+
+        # Inject pending import state to prevent re-imports
+        if all_pending:
+            prompt += "\n\n## Pending Import State\n"
+            prompt += "The following workout(s) have been extracted and are awaiting user confirmation.\n"
+            prompt += "DO NOT call import_from_* again for these URLs. If user confirms, call save_imported_workout.\n\n"
+            for imp in all_pending:
+                prompt += f"- **URL**: `{imp.get('source_url', 'unknown')}`\n"
+                prompt += f"  **Title**: {imp.get('title', 'Untitled')}\n"
+                if imp.get('exercise_count'):
+                    prompt += f"  **Exercises**: {imp['exercise_count']}\n"
 
         if not context:
             return prompt

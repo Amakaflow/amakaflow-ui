@@ -216,28 +216,24 @@ PHASE_2_TOOLS: List[Dict[str, Any]] = [
     {
         "name": "save_imported_workout",
         "description": (
-            "Save an extracted workout to the user's library. Call this AFTER using "
-            "import_from_youtube/tiktok/instagram/pinterest/image to persist the workout. "
-            "Only call this after presenting the extracted workout to the user and receiving "
-            "their confirmation to save it. The workout will then appear in their 'My Workouts' tab."
+            "Save an imported workout to the user's library. Call this after showing the user "
+            "the workout preview from import_from_youtube/tiktok/instagram/pinterest/image and "
+            "receiving their confirmation to save. Only requires the source_url - the workout "
+            "data is fetched from cache automatically."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "workout_data": {
-                    "type": "object",
-                    "description": "The full workout data object returned from an import_from_* tool",
-                },
                 "source_url": {
                     "type": "string",
-                    "description": "The original source URL the workout was imported from",
+                    "description": "The source URL the workout was imported from (YouTube, TikTok, etc.)",
                 },
                 "title_override": {
                     "type": "string",
                     "description": "Optional custom title to use instead of the extracted title",
                 },
             },
-            "required": ["workout_data", "source_url"],
+            "required": ["source_url"],
         },
     },
 ]
