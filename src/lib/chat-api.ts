@@ -7,7 +7,7 @@
 
 import { API_URLS } from './config';
 import { authenticatedFetch } from './authenticated-fetch';
-import type { SSEEventData } from '../types/chat';
+import type { SSEEventData, PendingImport } from '../types/chat';
 
 /**
  * Parse a single SSE event block into structured data.
@@ -41,9 +41,17 @@ export function parseSSEEvent(block: string): SSEEventData | null {
   }
 }
 
+export interface ChatContext {
+  current_page?: string;
+  selected_workout_id?: string;
+  selected_date?: string;
+  pending_imports?: PendingImport[];
+}
+
 export interface StreamChatOptions {
   message: string;
   sessionId?: string | null;
+  context?: ChatContext;
   signal?: AbortSignal;
   onEvent: (event: SSEEventData) => void;
   onError?: (error: Error) => void;
@@ -58,6 +66,7 @@ export interface StreamChatOptions {
 export async function streamChat({
   message,
   sessionId,
+  context,
   signal,
   onEvent,
   onError,
@@ -69,6 +78,9 @@ export async function streamChat({
   const body: Record<string, unknown> = { message };
   if (sessionId) {
     body.session_id = sessionId;
+  }
+  if (context) {
+    body.context = context;
   }
 
   let response: Response;

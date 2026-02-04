@@ -84,9 +84,15 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
       receivedContentRef.current = false;
 
       const executeStream = () => {
+        // Build context with pending imports
+        const context = state.pendingImports.length > 0
+          ? { pending_imports: state.pendingImports }
+          : undefined;
+
         streamChat({
           message: trimmed,
           sessionId: sessionIdRef.current,
+          context,
           signal: controller.signal,
           onEvent: (event: SSEEventData) => {
             switch (event.event) {
@@ -123,6 +129,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                   type: 'FINALIZE_ASSISTANT_MESSAGE',
                   tokens_used: event.data.tokens_used,
                   latency_ms: event.data.latency_ms,
+                  pending_imports: event.data.pending_imports,
                 });
                 // FINALIZE_ASSISTANT_MESSAGE already sets isStreaming: false
                 abortRef.current = null;
@@ -168,7 +175,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
       executeStream();
     },
-    [state.isStreaming, dispatch],
+    [state.isStreaming, state.pendingImports, dispatch],
   );
 
   return { sendMessage, cancelStream };
