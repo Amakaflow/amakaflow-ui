@@ -56,10 +56,17 @@ export interface FunctionResultEvent {
   result: string;
 }
 
+export interface PendingImport {
+  source_url: string;
+  title?: string;
+  exercise_count?: number;
+}
+
 export interface MessageEndEvent {
   session_id: string;
   tokens_used: number;
   latency_ms: number;
+  pending_imports?: PendingImport[];
 }
 
 export interface ErrorEvent {
@@ -93,6 +100,8 @@ export interface ChatState {
   isStreaming: boolean;
   error: string | null;
   rateLimitInfo: RateLimitInfo | null;
+  /** Pending imports from last message - send back to API on next request */
+  pendingImports: PendingImport[];
 }
 
 // ============================================================================
@@ -109,7 +118,7 @@ export type ChatAction =
   | { type: 'APPEND_CONTENT_DELTA'; text: string }
   | { type: 'ADD_FUNCTION_CALL'; toolCall: ChatToolCall }
   | { type: 'UPDATE_FUNCTION_RESULT'; toolUseId: string; result: string }
-  | { type: 'FINALIZE_ASSISTANT_MESSAGE'; tokens_used: number; latency_ms: number }
+  | { type: 'FINALIZE_ASSISTANT_MESSAGE'; tokens_used: number; latency_ms: number; pending_imports?: PendingImport[] }
   | { type: 'SET_STREAMING'; isStreaming: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_RATE_LIMIT'; info: RateLimitInfo }

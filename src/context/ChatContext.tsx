@@ -39,6 +39,7 @@ export const initialChatState: ChatState = {
   isStreaming: false,
   error: null,
   rateLimitInfo: null,
+  pendingImports: [],
 };
 
 function createInitialState(): ChatState {
@@ -121,7 +122,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           latency_ms: action.latency_ms,
         };
       }
-      return { ...state, messages, isStreaming: false };
+      // Store pending imports for sending back on next request
+      return {
+        ...state,
+        messages,
+        isStreaming: false,
+        pendingImports: action.pending_imports || [],
+      };
     }
 
     case 'SET_STREAMING':
@@ -140,6 +147,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: [],
         error: null,
         rateLimitInfo: null,
+        pendingImports: [],
       };
 
     case 'LOAD_SESSION':
