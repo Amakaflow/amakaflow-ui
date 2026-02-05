@@ -1,19 +1,37 @@
 {
   "name": "amakaflow-automation",
   "description": "Autonomous test automation for AmakaFlow fitness platform (Web + iOS + Android + Watch)",
-  "version": "2.0.0",
-  "model": "claude-sonnet-4-20250514",
-  "maxTokens": 8192,
-  "temperature": 0,
+  "version": "3.0.0",
+  "models": {
+    "orchestration": {
+      "provider": "moonshot",
+      "model": "kimi-k2.5",
+      "baseUrl": "https://api.moonshot.ai/v1",
+      "apiKeyEnv": "MOONSHOT_API_KEY",
+      "maxTokens": 8192,
+      "temperature": 0
+    },
+    "coding": {
+      "provider": "minimax",
+      "model": "minimax-m2",
+      "baseUrl": "https://api.minimax.chat/v1",
+      "apiKeyEnv": "MINIMAX_API_KEY",
+      "maxTokens": 16384,
+      "temperature": 0.1
+    }
+  },
+  "routing": {
+    "default": "orchestration",
+    "codeGeneration": "coding",
+    "codeEdit": "coding",
+    "codeReview": "coding"
+  },
   "tools": {
     "browser": {
       "enabled": true,
       "headless": true,
       "timeout": 30000,
-      "viewport": {
-        "width": 1280,
-        "height": 720
-      }
+      "viewport": { "width": 1280, "height": 720 }
     },
     "exec": {
       "enabled": true,
@@ -22,20 +40,11 @@
     },
     "read": {
       "enabled": true,
-      "allowedPaths": [
-        "scenarios/**",
-        "flows/**",
-        "skills/**",
-        "*.md",
-        "*.json",
-        "artifacts/**"
-      ]
+      "allowedPaths": ["scenarios/**", "flows/**", "skills/**", "*.md", "*.json", "artifacts/**"]
     },
     "write": {
       "enabled": true,
-      "allowedPaths": [
-        "artifacts/**"
-      ]
+      "allowedPaths": ["artifacts/**", "flows/**"]
     }
   },
   "environment": {
@@ -51,9 +60,7 @@
     "ANDROID_EMULATOR": "Pixel_7_API_34",
     "WEAR_EMULATOR": "Wear_OS_Square_API_33"
   },
-  "skills": [
-    "skills/test-runner"
-  ],
+  "skills": ["skills/test-runner", "skills/test-writer"],
   "artifacts": {
     "directory": "artifacts",
     "screenshots": "artifacts/screenshots",
@@ -63,38 +70,14 @@
   "defaults": {
     "suite": "smoke",
     "platform": "all",
-    "retries": 0,
+    "retries": 1,
     "parallel": false
   },
   "platforms": {
-    "web": {
-      "enabled": true,
-      "tool": "browser",
-      "scenarios": "scenarios/web"
-    },
-    "ios": {
-      "enabled": true,
-      "tool": "maestro",
-      "flows": "flows/ios",
-      "appId": "com.amakaflow.app"
-    },
-    "watchos": {
-      "enabled": true,
-      "tool": "maestro",
-      "flows": "flows/ios/watch",
-      "appId": "com.amakaflow.app.watchkitapp"
-    },
-    "android": {
-      "enabled": true,
-      "tool": "maestro",
-      "flows": "flows/android",
-      "appId": "com.amakaflow.companion"
-    },
-    "wearos": {
-      "enabled": true,
-      "tool": "maestro",
-      "flows": "flows/android/wear",
-      "appId": "com.amakaflow.companion.wear"
-    }
+    "web": { "enabled": true, "tool": "browser", "scenarios": "scenarios/web" },
+    "ios": { "enabled": true, "tool": "maestro", "flows": "flows/ios", "appId": "com.amakaflow.app" },
+    "watchos": { "enabled": true, "tool": "maestro", "flows": "flows/ios/watch", "appId": "com.amakaflow.app.watchkitapp" },
+    "android": { "enabled": true, "tool": "maestro", "flows": "flows/android", "appId": "com.amakaflow.companion" },
+    "wearos": { "enabled": true, "tool": "maestro", "flows": "flows/android/wear", "appId": "com.amakaflow.companion.wear" }
   }
 }

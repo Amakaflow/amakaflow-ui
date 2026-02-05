@@ -43,6 +43,49 @@ export ANTHROPIC_API_KEY=sk-...
 ./scripts/run-full-suite.sh full
 ```
 
+## AI Model Configuration
+
+This automation framework uses a multi-model approach for cost efficiency:
+
+| Task | Model | Provider | Pricing (in/out per 1M tokens) |
+|------|-------|----------|------|
+| Orchestration | Kimi K2.5 | Moonshot AI | $0.60/$2.50 |
+| Code Generation | MiniMax M2 | MiniMax | See pricing page |
+
+### Setup
+
+1. Get API keys:
+   - Kimi K2.5: https://platform.moonshot.ai/
+   - MiniMax M2: https://www.minimax.io/
+
+2. Configure environment:
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+3. Run with AI analysis:
+```bash
+# Run tests with AI-powered failure analysis
+./scripts/run-qa-agent.sh ios smoke analyze
+
+# Watch mode - auto-test when app code changes
+./scripts/watch-and-test.sh smoke
+```
+
+### Model Routing
+
+- **Orchestration (Kimi K2.5)**: Test planning, failure analysis, decision making
+- **Coding (MiniMax M2)**: Fix broken tests, generate new Maestro flows
+
+### New Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `run-qa-agent.sh` | Main entry point with AI analysis |
+| `watch-and-test.sh` | Continuous testing while coding |
+| `model-router.sh` | Route prompts to appropriate model |
+
 ## Test Suites
 
 | Suite | Web | iOS | Android | watchOS | Wear OS | Duration |
@@ -85,6 +128,8 @@ amakaflow-automation/
 ├── skills/
 │   └── test-runner/
 │       └── SKILL.md           # /test-runner command definition
+│   └── test-writer/
+│       └── SKILL.md           # Test flow generator (MiniMax)
 ├── scenarios/
 │   ├── web/                   # Web test scenarios
 │   │   ├── health-checks.md
@@ -119,8 +164,13 @@ amakaflow-automation/
 │   ├── screenshots/
 │   ├── logs/
 │   └── reports/
+├── prompts/
+│   └── orchestration-agent.md # Kimi K2.5 system prompt
 ├── scripts/
 │   ├── run-full-suite.sh      # Main entry point
+│   ├── run-qa-agent.sh        # AI-powered test runner
+│   ├── watch-and-test.sh      # Continuous testing
+│   ├── model-router.sh        # Model routing utility
 │   └── setup-maestro.sh       # Environment setup
 └── docker-compose.yml         # Container config (web only)
 ```
