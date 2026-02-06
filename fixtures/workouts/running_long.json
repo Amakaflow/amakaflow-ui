@@ -1,0 +1,13 @@
+{
+  "id": "fixture-running-001",
+  "name": "Long Run - Easy Pace",
+  "sport": "running",
+  "duration": 3600,
+  "description": "60 minute easy conversational pace run",
+  "source": "coach",
+  "intervals": [
+    { "kind": "warmup", "seconds": 300 },
+    { "kind": "time", "seconds": 2700, "target": "Zone 2" },
+    { "kind": "cooldown", "seconds": 600 }
+  ]
+}

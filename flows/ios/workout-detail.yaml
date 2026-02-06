@@ -1,0 +1,118 @@
+# iOS Workout Detail Flow
+# Validates tapping a workout card opens the detail sheet with correct content
+#
+# Run: maestro test flows/ios/workout-detail.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-workout-detail-error
+
+---
+
+# Launch with specific fixtures
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min,strength_block_w1,running_long"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+# ============================================
+# DETAIL 1: Tap first workout (AMRAP)
+# ============================================
+
+- tapOn:
+    id: "workout_card_0"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_detail_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workout_detail_screen"
+
+# Verify workout detail content
+- assertVisible:
+    text: "Step-by-Step Breakdown"
+- assertVisible:
+    text: "Start Follow-Along"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-detail-01-amrap
+
+# Scroll down to see action buttons
+- scroll:
+    direction: DOWN
+    amount: 0.5
+
+- takeScreenshot: artifacts/screenshots/ios-workout-detail-02-amrap-actions
+
+# Dismiss detail sheet (swipe down)
+- swipe:
+    direction: DOWN
+    from: "50%, 10%"
+    to: "50%, 90%"
+
+# Wait for detail to dismiss
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+# ============================================
+# DETAIL 2: Tap second workout (Strength)
+# ============================================
+
+- tapOn:
+    id: "workout_card_1"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_detail_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workout_detail_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-detail-03-strength
+
+# Dismiss
+- swipe:
+    direction: DOWN
+    from: "50%, 10%"
+    to: "50%, 90%"
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-detail-04-complete
+
+# Final assertions
+- assertNotVisible:
+    id: "error_view"
+    optional: true

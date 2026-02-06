@@ -1,0 +1,143 @@
+# iOS EMOM Workout Complete Flow
+# Full lifecycle: load → detail → start → end early → completion screen → done
+#
+# Run: maestro test flows/ios/workout-complete-emom.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-error
+
+---
+
+# Launch with EMOM fixture only
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "emom_strength"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+# ============================================
+# STEP 1: Open workout detail
+# ============================================
+
+- tapOn:
+    id: "workout_card_0"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_detail_screen"
+    timeout: 5000
+
+- assertVisible:
+    text: "EMOM Strength - 16 min"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-01-detail
+
+# ============================================
+# STEP 2: Start follow-along workout
+# ============================================
+
+- tapOn:
+    id: "start_follow_along_button"
+    retryTapIfNoChange: true
+
+# Device selection sheet - select Phone Only
+- extendedWaitUntil:
+    visible:
+      text: "Start Workout"
+    timeout: 5000
+
+- tapOn:
+    id: "device_option_phone-only"
+    retryTapIfNoChange: true
+
+# ============================================
+# STEP 3: Workout player running
+# ============================================
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_player_screen"
+    timeout: 10000
+
+- assertVisible:
+    id: "workout_player_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-02-player
+
+# Let workout run briefly
+- wait: 3000
+
+# ============================================
+# STEP 4: End workout early
+# ============================================
+
+- tapOn:
+    id: "CloseWorkoutButton"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      text: "End Workout?"
+    timeout: 5000
+
+- tapOn:
+    text: "Save & End"
+    retryTapIfNoChange: true
+
+# ============================================
+# STEP 5: Completion screen
+# ============================================
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_completion_screen"
+    timeout: 10000
+
+- assertVisible:
+    text: "Workout Complete!"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-03-completion
+
+# ============================================
+# STEP 6: Dismiss completion
+# ============================================
+
+- tapOn:
+    id: "completion_done_button"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-04-done
+
+# Final assertions
+- assertNotVisible:
+    id: "error_view"
+    optional: true

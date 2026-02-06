@@ -1,0 +1,19 @@
+{
+  "id": "fixture-emom-001",
+  "name": "EMOM Strength - 20 min",
+  "sport": "strength",
+  "duration": 1200,
+  "description": "Every minute on the minute for 20 minutes",
+  "source": "coach",
+  "intervals": [
+    { "kind": "warmup", "seconds": 120 },
+    {
+      "kind": "repeat",
+      "reps": 20,
+      "intervals": [
+        { "kind": "reps", "reps": 5, "name": "Power Clean", "load": "70% 1RM", "rest_sec": 30 }
+      ]
+    },
+    { "kind": "cooldown", "seconds": 120 }
+  ]
+}

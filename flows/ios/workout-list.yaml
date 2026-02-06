@@ -1,0 +1,73 @@
+# iOS Workout List Flow
+# Validates that fixture workouts load correctly and cards render in the list
+#
+# Run: maestro test flows/ios/workout-list.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-workout-list-error
+
+---
+
+# Launch with all fixture workouts loaded
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min,emom_strength,strength_block_w1,running_long,hiit_follow_along,for_time_conditioning"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workouts_screen"
+
+# Assert fixture workout cards are present
+- assertVisible:
+    id: "workout_card_0"
+- assertVisible:
+    id: "workout_card_1"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-list-01-all-fixtures
+
+# Verify workout names from fixtures appear
+- assertVisible:
+    text: "AMRAP Test - 10 min"
+- assertVisible:
+    text: "EMOM Strength - 16 min"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-list-02-names-verified
+
+# Scroll down to see more workout cards
+- scroll:
+    direction: DOWN
+    amount: 0.5
+
+- takeScreenshot: artifacts/screenshots/ios-workout-list-03-scrolled
+
+# Final assertions
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true

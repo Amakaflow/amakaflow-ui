@@ -1,0 +1,85 @@
+# iOS Error State Flow
+# Validates the app handles API failures gracefully when UITEST_FIXTURE_STATE=error
+#
+# Run: maestro test flows/ios/error-state.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-error-state-error
+
+---
+
+# Launch with UITEST_FIXTURE_STATE=error (simulate API failure)
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURE_STATE: "error"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen (auth bypass should still work)
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+- assertVisible:
+    id: "home_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-error-state-01-home
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+# The app should handle the error gracefully - no crash
+- assertVisible:
+    id: "workouts_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-error-state-02-workouts-error
+
+# Verify no workout cards exist (API failed)
+- assertNotVisible:
+    id: "workout_card_0"
+
+# Navigate to other tabs - app should remain stable
+- tapOn:
+    id: "settings_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-error-state-03-settings-ok
+
+# Return home
+- tapOn:
+    id: "home_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 5000
+
+# Final assertions - app should NOT crash from API errors
+- assertVisible:
+    id: "home_screen"
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/ios-error-state-04-complete

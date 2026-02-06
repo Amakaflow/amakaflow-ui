@@ -1,0 +1,18 @@
+{
+  "id": "fixture-fortime-001",
+  "name": "For Time - Conditioning",
+  "sport": "cardio",
+  "duration": 1800,
+  "description": "Complete all rounds for time",
+  "source": "coach",
+  "intervals": [
+    { "kind": "warmup", "seconds": 180 },
+    { "kind": "reps", "reps": 21, "name": "Thrusters", "load": "40kg" },
+    { "kind": "reps", "reps": 21, "name": "Pull Ups" },
+    { "kind": "reps", "reps": 15, "name": "Thrusters", "load": "40kg" },
+    { "kind": "reps", "reps": 15, "name": "Pull Ups" },
+    { "kind": "reps", "reps": 9, "name": "Thrusters", "load": "40kg" },
+    { "kind": "reps", "reps": 9, "name": "Pull Ups" },
+    { "kind": "cooldown", "seconds": 180 }
+  ]
+}

@@ -1,0 +1,160 @@
+# iOS AMRAP Workout Complete Flow
+# Full lifecycle: load → detail → start → end early → completion screen → done
+#
+# Run: maestro test flows/ios/workout-complete-amrap.yaml
+#
+# Note: This test ends the workout early via "Save & End" rather than
+# waiting for natural completion, to keep test duration practical.
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-error
+
+---
+
+# Launch with AMRAP fixture only
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+# ============================================
+# STEP 1: Open workout detail
+# ============================================
+
+- tapOn:
+    id: "workout_card_0"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_detail_screen"
+    timeout: 5000
+
+- assertVisible:
+    text: "AMRAP Test - 10 min"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-01-detail
+
+# ============================================
+# STEP 2: Start follow-along workout
+# ============================================
+
+- tapOn:
+    id: "start_follow_along_button"
+    retryTapIfNoChange: true
+
+# Device selection sheet appears - select Phone Only
+- extendedWaitUntil:
+    visible:
+      text: "Start Workout"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-02-device-sheet
+
+- tapOn:
+    id: "device_option_phone-only"
+    retryTapIfNoChange: true
+
+# ============================================
+# STEP 3: Workout player running
+# ============================================
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_player_screen"
+    timeout: 10000
+
+- assertVisible:
+    id: "workout_player_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-03-player
+
+# Let workout run briefly (warmup phase)
+- wait: 3000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-04-running
+
+# ============================================
+# STEP 4: End workout early via Save & End
+# ============================================
+
+- tapOn:
+    id: "CloseWorkoutButton"
+    retryTapIfNoChange: true
+
+# Wait for end confirmation dialog
+- extendedWaitUntil:
+    visible:
+      text: "End Workout?"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-05-end-dialog
+
+# Tap "Save & End"
+- tapOn:
+    text: "Save & End"
+    retryTapIfNoChange: true
+
+# ============================================
+# STEP 5: Completion screen
+# ============================================
+
+- extendedWaitUntil:
+    visible:
+      id: "workout_completion_screen"
+    timeout: 10000
+
+- assertVisible:
+    id: "workout_completion_screen"
+- assertVisible:
+    text: "Workout Complete!"
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-06-completion
+
+# ============================================
+# STEP 6: Dismiss completion
+# ============================================
+
+- tapOn:
+    id: "completion_done_button"
+    retryTapIfNoChange: true
+
+# Should return to workout detail or workouts list
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/ios-workout-complete-amrap-07-done
+
+# Final assertions
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true

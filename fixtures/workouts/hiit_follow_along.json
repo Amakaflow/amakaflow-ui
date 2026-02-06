@@ -1,0 +1,18 @@
+{
+  "id": "fixture-hiit-001",
+  "name": "HIIT Follow-Along",
+  "sport": "cardio",
+  "duration": 1800,
+  "description": "High intensity interval training with follow-along videos",
+  "source": "instagram",
+  "source_url": "https://www.instagram.com/amakaflow",
+  "intervals": [
+    { "kind": "warmup", "seconds": 300 },
+    { "kind": "reps", "reps": 20, "name": "Jumping Jacks", "rest_sec": 30, "follow_along_url": "https://www.instagram.com/reel/example1" },
+    { "kind": "reps", "reps": 15, "name": "Burpees", "rest_sec": 30, "follow_along_url": "https://www.instagram.com/reel/example2" },
+    { "kind": "reps", "reps": 30, "name": "Mountain Climbers", "rest_sec": 30 },
+    { "kind": "reps", "reps": 20, "name": "High Knees", "rest_sec": 30 },
+    { "kind": "reps", "reps": 10, "name": "Push Ups", "rest_sec": 30 },
+    { "kind": "cooldown", "seconds": 300 }
+  ]
+}

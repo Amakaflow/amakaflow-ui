@@ -23,6 +23,7 @@ onFlowError:
       UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
       UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
       UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min,emom_strength"
       UITEST_SKIP_ONBOARDING: "true"
 
 # ============================================

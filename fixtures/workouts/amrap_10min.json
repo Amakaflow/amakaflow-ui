@@ -1,0 +1,21 @@
+{
+  "id": "fixture-amrap-001",
+  "name": "AMRAP Test - 10 min",
+  "sport": "strength",
+  "duration": 600,
+  "description": "As many rounds as possible in 10 minutes",
+  "source": "coach",
+  "intervals": [
+    { "kind": "warmup", "seconds": 60 },
+    {
+      "kind": "repeat",
+      "reps": 99,
+      "intervals": [
+        { "kind": "reps", "reps": 10, "name": "Push Ups" },
+        { "kind": "reps", "reps": 15, "name": "Air Squats" },
+        { "kind": "reps", "reps": 20, "name": "Sit Ups" }
+      ]
+    },
+    { "kind": "cooldown", "seconds": 60 }
+  ]
+}

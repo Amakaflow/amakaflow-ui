@@ -19,6 +19,7 @@ onFlowError:
       UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
       UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
       UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min,strength_block_w1"
       UITEST_SKIP_ONBOARDING: "true"
 
 # Wait for app to fully load - use specific element, not wildcard

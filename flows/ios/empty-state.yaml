@@ -1,0 +1,96 @@
+# iOS Empty State Flow
+# Validates the app handles zero workouts gracefully
+#
+# Run: maestro test flows/ios/empty-state.yaml
+
+appId: com.amakaflow.app
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-empty-state-error
+
+---
+
+# Launch with UITEST_FIXTURE_STATE=empty (zero workouts)
+- launchApp:
+    clearState: true
+    stopApp: true
+    env:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "fixture-test-user"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURE_STATE: "empty"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+- assertVisible:
+    id: "home_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-empty-state-01-home
+
+# Navigate to workouts tab
+- tapOn:
+    id: "workouts_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "workouts_screen"
+
+# Verify empty state message is shown (no workout cards)
+- assertVisible:
+    text: "No Upcoming Workouts"
+- assertVisible:
+    text: "No Incoming Workouts"
+
+# Verify NO workout cards exist
+- assertNotVisible:
+    id: "workout_card_0"
+
+- takeScreenshot: artifacts/screenshots/ios-empty-state-02-workouts-empty
+
+# Verify other tabs still work
+- tapOn:
+    id: "settings_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "settings_screen"
+
+- takeScreenshot: artifacts/screenshots/ios-empty-state-03-settings-ok
+
+# Return home
+- tapOn:
+    id: "home_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 5000
+
+# Final assertions - app should be stable even with no data
+- assertVisible:
+    id: "home_screen"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/ios-empty-state-04-complete

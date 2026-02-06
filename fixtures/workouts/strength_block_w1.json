@@ -1,0 +1,34 @@
+{
+  "id": "fixture-strength-001",
+  "name": "Strength Block W1D1",
+  "sport": "strength",
+  "duration": 3600,
+  "description": "Week 1 Day 1 - Squat and Bench focus",
+  "source": "coach",
+  "intervals": [
+    { "kind": "warmup", "seconds": 300 },
+    {
+      "kind": "repeat",
+      "reps": 5,
+      "intervals": [
+        { "kind": "reps", "reps": 5, "name": "Back Squat", "load": "80% 1RM", "rest_sec": 180 }
+      ]
+    },
+    {
+      "kind": "repeat",
+      "reps": 5,
+      "intervals": [
+        { "kind": "reps", "reps": 5, "name": "Bench Press", "load": "80% 1RM", "rest_sec": 180 }
+      ]
+    },
+    {
+      "kind": "repeat",
+      "reps": 3,
+      "intervals": [
+        { "kind": "reps", "reps": 10, "name": "Romanian Deadlift", "rest_sec": 90 },
+        { "kind": "reps", "reps": 10, "name": "Barbell Row", "rest_sec": 90 }
+      ]
+    },
+    { "kind": "cooldown", "seconds": 300 }
+  ]
+}
