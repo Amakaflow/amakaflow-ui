@@ -14,7 +14,7 @@ onFlowError:
 - launchApp:
     clearState: true
     stopApp: true
-    env:
+    arguments:
       UITEST_MODE: "true"
       UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
       UITEST_USER_ID: "fixture-test-user"
@@ -23,11 +23,7 @@ onFlowError:
       UITEST_SKIP_ONBOARDING: "true"
 
 # Wait for home screen (auth bypass should still work)
-- extendedWaitUntil:
-    visible:
-      id: "home_screen"
-    timeout: 15000
-
+- wait: 10000
 - assertVisible:
     id: "home_screen"
 
@@ -37,11 +33,6 @@ onFlowError:
 - tapOn:
     id: "workouts_tab"
     retryTapIfNoChange: true
-
-- extendedWaitUntil:
-    visible:
-      id: "workouts_screen"
-    timeout: 5000
 
 # The app should handle the error gracefully - no crash
 - assertVisible:
@@ -58,10 +49,8 @@ onFlowError:
     id: "settings_tab"
     retryTapIfNoChange: true
 
-- extendedWaitUntil:
-    visible:
-      id: "settings_screen"
-    timeout: 5000
+- assertVisible:
+    id: "settings_screen"
 
 - takeScreenshot: artifacts/screenshots/ios-error-state-03-settings-ok
 
@@ -69,11 +58,6 @@ onFlowError:
 - tapOn:
     id: "home_tab"
     retryTapIfNoChange: true
-
-- extendedWaitUntil:
-    visible:
-      id: "home_screen"
-    timeout: 5000
 
 # Final assertions - app should NOT crash from API errors
 - assertVisible:
