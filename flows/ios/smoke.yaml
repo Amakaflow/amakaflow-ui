@@ -14,7 +14,7 @@ onFlowError:
 - launchApp:
     clearState: true
     stopApp: true
-    env:
+    arguments:
       UITEST_MODE: "true"
       UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
       UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
@@ -23,17 +23,14 @@ onFlowError:
       UITEST_SKIP_ONBOARDING: "true"
 
 # Wait for app to fully load - use specific element, not wildcard
-- extendedWaitUntil:
-    visible:
-      id: "home_screen"
-    timeout: 15000
+- wait: 10000
+- assertVisible:
+    id: "home_screen"
 
 # Take screenshot of initial state
 - takeScreenshot: artifacts/screenshots/ios-smoke-01-launch
 
 # Verify home screen loaded with specific assertions
-- assertVisible:
-    id: "home_screen"
 - assertNotVisible:
     id: "error_view"
     optional: true
@@ -47,11 +44,6 @@ onFlowError:
     retryTapIfNoChange: true
 
 # Wait for workouts screen to load
-- extendedWaitUntil:
-    visible:
-      id: "workouts_screen"
-    timeout: 5000
-
 - assertVisible:
     id: "workouts_screen"
 
@@ -63,11 +55,6 @@ onFlowError:
     retryTapIfNoChange: true
 
 # Wait for settings screen
-- extendedWaitUntil:
-    visible:
-      id: "settings_screen"
-    timeout: 5000
-
 - assertVisible:
     id: "settings_screen"
 
@@ -79,10 +66,8 @@ onFlowError:
     retryTapIfNoChange: true
 
 # Wait for home screen
-- extendedWaitUntil:
-    visible:
-      id: "home_screen"
-    timeout: 5000
+- assertVisible:
+    id: "home_screen"
 
 - takeScreenshot: artifacts/screenshots/ios-smoke-05-complete
 
