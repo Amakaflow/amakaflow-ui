@@ -1,0 +1,14 @@
+# AmakaFlow Garmin Watch App - Test Project Configuration
+#
+# This is a minimal jungle file for running unit tests.
+# For the full app build, see the main app's monkey.jungle.
+#
+# Run tests: monkeyc -t -f monkey.jungle
+
+project.manifest = manifest.xml
+
+# Source files
+base.sourcePath = source
+
+# Target devices for testing
+base.devices = venu3

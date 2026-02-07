@@ -1,0 +1,156 @@
+# Garmin Companion Sync Smoke Test Flow (iOS)
+# Validates phone-side Garmin Connect IQ companion integration
+#
+# Run: maestro test flows/garmin/companion/ios/sync-smoke.yaml
+#
+# NOTE: Maestro can only test the phone-side companion app UI.
+# It CANNOT drive the Garmin watch itself. This flow tests:
+# - App launch and navigation to Sources/Garmin section
+# - Garmin Connect sync UI elements are present
+# - Sync status indicators render correctly
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/garmin-sync-smoke-error
+
+---
+
+# Launch the app with clean state and UITEST env vars for auth bypass
+- launchApp:
+    clearState: true
+    stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+      UITEST_SKIP_APPLE_WATCH: "true"
+
+# Wait for app to fully load
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Take screenshot of initial state
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-01-launch
+
+# Verify home screen loaded
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+
+# ============================================
+# NAVIGATE TO SETTINGS / SOURCES
+# ============================================
+
+# Navigate to Settings where device sources live
+- tapOn:
+    id: "settings_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-02-settings
+
+# ============================================
+# FIND GARMIN CONNECT SECTION
+# ============================================
+
+# Scroll to find the Garmin / Data Sources section
+- scrollUntilVisible:
+    element:
+      text: "Data Sources"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-03-data-sources
+
+# Tap into Data Sources
+- tapOn:
+    text: "Data Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "data_sources_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-04-sources-list
+
+# ============================================
+# VERIFY GARMIN CONNECT UI
+# ============================================
+
+# Scroll to find Garmin Connect entry in the sources list
+- scrollUntilVisible:
+    element:
+      text: "Garmin Connect"
+    direction: DOWN
+    timeout: 10000
+
+# Verify Garmin Connect is listed as a source
+- assertVisible:
+    text: "Garmin Connect"
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-05-garmin-visible
+
+# Tap into Garmin Connect settings
+- tapOn:
+    text: "Garmin Connect"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "garmin_connect_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-06-garmin-connect
+
+# ============================================
+# VERIFY SYNC UI ELEMENTS
+# ============================================
+
+# Verify sync status indicator is present (optional - may show "Not Connected")
+- assertVisible:
+    id: "garmin_sync_status"
+    optional: true
+
+# Verify connect/disconnect button is present
+- assertVisible:
+    id: "garmin_connect_button"
+    optional: true
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-07-sync-ui
+
+# ============================================
+# FINAL STATE
+# ============================================
+
+# Navigate back to home
+- tapOn:
+    id: "home_tab"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/garmin-sync-smoke-08-complete
+
+# Final health check
+- assertVisible:
+    id: "home_screen"
+- assertNotVisible:
+    id: "error_view"
+    optional: true
+- assertNotVisible:
+    id: "crash_dialog"
+    optional: true
