@@ -3,7 +3,7 @@
 #
 # Run: maestro test flows/ios/error-state.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-error-state-error
@@ -24,9 +24,10 @@ onFlowError:
       UITEST_SKIP_APPLE_WATCH: "true"
 
 # Wait for home screen (auth bypass should still work)
-- wait: 10000
-- assertVisible:
-    id: "home_screen"
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
 
 - takeScreenshot: artifacts/screenshots/ios-error-state-01-home
 

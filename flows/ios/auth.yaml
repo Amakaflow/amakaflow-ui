@@ -14,7 +14,7 @@
 #   export TEST_PASSWORD="your-test-password"
 #   maestro test flows/ios/auth.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-auth-error
@@ -33,7 +33,7 @@ env:
 
 # Wait for login screen or home screen
 # (Home screen means user is already logged in)
-- wait: 5000
+- waitForAnimationToEnd
 - assertVisible:
     id: "login_screen"
     optional: true
@@ -66,9 +66,10 @@ env:
           retryTapIfNoChange: true
 
       # Wait for home screen after login
-      - wait: 10000
-      - assertVisible:
-          id: "home_screen"
+      - extendedWaitUntil:
+          visible:
+            id: "home_screen"
+          timeout: 15000
 
       - takeScreenshot: artifacts/screenshots/ios-auth-04-logged-in
 

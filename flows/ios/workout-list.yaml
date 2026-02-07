@@ -3,7 +3,7 @@
 #
 # Run: maestro test flows/ios/workout-list.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-workout-list-error
@@ -24,9 +24,10 @@ onFlowError:
       UITEST_SKIP_APPLE_WATCH: "true"
 
 # Wait for home screen
-- wait: 10000
-- assertVisible:
-    id: "home_screen"
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
 
 # Navigate to workouts tab
 - tapOn:

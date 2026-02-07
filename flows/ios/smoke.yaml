@@ -3,7 +3,7 @@
 #
 # Run: maestro test flows/ios/smoke.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-smoke-error
@@ -24,9 +24,10 @@ onFlowError:
       UITEST_SKIP_APPLE_WATCH: "true"
 
 # Wait for app to fully load - use specific element, not wildcard
-- wait: 10000
-- assertVisible:
-    id: "home_screen"
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
 
 # Take screenshot of initial state
 - takeScreenshot: artifacts/screenshots/ios-smoke-01-launch

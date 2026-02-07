@@ -3,7 +3,7 @@
 #
 # Run: maestro test flows/ios/watch/golden-paths.yaml
 
-appId: com.amakaflow.app.watchkitapp
+appId: com.myamaka.AmakaFlowCompanion.watchkitapp
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/watchos-golden-error
@@ -18,9 +18,10 @@ onFlowError:
     clearState: true
     stopApp: true
 
-- wait: 10000
-- assertVisible:
-    id: "watch_main_screen"
+- extendedWaitUntil:
+    visible:
+      id: "watch_main_screen"
+    timeout: 15000
 - assertNotVisible:
     id: "error_view"
     optional: true

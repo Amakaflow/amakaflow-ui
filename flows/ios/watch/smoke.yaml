@@ -4,7 +4,7 @@
 # Run: maestro test flows/ios/watch/smoke.yaml
 # Note: Requires watchOS simulator paired with iOS simulator
 
-appId: com.amakaflow.app.watchkitapp
+appId: com.myamaka.AmakaFlowCompanion.watchkitapp
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/watchos-smoke-error
@@ -17,9 +17,10 @@ onFlowError:
     stopApp: true
 
 # Wait for app to load
-- wait: 10000
-- assertVisible:
-    id: "watch_main_screen"
+- extendedWaitUntil:
+    visible:
+      id: "watch_main_screen"
+    timeout: 15000
 
 # Take screenshot of initial state
 - takeScreenshot: artifacts/screenshots/watchos-smoke-01-launch

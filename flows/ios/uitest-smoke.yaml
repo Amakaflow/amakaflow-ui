@@ -7,7 +7,7 @@
 #   UITEST_USER_ID="user_37lZCcU9AJ9b7MX2H71dZ2CuX2u" \
 #   maestro test flows/ios/uitest-smoke.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-uitest-smoke-error
@@ -31,10 +31,10 @@ onFlowError:
 # ASSERT: Auth was bypassed - home screen visible (not PairingView)
 # ============================================
 
-- wait: 10000
-
-- assertVisible:
-    id: "home_screen"
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
 
 # Verify we are NOT on the pairing screen (auth bypass worked)
 - assertNotVisible:

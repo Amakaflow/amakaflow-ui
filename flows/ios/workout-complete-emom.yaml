@@ -3,7 +3,7 @@
 #
 # Run: maestro test flows/ios/workout-complete-emom.yaml
 
-appId: com.amakaflow.app
+appId: com.myamaka.AmakaFlowCompanion
 
 onFlowError:
   - takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-error
@@ -24,9 +24,10 @@ onFlowError:
       UITEST_SKIP_APPLE_WATCH: "true"
 
 # Wait for home screen
-- wait: 10000
-- assertVisible:
-    id: "home_screen"
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
 
 # Navigate to workouts tab
 - tapOn:
@@ -72,14 +73,15 @@ onFlowError:
 # STEP 3: Workout player running
 # ============================================
 
-- wait: 5000
-- assertVisible:
-    id: "workout_player_screen"
+- extendedWaitUntil:
+    visible:
+      id: "workout_player_screen"
+    timeout: 10000
 
 - takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-02-player
 
 # Let workout run briefly
-- wait: 3000
+- waitForAnimationToEnd
 
 # ============================================
 # STEP 4: End workout early
@@ -100,9 +102,10 @@ onFlowError:
 # STEP 5: Completion screen
 # ============================================
 
-- wait: 5000
-- assertVisible:
-    id: "workout_completion_screen"
+- extendedWaitUntil:
+    visible:
+      id: "workout_completion_screen"
+    timeout: 10000
 
 - assertVisible:
     text: "Workout Complete!"
@@ -117,9 +120,10 @@ onFlowError:
     id: "completion_done_button"
     retryTapIfNoChange: true
 
-- wait: 5000
-- assertVisible:
-    id: "workouts_screen"
+- extendedWaitUntil:
+    visible:
+      id: "workouts_screen"
+    timeout: 10000
 
 - takeScreenshot: artifacts/screenshots/ios-workout-complete-emom-04-done
 
