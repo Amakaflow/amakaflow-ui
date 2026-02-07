@@ -115,13 +115,14 @@ Garmin Connect IQ testing uses a multi-layer approach since there is no single t
 connectiq test garmin/unit-tests/
 
 # Run Garmin companion app Maestro flows (iOS)
-maestro test flows/garmin/companion/ios/smoke.yaml
+maestro test flows/garmin/companion/ios/sync-smoke.yaml
 
 # Run Garmin companion app Maestro flows (Android)
-maestro test flows/garmin/companion/android/smoke.yaml
+# Not yet implemented
+# maestro test flows/garmin/companion/android/sync-smoke.yaml
 
 # Run Garmin simulator scripts
-./garmin/simulator-scripts/run-all.sh
+./garmin/simulator-scripts/run-all.sh  # TODO: not yet implemented
 ```
 
 ### Connect IQ SDK Requirements

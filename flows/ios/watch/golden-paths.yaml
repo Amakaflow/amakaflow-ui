@@ -7,7 +7,7 @@
 # watchOS Golden Paths Flow
 # Tests critical user journeys on Apple Watch
 #
-# Run: maestro test flows/ios/watch/golden-paths.yaml
+# Run (aspirational - cannot execute): maestro test flows/ios/watch/golden-paths.yaml
 
 appId: com.myamaka.AmakaFlowCompanion.watchkitapp
 

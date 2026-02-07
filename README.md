@@ -52,13 +52,14 @@ export CONNECTIQ_HOME=/path/to/connectiq-sdk
 connectiq test garmin/unit-tests/
 
 # Run Garmin companion app flows (iOS)
-maestro test flows/garmin/companion/ios/smoke.yaml
+maestro test flows/garmin/companion/ios/sync-smoke.yaml
 
 # Run Garmin companion app flows (Android)
-maestro test flows/garmin/companion/android/smoke.yaml
+# Not yet implemented
+# maestro test flows/garmin/companion/android/sync-smoke.yaml
 
 # Run Garmin simulator scripts
-./garmin/simulator-scripts/run-all.sh
+./garmin/simulator-scripts/run-all.sh  # TODO: not yet implemented
 
 # Run full Garmin suite
 ./scripts/run-full-suite.sh garmin

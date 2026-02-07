@@ -7,7 +7,7 @@
 # watchOS Smoke Test Flow
 # Validates watch app launches and basic functionality
 #
-# Run: maestro test flows/ios/watch/smoke.yaml
+# Run (aspirational - cannot execute): maestro test flows/ios/watch/smoke.yaml
 # Note: Requires watchOS simulator paired with iOS simulator
 
 appId: com.myamaka.AmakaFlowCompanion.watchkitapp
