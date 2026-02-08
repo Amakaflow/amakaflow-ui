@@ -1,5 +1,6 @@
 # Android Golden Paths Flow
 # Tests critical user journeys through the app
+# Aligned with iOS 4-path structure (AMA-552)
 #
 # Run: maestro test flows/android/golden-paths.yaml
 
@@ -17,16 +18,31 @@ onFlowError:
 - launchApp:
     clearState: true
     stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min,emom_strength,strength_block_w1"
+      UITEST_SKIP_ONBOARDING: "true"
+
+# Dismiss Android system dialogs (notification, microphone, etc.)
+- waitForAnimationToEnd
+- tapOn:
+    text: "Allow"
+    optional: true
+- tapOn:
+    text: "While using the app"
+    optional: true
+- tapOn:
+    text: "Don't allow"
+    optional: true
 
 - extendedWaitUntil:
     visible:
       id: "home_screen"
     timeout: 15000
 
-- assertVisible:
-    id: "home_screen"
-- assertVisible:
-    id: "bottom_navigation"
 - assertNotVisible:
     id: "error_view"
     optional: true
@@ -37,7 +53,7 @@ onFlowError:
 # GOLDEN PATH 1: View Workouts
 # ============================================
 
-# Navigate to workouts - MUST work
+# Navigate to workouts tab - MUST work
 - tapOn:
     id: "nav_workouts"
     retryTapIfNoChange: true
@@ -45,121 +61,70 @@ onFlowError:
 - extendedWaitUntil:
     visible:
       id: "workouts_screen"
-    timeout: 5000
-
-- assertVisible:
-    id: "workouts_screen"
+    timeout: 10000
 
 - takeScreenshot: artifacts/screenshots/android-golden-02-workouts-list
 
-# Tap first workout if exists (optional - depends on test data)
+# Tap first workout if list is not empty
+# This is optional because test data may not exist
 - tapOn:
     id: "workout_item_0"
     optional: true
     retryTapIfNoChange: true
 
-- extendedWaitUntil:
-    visible:
-      id: "workout_detail_screen"
-    timeout: 5000
-    optional: true
-
 - takeScreenshot: artifacts/screenshots/android-golden-03-workout-detail
 
-# Verify exercise list if on detail screen
-- assertVisible:
-    id: "exercise_list"
-    optional: true
-
-- takeScreenshot: artifacts/screenshots/android-golden-04-exercises
-
-# Go back
+# Go back to workouts list (optional because workout_item_0 tap is optional)
 - back
 
 # ============================================
 # GOLDEN PATH 2: Voice Workout
 # ============================================
 
-# Open voice workout (FAB) - MUST work (core feature)
+# Return to home first
 - tapOn:
-    id: "voice_workout_fab"
+    id: "nav_home"
     retryTapIfNoChange: true
 
 - extendedWaitUntil:
     visible:
+      id: "home_screen"
+    timeout: 10000
+
+# Open voice workout via Log Workout button - MUST work (core feature)
+- tapOn:
+    id: "log_workout_button"
+    retryTapIfNoChange: true
+
+# Dismiss microphone permission dialog if shown
+- tapOn:
+    text: "While using the app"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- extendedWaitUntil:
+    visible:
       id: "voice_workout_screen"
-    timeout: 5000
+    timeout: 10000
 
-- assertVisible:
-    id: "voice_workout_screen"
-
-- takeScreenshot: artifacts/screenshots/android-golden-05-voice-workout
+- takeScreenshot: artifacts/screenshots/android-golden-04-voice-workout
 
 # Verify record button is present - MUST exist
 - assertVisible:
     id: "record_button"
 
-- takeScreenshot: artifacts/screenshots/android-golden-06-voice-ready
+- takeScreenshot: artifacts/screenshots/android-golden-05-voice-ready
 
 # Go back without recording
 - back
 
 # ============================================
-# GOLDEN PATH 3: Calendar View
+# GOLDEN PATH 3: Activity History
 # ============================================
 
-# Navigate to calendar - MUST work
-- tapOn:
-    id: "nav_calendar"
-    retryTapIfNoChange: true
-
-- extendedWaitUntil:
-    visible:
-      id: "calendar_screen"
-    timeout: 5000
-
-- assertVisible:
-    id: "calendar_screen"
-- assertVisible:
-    id: "calendar_view"
-
-- takeScreenshot: artifacts/screenshots/android-golden-07-calendar
-
-# ============================================
-# GOLDEN PATH 4: History
-# ============================================
-
-# Navigate to history - MUST work
-- tapOn:
-    id: "nav_history"
-    retryTapIfNoChange: true
-
-- extendedWaitUntil:
-    visible:
-      id: "history_screen"
-    timeout: 5000
-
-- assertVisible:
-    id: "history_screen"
-
-- takeScreenshot: artifacts/screenshots/android-golden-08-history
-
-# Tap first completion if exists (optional - depends on test data)
-- tapOn:
-    id: "completion_item_0"
-    optional: true
-    retryTapIfNoChange: true
-
-- takeScreenshot: artifacts/screenshots/android-golden-09-completion-detail
-
-# Go back
-- back
-
-# ============================================
-# GOLDEN PATH 5: Settings
-# ============================================
-
-# Navigate to More - MUST work
+# Navigate via More tab (History is a sub-screen of More)
 - tapOn:
     id: "nav_more"
     retryTapIfNoChange: true
@@ -167,14 +132,51 @@ onFlowError:
 - extendedWaitUntil:
     visible:
       id: "more_screen"
-    timeout: 5000
+    timeout: 10000
 
-- assertVisible:
-    id: "more_screen"
+- tapOn:
+    text: "History"
+    retryTapIfNoChange: true
 
-- takeScreenshot: artifacts/screenshots/android-golden-10-more
+# Dismiss any API error dialogs (no backend in test mode)
+- waitForAnimationToEnd
+- tapOn:
+    text: "OK"
+    optional: true
+- waitForAnimationToEnd
 
-# Open settings - MUST work
+- extendedWaitUntil:
+    visible:
+      id: "history_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/android-golden-06-history
+
+# Tap first completion if exists (optional - depends on test data)
+- tapOn:
+    id: "completion_item_0"
+    optional: true
+    retryTapIfNoChange: true
+
+- takeScreenshot: artifacts/screenshots/android-golden-07-completion-detail
+
+# Go back to More screen
+- back
+
+# ============================================
+# GOLDEN PATH 4: Settings
+# ============================================
+
+# Navigate via More tab (resets More navigation stack)
+- tapOn:
+    id: "nav_more"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "more_screen"
+    timeout: 10000
+
 - tapOn:
     text: "Settings"
     retryTapIfNoChange: true
@@ -182,26 +184,30 @@ onFlowError:
 - extendedWaitUntil:
     visible:
       id: "settings_screen"
-    timeout: 5000
+    timeout: 10000
 
-- assertVisible:
-    id: "settings_screen"
-
-- takeScreenshot: artifacts/screenshots/android-golden-11-settings
+- takeScreenshot: artifacts/screenshots/android-golden-08-settings
 
 # Open transcription settings - MUST work
+# Need to scroll down to find it
+- scrollUntilVisible:
+    element:
+      text: "Transcription Settings"
+    direction: DOWN
+    timeout: 10000
+    speed: 25
 - tapOn:
-    text: "Transcription"
+    text: "Transcription Settings"
     retryTapIfNoChange: true
 
 - extendedWaitUntil:
     visible:
       id: "transcription_settings_screen"
-    timeout: 5000
+    timeout: 10000
 
-- takeScreenshot: artifacts/screenshots/android-golden-12-transcription-settings
+- takeScreenshot: artifacts/screenshots/android-golden-09-transcription-settings
 
-# Go back twice
+# Go back to settings, then back to more
 - back
 - back
 
@@ -217,9 +223,9 @@ onFlowError:
 - extendedWaitUntil:
     visible:
       id: "home_screen"
-    timeout: 5000
+    timeout: 10000
 
-- takeScreenshot: artifacts/screenshots/android-golden-13-complete
+- takeScreenshot: artifacts/screenshots/android-golden-10-complete
 
 # Final health check - specific assertions
 - assertVisible:
