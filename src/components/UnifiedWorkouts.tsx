@@ -89,6 +89,7 @@ import { ActivityHistory } from './ActivityHistory';
 import { CompletionDetailView } from './CompletionDetailView';
 import { fetchWorkoutCompletions, type WorkoutCompletion } from '../lib/completions-api';
 import { SyncStatusIndicator } from './workouts/UnifiedWorkoutCard';
+import { toast } from 'sonner';
 
 // =============================================================================
 // Types
@@ -410,22 +411,41 @@ export function UnifiedWorkouts({
   const confirmBulkDelete = async () => {
     if (pendingDeleteIds.length === 0) return;
 
+    const successIds: string[] = [];
+    let failCount = 0;
+
     for (const id of pendingDeleteIds) {
       const workout = allWorkouts.find((w) => w.id === id);
       if (!workout) continue;
 
       try {
+        let success = false;
+
         if (isHistoryWorkout(workout)) {
-          await deleteWorkoutFromHistory(id, profileId);
+          success = await deleteWorkoutFromHistory(id, profileId);
         } else if (isFollowAlongWorkout(workout)) {
-          await deleteFollowAlong(id, profileId);
+          const result = await deleteFollowAlong(id, profileId);
+          success = result.success;
+        }
+
+        if (success) {
+          successIds.push(id);
+        } else {
+          failCount++;
         }
       } catch (err) {
         console.error('Error deleting workout:', err);
+        failCount++;
       }
     }
 
-    setAllWorkouts((prev) => prev.filter((w) => !pendingDeleteIds.includes(w.id)));
+    if (successIds.length > 0) {
+      setAllWorkouts((prev) => prev.filter((w) => !successIds.includes(w.id)));
+    }
+    if (failCount > 0) {
+      toast.error(`Failed to delete ${failCount} workout${failCount > 1 ? 's' : ''}. Please try again.`);
+    }
+
     clearSelection();
     setPendingDeleteIds([]);
     setShowDeleteModal(false);
@@ -447,12 +467,24 @@ export function UnifiedWorkouts({
     const workout = allWorkouts.find((w) => w.id === confirmDeleteId);
 
     try {
+      let success = false;
+
       if (workout && isHistoryWorkout(workout)) {
-        await deleteWorkoutFromHistory(confirmDeleteId, profileId);
+        success = await deleteWorkoutFromHistory(confirmDeleteId, profileId);
       } else if (workout && isFollowAlongWorkout(workout)) {
-        await deleteFollowAlong(confirmDeleteId, profileId);
+        const result = await deleteFollowAlong(confirmDeleteId, profileId);
+        success = result.success;
       }
-      setAllWorkouts((prev) => prev.filter((w) => w.id !== confirmDeleteId));
+
+      if (success) {
+        setAllWorkouts((prev) => prev.filter((w) => w.id !== confirmDeleteId));
+      } else {
+        toast.error('Failed to delete workout. Please try again.');
+      }
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error('[handleDeleteConfirm] Error:', err);
+      toast.error('Failed to delete workout. Please try again.');
       setConfirmDeleteId(null);
     } finally {
       setDeletingId(null);
