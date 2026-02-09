@@ -373,52 +373,92 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     const lines = text.split('\n');
 
     // Patterns to match exercise lines:
-    // 1. "1. Exercise Name" or "1) Exercise Name" or "1: Exercise Name"
-    // 2. "• Exercise Name" or "- Exercise Name" or "→ Exercise Name"
+    // 1. "1. Exercise Name" or "1) Exercise Name" or "1: Exercise Name" (numbered format)
+    // 2. "• Exercise Name" or "- Exercise Name" or "→ Exercise Name" (bullet format)
     // 3. Lines starting with emoji + Exercise
+    // 4. Real fitness notation: "Exercise Name 4x8" or "Exercise Name 4x8 + Another 4x8"
     const numberedPattern = /^\s*(\d+)\s*[.):]\s*(.+)/;
     const bulletPattern = /^\s*[•\-→>]\s*(.+)/;
     const emojiNumberPattern = /^\s*[\u{1F1E0}-\u{1F9FF}]?\s*(\d+)\s*[.):]\s*(.+)/u;
+    
+    // Pattern to remove set/rep notation: "4x8", "5 x 10m", "4x12", "4 x 8", "3×10" (with times symbol)
+    const setsRepsPattern = /\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i;
+    // Pattern to split supersets by "+"
+    const supersetDelimiter = /\s*\+\s*/;
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
+      
+      // Skip lines that are just labels like "Workout:"
+      if (/^workout[:\s]*$/i.test(trimmed)) continue;
 
       let exerciseName: string | null = null;
+      let remainingText: string | null = null;
 
-      // Try numbered pattern first
+      // Try numbered pattern first (e.g., "1. Exercise Name")
       const numberedMatch = trimmed.match(numberedPattern);
       if (numberedMatch) {
         exerciseName = numberedMatch[2].trim();
+        remainingText = exerciseName;
       } else {
-        // Try bullet pattern
+        // Try bullet pattern (e.g., "• Exercise Name")
         const bulletMatch = trimmed.match(bulletPattern);
         if (bulletMatch) {
           exerciseName = bulletMatch[1].trim();
+          remainingText = exerciseName;
         } else {
           // Try emoji number pattern
           const emojiMatch = trimmed.match(emojiNumberPattern);
           if (emojiMatch) {
             exerciseName = emojiMatch[2].trim();
+            remainingText = exerciseName;
+          } else {
+            // Try real fitness notation - just use the whole line
+            // Handle labels like "Workout:" by extracting content after colon
+            if (trimmed.toLowerCase().startsWith('workout:')) {
+              remainingText = trimmed.substring(8).trim(); // Remove "Workout:"
+            } else {
+              remainingText = trimmed;
+            }
           }
         }
       }
 
-      if (exerciseName && exerciseName.length > 2) {
-        // Clean up the exercise name - remove trailing arrows, brackets, etc.
-        exerciseName = exerciseName
-          .replace(/→.*$/, '') // Remove "→ Supported" type suffixes
-          .replace(/\s*\([^)]*\)\s*$/, '') // Remove trailing parentheses
-          .replace(/\s*-\s*(Easy|Hard|Moderate|Dynamic|Static|Supported|Loaded)\s*$/i, '') // Remove difficulty hints
-          .trim();
+      // If we have text to process, handle supersets and clean up
+      if (remainingText) {
+        // Split by "+" for supersets: "Pull-ups 4x8 + Z Press 4x8" -> ["Pull-ups 4x8", "Z Press 4x8"]
+        const supersetParts = remainingText.split(supersetDelimiter);
+        
+        for (const part of supersetParts) {
+          let cleanedName = part.trim();
+          
+          if (cleanedName.length <= 2) continue;
 
-        if (exerciseName.length > 2) {
-          exercises.push({
-            id: `parsed_${Date.now()}_${exercises.length}`,
-            label: exerciseName,
-            duration_sec: 30,
-            accepted: true, // Default to accepted since user explicitly pasted this
-          });
+          // Remove set/rep notation: "4x8", "5 x 10m", "4x12", "4×8"
+          cleanedName = cleanedName
+            .replace(setsRepsPattern, '') // Remove trailing sets/reps like "4x8", "5 x 10m"
+            .replace(/\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i, '') // Double-check removal
+            .trim();
+
+          // Clean up the exercise name - remove trailing arrows, brackets, etc.
+          cleanedName = cleanedName
+            .replace(/→.*$/, '') // Remove "→ Supported" type suffixes
+            .replace(/\s*\([^)]*\)\s*$/, '') // Remove trailing parentheses
+            .replace(/\s*-\s*(Easy|Hard|Moderate|Dynamic|Static|Supported|Loaded)\s*$/i, '') // Remove difficulty hints
+            .trim();
+          
+          // Normalize multiple spaces
+          cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
+
+          if (cleanedName.length > 2) {
+            exercises.push({
+              id: `parsed_${Date.now()}_${exercises.length}`,
+              label: cleanedName,
+              duration_sec: 30,
+              accepted: true, // Default to accepted since user explicitly pasted this
+            });
+          }
         }
       }
     }
@@ -890,7 +930,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
                   </div>
 
                   {parsedSuggestions.length === 0 ? (
-                    <>
+                    <div className="max-h-[400px] overflow-y-auto pr-1">
                       <textarea
                         className="w-full h-32 p-3 text-sm border rounded-lg resize-none bg-background"
                         placeholder={`Paste the video description/caption here...
@@ -898,11 +938,15 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 Example:
 1. Side-Lying Foam Roller IR
 2. Frog Pose IR Alternating
-3. Kneeling W Squat`}
+3. Kneeling W Squat
+
+Or fitness notation:
+Pull-ups 4x8 + Z Press 4x8
+SA cable row 4x12 + SA DB press 4x8`}
                         value={descriptionText}
                         onChange={(e) => setDescriptionText(e.target.value)}
                       />
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-3">
                         <Button
                           size="sm"
                           onClick={handleParseDescription}
@@ -920,7 +964,7 @@ Example:
                           Cancel
                         </Button>
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
