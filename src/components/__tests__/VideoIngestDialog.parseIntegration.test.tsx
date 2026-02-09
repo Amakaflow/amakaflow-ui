@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VideoIngestDialog } from '../VideoIngestDialog';
+import { parseDescriptionForExercises } from '../../lib/parse-exercises';
+import { API_URLS } from '../../lib/config';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -24,6 +26,17 @@ vi.mock('../../lib/parse-exercises', () => ({
       }));
   })
 }));
+
+// Helper function to navigate to the parse step
+async function navigateToParseStep(urlToPaste = 'https://instagram.com/reel/ABC123') {
+  const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
+  await userEvent.type(urlInput, urlToPaste);
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+  await waitFor(() => {
+    expect(screen.getByText(/parse description/i)).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByRole('button', { name: /paste text/i }));
+}
 
 describe('VideoIngestDialog Parse Description Integration', () => {
   const defaultProps = {
@@ -56,20 +69,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry (Instagram flow)
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    // Wait for manual entry step
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
@@ -81,7 +81,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
 
     // Wait for API call and results
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/parse/text', {
+      expect(mockFetch).toHaveBeenCalledWith(`${API_URLS.INGESTOR}/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,19 +114,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
@@ -153,19 +141,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
@@ -200,19 +176,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
@@ -256,19 +220,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
@@ -294,19 +246,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     render(<VideoIngestDialog {...defaultProps} />);
     
     // Navigate to manual entry
-    const urlInput = screen.getByPlaceholderText(/instagram.com|youtube.com/i);
-    await userEvent.type(urlInput, 'https://instagram.com/reel/ABC123');
-    
-    const continueBtn = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(continueBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/parse description/i)).toBeInTheDocument();
-    });
-
-    // Click "Paste Text" button
-    const pasteTextBtn = screen.getByRole('button', { name: /paste text/i });
-    fireEvent.click(pasteTextBtn);
+    await navigateToParseStep();
 
     // Enter non-workout text
     const textarea = screen.getByPlaceholderText(/paste the video description/i);
