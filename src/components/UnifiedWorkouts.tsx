@@ -481,12 +481,11 @@ export function UnifiedWorkouts({
       } else {
         toast.error('Failed to delete workout. Please try again.');
       }
-      setConfirmDeleteId(null);
     } catch (err) {
       console.error('[handleDeleteConfirm] Error:', err);
       toast.error('Failed to delete workout. Please try again.');
-      setConfirmDeleteId(null);
     } finally {
+      setConfirmDeleteId(null);
       setDeletingId(null);
     }
   };
