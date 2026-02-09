@@ -995,8 +995,8 @@ SA cable row 4x12 + SA DB press 4x8`}
                             <span className="text-xs text-muted-foreground w-4">{i + 1}</span>
                             <span className="flex-1 truncate">{suggestion.label}</span>
                             {/* Show structured data: sets × reps (superset) */}
-                            {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group) && (
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group || suggestion.source === 'local') && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
                                 {suggestion.sets && suggestion.reps 
                                   ? `${suggestion.sets} × ${suggestion.reps}`
                                   : suggestion.sets && suggestion.distance
@@ -1005,12 +1005,12 @@ SA cable row 4x12 + SA DB press 4x8`}
                                   ? suggestion.distance
                                   : ''}
                                 {suggestion.superset_group && (
-                                  <span className="ml-1 text-purple-600 dark:text-purple-400">
+                                  <span className="text-purple-600 dark:text-purple-400">
                                     (superset {suggestion.superset_group})
                                   </span>
                                 )}
                                 {suggestion.source === 'local' && (
-                                  <span className="ml-1 text-amber-600 dark:text-amber-400 text-[10px]">
+                                  <span className="text-amber-600 dark:text-amber-400 text-[10px] font-semibold whitespace-nowrap">
                                     [offline]
                                   </span>
                                 )}
