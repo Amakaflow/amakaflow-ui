@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -74,6 +74,14 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   const [parsedSuggestions, setParsedSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
   const [isLoadingParse, setIsLoadingParse] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const parseDescriptionRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to Parse Description section when it expands
+  useEffect(() => {
+    if (showDescriptionParser && parseDescriptionRef.current) {
+      parseDescriptionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showDescriptionParser]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -882,7 +890,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
                 </CardContent>
               </Card>
             ) : (
-              <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+              <Card ref={parseDescriptionRef} className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
                 <CardContent className="pt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium flex items-center gap-1">
