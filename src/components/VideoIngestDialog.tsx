@@ -20,6 +20,7 @@ import {
 } from '../lib/video-api';
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
+import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
 import type { FollowAlongWorkout } from '../types/follow-along';
 
 type IngestStep = 'url' | 'detecting' | 'preview' | 'manual-entry' | 'extracting' | 'cached';
@@ -60,15 +61,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   const [error, setError] = useState<string | null>(null);
 
   // AI Assist state
-  interface AiSuggestion {
-    id: string;
-    label: string;
-    duration_sec?: number;
-    target_reps?: number;
-    notes?: string;
-    accepted: boolean;
-  }
-  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -76,7 +69,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   // Parse Description state
   const [descriptionText, setDescriptionText] = useState('');
   const [showDescriptionParser, setShowDescriptionParser] = useState(false);
-  const [parsedSuggestions, setParsedSuggestions] = useState<AiSuggestion[]>([]);
+  const [parsedSuggestions, setParsedSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -301,7 +294,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 
       if (workout?.steps && workout.steps.length > 0) {
         // Convert to suggestions format
-        const suggestions: AiSuggestion[] = workout.steps.map((step: any, i: number) => ({
+        const suggestions: ParsedExerciseSuggestion[] = workout.steps.map((step: any, i: number) => ({
           id: `ai_${Date.now()}_${i}`,
           label: step.label || step.name || `Exercise ${i + 1}`,
           duration_sec: step.durationSec || step.duration_sec || 30,
@@ -365,77 +358,18 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setAiError(null);
   }, []);
 
-  // Parse description text to extract exercises
-  const parseDescriptionForExercises = useCallback((text: string): AiSuggestion[] => {
-    if (!text.trim()) return [];
-
-    const exercises: AiSuggestion[] = [];
-    const lines = text.split('\n');
-
-    // Patterns to match exercise lines:
-    // 1. "1. Exercise Name" or "1) Exercise Name" or "1: Exercise Name"
-    // 2. "• Exercise Name" or "- Exercise Name" or "→ Exercise Name"
-    // 3. Lines starting with emoji + Exercise
-    const numberedPattern = /^\s*(\d+)\s*[.):]\s*(.+)/;
-    const bulletPattern = /^\s*[•\-→>]\s*(.+)/;
-    const emojiNumberPattern = /^\s*[\u{1F1E0}-\u{1F9FF}]?\s*(\d+)\s*[.):]\s*(.+)/u;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      let exerciseName: string | null = null;
-
-      // Try numbered pattern first
-      const numberedMatch = trimmed.match(numberedPattern);
-      if (numberedMatch) {
-        exerciseName = numberedMatch[2].trim();
-      } else {
-        // Try bullet pattern
-        const bulletMatch = trimmed.match(bulletPattern);
-        if (bulletMatch) {
-          exerciseName = bulletMatch[1].trim();
-        } else {
-          // Try emoji number pattern
-          const emojiMatch = trimmed.match(emojiNumberPattern);
-          if (emojiMatch) {
-            exerciseName = emojiMatch[2].trim();
-          }
-        }
-      }
-
-      if (exerciseName && exerciseName.length > 2) {
-        // Clean up the exercise name - remove trailing arrows, brackets, etc.
-        exerciseName = exerciseName
-          .replace(/→.*$/, '') // Remove "→ Supported" type suffixes
-          .replace(/\s*\([^)]*\)\s*$/, '') // Remove trailing parentheses
-          .replace(/\s*-\s*(Easy|Hard|Moderate|Dynamic|Static|Supported|Loaded)\s*$/i, '') // Remove difficulty hints
-          .trim();
-
-        if (exerciseName.length > 2) {
-          exercises.push({
-            id: `parsed_${Date.now()}_${exercises.length}`,
-            label: exerciseName,
-            duration_sec: 30,
-            accepted: true, // Default to accepted since user explicitly pasted this
-          });
-        }
-      }
-    }
-
-    return exercises;
-  }, []);
+  // Note: parseDescriptionForExercises is now imported from '../lib/parse-exercises'
 
   // Handle description parse
   const handleParseDescription = useCallback(() => {
     const parsed = parseDescriptionForExercises(descriptionText);
     if (parsed.length === 0) {
-      toast.error('No exercises found. Try text with numbered items like "1. Exercise Name"');
+      toast.error('No exercises found. Paste exercise names, one per line.');
       return;
     }
     setParsedSuggestions(parsed);
     toast.success(`Found ${parsed.length} exercises`);
-  }, [descriptionText, parseDescriptionForExercises]);
+  }, [descriptionText]);
 
   // Toggle a parsed suggestion's accepted state
   const handleToggleParsedSuggestion = useCallback((id: string) => {
@@ -890,7 +824,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
                   </div>
 
                   {parsedSuggestions.length === 0 ? (
-                    <>
+                    <div className="max-h-[400px] overflow-y-auto pr-1">
                       <textarea
                         className="w-full h-32 p-3 text-sm border rounded-lg resize-none bg-background"
                         placeholder={`Paste the video description/caption here...
@@ -898,11 +832,15 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 Example:
 1. Side-Lying Foam Roller IR
 2. Frog Pose IR Alternating
-3. Kneeling W Squat`}
+3. Kneeling W Squat
+
+Or fitness notation:
+Pull-ups 4x8 + Z Press 4x8
+SA cable row 4x12 + SA DB press 4x8`}
                         value={descriptionText}
                         onChange={(e) => setDescriptionText(e.target.value)}
                       />
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-3">
                         <Button
                           size="sm"
                           onClick={handleParseDescription}
@@ -920,7 +858,7 @@ Example:
                           Cancel
                         </Button>
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
