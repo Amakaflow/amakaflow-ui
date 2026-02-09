@@ -9,6 +9,34 @@ import { API_URLS } from '../../lib/config';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Mock authenticated-fetch as a spy that passes through to global.fetch
+const mockAuthenticatedFetch = vi.fn((...args: any[]) => global.fetch(...args));
+vi.mock('../../lib/authenticated-fetch', () => ({
+  authenticatedFetch: (...args: any[]) => mockAuthenticatedFetch(...args),
+}));
+
+// Mock video-api so handleDetectUrl doesn't consume mockFetch responses
+vi.mock('../../lib/video-api', () => ({
+  detectVideoUrl: vi.fn().mockResolvedValue({ video_id: 'ABC123', normalized_url: 'https://instagram.com/reel/ABC123' }),
+  fetchOEmbed: vi.fn().mockRejectedValue(new Error('oEmbed not supported')),
+  checkVideoCache: vi.fn().mockResolvedValue({ cached: false, cache_entry: null }),
+  saveVideoToCache: vi.fn().mockResolvedValue({}),
+  supportsAutoExtraction: vi.fn().mockReturnValue(false),
+  getPlatformDisplayName: vi.fn().mockReturnValue('Instagram'),
+}));
+
+// Mock follow-along-api so ingestFollowAlong/createFollowAlongManual are no-ops
+vi.mock('../../lib/follow-along-api', () => ({
+  ingestFollowAlong: vi.fn().mockResolvedValue({ followAlongWorkout: {} }),
+  createFollowAlongManual: vi.fn().mockResolvedValue({ followAlongWorkout: {} }),
+}));
+
+// Mock exercise-library
+vi.mock('../../lib/exercise-library', () => ({
+  searchExercises: vi.fn().mockReturnValue([]),
+  exerciseLibrary: [],
+}));
+
 // Mock the parse-exercises module
 vi.mock('../../lib/parse-exercises', () => ({
   parseDescriptionForExercises: vi.fn((text) => {
@@ -49,6 +77,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    mockAuthenticatedFetch.mockClear();
   });
 
   it('should call API and display structured data when parse succeeds', async () => {
@@ -79,14 +108,14 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     const parseBtn = screen.getByRole('button', { name: /parse exercises/i });
     fireEvent.click(parseBtn);
 
-    // Wait for API call and results
+    // Wait for API call and results — verify authenticatedFetch was used (not raw fetch)
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(`${API_URLS.INGESTOR}/parse/text`, {
+      expect(mockAuthenticatedFetch).toHaveBeenCalledWith(`${API_URLS.INGESTOR}/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: 'Pull-ups 4x8 + Z Press 4x8\nSeated sled pull 5 x 10m',
-          source: 'instagram_caption'
+          source: 'instagram'
         }),
         signal: expect.any(AbortSignal),
       });
@@ -99,12 +128,12 @@ describe('VideoIngestDialog Parse Description Integration', () => {
       expect(screen.getByText('Seated sled pull')).toBeInTheDocument();
     });
 
-    // Verify sets/reps are shown
-    expect(screen.getByText(/4 × 8/)).toBeInTheDocument();
+    // Verify sets/reps are shown (two exercises share 4 × 8)
+    expect(screen.getAllByText(/4 × 8/)).toHaveLength(2);
     expect(screen.getByText(/5 × 10m/)).toBeInTheDocument();
 
     // Verify superset grouping is shown
-    expect(screen.getByText(/superset A/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/superset A/i)).toHaveLength(2);
   });
 
   it('should fall back to local parser when API fails', async () => {
@@ -130,8 +159,8 @@ describe('VideoIngestDialog Parse Description Integration', () => {
       expect(screen.getByText('Bench Press')).toBeInTheDocument();
     });
 
-    // Verify offline indicator is shown
-    expect(screen.getByText(/\[offline\]/i)).toBeInTheDocument();
+    // Verify offline indicator is shown on each local result
+    expect(screen.getAllByText(/\[offline\]/i)).toHaveLength(2);
   });
 
   it('should show loading spinner during API call', async () => {
@@ -205,8 +234,10 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   });
 
   it('should handle API timeout gracefully', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
     // Mock API that times out (abort signal triggered)
-    mockFetch.mockImplementationOnce((url, options) => {
+    mockFetch.mockImplementationOnce((_url: string, options: RequestInit) => {
       return new Promise((_, reject) => {
         // Simulate abort on timeout
         if (options.signal) {
@@ -218,7 +249,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     });
 
     render(<VideoIngestDialog {...defaultProps} />);
-    
+
     // Navigate to manual entry
     await navigateToParseStep();
 
@@ -230,10 +261,15 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     const parseBtn = screen.getByRole('button', { name: /parse exercises/i });
     fireEvent.click(parseBtn);
 
+    // Advance past the 10s abort timeout
+    await vi.advanceTimersByTimeAsync(11000);
+
     // Wait for fallback to local parser
     await waitFor(() => {
       expect(screen.getByText('Squats')).toBeInTheDocument();
     });
+
+    vi.useRealTimers();
   });
 
   it('should show error when both API and local parser fail', async () => {

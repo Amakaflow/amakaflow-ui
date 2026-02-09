@@ -21,6 +21,7 @@ import {
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
 import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
+import { authenticatedFetch } from '../lib/authenticated-fetch';
 import { API_URLS } from '../lib/config';
 import type { FollowAlongWorkout } from '../types/follow-along';
 
@@ -373,22 +374,20 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setIsLoadingParse(true);
     setParseError(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       // Try API first
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(`${API_URLS.INGESTOR}/parse/text`, {
+      const response = await authenticatedFetch(`${API_URLS.INGESTOR}/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: descriptionText,
-          source: 'instagram_caption'
+          source: platform || 'instagram_caption'
         }),
         signal: controller.signal
       });
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -441,9 +440,10 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
         toast.warning(`Offline mode: Found ${localSuggestions.length} exercises (limited parsing)`);
       }
     } finally {
+      clearTimeout(timeoutId);
       setIsLoadingParse(false);
     }
-  }, [descriptionText]);
+  }, [descriptionText, platform]);
 
   // Toggle a parsed suggestion's accepted state
   const handleToggleParsedSuggestion = useCallback((id: string) => {
@@ -997,7 +997,7 @@ SA cable row 4x12 + SA DB press 4x8`}
                             {/* Show structured data: sets × reps (superset) */}
                             {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group) && (
                               <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                                {suggestion.sets && suggestion.reps 
+                                {suggestion.sets && suggestion.reps
                                   ? `${suggestion.sets} × ${suggestion.reps}`
                                   : suggestion.sets && suggestion.distance
                                   ? `${suggestion.sets} × ${suggestion.distance}`
@@ -1009,11 +1009,11 @@ SA cable row 4x12 + SA DB press 4x8`}
                                     (superset {suggestion.superset_group})
                                   </span>
                                 )}
-                                {suggestion.source === 'local' && (
-                                  <span className="ml-1 text-amber-600 dark:text-amber-400 text-[10px]">
-                                    [offline]
-                                  </span>
-                                )}
+                              </span>
+                            )}
+                            {suggestion.source === 'local' && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                                [offline]
                               </span>
                             )}
                             {suggestion.duration_sec && !suggestion.sets && (
