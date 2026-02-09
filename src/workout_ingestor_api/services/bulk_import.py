@@ -1802,15 +1802,6 @@ class BulkImportService:
                 "supersets": [],
             })
 
-        # If no blocks were created, create an empty placeholder
-        if not blocks:
-            blocks.append({
-                "label": "Main",
-                "structure": None,
-                "exercises": [],
-                "supersets": [],
-            })
-
         return {
             "title": title,
             "source": f"bulk_import:{item.get('source_type', 'file')}",
@@ -2012,6 +2003,15 @@ class BulkImportService:
                         fallback_title=sub_title,
                     )
 
+                    # Skip workouts with no exercises
+                    total_exercises = sum(
+                        len(block.get("exercises", []))
+                        for block in workout_structure.get("blocks", [])
+                    )
+                    if total_exercises == 0:
+                        logger.warning(f"Skipping workout '{sub_title}' - no exercises found")
+                        continue
+
                     # Save to API
                     saved_id = await self._save_workout_to_api(
                         workout_data=workout_structure,
@@ -2053,6 +2053,20 @@ class BulkImportService:
             else:
                 # Single workout - use existing transform method
                 workout_structure = self._transform_to_workout_structure(item)
+
+                # Skip workouts with no exercises
+                total_exercises = sum(
+                    len(block.get("exercises", []))
+                    for block in workout_structure.get("blocks", [])
+                )
+                if total_exercises == 0:
+                    logger.warning(f"Skipping workout '{title}' - no exercises found")
+                    return ImportResult(
+                        workout_id=item["id"],
+                        title=title,
+                        status="skipped",
+                        error="No exercises found",
+                    )
 
                 # Save to API
                 saved_id = await self._save_workout_to_api(
