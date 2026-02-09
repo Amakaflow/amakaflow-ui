@@ -108,15 +108,16 @@ function looksLikeExerciseName(text: string): boolean {
   if (!/\w/.test(trimmed)) return false;
   
   // Check for exercise-like keywords (optional but helpful)
+  // Use word boundary matching to avoid false positives like "Follow up" or "Break down"
   const exerciseKeywords = [
     'press', 'pull', 'push', 'row', 'squat', 'lunge', 'curl', 'raise', 'fly', 'extension',
-    'up', 'down', 'hold', 'negative', 'positive', 'pose', 'stretch', 'rotation'
+    'hold', 'negative', 'positive', 'pose', 'stretch', 'rotation'
   ];
   
   const lowerText = trimmed.toLowerCase();
   
   // If it has exercise keywords, it's likely an exercise
-  if (exerciseKeywords.some(kw => lowerText.includes(kw))) {
+  if (exerciseKeywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lowerText))) {
     return true;
   }
   
@@ -153,11 +154,13 @@ function extractExerciseName(line: string): { name: string | null; remainingText
   }
   
   // Handle "Workout:" prefix by extracting content after colon
+  // Only extract if the content has fitness notation (indicating it's exercises, not a title)
   if (trimmed.toLowerCase().startsWith('workout:')) {
     const afterColon = trimmed.substring(8).trim();
-    if (afterColon) {
+    if (afterColon && hasSetsRepsNotation(afterColon)) {
       return { name: null, remainingText: afterColon };
     }
+    // Skip lines like "Workout: Full Body Day" (no set/rep notation = title, not exercise)
     return { name: null, remainingText: null };
   }
   

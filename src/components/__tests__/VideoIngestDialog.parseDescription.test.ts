@@ -154,15 +154,14 @@ Run 5 x 100m`;
     
     const result = parseDescriptionForExercises(input);
     
-    // "Full Body Day" after "Workout:" is also parsed as it's valid text
-    expect(result).toHaveLength(7);
-    expect(result[0].label).toBe('Full Body Day');
-    expect(result[1].label).toBe('Squats');
-    expect(result[2].label).toBe('Lunges');
-    expect(result[3].label).toBe('Push-ups');
-    expect(result[4].label).toBe('Pull-ups');
-    expect(result[5].label).toBe('Rows');
-    expect(result[6].label).toBe('Run');
+    // "Full Body Day" is skipped (no set/rep notation = title, not exercise)
+    expect(result).toHaveLength(6);
+    expect(result[0].label).toBe('Squats');
+    expect(result[1].label).toBe('Lunges');
+    expect(result[2].label).toBe('Push-ups');
+    expect(result[3].label).toBe('Pull-ups');
+    expect(result[4].label).toBe('Rows');
+    expect(result[5].label).toBe('Run');
   });
 
   // New tests for Issue #3: Don't split compound names without set/rep notation

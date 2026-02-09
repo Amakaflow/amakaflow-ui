@@ -294,7 +294,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 
       if (workout?.steps && workout.steps.length > 0) {
         // Convert to suggestions format
-        const suggestions: AiSuggestion[] = workout.steps.map((step: any, i: number) => ({
+        const suggestions: ParsedExerciseSuggestion[] = workout.steps.map((step: any, i: number) => ({
           id: `ai_${Date.now()}_${i}`,
           label: step.label || step.name || `Exercise ${i + 1}`,
           duration_sec: step.durationSec || step.duration_sec || 30,
