@@ -20,6 +20,7 @@ import {
 } from '../lib/video-api';
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
+import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
 import type { FollowAlongWorkout } from '../types/follow-along';
 
 type IngestStep = 'url' | 'detecting' | 'preview' | 'manual-entry' | 'extracting' | 'cached';
@@ -60,15 +61,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   const [error, setError] = useState<string | null>(null);
 
   // AI Assist state
-  interface AiSuggestion {
-    id: string;
-    label: string;
-    duration_sec?: number;
-    target_reps?: number;
-    notes?: string;
-    accepted: boolean;
-  }
-  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -76,7 +69,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   // Parse Description state
   const [descriptionText, setDescriptionText] = useState('');
   const [showDescriptionParser, setShowDescriptionParser] = useState(false);
-  const [parsedSuggestions, setParsedSuggestions] = useState<AiSuggestion[]>([]);
+  const [parsedSuggestions, setParsedSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -365,117 +358,18 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setAiError(null);
   }, []);
 
-  // Parse description text to extract exercises
-  const parseDescriptionForExercises = useCallback((text: string): AiSuggestion[] => {
-    if (!text.trim()) return [];
-
-    const exercises: AiSuggestion[] = [];
-    const lines = text.split('\n');
-
-    // Patterns to match exercise lines:
-    // 1. "1. Exercise Name" or "1) Exercise Name" or "1: Exercise Name" (numbered format)
-    // 2. "• Exercise Name" or "- Exercise Name" or "→ Exercise Name" (bullet format)
-    // 3. Lines starting with emoji + Exercise
-    // 4. Real fitness notation: "Exercise Name 4x8" or "Exercise Name 4x8 + Another 4x8"
-    const numberedPattern = /^\s*(\d+)\s*[.):]\s*(.+)/;
-    const bulletPattern = /^\s*[•\-→>]\s*(.+)/;
-    const emojiNumberPattern = /^\s*[\u{1F1E0}-\u{1F9FF}]?\s*(\d+)\s*[.):]\s*(.+)/u;
-    
-    // Pattern to remove set/rep notation: "4x8", "5 x 10m", "4x12", "4 x 8", "3×10" (with times symbol)
-    const setsRepsPattern = /\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i;
-    // Pattern to split supersets by "+"
-    const supersetDelimiter = /\s*\+\s*/;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      
-      // Skip lines that are just labels like "Workout:"
-      if (/^workout[:\s]*$/i.test(trimmed)) continue;
-
-      let exerciseName: string | null = null;
-      let remainingText: string | null = null;
-
-      // Try numbered pattern first (e.g., "1. Exercise Name")
-      const numberedMatch = trimmed.match(numberedPattern);
-      if (numberedMatch) {
-        exerciseName = numberedMatch[2].trim();
-        remainingText = exerciseName;
-      } else {
-        // Try bullet pattern (e.g., "• Exercise Name")
-        const bulletMatch = trimmed.match(bulletPattern);
-        if (bulletMatch) {
-          exerciseName = bulletMatch[1].trim();
-          remainingText = exerciseName;
-        } else {
-          // Try emoji number pattern
-          const emojiMatch = trimmed.match(emojiNumberPattern);
-          if (emojiMatch) {
-            exerciseName = emojiMatch[2].trim();
-            remainingText = exerciseName;
-          } else {
-            // Try real fitness notation - just use the whole line
-            // Handle labels like "Workout:" by extracting content after colon
-            if (trimmed.toLowerCase().startsWith('workout:')) {
-              remainingText = trimmed.substring(8).trim(); // Remove "Workout:"
-            } else {
-              remainingText = trimmed;
-            }
-          }
-        }
-      }
-
-      // If we have text to process, handle supersets and clean up
-      if (remainingText) {
-        // Split by "+" for supersets: "Pull-ups 4x8 + Z Press 4x8" -> ["Pull-ups 4x8", "Z Press 4x8"]
-        const supersetParts = remainingText.split(supersetDelimiter);
-        
-        for (const part of supersetParts) {
-          let cleanedName = part.trim();
-          
-          if (cleanedName.length <= 2) continue;
-
-          // Remove set/rep notation: "4x8", "5 x 10m", "4x12", "4×8"
-          cleanedName = cleanedName
-            .replace(setsRepsPattern, '') // Remove trailing sets/reps like "4x8", "5 x 10m"
-            .replace(/\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i, '') // Double-check removal
-            .trim();
-
-          // Clean up the exercise name - remove trailing arrows, brackets, etc.
-          cleanedName = cleanedName
-            .replace(/→.*$/, '') // Remove "→ Supported" type suffixes
-            .replace(/\s*\([^)]*\)\s*$/, '') // Remove trailing parentheses
-            .replace(/\s*-\s*(Easy|Hard|Moderate|Dynamic|Static|Supported|Loaded)\s*$/i, '') // Remove difficulty hints
-            .trim();
-          
-          // Normalize multiple spaces
-          cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
-
-          if (cleanedName.length > 2) {
-            exercises.push({
-              id: `parsed_${Date.now()}_${exercises.length}`,
-              label: cleanedName,
-              duration_sec: 30,
-              accepted: true, // Default to accepted since user explicitly pasted this
-            });
-          }
-        }
-      }
-    }
-
-    return exercises;
-  }, []);
+  // Note: parseDescriptionForExercises is now imported from '../lib/parse-exercises'
 
   // Handle description parse
   const handleParseDescription = useCallback(() => {
     const parsed = parseDescriptionForExercises(descriptionText);
     if (parsed.length === 0) {
-      toast.error('No exercises found. Try text with numbered items like "1. Exercise Name"');
+      toast.error('No exercises found. Paste exercise names, one per line.');
       return;
     }
     setParsedSuggestions(parsed);
     toast.success(`Found ${parsed.length} exercises`);
-  }, [descriptionText, parseDescriptionForExercises]);
+  }, [descriptionText]);
 
   // Toggle a parsed suggestion's accepted state
   const handleToggleParsedSuggestion = useCallback((id: string) => {

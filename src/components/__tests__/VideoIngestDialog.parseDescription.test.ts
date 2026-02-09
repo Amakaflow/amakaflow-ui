@@ -1,110 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { useCallback } from 'react';
-import { renderHook } from '@testing-library/react';
-
-// Mock React's useCallback to execute immediately for testing
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    useCallback: (fn: Function) => fn,
-  };
-});
-
-// Import the actual parseDescriptionForExercises function logic
-// Since it's inside the component, we'll extract and test the logic directly
-
-type AiSuggestion = {
-  id: string;
-  label: string;
-  duration_sec?: number;
-  target_reps?: number;
-  notes?: string;
-  accepted: boolean;
-};
-
-// Reproduce the parser function for testing
-function parseDescriptionForExercises(text: string): AiSuggestion[] {
-  if (!text.trim()) return [];
-
-  const exercises: AiSuggestion[] = [];
-  const lines = text.split('\n');
-
-  const numberedPattern = /^\s*(\d+)\s*[.):]\s*(.+)/;
-  const bulletPattern = /^\s*[•\-→>]\s*(.+)/;
-  const emojiNumberPattern = /^\s*[\u{1F1E0}-\u{1F9FF}]?\s*(\d+)\s*[.):]\s*(.+)/u;
-  const setsRepsPattern = /\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i;
-  const supersetDelimiter = /\s*\+\s*/;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    // Skip standalone "Workout:" lines (with no content after colon)
-    if (/^workout[:\s]*$/i.test(trimmed)) continue;
-
-    let exerciseName: string | null = null;
-    let remainingText: string | null = null;
-
-    const numberedMatch = trimmed.match(numberedPattern);
-    if (numberedMatch) {
-      exerciseName = numberedMatch[2].trim();
-      remainingText = exerciseName;
-    } else {
-      const bulletMatch = trimmed.match(bulletPattern);
-      if (bulletMatch) {
-        exerciseName = bulletMatch[1].trim();
-        remainingText = exerciseName;
-      } else {
-        const emojiMatch = trimmed.match(emojiNumberPattern);
-        if (emojiMatch) {
-          exerciseName = emojiMatch[2].trim();
-          remainingText = exerciseName;
-        } else {
-          if (trimmed.toLowerCase().startsWith('workout:')) {
-            remainingText = trimmed.substring(8).trim();
-          } else {
-            remainingText = trimmed;
-          }
-        }
-      }
-    }
-
-    if (remainingText) {
-      const supersetParts = remainingText.split(supersetDelimiter);
-      
-      for (const part of supersetParts) {
-        let cleanedName = part.trim();
-        
-        if (cleanedName.length <= 2) continue;
-
-        cleanedName = cleanedName
-          .replace(setsRepsPattern, '')
-          .replace(/\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i, '')
-          .trim();
-
-        cleanedName = cleanedName
-          .replace(/→.*$/, '')
-          .replace(/\s*\([^)]*\)\s*$/, '')
-          .replace(/\s*-\s*(Easy|Hard|Moderate|Dynamic|Static|Supported|Loaded)\s*$/i, '')
-          .trim();
-        
-        cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
-
-        if (cleanedName.length > 2) {
-          exercises.push({
-            id: `parsed_${Date.now()}_${exercises.length}`,
-            label: cleanedName,
-            duration_sec: 30,
-            accepted: true,
-          });
-        }
-      }
-    }
-  }
-
-  return exercises;
-}
+import { describe, it, expect } from 'vitest';
+import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../../lib/parse-exercises';
 
 describe('parseDescriptionForExercises', () => {
   it('should parse numbered format (existing behavior)', () => {
@@ -268,5 +163,42 @@ Run 5 x 100m`;
     expect(result[4].label).toBe('Pull-ups');
     expect(result[5].label).toBe('Rows');
     expect(result[6].label).toBe('Run');
+  });
+
+  // New tests for Issue #3: Don't split compound names without set/rep notation
+  it('should NOT split compound exercise names without sets/reps', () => {
+    const input = 'Chin-up + Negative Hold';
+    const result = parseDescriptionForExercises(input);
+    
+    // Should stay as one exercise since neither side has set/rep notation
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe('Chin-up + Negative Hold');
+  });
+
+  it('should skip hashtags', () => {
+    const input = '1. Exercise A\n#fitness #legday\n2. Exercise B';
+    const result = parseDescriptionForExercises(input);
+    
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('Exercise A');
+    expect(result[1].label).toBe('Exercise B');
+  });
+
+  it('should skip CTAs like "Follow me for more!"', () => {
+    const input = '1. Exercise A\nFollow me for more workouts!\n2. Exercise B';
+    const result = parseDescriptionForExercises(input);
+    
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('Exercise A');
+    expect(result[1].label).toBe('Exercise B');
+  });
+
+  it('should skip section headers', () => {
+    const input = 'Upper Body:\n1. Exercise A\nLower Body:\n2. Exercise B';
+    const result = parseDescriptionForExercises(input);
+    
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('Exercise A');
+    expect(result[1].label).toBe('Exercise B');
   });
 });
