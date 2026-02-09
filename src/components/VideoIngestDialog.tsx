@@ -21,6 +21,8 @@ import {
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
 import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
+import { authenticatedFetch } from '../lib/authenticated-fetch';
+import { API_URLS } from '../lib/config';
 import type { FollowAlongWorkout } from '../types/follow-along';
 
 type IngestStep = 'url' | 'detecting' | 'preview' | 'manual-entry' | 'extracting' | 'cached';
@@ -70,6 +72,8 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   const [descriptionText, setDescriptionText] = useState('');
   const [showDescriptionParser, setShowDescriptionParser] = useState(false);
   const [parsedSuggestions, setParsedSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
+  const [isLoadingParse, setIsLoadingParse] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -93,6 +97,8 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       setDescriptionText('');
       setShowDescriptionParser(false);
       setParsedSuggestions([]);
+      setIsLoadingParse(false);
+      setParseError(null);
     }
   }, [open]);
 
@@ -358,18 +364,86 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setAiError(null);
   }, []);
 
-  // Note: parseDescriptionForExercises is now imported from '../lib/parse-exercises'
-
-  // Handle description parse
-  const handleParseDescription = useCallback(() => {
-    const parsed = parseDescriptionForExercises(descriptionText);
-    if (parsed.length === 0) {
-      toast.error('No exercises found. Paste exercise names, one per line.');
+  // Handle description parse - calls API with fallback to local parser
+  const handleParseDescription = useCallback(async () => {
+    if (!descriptionText.trim()) {
+      toast.error('Please enter some text to parse');
       return;
     }
-    setParsedSuggestions(parsed);
-    toast.success(`Found ${parsed.length} exercises`);
-  }, [descriptionText]);
+
+    setIsLoadingParse(true);
+    setParseError(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    try {
+      // Try API first
+      const response = await authenticatedFetch(`${API_URLS.INGESTOR}/parse/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: descriptionText,
+          source: platform || 'instagram_caption'
+        }),
+        signal: controller.signal
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.exercises && data.exercises.length > 0) {
+          // Convert API response to our format
+          const apiSuggestions: ParsedExerciseSuggestion[] = data.exercises.map((ex: any, index: number) => ({
+            id: `api_${Date.now()}_${index}`,
+            label: ex.raw_name,
+            duration_sec: ex.duration_sec || 30,
+            target_reps: ex.reps && !ex.reps.includes('-') ? parseInt(ex.reps) : undefined,
+            notes: ex.notes,
+            accepted: true,
+            sets: ex.sets,
+            reps: ex.reps,
+            distance: ex.distance,
+            superset_group: ex.superset_group,
+            order: ex.order ?? index,
+            source: 'api'
+          }));
+          
+          setParsedSuggestions(apiSuggestions);
+          toast.success(`Found ${apiSuggestions.length} exercises via API`);
+        } else {
+          // API returned no exercises, fall back to local
+          throw new Error('API returned no exercises');
+        }
+      } else {
+        // API error, fall back to local
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      // Fallback to local parser
+      console.warn('API parse failed, using local fallback:', error);
+      
+      const localParsed = parseDescriptionForExercises(descriptionText);
+      
+      if (localParsed.length === 0) {
+        toast.error('No exercises found. Paste exercise names, one per line.');
+        setParseError('Unable to parse. Try numbered format.');
+      } else {
+        // Convert local results to extended format
+        const localSuggestions: ParsedExerciseSuggestion[] = localParsed.map((ex, index) => ({
+          ...ex,
+          order: index,
+          source: 'local'
+        }));
+        
+        setParsedSuggestions(localSuggestions);
+        toast.warning(`Offline mode: Found ${localSuggestions.length} exercises (limited parsing)`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setIsLoadingParse(false);
+    }
+  }, [descriptionText, platform]);
 
   // Toggle a parsed suggestion's accepted state
   const handleToggleParsedSuggestion = useCallback((id: string) => {
@@ -391,13 +465,14 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       label: s.label,
       duration_sec: s.duration_sec || 30,
       target_reps: s.target_reps,
-      notes: s.notes,
+      notes: s.notes || (s.sets && s.reps ? `${s.sets} sets × ${s.reps}${s.superset_group ? ` (Superset ${s.superset_group})` : ''}${s.distance ? ` ${s.distance}` : ''}` : undefined),
     }));
 
     setExercises((prev) => [...prev, ...newExercises]);
     setShowDescriptionParser(false);
     setParsedSuggestions([]);
     setDescriptionText('');
+    setParseError(null);
     toast.success(`Added ${accepted.length} exercises`);
   }, [parsedSuggestions]);
 
@@ -406,6 +481,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setShowDescriptionParser(false);
     setParsedSuggestions([]);
     setDescriptionText('');
+    setParseError(null);
   }, []);
 
   const handleSaveManualWorkout = useCallback(async () => {
@@ -839,21 +915,37 @@ Pull-ups 4x8 + Z Press 4x8
 SA cable row 4x12 + SA DB press 4x8`}
                         value={descriptionText}
                         onChange={(e) => setDescriptionText(e.target.value)}
+                        disabled={isLoadingParse}
                       />
+                      {parseError && (
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                          {parseError}
+                        </div>
+                      )}
                       <div className="flex gap-2 mt-3">
                         <Button
                           size="sm"
                           onClick={handleParseDescription}
-                          disabled={!descriptionText.trim()}
+                          disabled={!descriptionText.trim() || isLoadingParse}
                           className="flex-1 bg-blue-600 hover:bg-blue-700"
                         >
-                          <FileText className="h-3 w-3 mr-1" />
-                          Parse Exercises
+                          {isLoadingParse ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Parsing...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="h-3 w-3 mr-1" />
+                              Parse Exercises
+                            </>
+                          )}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={handleDismissDescriptionParser}
+                          disabled={isLoadingParse}
                         >
                           Cancel
                         </Button>
@@ -902,7 +994,29 @@ SA cable row 4x12 + SA DB press 4x8`}
                             )}
                             <span className="text-xs text-muted-foreground w-4">{i + 1}</span>
                             <span className="flex-1 truncate">{suggestion.label}</span>
-                            {suggestion.duration_sec && (
+                            {/* Show structured data: sets × reps (superset) */}
+                            {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group) && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                {suggestion.sets && suggestion.reps
+                                  ? `${suggestion.sets} × ${suggestion.reps}`
+                                  : suggestion.sets && suggestion.distance
+                                  ? `${suggestion.sets} × ${suggestion.distance}`
+                                  : suggestion.distance
+                                  ? suggestion.distance
+                                  : ''}
+                                {suggestion.superset_group && (
+                                  <span className="ml-1 text-purple-600 dark:text-purple-400">
+                                    (superset {suggestion.superset_group})
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                            {suggestion.source === 'local' && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                                [offline]
+                              </span>
+                            )}
+                            {suggestion.duration_sec && !suggestion.sets && (
                               <span className="text-xs text-muted-foreground">
                                 {suggestion.duration_sec}s
                               </span>
