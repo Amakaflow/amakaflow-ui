@@ -20,6 +20,13 @@ export interface ParsedExerciseSuggestion {
   target_reps?: number;
   notes?: string;
   accepted: boolean;
+  // Optional fields (from API response)
+  sets?: number;
+  reps?: string;
+  distance?: string;
+  superset_group?: string;
+  order?: number;
+  source?: 'api' | 'local';
 }
 
 // Patterns to match exercise lines

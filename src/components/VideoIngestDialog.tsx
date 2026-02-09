@@ -20,25 +20,9 @@ import {
 } from '../lib/video-api';
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
-import { parseDescriptionForExercises } from '../lib/parse-exercises';
+import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
+import { API_URLS } from '../lib/config';
 import type { FollowAlongWorkout } from '../types/follow-along';
-
-// Extended exercise suggestion with structured data from API
-interface ParsedExerciseSuggestion {
-  id: string;
-  label: string;
-  duration_sec?: number;
-  target_reps?: number;
-  notes?: string;
-  accepted: boolean;
-  // Structured data from API
-  sets?: number;
-  reps?: string;
-  distance?: string;
-  superset_group?: string;
-  order?: number;
-  source?: 'api' | 'local';
-}
 
 type IngestStep = 'url' | 'detecting' | 'preview' | 'manual-entry' | 'extracting' | 'cached';
 
@@ -315,7 +299,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
 
       if (workout?.steps && workout.steps.length > 0) {
         // Convert to suggestions format
-        const suggestions: AiSuggestion[] = workout.steps.map((step: any, i: number) => ({
+        const suggestions: ParsedExerciseSuggestion[] = workout.steps.map((step: any, i: number) => ({
           id: `ai_${Date.now()}_${i}`,
           label: step.label || step.name || `Exercise ${i + 1}`,
           duration_sec: step.durationSec || step.duration_sec || 30,
@@ -394,7 +378,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      const response = await fetch('/api/parse/text', {
+      const response = await fetch(`${API_URLS.INGESTOR}/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -415,7 +399,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
             id: `api_${Date.now()}_${index}`,
             label: ex.raw_name,
             duration_sec: ex.duration_sec || 30,
-            target_reps: ex.reps ? parseInt(ex.reps) : undefined,
+            target_reps: ex.reps && !ex.reps.includes('-') ? parseInt(ex.reps) : undefined,
             notes: ex.notes,
             accepted: true,
             sets: ex.sets,
