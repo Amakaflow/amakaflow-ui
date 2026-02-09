@@ -43,6 +43,9 @@ const SETS_REPS_PATTERN = /\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i;
 // Pattern to detect set/rep notation in text (for superset splitting logic)
 const HAS_SETS_REPS_PATTERN = /\d+\s*[x×]\s*\d+/;
 
+// Pattern to match standalone distance at end of line (e.g., "Rowing 500m", "Run 1.5km")
+const STANDALONE_DISTANCE_PATTERN = /\s+(\d+(?:\.\d+)?)\s*(m|km|mi|yd)\s*$/i;
+
 // Patterns to skip (hashtags, CTAs, section headers)
 const SKIP_PATTERNS = [
   /^#\w+/,  // Hashtags
@@ -56,6 +59,7 @@ const SKIP_PATTERNS = [
   /^round\s+\d+:/i,
   /^day\s+\d+:/i,
   /^week\s+\d+:/i,
+  /^\d+\s+rounds?(?:\s+of)?:?\s*$/i,  // "5 Rounds", "3 Rounds of:", etc.
 ];
 
 /**
@@ -237,17 +241,28 @@ export function parseDescriptionForExercises(text: string): ParsedExerciseSugges
       
       for (const part of supersetParts) {
         let cleanedName = cleanExerciseName(part);
-        
+
         // Skip very short names
         if (cleanedName.length <= 2) continue;
 
         // Skip if it looks like a hashtag or CTA
         if (cleanedName.startsWith('#')) continue;
 
+        // Extract standalone distance (e.g., "Rowing 500m" → name "Rowing", distance "500m")
+        let distance: string | undefined;
+        const distanceMatch = cleanedName.match(STANDALONE_DISTANCE_PATTERN);
+        if (distanceMatch) {
+          distance = `${distanceMatch[1]}${distanceMatch[2]}`;
+          cleanedName = cleanedName.replace(STANDALONE_DISTANCE_PATTERN, '').trim();
+          // Re-check name length after stripping distance
+          if (cleanedName.length <= 2) continue;
+        }
+
         exercises.push({
           id: `parsed_${Date.now()}_${exercises.length}`,
           label: cleanedName,
-          duration_sec: 30,
+          duration_sec: distance ? undefined : 30,
+          distance,
           accepted: true, // Default to accepted since user explicitly pasted this
         });
       }
