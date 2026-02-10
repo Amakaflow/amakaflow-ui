@@ -315,7 +315,11 @@ test.describe('Video ingest dialog flow details', () => {
 
     await addSourcesPage.goto(PREFS_MANUAL_MODE);
 
-    // Track if the Apify endpoint is called
+    // Mock the other APIs first
+    await addSourcesPage.mockIngestApis();
+
+    // Track if the Apify endpoint is called (registered AFTER mockIngestApis
+    // so this handler takes priority — Playwright matches last-registered first)
     await page.route('**/ingest/instagram_reel', async (route) => {
       apifyCalled = true;
       await route.fulfill({
@@ -324,9 +328,6 @@ test.describe('Video ingest dialog flow details', () => {
         body: JSON.stringify(APIFY_INGEST_SUCCESS),
       });
     });
-
-    // Mock the other APIs
-    await addSourcesPage.mockIngestApis();
 
     await addSourcesPage.typeVideoUrl(INSTAGRAM_REEL_URL);
     await addSourcesPage.submitVideoUrl();

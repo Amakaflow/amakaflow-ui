@@ -227,6 +227,15 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
               notes: ex.sets ? `${ex.sets} sets` : undefined,
             }))
           );
+
+          // If Apify returned no exercises, fall back to manual entry
+          if (steps.length === 0) {
+            setWorkoutTitle(reelResult.title || 'Instagram Workout');
+            setStep('manual-entry');
+            setIsLoading(false);
+            return;
+          }
+
           const result = await createFollowAlongManual({
             sourceUrl: normalizedVideoUrl,
             title: reelResult.title || 'Instagram Workout',
