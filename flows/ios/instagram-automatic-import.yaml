@@ -1,0 +1,110 @@
+# Instagram Automatic Import Sheet (Regression)
+# Validates the Automatic Instagram import sheet opens from Sources tab
+# after switching mode in Settings.
+#
+# Run: maestro test flows/ios/instagram-automatic-import.yaml
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-instagram-automatic-import-error
+
+---
+
+- launchApp:
+    clearState: true
+    stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+      UITEST_SKIP_APPLE_WATCH: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Step 1: Switch mode to Automatic in Settings (via More overflow)
+- tapOn:
+    text: "More"
+    retryTapIfNoChange: true
+
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram Import"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Automatic"
+    retryTapIfNoChange: true
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-automatic-01-settings
+
+# Step 2: Navigate to Sources and tap Instagram
+- tapOn:
+    text: "Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 10000
+
+# Verify subtitle reflects Automatic mode
+- scrollUntilVisible:
+    element:
+      text: "Instagram"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Import from saved reels"
+
+# Tap Instagram row
+- tapOn:
+    text: "Instagram"
+    retryTapIfNoChange: true
+
+# Wait for automatic sheet
+- extendedWaitUntil:
+    visible:
+      id: "automatic_instagram_sheet"
+    timeout: 5000
+
+# Verify automatic sheet content (URL field, not caption editor)
+- assertVisible:
+    text: "Paste an Instagram Reel URL"
+
+- assertVisible:
+    text: "Import from Instagram"
+
+# Verify manual sheet is NOT showing
+- assertNotVisible:
+    text: "Paste the workout caption"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-automatic-02-sheet
+
+# Dismiss
+- tapOn:
+    text: "Cancel"
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-automatic-03-dismissed

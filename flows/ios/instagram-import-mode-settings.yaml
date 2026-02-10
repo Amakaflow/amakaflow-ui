@@ -1,0 +1,78 @@
+# Instagram Import Mode Settings Toggle (Smoke)
+# Validates the Settings > Integrations segmented picker toggles between
+# Automatic/Manual mode and the subtitle updates accordingly.
+#
+# Run: maestro test flows/ios/instagram-import-mode-settings.yaml
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-instagram-settings-error
+
+---
+
+- launchApp:
+    clearState: true
+    stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+      UITEST_SKIP_APPLE_WATCH: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to Settings via More overflow (6 tabs → Settings in More)
+- tapOn:
+    text: "More"
+    retryTapIfNoChange: true
+
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 10000
+
+# Scroll to Instagram Import card in Integrations section
+- scrollUntilVisible:
+    element:
+      text: "Instagram Import"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-settings-01-default
+
+# Default mode should be Manual -- verify subtitle
+- assertVisible:
+    text: "Paste caption text"
+
+# Tap "Automatic" segment
+- tapOn:
+    text: "Automatic"
+    retryTapIfNoChange: true
+
+# Verify subtitle changed
+- assertVisible:
+    text: "Paste reel URL (requires Apify)"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-settings-02-automatic
+
+# Switch back to Manual
+- tapOn:
+    text: "Manual"
+    retryTapIfNoChange: true
+
+# Verify subtitle reverted
+- assertVisible:
+    text: "Paste caption text"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-settings-03-manual-again

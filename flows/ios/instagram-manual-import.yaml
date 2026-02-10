@@ -1,0 +1,93 @@
+# Instagram Manual Import Sheet (Regression)
+# Validates the Manual Instagram import sheet opens from Sources tab,
+# accepts caption text, and can be dismissed.
+#
+# Default mode is Manual so no Settings toggle needed.
+#
+# Run: maestro test flows/ios/instagram-manual-import.yaml
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-instagram-manual-import-error
+
+---
+
+- launchApp:
+    clearState: true
+    stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+      UITEST_SKIP_APPLE_WATCH: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# Navigate to Sources tab
+- tapOn:
+    text: "Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 10000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-manual-01-sources
+
+# Scroll to Instagram row and verify Manual mode subtitle
+- scrollUntilVisible:
+    element:
+      text: "Instagram"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Paste caption text"
+
+# Tap Instagram row to open manual sheet
+- tapOn:
+    text: "Instagram"
+    retryTapIfNoChange: true
+
+# Wait for sheet to appear
+- extendedWaitUntil:
+    visible:
+      id: "manual_instagram_sheet"
+    timeout: 5000
+
+# Verify manual sheet content
+- assertVisible:
+    text: "Paste the workout caption"
+
+- assertVisible:
+    text: "Import from Instagram"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-manual-02-sheet-empty
+
+# Type caption text
+- tapOn:
+    id: "instagram_caption_editor"
+
+- inputText: "3x12 Romanian Deadlift\n3x10 Barbell Hip Thrust\n3x15 Walking Lunges"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-manual-03-sheet-filled
+
+# Dismiss via Cancel (don't submit -- avoids API dependency)
+- tapOn:
+    text: "Cancel"
+
+# Wait for sheet dismiss animation
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-manual-04-dismissed

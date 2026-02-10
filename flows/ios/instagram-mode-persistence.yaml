@@ -1,0 +1,197 @@
+# Instagram Mode Persistence Across Tabs (Regression)
+# Validates that changing mode in Settings reflects correctly
+# in the Sources tab subtitle and opens the correct sheet.
+#
+# Run: maestro test flows/ios/instagram-mode-persistence.yaml
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-instagram-persistence-error
+
+---
+
+- launchApp:
+    clearState: true
+    stopApp: true
+    arguments:
+      UITEST_MODE: "true"
+      UITEST_AUTH_SECRET: "${UITEST_AUTH_SECRET}"
+      UITEST_USER_ID: "${UITEST_USER_ID:-test-user-123}"
+      UITEST_USE_FIXTURES: "true"
+      UITEST_FIXTURES: "amrap_10min"
+      UITEST_SKIP_ONBOARDING: "true"
+      UITEST_SKIP_APPLE_WATCH: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: "home_screen"
+    timeout: 15000
+
+# ============================================
+# Phase 1: Verify default is Manual
+# ============================================
+
+- tapOn:
+    text: "Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Paste caption text"
+
+# Open manual sheet to confirm
+- tapOn:
+    text: "Instagram"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "manual_instagram_sheet"
+    timeout: 5000
+
+- assertVisible:
+    text: "Paste the workout caption"
+
+- tapOn:
+    text: "Cancel"
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-persist-01-manual-default
+
+# ============================================
+# Phase 2: Switch to Automatic in Settings
+# ============================================
+
+- tapOn:
+    text: "More"
+    retryTapIfNoChange: true
+
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram Import"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Automatic"
+    retryTapIfNoChange: true
+
+# ============================================
+# Phase 3: Verify Sources reflects Automatic
+# ============================================
+
+- tapOn:
+    text: "Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Import from saved reels"
+
+# Open automatic sheet to confirm
+- tapOn:
+    text: "Instagram"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "automatic_instagram_sheet"
+    timeout: 5000
+
+- assertVisible:
+    text: "Paste an Instagram Reel URL"
+
+- tapOn:
+    text: "Cancel"
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 5000
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-persist-02-switched-to-automatic
+
+# ============================================
+# Phase 4: Switch back to Manual, verify again
+# ============================================
+
+- tapOn:
+    text: "More"
+    retryTapIfNoChange: true
+
+- tapOn:
+    text: "Settings"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "settings_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram Import"
+    direction: DOWN
+    timeout: 10000
+
+# Verify Automatic is still selected (persisted)
+- assertVisible:
+    text: "Paste reel URL (requires Apify)"
+
+- tapOn:
+    text: "Manual"
+    retryTapIfNoChange: true
+
+- tapOn:
+    text: "Sources"
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible:
+      id: "sources_screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Instagram"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Paste caption text"
+
+- takeScreenshot: artifacts/screenshots/ios-instagram-persist-03-back-to-manual
