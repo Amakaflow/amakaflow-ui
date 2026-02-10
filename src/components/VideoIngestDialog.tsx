@@ -218,36 +218,31 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
         if (clientPlatform === 'instagram') {
           // Instagram auto-extraction via Apify (workout-ingestor-api)
           const reelResult = await ingestInstagramReel(normalizedVideoUrl);
-          // Convert Apify response to follow-along format
-          const steps = (reelResult.blocks || []).flatMap(block =>
+          // Convert Apify response to editable exercises
+          const extractedExercises: ExerciseEntry[] = (reelResult.blocks || []).flatMap(block =>
             (block.exercises || []).map(ex => ({
+              id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
               label: ex.name,
-              durationSec: ex.duration_sec || 30,
-              targetReps: ex.reps,
+              duration_sec: ex.duration_sec || 30,
+              target_reps: ex.reps,
               notes: ex.sets ? `${ex.sets} sets` : undefined,
             }))
           );
 
-          // If Apify returned no exercises, fall back to manual entry
-          if (steps.length === 0) {
-            setWorkoutTitle(reelResult.title || 'Instagram Workout');
-            setStep('manual-entry');
-            setIsLoading(false);
-            return;
-          }
+          // Pre-fill title and exercises, then show manual-entry for review
+          setWorkoutTitle(reelResult.title || reelResult._provenance?.creator
+            ? `Workout by ${reelResult._provenance?.creator}`
+            : 'Instagram Workout');
+          setExercises(extractedExercises);
+          setStep('manual-entry');
+          setIsLoading(false);
 
-          const result = await createFollowAlongManual({
-            sourceUrl: normalizedVideoUrl,
-            title: reelResult.title || 'Instagram Workout',
-            description: reelResult._provenance?.creator
-              ? `Workout by ${reelResult._provenance.creator}`
-              : undefined,
-            steps,
-            source: 'instagram',
-          });
-          onWorkoutCreated(result.followAlongWorkout);
-          toast.success('Instagram workout extracted via Apify!');
-          onOpenChange(false);
+          if (extractedExercises.length > 0) {
+            toast.success(`Apify extracted ${extractedExercises.length} exercises — review and save`);
+          } else {
+            toast.info('No exercises found — add them manually');
+          }
+          return;
         } else {
           // YouTube/TikTok/Pinterest — existing flow
           const result = await ingestFollowAlong(normalizedVideoUrl, userId);

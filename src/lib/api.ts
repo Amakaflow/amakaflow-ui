@@ -395,6 +395,20 @@ export async function generateWorkoutStructure(
       break;
     }
 
+    if (source.type === 'instagram') {
+      const resp = await apiCall<WorkoutStructure>(
+        '/ingest/instagram_reel',
+        {
+          method: 'POST',
+          body: JSON.stringify({ url: source.content }),
+        },
+        signal,
+      );
+
+      workout = resp;
+      break;
+    }
+
     if (source.type === 'image') {
       try {
         const imageResponse = await fetch(source.content);

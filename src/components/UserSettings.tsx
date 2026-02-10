@@ -602,10 +602,10 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
                     <Switch
                       checked={instagramAutoExtract}
                       onCheckedChange={handleInstagramModeChange}
-                      disabled={user.subscription === 'free'}
+                      disabled={user.subscription === 'free' && import.meta.env.VITE_BYPASS_TIER_GATE !== 'true'}
                     />
                   </div>
-                  {user.subscription === 'free' && (
+                  {user.subscription === 'free' && import.meta.env.VITE_BYPASS_TIER_GATE !== 'true' && (
                     <Alert>
                       <Info className="h-4 w-4" />
                       <AlertDescription className="text-xs">
