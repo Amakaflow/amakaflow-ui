@@ -13,11 +13,13 @@ import {
   saveVideoToCache,
   supportsAutoExtraction,
   getPlatformDisplayName,
+  ingestInstagramReel,
   type VideoPlatform,
   type OEmbedData,
   type CachedVideo,
   type WorkoutStep,
 } from '../lib/video-api';
+import { getInstagramAutoExtract } from '../lib/preferences';
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
 import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
@@ -209,15 +211,43 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       }
 
       // Check if auto-extraction is supported
-      if (supportsAutoExtraction(clientPlatform)) {
-        // Use existing auto-extraction flow
+      const instagramAuto = getInstagramAutoExtract();
+      if (supportsAutoExtraction(clientPlatform, instagramAuto)) {
         setStep('extracting');
-        const result = await ingestFollowAlong(normalizedVideoUrl, userId);
-        onWorkoutCreated(result.followAlongWorkout);
-        toast.success('Workout extracted successfully!');
-        onOpenChange(false);
+
+        if (clientPlatform === 'instagram') {
+          // Instagram auto-extraction via Apify (workout-ingestor-api)
+          const reelResult = await ingestInstagramReel(normalizedVideoUrl);
+          // Convert Apify response to follow-along format
+          const steps = (reelResult.blocks || []).flatMap(block =>
+            (block.exercises || []).map(ex => ({
+              label: ex.name,
+              durationSec: ex.duration_sec || 30,
+              targetReps: ex.reps,
+              notes: ex.sets ? `${ex.sets} sets` : undefined,
+            }))
+          );
+          const result = await createFollowAlongManual({
+            sourceUrl: normalizedVideoUrl,
+            title: reelResult.title || 'Instagram Workout',
+            description: reelResult._provenance?.creator
+              ? `Workout by ${reelResult._provenance.creator}`
+              : undefined,
+            steps,
+            source: 'instagram',
+          });
+          onWorkoutCreated(result.followAlongWorkout);
+          toast.success('Instagram workout extracted via Apify!');
+          onOpenChange(false);
+        } else {
+          // YouTube/TikTok/Pinterest — existing flow
+          const result = await ingestFollowAlong(normalizedVideoUrl, userId);
+          onWorkoutCreated(result.followAlongWorkout);
+          toast.success('Workout extracted successfully!');
+          onOpenChange(false);
+        }
       } else {
-        // Instagram - fetch oEmbed and show manual entry
+        // Instagram manual - fetch oEmbed and show manual entry
         setStep('preview');
         try {
           const oembed = await fetchOEmbed(normalizedVideoUrl, clientPlatform);

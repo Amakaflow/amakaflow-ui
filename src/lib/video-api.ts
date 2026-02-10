@@ -191,12 +191,62 @@ export async function getVideoCacheStats(): Promise<CacheStatsResponse> {
   return response.json();
 }
 
+export interface InstagramReelResponse {
+  title?: string;
+  workout_type?: string;
+  workout_type_confidence?: number;
+  blocks?: Array<{
+    label: string;
+    structure: string;
+    rounds?: number;
+    exercises: Array<{
+      name: string;
+      duration_sec?: number;
+      sets?: number;
+      reps?: number;
+      type?: string;
+      video_start_sec?: number;
+      video_end_sec?: number;
+    }>;
+    time_rest_sec?: number;
+  }>;
+  _provenance?: {
+    mode: string;
+    source_url: string;
+    shortcode?: string;
+    creator?: string;
+    video_duration_sec?: number;
+    had_transcript?: boolean;
+    extraction_method?: string;
+  };
+}
+
 /**
- * Helper to determine if a platform supports auto-extraction
- * YouTube, TikTok, and Pinterest use AI/vision extraction
- * Instagram uses manual entry with oEmbed preview
+ * Ingest an Instagram Reel via Apify (pro/trainer tier only).
+ * Calls POST /ingest/instagram_reel on workout-ingestor-api.
  */
-export function supportsAutoExtraction(platform: VideoPlatform): boolean {
+export async function ingestInstagramReel(url: string, skipCache = false): Promise<InstagramReelResponse> {
+  const response = await authenticatedFetch(`${WORKOUT_INGESTOR_API_URL}/ingest/instagram_reel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, skip_cache: skipCache }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || `Failed to ingest Instagram Reel: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Helper to determine if a platform supports auto-extraction.
+ * Instagram auto-extraction requires Apify (pro/trainer tier).
+ * Pass instagramAutoExtract=true to enable Instagram auto-extraction.
+ */
+export function supportsAutoExtraction(platform: VideoPlatform, instagramAutoExtract = false): boolean {
+  if (platform === 'instagram') return instagramAutoExtract;
   return platform === 'youtube' || platform === 'tiktok' || platform === 'pinterest';
 }
 

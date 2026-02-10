@@ -9,6 +9,7 @@ import { Source, SourceType, WorkoutStructure } from '../types/workout';
 import { Textarea } from './ui/textarea';
 import { WorkoutTemplates } from './WorkoutTemplates';
 import { getImageProcessingMethod } from '../lib/preferences';
+import { getInstagramAutoExtract } from '../lib/preferences';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
@@ -86,23 +87,42 @@ function VideoInputSection({ currentInput, setCurrentInput, onAddSource }: Video
           ],
           alertText: 'Processing may take 20-30 seconds as video frames are analyzed.',
         };
-      case 'instagram':
-        return {
-          icon: <Instagram className="w-4 h-4 text-purple-600" />,
-          name: 'Instagram',
-          method: 'oEmbed Preview + Manual Exercise Entry',
-          detail: 'Add exercises manually with autocomplete',
-          badge: 'Semi-Manual',
-          badgeColor: 'bg-purple-600',
-          alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
-          alertIconColor: 'text-purple-600 dark:text-purple-400',
-          alertTextColor: 'text-purple-800 dark:text-purple-200',
-          steps: [
-            { label: 'Step 1', text: 'Video thumbnail and metadata fetched via oEmbed' },
-            { label: 'Step 2', text: 'You add exercises manually with autocomplete suggestions' },
-          ],
-          alertText: 'Instagram videos require manual exercise entry. oEmbed provides thumbnail and creator info when available.',
-        };
+      case 'instagram': {
+        const isAutoExtract = getInstagramAutoExtract();
+        return isAutoExtract
+          ? {
+              icon: <Instagram className="w-4 h-4 text-purple-600" />,
+              name: 'Instagram',
+              method: 'Apify Transcript + AI Exercise Extraction',
+              detail: 'Reel transcript extracted via Apify, parsed by GPT-4o-mini',
+              badge: 'AI-Powered',
+              badgeColor: 'bg-purple-600',
+              alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
+              alertIconColor: 'text-purple-600 dark:text-purple-400',
+              alertTextColor: 'text-purple-800 dark:text-purple-200',
+              steps: [
+                { label: 'Step 1', text: 'Reel transcript and metadata fetched via Apify' },
+                { label: 'Step 2', text: 'Exercises extracted from transcript using AI' },
+              ],
+              alertText: 'Requires Apify API token. Pro/Trainer tier only.',
+            }
+          : {
+              icon: <Instagram className="w-4 h-4 text-purple-600" />,
+              name: 'Instagram',
+              method: 'oEmbed Preview + Manual Exercise Entry',
+              detail: 'Add exercises manually with autocomplete',
+              badge: 'Semi-Manual',
+              badgeColor: 'bg-purple-600',
+              alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
+              alertIconColor: 'text-purple-600 dark:text-purple-400',
+              alertTextColor: 'text-purple-800 dark:text-purple-200',
+              steps: [
+                { label: 'Step 1', text: 'Video thumbnail and metadata fetched via oEmbed' },
+                { label: 'Step 2', text: 'You add exercises manually with autocomplete suggestions' },
+              ],
+              alertText: 'Instagram videos require manual exercise entry. Upgrade to Pro for AI-powered extraction.',
+            };
+      }
       case 'pinterest':
         return {
           icon: <ImageIcon className="w-4 h-4 text-red-500" />,

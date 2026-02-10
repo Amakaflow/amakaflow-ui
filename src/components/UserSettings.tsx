@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './ui/alert-dialog';
-import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin, Mic, Plus, Trash2, Loader2 } from 'lucide-react';
+import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin, Mic, Plus, Trash2, Loader2, Instagram } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -45,7 +45,7 @@ import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
 import { useClerkUser, useClerkAuth, updateUserProfileFromClerk } from '../lib/clerk-auth';
 import { cn } from './ui/utils';
-import { getPreferences, savePreferences, ImageProcessingMethod, getImageProcessingMethod, setImageProcessingMethod } from '../lib/preferences';
+import { getPreferences, savePreferences, ImageProcessingMethod, getImageProcessingMethod, setImageProcessingMethod, getInstagramAutoExtract, setInstagramAutoExtract } from '../lib/preferences';
 import { getPairedDevices } from '../lib/mobile-api';
 import { Alert, AlertDescription } from './ui/alert';
 import { ENABLE_GARMIN_USB_EXPORT } from '../lib/env';
@@ -88,6 +88,7 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['GENERAL']));
   const [imageProcessingMethod, setImageProcessingMethodState] = useState<ImageProcessingMethod>(getImageProcessingMethod());
+  const [instagramAutoExtract, setInstagramAutoExtractState] = useState(getInstagramAutoExtract());
 
   // Location fields
   const [address, setAddress] = useState(user.address || '');
@@ -233,6 +234,12 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
     setImageProcessingMethodState(method);
     setImageProcessingMethod(method);
     toast.success(`Image processing method set to ${method === 'vision' ? 'Vision Model' : 'OCR'}`);
+  };
+
+  const handleInstagramModeChange = (enabled: boolean) => {
+    setInstagramAutoExtract(enabled);
+    setInstagramAutoExtractState(enabled);
+    toast.success(enabled ? 'Instagram: AI-powered extraction enabled' : 'Instagram: Manual mode enabled');
   };
 
   // Voice settings handlers (AMA-229)
@@ -569,6 +576,43 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
                       Your choice applies to all new image uploads. Existing workouts are not affected.
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Instagram className="w-4 h-4" />
+                    Instagram Import
+                  </CardTitle>
+                  <CardDescription>
+                    Choose how Instagram Reel workouts are imported
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>AI-Powered Extraction (Apify)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {instagramAutoExtract
+                          ? 'Reels are automatically transcribed and parsed into exercises'
+                          : 'You add exercises manually after pasting a Reel URL'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={instagramAutoExtract}
+                      onCheckedChange={handleInstagramModeChange}
+                      disabled={user.subscription === 'free'}
+                    />
+                  </div>
+                  {user.subscription === 'free' && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        AI-powered Instagram extraction requires a Pro or Trainer subscription.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
 
