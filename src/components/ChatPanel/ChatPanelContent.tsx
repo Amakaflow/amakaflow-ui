@@ -143,17 +143,27 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
             </div>
           )}
 
-          {state.messages.map((msg, idx) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              isStreaming={
-                state.isStreaming &&
-                msg.role === 'assistant' &&
-                idx === state.messages.length - 1
-              }
-            />
-          ))}
+          {state.messages.map((msg, idx) => {
+            const isLastAssistant =
+              msg.role === 'assistant' &&
+              idx === state.messages.length - 1 &&
+              state.isStreaming;
+
+            const isCreatingStage = state.currentStage?.stage === 'creating';
+
+            return (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                isStreaming={isLastAssistant}
+                currentStage={isLastAssistant ? state.currentStage : undefined}
+                completedStages={isLastAssistant ? state.completedStages : undefined}
+                workoutData={isLastAssistant ? state.workoutData : undefined}
+                searchResults={isLastAssistant ? state.searchResults : undefined}
+                isGenerating={isLastAssistant && isCreatingStage && !state.workoutData}
+              />
+            );
+          })}
 
           {/* Error display */}
           {state.error && (
