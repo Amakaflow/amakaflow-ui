@@ -88,7 +88,7 @@ export interface StageEvent {
 export interface WorkoutExercise {
   name: string;
   sets?: number;
-  reps?: string;
+  reps?: number | string;
   muscle_group?: string;
   notes?: string;
 }
