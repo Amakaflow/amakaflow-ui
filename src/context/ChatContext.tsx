@@ -138,8 +138,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         pendingImports: action.pending_imports || [],
         currentStage: null,
         completedStages: [],
-        workoutData: null,
-        searchResults: null,
+        // Keep workoutData/searchResults so cards persist after streaming ends.
+        // They get cleared in START_ASSISTANT_MESSAGE when the next message begins.
       };
     }
 

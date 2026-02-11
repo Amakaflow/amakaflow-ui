@@ -153,6 +153,20 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
                   if (parsed?.type === 'workout_generated') {
                     dispatch({ type: 'SET_WORKOUT_DATA', data: parsed });
+                  } else if (parsed?.type === 'workout_imported' && parsed?.workout) {
+                    // Map imported workout into GeneratedWorkout shape for card rendering
+                    const exercises = parsed.workout.exercises ?? [];
+                    dispatch({
+                      type: 'SET_WORKOUT_DATA',
+                      data: {
+                        type: 'workout_generated',
+                        workout: {
+                          name: parsed.workout.title ?? 'Imported Workout',
+                          exercises,
+                          source: parsed.source,
+                        },
+                      },
+                    });
                   } else if (parsed?.type === 'search_results') {
                     dispatch({ type: 'SET_SEARCH_RESULTS', data: parsed });
                   }

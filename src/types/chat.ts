@@ -116,7 +116,21 @@ export interface WorkoutSearchResults {
   workouts: SearchResultWorkout[];
 }
 
-export type WorkoutToolResult = GeneratedWorkout | WorkoutSearchResults;
+export interface ImportedWorkout {
+  type: 'workout_imported';
+  success: boolean;
+  source: string;
+  workout: {
+    title: string;
+    exercises?: WorkoutExercise[];
+    exercise_count?: number;
+    exercise_names?: string[];
+    full_workout_data?: Record<string, unknown>;
+  };
+  source_url?: string;
+}
+
+export type WorkoutToolResult = GeneratedWorkout | WorkoutSearchResults | ImportedWorkout;
 
 export type SSEEventData =
   | { event: 'message_start'; data: MessageStartEvent }

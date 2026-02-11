@@ -149,7 +149,13 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
               idx === state.messages.length - 1 &&
               state.isStreaming;
 
+            const isLastAssistantMsg =
+              msg.role === 'assistant' && idx === state.messages.length - 1;
             const isCreatingStage = state.currentStage?.stage === 'creating';
+            const hasRunningImport = msg.tool_calls?.some(
+              tc => tc.status === 'running' && tc.name.startsWith('import_from_')
+            );
+            const isGenerating = isLastAssistant && !state.workoutData && (isCreatingStage || !!hasRunningImport);
 
             return (
               <ChatMessage
@@ -158,9 +164,9 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
                 isStreaming={isLastAssistant}
                 currentStage={isLastAssistant ? state.currentStage : undefined}
                 completedStages={isLastAssistant ? state.completedStages : undefined}
-                workoutData={isLastAssistant ? state.workoutData : undefined}
-                searchResults={isLastAssistant ? state.searchResults : undefined}
-                isGenerating={isLastAssistant && isCreatingStage && !state.workoutData}
+                workoutData={isLastAssistantMsg ? state.workoutData : undefined}
+                searchResults={isLastAssistantMsg ? state.searchResults : undefined}
+                isGenerating={isGenerating}
               />
             );
           })}

@@ -42,7 +42,7 @@ export function BuildBadge() {
     <div
       style={{
         position: "fixed",
-        right: 8,
+        left: 8,
         bottom: 8,
         padding: "4px 8px",
         borderRadius: 999,
