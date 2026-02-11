@@ -34,18 +34,36 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
   const retryCountRef = useRef(0);
   const receivedContentRef = useRef(false);
   const sessionIdRef = useRef(state.sessionId);
+  const contentBufferRef = useRef('');
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxRetries = 3;
 
   // Keep sessionIdRef in sync with state
   sessionIdRef.current = state.sessionId;
 
+  const flushContentBuffer = useCallback(() => {
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
+    flushTimerRef.current = null;
+  }, [dispatch]);
+
   const cancelStream = useCallback(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
     }
     dispatch({ type: 'SET_STREAMING', isStreaming: false });
-  }, [dispatch]);
+  }, [dispatch, flushContentBuffer]);
 
   const sendMessage = useCallback(
     (text: string) => {
@@ -98,11 +116,15 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
             switch (event.event) {
               case 'message_start':
                 dispatch({ type: 'SET_SESSION_ID', sessionId: event.data.session_id });
+                dispatch({ type: 'CLEAR_WORKOUT_DATA' });
                 break;
 
               case 'content_delta':
                 receivedContentRef.current = true;
-                dispatch({ type: 'APPEND_CONTENT_DELTA', text: event.data.text });
+                contentBufferRef.current += event.data.text;
+                if (!flushTimerRef.current) {
+                  flushTimerRef.current = setTimeout(flushContentBuffer, 80);
+                }
                 break;
 
               case 'function_call':
@@ -116,15 +138,65 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 });
                 break;
 
-              case 'function_result':
+              case 'function_result': {
                 dispatch({
                   type: 'UPDATE_FUNCTION_RESULT',
                   toolUseId: event.data.tool_use_id,
                   result: event.data.result,
                 });
+
+                // Parse structured workout data from tool results
+                try {
+                  const parsed = typeof event.data.result === 'string'
+                    ? JSON.parse(event.data.result)
+                    : event.data.result;
+
+                  if (parsed?.type === 'workout_generated') {
+                    dispatch({ type: 'SET_WORKOUT_DATA', data: parsed });
+                  } else if (parsed?.type === 'workout_imported' && parsed?.workout) {
+                    // Map imported workout into GeneratedWorkout shape for card rendering
+                    const exercises = parsed.workout.exercises ?? [];
+                    dispatch({
+                      type: 'SET_WORKOUT_DATA',
+                      data: {
+                        type: 'workout_generated',
+                        workout: {
+                          name: parsed.workout.title ?? 'Imported Workout',
+                          exercises,
+                          source: parsed.source,
+                        },
+                      },
+                    });
+                  } else if (parsed?.type === 'search_results') {
+                    dispatch({ type: 'SET_SEARCH_RESULTS', data: parsed });
+                  }
+                } catch {
+                  // Non-JSON result, ignore
+                }
+                break;
+              }
+
+              case 'stage':
+                dispatch({
+                  type: 'SET_STAGE',
+                  stage: event.data,
+                });
+                break;
+
+              case 'heartbeat':
+                // Heartbeats keep connection alive — no state update needed
                 break;
 
               case 'message_end':
+                // Flush any remaining buffered content before finalizing
+                if (flushTimerRef.current) {
+                  clearTimeout(flushTimerRef.current);
+                  flushTimerRef.current = null;
+                }
+                if (contentBufferRef.current) {
+                  dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+                  contentBufferRef.current = '';
+                }
                 dispatch({
                   type: 'FINALIZE_ASSISTANT_MESSAGE',
                   tokens_used: event.data.tokens_used,
@@ -175,7 +247,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
       executeStream();
     },
-    [state.isStreaming, state.pendingImports, dispatch],
+    [state.isStreaming, state.pendingImports, dispatch, flushContentBuffer],
   );
 
   return { sendMessage, cancelStream };
