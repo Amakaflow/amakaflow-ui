@@ -250,6 +250,124 @@ export const CREATE_FOLLOW_ALONG_SUCCESS = {
 };
 
 // ---------------------------------------------------------------------------
+// TikTok URL constant (for regression tests)
+// ---------------------------------------------------------------------------
+
+export const TIKTOK_URL = 'https://www.tiktok.com/@fitnessguru/video/7123456789012345678';
+
+// ---------------------------------------------------------------------------
+// Generate Structure API responses (returned by the server after
+// processing sources through the Apify / transcript / vision pipeline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Simple generate-structure response (no supersets).
+ * Used by smoke tests for basic flow validation.
+ */
+export const GENERATE_STRUCTURE_RESPONSE_SIMPLE = {
+  title: 'Instagram HIIT Workout',
+  workout_type: 'hiit',
+  blocks: [
+    {
+      label: 'Warm-Up',
+      structure: 'circuit',
+      rounds: 1,
+      exercises: [
+        { name: 'Jumping Jacks', duration_sec: 30, sets: 1, type: 'warmup' },
+        { name: 'High Knees', duration_sec: 30, sets: 1, type: 'warmup' },
+      ],
+    },
+    {
+      label: 'Main Circuit',
+      structure: 'circuit',
+      rounds: 3,
+      exercises: [
+        { name: 'Burpees', duration_sec: 45, sets: 1, reps: 10, type: 'cardio' },
+        { name: 'Mountain Climbers', duration_sec: 30, sets: 1, type: 'cardio' },
+      ],
+    },
+  ],
+};
+
+/**
+ * Generate-structure response WITH supersets.
+ * Used to test the critical superset rendering flow (Flow 4).
+ *
+ * Structure: Block "Strength Supersets" contains 2 superset groups.
+ * Each superset has 2 exercises. The exercises should appear ONLY inside
+ * the superset containers, NOT duplicated as standalone block exercises.
+ */
+export const GENERATE_STRUCTURE_RESPONSE_WITH_SUPERSETS = {
+  title: 'Instagram Strength Supersets',
+  workout_type: 'strength',
+  blocks: [
+    {
+      label: 'Warm-Up',
+      structure: 'circuit',
+      rounds: 1,
+      exercises: [
+        { name: 'Arm Circles', duration_sec: 30, sets: 1, type: 'warmup' },
+        { name: 'Leg Swings', duration_sec: 30, sets: 1, type: 'warmup' },
+      ],
+      supersets: [],
+    },
+    {
+      label: 'Strength Supersets',
+      structure: 'superset',
+      rounds: 3,
+      exercises: [],
+      supersets: [
+        {
+          id: 'ss-1',
+          exercises: [
+            { name: 'Bench Press', sets: 4, reps: 8, type: 'strength' },
+            { name: 'Bent Over Row', sets: 4, reps: 8, type: 'strength' },
+          ],
+          rest_between_sec: 90,
+        },
+        {
+          id: 'ss-2',
+          exercises: [
+            { name: 'Overhead Press', sets: 3, reps: 10, type: 'strength' },
+            { name: 'Pull-Ups', sets: 3, reps: 8, type: 'strength' },
+          ],
+          rest_between_sec: 60,
+        },
+      ],
+    },
+    {
+      label: 'Cool-Down',
+      structure: null,
+      exercises: [
+        { name: 'Chest Stretch', duration_sec: 30, type: 'cooldown' },
+        { name: 'Lat Stretch', duration_sec: 30, type: 'cooldown' },
+      ],
+      supersets: [],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Video detect response for YouTube (used in regression/non-regression tests)
+// ---------------------------------------------------------------------------
+
+export const DETECT_YOUTUBE_RESPONSE = {
+  platform: 'youtube',
+  video_id: 'dQw4w9WgXcQ',
+  normalized_url: YOUTUBE_URL,
+  original_url: YOUTUBE_URL,
+  post_type: 'video',
+};
+
+export const DETECT_TIKTOK_RESPONSE = {
+  platform: 'tiktok',
+  video_id: '7123456789012345678',
+  normalized_url: TIKTOK_URL,
+  original_url: TIKTOK_URL,
+  post_type: 'video',
+};
+
+// ---------------------------------------------------------------------------
 // Response builders
 // ---------------------------------------------------------------------------
 
@@ -271,4 +389,10 @@ export function buildOEmbedSuccessResponse() {
 
 export function buildOEmbedFailureResponse() {
   return OEMBED_INSTAGRAM_FAILURE;
+}
+
+export function buildGenerateStructureResponse(withSupersets = false) {
+  return withSupersets
+    ? GENERATE_STRUCTURE_RESPONSE_WITH_SUPERSETS
+    : GENERATE_STRUCTURE_RESPONSE_SIMPLE;
 }

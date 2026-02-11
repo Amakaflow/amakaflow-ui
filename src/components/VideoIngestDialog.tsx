@@ -219,20 +219,25 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
           // Instagram auto-extraction via Apify (workout-ingestor-api)
           const reelResult = await ingestInstagramReel(normalizedVideoUrl);
           // Convert Apify response to editable exercises
-          const extractedExercises: ExerciseEntry[] = (reelResult.blocks || []).flatMap(block =>
-            (block.exercises || []).map(ex => ({
-              id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              label: ex.name,
-              duration_sec: ex.duration_sec || 30,
-              target_reps: ex.reps,
-              notes: ex.sets ? `${ex.sets} sets` : undefined,
-            }))
-          );
+          const mapExercise = (ex: any): ExerciseEntry => ({
+            id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            label: ex.name,
+            duration_sec: ex.duration_sec || 30,
+            target_reps: ex.reps,
+            notes: ex.sets ? `${ex.sets} sets` : undefined,
+          });
+          const extractedExercises: ExerciseEntry[] = (reelResult.blocks || []).flatMap(block => {
+            const regular = (block.exercises || []).map(mapExercise);
+            const fromSupersets = (block.supersets || []).flatMap((ss: any) =>
+              (ss.exercises || []).map(mapExercise)
+            );
+            return [...regular, ...fromSupersets];
+          });
 
           // Pre-fill title and exercises, then show manual-entry for review
-          setWorkoutTitle(reelResult.title || reelResult._provenance?.creator
+          setWorkoutTitle(reelResult.title || (reelResult._provenance?.creator
             ? `Workout by ${reelResult._provenance?.creator}`
-            : 'Instagram Workout');
+            : 'Instagram Workout'));
           setExercises(extractedExercises);
           setStep('manual-entry');
           setIsLoading(false);

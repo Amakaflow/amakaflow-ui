@@ -3,7 +3,10 @@
  *
  * Encapsulates selectors and common operations for:
  * - The AddSources component (Video tab URL input + platform badges)
+ * - The "Added Sources" list (source cards with icons)
+ * - The "Generate Structure" button and loading state
  * - The VideoIngestDialog (manual entry vs auto-extraction flow)
+ * - The StructureWorkout view (superset rendering)
  *
  * Used by AMA-565 Instagram Apify E2E tests.
  */
@@ -21,6 +24,8 @@ import {
   APIFY_INGEST_FAILURE,
   CREATE_FOLLOW_ALONG_SUCCESS,
   INSTAGRAM_REEL_URL,
+  GENERATE_STRUCTURE_RESPONSE_WITH_SUPERSETS,
+  GENERATE_STRUCTURE_RESPONSE_SIMPLE,
 } from '../fixtures/instagram-apify.fixtures';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +45,17 @@ export interface MockApiOptions {
   apifyDelayMs?: number;
 }
 
+export interface MockGenerateOptions {
+  /** If true, the generate-structure endpoint returns a failure. */
+  fails?: boolean;
+  /** Custom response body. */
+  response?: object;
+  /** Delay (ms) before responding to test loading states. */
+  delayMs?: number;
+  /** If true, return a response with supersets. */
+  withSupersets?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Page Object
 // ---------------------------------------------------------------------------
@@ -56,6 +72,13 @@ export class AddSourcesPage {
   readonly platformInfoBadge: Locator;
   readonly platformSteps: Locator;
 
+  // Added Sources list
+  readonly addedSourcesCard: Locator;
+  readonly addedSourcesList: Locator;
+
+  // Generate Structure button
+  readonly generateStructureButton: Locator;
+
   // VideoIngestDialog
   readonly videoIngestDialog: Locator;
   readonly dialogTitle: Locator;
@@ -65,6 +88,9 @@ export class AddSourcesPage {
   readonly dialogManualEntryTitle: Locator;
   readonly dialogWorkoutTitleInput: Locator;
   readonly dialogSaveButton: Locator;
+
+  // StructureWorkout view (post-generate)
+  readonly structureView: Locator;
 
   // Toast
   readonly toastContainer: Locator;
@@ -90,6 +116,18 @@ export class AddSourcesPage {
       hasText: /Step 1:/,
     });
 
+    // Added Sources card -- the card that appears when sources are added.
+    // Identified by the "Added Sources" title text.
+    this.addedSourcesCard = page.locator('[class*="Card"]').filter({
+      hasText: /Added Sources/,
+    });
+    this.addedSourcesList = this.addedSourcesCard.locator('.space-y-2 > div');
+
+    // Generate Structure button
+    this.generateStructureButton = page.getByRole('button', {
+      name: /Generate Structure/,
+    });
+
     // VideoIngestDialog (Radix Dialog)
     this.videoIngestDialog = page.getByRole('dialog');
     this.dialogTitle = this.videoIngestDialog.getByText('Add Video Workout');
@@ -112,12 +150,18 @@ export class AddSourcesPage {
       name: 'Save Workout',
     });
 
+    // StructureWorkout view -- appears after successful generation.
+    // Contains block cards with exercises and supersets.
+    this.structureView = page.locator('[class*="Card"]').filter({
+      has: page.locator('svg.lucide-grip-vertical'),
+    });
+
     // Sonner toast
     this.toastContainer = page.locator('[data-sonner-toaster]');
   }
 
   // =========================================================================
-  // API Mocking
+  // API Mocking -- VideoIngestDialog flow (manual mode)
   // =========================================================================
 
   /**
@@ -208,6 +252,79 @@ export class AddSourcesPage {
   }
 
   // =========================================================================
+  // API Mocking -- Generate Structure flow (auto mode)
+  // =========================================================================
+
+  /**
+   * Set up API route mock for the Generate Structure endpoint.
+   *
+   * This is the server-side endpoint that processes sources (including
+   * Instagram URLs via the Apify pipeline) and returns a structured workout.
+   *
+   * Intercepts:
+   * - POST /generate-structure (or /chat/ SSE endpoint used by the app)
+   *
+   * The app sends sources to the backend, which processes them and returns
+   * a WorkoutStructure. For Instagram auto-extract, the backend calls Apify
+   * internally, so the E2E test only needs to mock the final response.
+   */
+  async mockGenerateStructureApi(options: MockGenerateOptions = {}) {
+    const {
+      fails = false,
+      response,
+      delayMs = 50,
+      withSupersets = false,
+    } = options;
+
+    const responseBody = response
+      || (withSupersets
+        ? GENERATE_STRUCTURE_RESPONSE_WITH_SUPERSETS
+        : GENERATE_STRUCTURE_RESPONSE_SIMPLE);
+
+    // The app may use different endpoints for structure generation.
+    // Mock the ingest endpoints that the generate flow calls.
+    await this.page.route('**/ingest/**', async (route) => {
+      if (delayMs > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      if (fails) {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Generation failed' }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(responseBody),
+        });
+      }
+    });
+
+    // Also mock the video/detect endpoint for URL validation
+    await this.page.route('**/video/detect', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(DETECT_INSTAGRAM_RESPONSE),
+      });
+    });
+
+    // Mock transcript endpoint (used by YouTube/TikTok sources)
+    await this.page.route('**/transcript/**', async (route) => {
+      if (delayMs > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(responseBody),
+      });
+    });
+  }
+
+  // =========================================================================
   // localStorage Helpers
   // =========================================================================
 
@@ -266,6 +383,88 @@ export class AddSourcesPage {
   }
 
   // =========================================================================
+  // Added Sources List Assertions
+  // =========================================================================
+
+  /**
+   * Assert that a URL appears in the "Added Sources" list.
+   */
+  async expectSourceInList(url: string) {
+    await expect(this.addedSourcesCard).toBeVisible({ timeout: 5_000 });
+    const sourceEntry = this.addedSourcesCard.locator('.break-all').filter({
+      hasText: url,
+    });
+    await expect(sourceEntry.first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert the source count in the "Added Sources" card header.
+   */
+  async expectSourceCount(count: number) {
+    await expect(
+      this.addedSourcesCard.getByText(`Added Sources (${count})`)
+    ).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert that a source with a specific type label exists in the list.
+   * The type label is the capitalized platform name shown above the URL.
+   */
+  async expectSourceType(type: string) {
+    const typeLabel = this.addedSourcesCard.locator('.capitalize').filter({
+      hasText: new RegExp(type, 'i'),
+    });
+    await expect(typeLabel.first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert that the "Added Sources" card is NOT visible (no sources added).
+   */
+  async expectNoSources() {
+    await expect(this.addedSourcesCard).toBeHidden();
+  }
+
+  // =========================================================================
+  // Generate Structure Assertions
+  // =========================================================================
+
+  /**
+   * Assert that the "Generate Structure" button is visible and enabled.
+   */
+  async expectGenerateButtonEnabled() {
+    await expect(this.generateStructureButton).toBeVisible();
+    await expect(this.generateStructureButton).toBeEnabled();
+  }
+
+  /**
+   * Assert that the "Generate Structure" button is disabled.
+   */
+  async expectGenerateButtonDisabled() {
+    await expect(this.generateStructureButton).toBeVisible();
+    await expect(this.generateStructureButton).toBeDisabled();
+  }
+
+  /**
+   * Click the "Generate Structure" button.
+   */
+  async clickGenerateStructure() {
+    await this.generateStructureButton.click();
+  }
+
+  /**
+   * Wait for the structure generation to complete.
+   * The loading spinner should disappear and either the structure view
+   * appears or a toast is shown.
+   */
+  async expectGenerateComplete() {
+    // The button shows a Loader2 spinner during generation.
+    // Wait for either: the spinner to disappear, or a toast to appear.
+    await expect(
+      this.page.locator('button').filter({ hasText: /Generating Structure/ })
+    ).toBeHidden({ timeout: 30_000 });
+  }
+
+  // =========================================================================
   // Badge Assertions (AddSources platform info)
   // =========================================================================
 
@@ -308,6 +507,16 @@ export class AddSourcesPage {
   }
 
   /**
+   * Assert no dialog is present (auto mode should NOT open a dialog).
+   */
+  async expectDialogNotPresent() {
+    // Short timeout: the dialog should never appear, so we only need a brief
+    // wait to confirm absence (avoids slowing down the test).
+    const dialogCount = await this.videoIngestDialog.count();
+    expect(dialogCount).toBe(0);
+  }
+
+  /**
    * Assert the dialog shows the extracting/AI step.
    */
   async expectExtractingStep() {
@@ -326,6 +535,60 @@ export class AddSourcesPage {
    */
   async expectDialogClosed() {
     await expect(this.videoIngestDialog).toBeHidden({ timeout: 10_000 });
+  }
+
+  // =========================================================================
+  // Superset Rendering Assertions (StructureWorkout view)
+  // =========================================================================
+
+  /**
+   * Assert that a superset badge is visible in the structure view.
+   * The StructureWorkout component renders supersets with
+   * "Superset N" badges inside blocks.
+   */
+  async expectSupersetBadgeVisible(supersetNumber: number) {
+    const badge = this.page.locator('[class*="Badge"]').filter({
+      hasText: `Superset ${supersetNumber}`,
+    });
+    await expect(badge.first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert that a specific number of superset groups are rendered.
+   */
+  async expectSupersetCount(count: number) {
+    const supersetBadges = this.page.locator('[class*="Badge"]').filter({
+      hasText: /^Superset \d+$/,
+    });
+    await expect(supersetBadges).toHaveCount(count, { timeout: 5_000 });
+  }
+
+  /**
+   * Assert that a block with a specific label is visible.
+   */
+  async expectBlockVisible(label: string) {
+    const block = this.page.getByText(label, { exact: false });
+    await expect(block.first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert that an exercise name appears in the structure view.
+   */
+  async expectExerciseVisible(name: string) {
+    const exercise = this.page.getByText(name, { exact: false });
+    await expect(exercise.first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  /**
+   * Assert that a "superset" structure badge appears on a block.
+   * This is the block-level structure indicator (e.g., "Superset" in the
+   * block header), distinct from the per-superset "Superset N" badges.
+   */
+  async expectBlockStructureBadge(structureName: string) {
+    const badge = this.page.locator('[class*="Badge"]').filter({
+      hasText: structureName,
+    });
+    await expect(badge.first()).toBeVisible({ timeout: 5_000 });
   }
 
   // =========================================================================

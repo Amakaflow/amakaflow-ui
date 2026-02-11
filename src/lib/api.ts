@@ -14,14 +14,6 @@ const API_TIMEOUT = 120000;
  * This function is exported for use when loading workouts from history
  */
 export function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStructure {
-  // DEBUG: Log incoming workout to trace warmup_sets persistence (AMA-94)
-  console.log('[normalizeWorkoutStructure] Input workout exercises:',
-    workout.blocks?.map(b => b.exercises?.map(e => ({
-      name: e?.name,
-      warmup_sets: e?.warmup_sets,
-      warmup_reps: e?.warmup_reps
-    }))));
-
   if (!workout.blocks || workout.blocks.length === 0) {
     return {
       ...workout,
@@ -45,17 +37,11 @@ export function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStr
     let restBetweenRoundsSec = block.rest_between_rounds_sec || block.rest_between_sec;
 
     if (block.supersets && block.supersets.length > 0) {
+      // Keep exercises[] empty — all exercises live inside supersets
       exercises = [];
-      block.supersets.forEach((superset) => {
-        exercises.push(...superset.exercises);
-      });
 
       if (!structure) {
-        if (exercises.length === 2) {
-          structure = 'superset';
-        } else if (exercises.length > 2) {
-          structure = 'circuit';
-        }
+        structure = 'superset';
       }
 
       if (block.supersets[0]?.rest_between_sec && !restBetweenRoundsSec) {

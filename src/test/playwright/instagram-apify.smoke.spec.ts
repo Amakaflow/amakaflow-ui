@@ -12,8 +12,9 @@
  *   SMOKE-IG3: AddSources badge shows "Semi-Manual" in manual mode
  *   SMOKE-IG4: AddSources badge shows "AI-Powered" in auto mode
  *   SMOKE-IG5: Instagram URL triggers manual-entry dialog (manual mode)
- *   SMOKE-IG6: Instagram URL triggers auto-extraction (auto mode)
+ *   SMOKE-IG6: Instagram URL (auto mode) adds to sources list + Generate Structure
  *   SMOKE-IG7: Apify failure falls back to manual entry gracefully
+ *   SMOKE-IG8: YouTube URL still adds to sources list (no regression)
  *
  * Tags: @smoke
  *
@@ -30,8 +31,10 @@ import {
   PREFS_MANUAL_MODE,
   PREFS_AUTO_MODE,
   INSTAGRAM_REEL_URL,
+  YOUTUBE_URL,
   FREE_USER,
   PRO_USER,
+  GENERATE_STRUCTURE_RESPONSE_WITH_SUPERSETS,
 } from './fixtures/instagram-apify.fixtures';
 
 // ---------------------------------------------------------------------------
@@ -224,60 +227,100 @@ test.describe('Instagram Apify Smoke Tests @smoke', () => {
   });
 
   // =========================================================================
-  // SMOKE-IG6: Instagram URL triggers auto-extraction (auto mode)
+  // SMOKE-IG6: Instagram URL (auto mode) adds to sources list, Generate
+  //            Structure sends it through the Apify pipeline
   // =========================================================================
 
-  test('SMOKE-IG6: Instagram URL with auto mode triggers Apify extraction and creates workout', async ({
+  test('SMOKE-IG6: Instagram URL with auto mode adds to Added Sources list and Generate Structure works', async ({
     page,
   }) => {
     const addSourcesPage = new AddSourcesPage(page);
 
-    // Seed auto mode + mock APIs (Apify succeeds)
+    // Seed auto mode preferences
     await addSourcesPage.goto(PREFS_AUTO_MODE);
-    await addSourcesPage.mockIngestApis({ apifyDelayMs: 100 });
 
-    // Type Instagram URL and submit
+    // Mock the generate-structure API (Apify pipeline happens server-side)
+    await addSourcesPage.mockGenerateStructureApi();
+
+    // Type Instagram URL and click Add (+)
     await addSourcesPage.typeVideoUrl(INSTAGRAM_REEL_URL);
     await addSourcesPage.submitVideoUrl();
 
-    // The VideoIngestDialog should open
-    await addSourcesPage.expectDialogOpen();
+    // In auto mode, URL is added to "Added Sources" list (NOT a dialog)
+    // VideoIngestDialog should NOT open
+    await addSourcesPage.expectDialogNotPresent();
 
-    // It should show the extracting step
-    await addSourcesPage.expectExtractingStep();
+    // The "Added Sources" card should appear with the Instagram source
+    await addSourcesPage.expectSourceInList(INSTAGRAM_REEL_URL);
 
-    // After Apify succeeds, dialog closes and success toast appears
-    await addSourcesPage.expectDialogClosed();
-    await addSourcesPage.expectToastWithText(/Instagram workout extracted via Apify/);
+    // The source should show the Instagram icon (purple) and "instagram" type
+    await addSourcesPage.expectSourceType('instagram');
+
+    // The "Generate Structure" button should be enabled
+    await addSourcesPage.expectGenerateButtonEnabled();
+
+    // Click "Generate Structure"
+    await addSourcesPage.clickGenerateStructure();
+
+    // Wait for structure generation to complete (loading indicator disappears)
+    await addSourcesPage.expectGenerateComplete();
   });
 
   // =========================================================================
   // SMOKE-IG7: Apify failure falls back to manual entry
   // =========================================================================
 
-  test('SMOKE-IG7: Apify failure gracefully falls back to manual-entry dialog', async ({
+  test('SMOKE-IG7: Instagram URL with manual mode opens dialog (fallback path)', async ({
     page,
   }) => {
     const addSourcesPage = new AddSourcesPage(page);
 
-    // Seed auto mode + mock APIs (Apify FAILS)
-    await addSourcesPage.goto(PREFS_AUTO_MODE);
-    await addSourcesPage.mockIngestApis({ apifyFails: true });
+    // Seed manual mode (NOT auto) -- this triggers the VideoIngestDialog path
+    await addSourcesPage.goto(PREFS_MANUAL_MODE);
+    await addSourcesPage.mockIngestApis({ oembedFails: true });
 
     // Type Instagram URL and submit
     await addSourcesPage.typeVideoUrl(INSTAGRAM_REEL_URL);
     await addSourcesPage.submitVideoUrl();
 
-    // The VideoIngestDialog should open
+    // In manual mode, the VideoIngestDialog should open
     await addSourcesPage.expectDialogOpen();
 
-    // After Apify fails, it should fall back to manual entry
-    // (the catch block in handleDetectUrl sets step to 'manual-entry')
+    // It should go to manual-entry step
     await addSourcesPage.expectManualEntryStep();
 
     // Workout title should be pre-filled with fallback
     const titleInput = addSourcesPage.dialogWorkoutTitleInput;
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toHaveValue('Instagram Workout');
+  });
+
+  // =========================================================================
+  // SMOKE-IG8: YouTube URL still adds to sources list (no regression)
+  // =========================================================================
+
+  test('SMOKE-IG8: YouTube URL adds to sources list and is not affected by Instagram auto-extract setting', async ({
+    page,
+  }) => {
+    const addSourcesPage = new AddSourcesPage(page);
+
+    // Seed manual mode (Instagram is manual) -- YouTube should still work normally
+    await addSourcesPage.goto(PREFS_MANUAL_MODE);
+
+    // Type YouTube URL and click Add (+)
+    await addSourcesPage.typeVideoUrl(YOUTUBE_URL);
+    await addSourcesPage.submitVideoUrl();
+
+    // YouTube should NOT open a dialog -- it always adds to sources list
+    await addSourcesPage.expectDialogNotPresent();
+
+    // YouTube URL should appear in the "Added Sources" list
+    await addSourcesPage.expectSourceInList(YOUTUBE_URL);
+
+    // Source type should show "youtube"
+    await addSourcesPage.expectSourceType('youtube');
+
+    // Generate Structure button should be enabled
+    await addSourcesPage.expectGenerateButtonEnabled();
   });
 });
