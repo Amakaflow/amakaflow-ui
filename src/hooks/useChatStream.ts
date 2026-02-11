@@ -34,18 +34,36 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
   const retryCountRef = useRef(0);
   const receivedContentRef = useRef(false);
   const sessionIdRef = useRef(state.sessionId);
+  const contentBufferRef = useRef('');
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxRetries = 3;
 
   // Keep sessionIdRef in sync with state
   sessionIdRef.current = state.sessionId;
 
+  const flushContentBuffer = useCallback(() => {
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
+    flushTimerRef.current = null;
+  }, [dispatch]);
+
   const cancelStream = useCallback(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
     }
     dispatch({ type: 'SET_STREAMING', isStreaming: false });
-  }, [dispatch]);
+  }, [dispatch, flushContentBuffer]);
 
   const sendMessage = useCallback(
     (text: string) => {
@@ -103,7 +121,10 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
               case 'content_delta':
                 receivedContentRef.current = true;
-                dispatch({ type: 'APPEND_CONTENT_DELTA', text: event.data.text });
+                contentBufferRef.current += event.data.text;
+                if (!flushTimerRef.current) {
+                  flushTimerRef.current = setTimeout(flushContentBuffer, 80);
+                }
                 break;
 
               case 'function_call':
@@ -153,6 +174,15 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 break;
 
               case 'message_end':
+                // Flush any remaining buffered content before finalizing
+                if (flushTimerRef.current) {
+                  clearTimeout(flushTimerRef.current);
+                  flushTimerRef.current = null;
+                }
+                if (contentBufferRef.current) {
+                  dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+                  contentBufferRef.current = '';
+                }
                 dispatch({
                   type: 'FINALIZE_ASSISTANT_MESSAGE',
                   tokens_used: event.data.tokens_used,
@@ -203,7 +233,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
       executeStream();
     },
-    [state.isStreaming, state.pendingImports, dispatch],
+    [state.isStreaming, state.pendingImports, dispatch, flushContentBuffer],
   );
 
   return { sendMessage, cancelStream };
