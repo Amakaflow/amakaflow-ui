@@ -11,6 +11,10 @@ import type {
   ChatState,
   ChatAction,
   ChatToolCall,
+  StageEvent,
+  WorkoutStage,
+  GeneratedWorkout,
+  WorkoutSearchResults,
 } from '../types/chat';
 import { useChatStream } from '../hooks/useChatStream';
 
@@ -40,6 +44,10 @@ export const initialChatState: ChatState = {
   error: null,
   rateLimitInfo: null,
   pendingImports: [],
+  currentStage: null,
+  completedStages: [],
+  workoutData: null,
+  searchResults: null,
 };
 
 function createInitialState(): ChatState {
@@ -71,7 +79,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { ...state, messages: [...state.messages, action.message] };
 
     case 'START_ASSISTANT_MESSAGE':
-      return { ...state, messages: [...state.messages, action.message] };
+      return { ...state, messages: [...state.messages, action.message], currentStage: null, completedStages: [], workoutData: null, searchResults: null };
 
     case 'APPEND_CONTENT_DELTA': {
       const messages = [...state.messages];
@@ -128,6 +136,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages,
         isStreaming: false,
         pendingImports: action.pending_imports || [],
+        currentStage: null,
+        completedStages: [],
+        workoutData: null,
+        searchResults: null,
       };
     }
 
@@ -148,6 +160,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         error: null,
         rateLimitInfo: null,
         pendingImports: [],
+        currentStage: null,
+        completedStages: [],
+        workoutData: null,
+        searchResults: null,
       };
 
     case 'LOAD_SESSION':
@@ -156,6 +172,29 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         sessionId: action.sessionId,
         messages: action.messages,
       };
+
+    case 'SET_STAGE': {
+      const prevStages = state.currentStage
+        ? [...state.completedStages, state.currentStage.stage]
+        : state.completedStages;
+      return {
+        ...state,
+        currentStage: action.stage.stage === 'complete' ? null : action.stage,
+        completedStages: action.stage.stage === 'complete' ? [] : prevStages,
+      };
+    }
+
+    case 'CLEAR_STAGES':
+      return { ...state, currentStage: null, completedStages: [] };
+
+    case 'SET_WORKOUT_DATA':
+      return { ...state, workoutData: action.data };
+
+    case 'SET_SEARCH_RESULTS':
+      return { ...state, searchResults: action.data };
+
+    case 'CLEAR_WORKOUT_DATA':
+      return { ...state, workoutData: null, searchResults: null };
 
     default:
       return state;

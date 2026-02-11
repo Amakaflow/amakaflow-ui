@@ -28,6 +28,11 @@ function baseState(overrides?: Partial<ChatState>): ChatState {
     isStreaming: false,
     error: null,
     rateLimitInfo: null,
+    pendingImports: [],
+    currentStage: null,
+    completedStages: [],
+    workoutData: null,
+    searchResults: null,
     ...overrides,
   };
 }
@@ -123,11 +128,13 @@ describe('useChatStream', () => {
     const { result } = renderHook(() => useChatStream({ state: baseState(), dispatch }));
     act(() => result.current.sendMessage('hi'));
 
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'FINALIZE_ASSISTANT_MESSAGE',
-      tokens_used: 50,
-      latency_ms: 300,
-    });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'FINALIZE_ASSISTANT_MESSAGE',
+        tokens_used: 50,
+        latency_ms: 300,
+      }),
+    );
   });
 
   // ── Tool calls ───────────────────────────────────────────────────
@@ -161,6 +168,129 @@ describe('useChatStream', () => {
       toolUseId: 'fc1',
       result: 'found',
     });
+  });
+
+  // ── Structured workout data parsing ─────────────────────────────
+
+  it('function_result with workout_generated JSON dispatches SET_WORKOUT_DATA', () => {
+    const workoutPayload = JSON.stringify({
+      type: 'workout_generated',
+      workout: {
+        name: 'Push Day',
+        exercises: [{ name: 'Bench Press', sets: 3, reps: '8-10' }],
+        duration_minutes: 45,
+        difficulty: 'intermediate',
+      },
+    });
+
+    mockStreamChat.mockImplementation((opts: StreamChatOptions) => {
+      opts.onEvent({
+        event: 'function_result',
+        data: { tool_use_id: 'fc1', name: 'generate_workout', result: workoutPayload },
+      });
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useChatStream({ state: baseState(), dispatch }));
+    act(() => result.current.sendMessage('hi'));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'SET_WORKOUT_DATA',
+      data: {
+        type: 'workout_generated',
+        workout: {
+          name: 'Push Day',
+          exercises: [{ name: 'Bench Press', sets: 3, reps: '8-10' }],
+          duration_minutes: 45,
+          difficulty: 'intermediate',
+        },
+      },
+    });
+  });
+
+  it('function_result with search_results JSON dispatches SET_SEARCH_RESULTS', () => {
+    const searchPayload = JSON.stringify({
+      type: 'search_results',
+      workouts: [
+        { workout_id: 'w1', title: 'PPL Day A', exercise_count: 6, duration_minutes: 60, difficulty: 'advanced' },
+        { workout_id: 'w2', title: 'Full Body', exercise_count: 8 },
+      ],
+    });
+
+    mockStreamChat.mockImplementation((opts: StreamChatOptions) => {
+      opts.onEvent({
+        event: 'function_result',
+        data: { tool_use_id: 'fc2', name: 'search_workouts', result: searchPayload },
+      });
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useChatStream({ state: baseState(), dispatch }));
+    act(() => result.current.sendMessage('hi'));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'SET_SEARCH_RESULTS',
+      data: {
+        type: 'search_results',
+        workouts: [
+          { workout_id: 'w1', title: 'PPL Day A', exercise_count: 6, duration_minutes: 60, difficulty: 'advanced' },
+          { workout_id: 'w2', title: 'Full Body', exercise_count: 8 },
+        ],
+      },
+    });
+  });
+
+  it('function_result with non-JSON string does not dispatch SET_WORKOUT_DATA', () => {
+    mockStreamChat.mockImplementation((opts: StreamChatOptions) => {
+      opts.onEvent({
+        event: 'function_result',
+        data: { tool_use_id: 'fc3', name: 'search', result: 'plain text result' },
+      });
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useChatStream({ state: baseState(), dispatch }));
+    act(() => result.current.sendMessage('hi'));
+
+    // Should still dispatch UPDATE_FUNCTION_RESULT
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'UPDATE_FUNCTION_RESULT',
+      toolUseId: 'fc3',
+      result: 'plain text result',
+    });
+
+    // Should NOT dispatch SET_WORKOUT_DATA or SET_SEARCH_RESULTS
+    const workoutDispatches = dispatch.mock.calls.filter(
+      (c: unknown[]) => {
+        const action = c[0] as ChatAction;
+        return action.type === 'SET_WORKOUT_DATA' || action.type === 'SET_SEARCH_RESULTS';
+      }
+    );
+    expect(workoutDispatches).toHaveLength(0);
+  });
+
+  it('heartbeat event does not crash or dispatch unexpected actions', () => {
+    mockStreamChat.mockImplementation((opts: StreamChatOptions) => {
+      opts.onEvent({
+        event: 'heartbeat',
+        data: { status: 'processing', tool_name: 'generate_workout', elapsed_seconds: 5 },
+      } as SSEEventData);
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useChatStream({ state: baseState(), dispatch }));
+    act(() => result.current.sendMessage('hi'));
+
+    // Heartbeat should not cause any unexpected dispatches beyond the standard
+    // sendMessage ones (ADD_USER_MESSAGE, START_ASSISTANT_MESSAGE, SET_STREAMING, SET_ERROR)
+    const actionTypes = dispatch.mock.calls.map((c: unknown[]) => (c[0] as ChatAction).type);
+    expect(actionTypes).not.toContain('SET_WORKOUT_DATA');
+    expect(actionTypes).not.toContain('SET_SEARCH_RESULTS');
+    // Should not throw or produce error dispatches from heartbeat
+    const errorDispatches = dispatch.mock.calls.filter(
+      (c: unknown[]) => (c[0] as ChatAction).type === 'SET_ERROR' && (c[0] as { error: string | null }).error !== null
+    );
+    expect(errorDispatches).toHaveLength(0);
   });
 
   // ── Error handling ───────────────────────────────────────────────

@@ -98,6 +98,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
             switch (event.event) {
               case 'message_start':
                 dispatch({ type: 'SET_SESSION_ID', sessionId: event.data.session_id });
+                dispatch({ type: 'CLEAR_WORKOUT_DATA' });
                 break;
 
               case 'content_delta':
@@ -116,12 +117,39 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 });
                 break;
 
-              case 'function_result':
+              case 'function_result': {
                 dispatch({
                   type: 'UPDATE_FUNCTION_RESULT',
                   toolUseId: event.data.tool_use_id,
                   result: event.data.result,
                 });
+
+                // Parse structured workout data from tool results
+                try {
+                  const parsed = typeof event.data.result === 'string'
+                    ? JSON.parse(event.data.result)
+                    : event.data.result;
+
+                  if (parsed?.type === 'workout_generated') {
+                    dispatch({ type: 'SET_WORKOUT_DATA', data: parsed });
+                  } else if (parsed?.type === 'search_results') {
+                    dispatch({ type: 'SET_SEARCH_RESULTS', data: parsed });
+                  }
+                } catch {
+                  // Non-JSON result, ignore
+                }
+                break;
+              }
+
+              case 'stage':
+                dispatch({
+                  type: 'SET_STAGE',
+                  stage: event.data,
+                });
+                break;
+
+              case 'heartbeat':
+                // Heartbeats keep connection alive — no state update needed
                 break;
 
               case 'message_end':

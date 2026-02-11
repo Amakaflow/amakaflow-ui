@@ -76,11 +76,55 @@ export interface ErrorEvent {
   limit?: number;
 }
 
+// Stage events for Perplexity-style progress indicator
+export type WorkoutStage = 'analyzing' | 'researching' | 'searching' | 'creating' | 'complete';
+
+export interface StageEvent {
+  stage: WorkoutStage;
+  message: string;
+}
+
+// Structured workout data from function_result events
+export interface WorkoutExercise {
+  name: string;
+  sets?: number;
+  reps?: string;
+  muscle_group?: string;
+  notes?: string;
+}
+
+export interface GeneratedWorkout {
+  type: 'workout_generated';
+  workout: {
+    name: string;
+    exercises: WorkoutExercise[];
+    duration_minutes?: number;
+    difficulty?: string;
+  };
+}
+
+export interface SearchResultWorkout {
+  workout_id: string;
+  title: string;
+  exercise_count?: number;
+  duration_minutes?: number;
+  difficulty?: string;
+}
+
+export interface WorkoutSearchResults {
+  type: 'search_results';
+  workouts: SearchResultWorkout[];
+}
+
+export type WorkoutToolResult = GeneratedWorkout | WorkoutSearchResults;
+
 export type SSEEventData =
   | { event: 'message_start'; data: MessageStartEvent }
   | { event: 'content_delta'; data: ContentDeltaEvent }
   | { event: 'function_call'; data: FunctionCallEvent }
   | { event: 'function_result'; data: FunctionResultEvent }
+  | { event: 'stage'; data: StageEvent }
+  | { event: 'heartbeat'; data: { status: string; tool_name: string; elapsed_seconds: number } }
   | { event: 'message_end'; data: MessageEndEvent }
   | { event: 'error'; data: ErrorEvent };
 
@@ -102,6 +146,14 @@ export interface ChatState {
   rateLimitInfo: RateLimitInfo | null;
   /** Pending imports from last message - send back to API on next request */
   pendingImports: PendingImport[];
+  /** Current stage for Perplexity-style progress (null when no active stage) */
+  currentStage: StageEvent | null;
+  /** History of stages for the current message */
+  completedStages: WorkoutStage[];
+  /** Structured workout data from tool results */
+  workoutData: GeneratedWorkout | null;
+  /** Search results from tool queries */
+  searchResults: WorkoutSearchResults | null;
 }
 
 // ============================================================================
@@ -122,5 +174,10 @@ export type ChatAction =
   | { type: 'SET_STREAMING'; isStreaming: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_RATE_LIMIT'; info: RateLimitInfo }
+  | { type: 'SET_STAGE'; stage: StageEvent }
+  | { type: 'CLEAR_STAGES' }
+  | { type: 'SET_WORKOUT_DATA'; data: GeneratedWorkout }
+  | { type: 'SET_SEARCH_RESULTS'; data: WorkoutSearchResults }
+  | { type: 'CLEAR_WORKOUT_DATA' }
   | { type: 'CLEAR_SESSION' }
   | { type: 'LOAD_SESSION'; sessionId: string; messages: ChatMessage[] };
