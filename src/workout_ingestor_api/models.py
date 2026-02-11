@@ -1,5 +1,5 @@
 """Data models for workout ingestion."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from typing import List, Optional, Literal
 
 # AMA-213: Workout type detection
@@ -100,7 +100,29 @@ class Workout(BaseModel):
 
     class Config:
         extra = "ignore"  # Ignore extra fields from UI
-    
+
+    @computed_field
+    @property
+    def exercises(self) -> List[Exercise]:
+        """Flatten all exercises from all blocks into a single list."""
+        return [ex for block in self.blocks for ex in block.exercises]
+
+    @computed_field
+    @property
+    def exercise_count(self) -> int:
+        """Total number of exercises across all blocks."""
+        return len(self.exercises)
+
+    @computed_field
+    @property
+    def exercise_names(self) -> List[str]:
+        """Exercise names capped at 10 with overflow indicator."""
+        all_exercises = self.exercises
+        names = [ex.name for ex in all_exercises[:10]]
+        if len(all_exercises) > 10:
+            names.append(f"... and {len(all_exercises) - 10} more")
+        return names
+
     def convert_to_new_structure(self) -> 'Workout':
         """
         Convert workout from old format (with supersets) to new format (exercises with structure).
