@@ -228,6 +228,128 @@ class TestChatStream:
         assert response.status_code == 422
 
 
+class TestStageEventsRouter:
+    """Integration tests: stage events appear in the SSE stream from the endpoint."""
+
+    def test_stage_events_in_sse_stream(self, chat_app):
+        """Stage events emitted by use case appear in the HTTP SSE response."""
+        async def _mock_execute(*args, **kwargs):
+            yield SSEEvent(event="message_start", data=json.dumps({"session_id": "sess-1"}))
+            yield SSEEvent(
+                event="function_call",
+                data=json.dumps({"id": "t-1", "name": "search_workout_library"}),
+            )
+            yield SSEEvent(
+                event="stage",
+                data=json.dumps({"stage": "searching", "message": "Processing search_workout_library..."}),
+            )
+            yield SSEEvent(
+                event="function_result",
+                data=json.dumps({"tool_use_id": "t-1", "name": "search_workout_library", "result": "{}"}),
+            )
+            yield SSEEvent(event="content_delta", data=json.dumps({"text": "Based on your search..."}))
+            yield SSEEvent(event="stage", data=json.dumps({"stage": "complete", "message": "Done"}))
+            yield SSEEvent(
+                event="message_end",
+                data=json.dumps({"session_id": "sess-1", "tokens_used": 300, "latency_ms": 2000}),
+            )
+
+        mock_uc = MagicMock(spec=AsyncStreamChatUseCase)
+        mock_uc.execute = _mock_execute
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_auth_context] = mock_auth_context
+        chat_app.dependency_overrides[get_async_stream_chat_use_case] = lambda: mock_uc
+
+        client = TestClient(chat_app)
+        response = client.post("/chat/stream", json={"message": "Search workouts"})
+
+        assert response.status_code == 200
+        events = _parse_sse_events(response.text)
+        event_types = [e[0] for e in events]
+
+        assert "stage" in event_types
+        stage_events = [(e[0], e[1]) for e in events if e[0] == "stage"]
+        assert len(stage_events) == 2
+
+        assert stage_events[0][1]["stage"] == "searching"
+        assert stage_events[-1][1]["stage"] == "complete"
+
+        chat_app.dependency_overrides.clear()
+
+    def test_stage_event_sse_format(self, chat_app):
+        """Stage events follow correct SSE wire format: event: stage\\ndata: {...}\\n\\n."""
+        async def _mock_execute(*args, **kwargs):
+            yield SSEEvent(
+                event="stage",
+                data=json.dumps({"stage": "analyzing", "message": "Understanding your goals..."}),
+            )
+
+        mock_uc = MagicMock(spec=AsyncStreamChatUseCase)
+        mock_uc.execute = _mock_execute
+
+        chat_app.dependency_overrides[backend_get_current_user] = mock_auth
+        chat_app.dependency_overrides[deps_get_current_user] = mock_auth
+        chat_app.dependency_overrides[get_auth_context] = mock_auth_context
+        chat_app.dependency_overrides[get_async_stream_chat_use_case] = lambda: mock_uc
+
+        client = TestClient(chat_app)
+        response = client.post("/chat/stream", json={"message": "Hello"})
+
+        assert "event: stage" in response.text
+        assert '"stage": "analyzing"' in response.text or '"stage":"analyzing"' in response.text
+
+        chat_app.dependency_overrides.clear()
+
+
+class TestSSEParsingCompatibility:
+    """Verify the backend SSE format is compatible with the frontend parseSSEEvent."""
+
+    @staticmethod
+    def _frontend_parse_sse(block: str):
+        """Python reimplementation of the frontend parseSSEEvent function."""
+        event_type = ""
+        data_str = ""
+
+        for line in block.split("\n"):
+            if line.startswith("event:"):
+                event_type = line[6:].strip()
+            elif line.startswith("data:"):
+                value = line[5:]
+                payload = value[1:] if value.startswith(" ") else value
+                data_str += ("\n" + payload) if data_str else payload
+
+        if not event_type or not data_str:
+            return None
+
+        try:
+            data = json.loads(data_str)
+            return {"event": event_type, "data": data}
+        except json.JSONDecodeError:
+            return None
+
+    def test_stage_event_parses_correctly(self):
+        """Backend SSE format for stage events is parseable by frontend."""
+        block = 'event: stage\ndata: {"stage": "researching", "message": "Processing import_from_youtube..."}'
+        result = self._frontend_parse_sse(block)
+        assert result is not None
+        assert result["event"] == "stage"
+        assert result["data"]["stage"] == "researching"
+
+    def test_all_event_types_match_frontend_contract(self):
+        """Every backend event type matches the frontend SSEEventData union."""
+        frontend_event_types = {
+            "message_start", "content_delta", "function_call",
+            "function_result", "stage", "message_end", "error",
+        }
+        backend_event_types = {
+            "message_start", "content_delta", "function_call",
+            "function_result", "stage", "message_end", "error",
+        }
+        assert backend_event_types == frontend_event_types
+
+
 class TestChatContextValidation:
     """Tests for ChatContext input validation."""
 

@@ -77,6 +77,7 @@ class AIClient:
         ttft_recorded = False
         input_tokens = 0
         output_tokens = 0
+        stop_reason = "end_turn"
 
         tracer = get_tracer()
 
@@ -140,15 +141,17 @@ class AIClient:
                                 )
 
                         elif event.type == "message_delta":
+                            delta = getattr(event, "delta", None)
+                            if delta:
+                                delta_stop = getattr(delta, "stop_reason", None)
+                                if delta_stop:
+                                    stop_reason = delta_stop
                             usage = getattr(
                                 getattr(event, "usage", None), "output_tokens", 0
                             )
                             if usage:
                                 output_tokens = usage
 
-                    # Get final message for stop_reason
-                    final_message = stream.get_final_message()
-                    stop_reason = getattr(final_message, "stop_reason", "end_turn")
                     total_seconds = time.time() - start_time
                     latency_ms = round(total_seconds * 1000)
 

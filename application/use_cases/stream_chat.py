@@ -77,6 +77,32 @@ You: "Saved to your library!"
 - Only claim success after save_imported_workout returns persisted: true
 """
 
+# Maps tool names to frontend stage indicator names (WorkoutStage type)
+TOOL_STAGE_MAP = {
+    "search_workout_library": "searching",
+    "add_workout_to_calendar": "creating",
+    "generate_ai_workout": "creating",
+    "navigate_to_page": "analyzing",
+    "import_from_youtube": "researching",
+    "import_from_tiktok": "researching",
+    "import_from_instagram": "researching",
+    "import_from_pinterest": "researching",
+    "import_from_image": "researching",
+    "save_imported_workout": "creating",
+    "edit_workout": "creating",
+    "export_workout": "creating",
+    "duplicate_workout": "creating",
+    "log_workout_completion": "creating",
+    "get_workout_history": "researching",
+    "get_workout_details": "researching",
+    "get_calendar_events": "researching",
+    "reschedule_workout": "creating",
+    "cancel_scheduled_workout": "creating",
+    "sync_strava": "researching",
+    "sync_garmin": "researching",
+    "get_strava_activities": "researching",
+}
+
 
 @dataclass
 class SSEEvent:
@@ -371,6 +397,13 @@ class StreamChatUseCase:
                         "message": f"Tool execution failed: {e}",
                     })
 
+                # Emit stage event for Perplexity-style progress indicator
+                stage_name = TOOL_STAGE_MAP.get(tool_name, "analyzing")
+                yield _sse("stage", {
+                    "stage": stage_name,
+                    "message": f"Processing {tool_name}...",
+                })
+
                 # Yield result to client
                 yield _sse("function_result", {
                     "tool_use_id": tool_use["id"],
@@ -443,6 +476,10 @@ class StreamChatUseCase:
         end_data["input_tokens"] = total_input_tokens
         end_data["output_tokens"] = total_output_tokens
         end_data["latency_ms"] = total_latency_ms
+
+        # 7b. Emit completion stage if tools were used
+        if all_tool_calls:
+            yield _sse("stage", {"stage": "complete", "message": "Done"})
 
         # 8. Persist assistant message
         try:
