@@ -370,13 +370,21 @@ class AsyncFunctionDispatcher:
 
         workouts = result.get("results", [])[:max_results]
         if not workouts:
-            return "No workouts found matching your search."
+            return json.dumps({"type": "search_results", "workouts": []})
 
-        lines = ["Found these workouts:"]
-        for i, w in enumerate(workouts, 1):
-            title = w.get("title", "Untitled")
-            lines.append(f"{i}. {title} (ID: {w.get('workout_id', 'unknown')})")
-        return "\n".join(lines)
+        return json.dumps({
+            "type": "search_results",
+            "workouts": [
+                {
+                    "workout_id": w.get("workout_id", "unknown"),
+                    "title": w.get("title", "Untitled"),
+                    "exercise_count": w.get("exercise_count"),
+                    "duration_minutes": w.get("duration_minutes"),
+                    "difficulty": w.get("difficulty"),
+                }
+                for w in workouts
+            ],
+        })
 
     async def _add_workout_to_calendar(
         self, args: Dict[str, Any], ctx: FunctionContext
@@ -436,8 +444,24 @@ class AsyncFunctionDispatcher:
             )
 
         workout = result.get("workout", {})
-        name = workout.get("name", "Generated Workout")
-        return f"Generated workout: {name}"
+        return json.dumps({
+            "type": "workout_generated",
+            "workout": {
+                "name": workout.get("name", "Generated Workout"),
+                "exercises": [
+                    {
+                        "name": ex.get("name", "Unknown"),
+                        "sets": ex.get("sets"),
+                        "reps": ex.get("reps"),
+                        "muscle_group": ex.get("muscle_group"),
+                        "notes": ex.get("notes"),
+                    }
+                    for ex in workout.get("exercises", [])
+                ],
+                "duration_minutes": workout.get("duration_minutes"),
+                "difficulty": workout.get("difficulty"),
+            },
+        })
 
     async def _navigate_to_page(
         self, args: Dict[str, Any], ctx: FunctionContext
@@ -686,6 +710,7 @@ class AsyncFunctionDispatcher:
         title = workout.get("title") or workout.get("name", "Imported Workout")
 
         response: Dict[str, Any] = {
+            "type": "workout_imported",
             "success": True,
             "source": source,
             "preview_mode": True,
@@ -728,6 +753,17 @@ class AsyncFunctionDispatcher:
                 response["workout"]["exercise_names"].append(
                     f"... and {len(exercises) - 10} more"
                 )
+            # Include structured exercise data for progressive UI rendering
+            response["workout"]["exercises"] = [
+                {
+                    "name": ex.get("name", "Unknown"),
+                    "sets": ex.get("sets"),
+                    "reps": ex.get("reps"),
+                    "muscle_group": ex.get("muscle_group"),
+                    "notes": ex.get("notes"),
+                }
+                for ex in exercises
+            ]
 
         return json.dumps(response)
 

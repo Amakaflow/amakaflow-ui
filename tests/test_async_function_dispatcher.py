@@ -464,7 +464,7 @@ class TestSearchWorkoutLibraryHandler:
 
     @pytest.mark.asyncio
     async def test_success_returns_formatted_results(self, dispatcher, context):
-        """search_workout_library returns formatted results."""
+        """search_workout_library returns structured JSON with workout data."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "results": [
@@ -482,12 +482,15 @@ class TestSearchWorkoutLibraryHandler:
                 "search_workout_library", {"query": "strength"}, context
             )
 
-        assert "Leg Day" in result
-        assert "w-1" in result
+        parsed = json.loads(result)
+        assert parsed["type"] == "search_results"
+        assert len(parsed["workouts"]) == 2
+        assert parsed["workouts"][0]["title"] == "Leg Day"
+        assert parsed["workouts"][0]["workout_id"] == "w-1"
 
     @pytest.mark.asyncio
     async def test_empty_results(self, dispatcher, context):
-        """search_workout_library handles no results gracefully."""
+        """search_workout_library returns empty search_results JSON on no results."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"results": []}
         mock_response.raise_for_status = MagicMock()
@@ -500,7 +503,92 @@ class TestSearchWorkoutLibraryHandler:
                 "search_workout_library", {"query": "nonexistent"}, context
             )
 
-        assert "no workouts" in result.lower() or "didn't find" in result.lower()
+        parsed = json.loads(result)
+        assert parsed["type"] == "search_results"
+        assert parsed["workouts"] == []
+
+    @pytest.mark.asyncio
+    async def test_search_workout_library_returns_structured_results(self, dispatcher, context):
+        """search_workout_library should return structured results with metadata."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "results": [
+                {
+                    "workout_id": "w-push-1",
+                    "title": "Push Day",
+                    "exercise_count": 6,
+                    "duration_minutes": 50,
+                    "difficulty": "intermediate",
+                },
+                {
+                    "workout_id": "w-push-2",
+                    "title": "Push Day Advanced",
+                    "exercise_count": 8,
+                    "duration_minutes": 65,
+                    "difficulty": "advanced",
+                },
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher.execute(
+                "search_workout_library", {"query": "push day"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["type"] == "search_results"
+        assert len(parsed["workouts"]) == 2
+
+        first = parsed["workouts"][0]
+        assert first["title"] == "Push Day"
+        assert first["workout_id"] == "w-push-1"
+        assert first["exercise_count"] == 6
+        assert first["duration_minutes"] == 50
+        assert first["difficulty"] == "intermediate"
+
+        second = parsed["workouts"][1]
+        assert second["title"] == "Push Day Advanced"
+        assert second["workout_id"] == "w-push-2"
+        assert second["exercise_count"] == 8
+        assert second["duration_minutes"] == 65
+        assert second["difficulty"] == "advanced"
+
+    @pytest.mark.asyncio
+    async def test_search_workout_library_handles_missing_metadata(self, dispatcher, context):
+        """search_workout_library handles workouts with missing optional metadata."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "results": [
+                {
+                    "workout_id": "w-minimal",
+                    "title": "Basic Workout",
+                },
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher.execute(
+                "search_workout_library", {"query": "basic"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["type"] == "search_results"
+        assert len(parsed["workouts"]) == 1
+
+        workout = parsed["workouts"][0]
+        assert workout["workout_id"] == "w-minimal"
+        assert workout["title"] == "Basic Workout"
+        assert workout["exercise_count"] is None
+        assert workout["duration_minutes"] is None
+        assert workout["difficulty"] is None
 
 
 class TestGenerateAiWorkoutHandler:
@@ -531,6 +619,131 @@ class TestGenerateAiWorkoutHandler:
             )
 
         assert "Generated HIIT" in result or "gen-123" in result
+
+    @pytest.mark.asyncio
+    async def test_generate_ai_workout_returns_structured_json(self, dispatcher, context):
+        """generate_ai_workout returns structured JSON with type, workout details, and exercises."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "name": "Full Body Blast",
+                "exercises": [
+                    {
+                        "name": "Push-ups",
+                        "sets": 3,
+                        "reps": 15,
+                        "muscle_group": "chest",
+                        "notes": "Keep core tight",
+                    },
+                    {
+                        "name": "Squats",
+                        "sets": 4,
+                        "reps": 12,
+                        "muscle_group": "legs",
+                        "notes": None,
+                    },
+                ],
+                "duration_minutes": 30,
+                "difficulty": "intermediate",
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher.execute(
+                "generate_ai_workout",
+                {"description": "30 min full body workout"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["type"] == "workout_generated"
+
+        workout = parsed["workout"]
+        assert workout["name"] == "Full Body Blast"
+        assert workout["duration_minutes"] == 30
+        assert workout["difficulty"] == "intermediate"
+
+        exercises = workout["exercises"]
+        assert len(exercises) == 2
+
+        assert exercises[0]["name"] == "Push-ups"
+        assert exercises[0]["sets"] == 3
+        assert exercises[0]["reps"] == 15
+        assert exercises[0]["muscle_group"] == "chest"
+        assert exercises[0]["notes"] == "Keep core tight"
+
+        assert exercises[1]["name"] == "Squats"
+        assert exercises[1]["sets"] == 4
+        assert exercises[1]["reps"] == 12
+        assert exercises[1]["muscle_group"] == "legs"
+
+    @pytest.mark.asyncio
+    async def test_generate_ai_workout_structured_with_missing_fields(self, dispatcher, context):
+        """generate_ai_workout handles exercises with missing optional fields gracefully."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "name": "Quick Stretch",
+                "exercises": [
+                    {"name": "Hamstring Stretch"},
+                ],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher.execute(
+                "generate_ai_workout",
+                {"description": "stretching routine"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["type"] == "workout_generated"
+
+        workout = parsed["workout"]
+        assert workout["name"] == "Quick Stretch"
+        assert workout["duration_minutes"] is None
+        assert workout["difficulty"] is None
+
+        exercises = workout["exercises"]
+        assert len(exercises) == 1
+        assert exercises[0]["name"] == "Hamstring Stretch"
+        assert exercises[0]["sets"] is None
+        assert exercises[0]["reps"] is None
+        assert exercises[0]["muscle_group"] is None
+
+    @pytest.mark.asyncio
+    async def test_generate_ai_workout_failure_returns_error(self, dispatcher, context):
+        """generate_ai_workout returns error JSON when ingestor reports failure."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": False,
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher.execute(
+                "generate_ai_workout",
+                {"description": "something vague"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "generation_failed"
 
 
 class TestAddWorkoutToCalendarHandler:
