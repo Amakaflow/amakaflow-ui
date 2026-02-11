@@ -755,27 +755,43 @@ class FunctionDispatcher:
         if blocks:
             response["workout"]["block_count"] = len(blocks)
 
-        # Include exercise count and details if available
-        # Check both root-level exercises and exercises nested in blocks
+        # Use ingestor's computed fields (exercises, exercise_count, exercise_names).
+        # Fallback: extract from blocks for cached responses that lack computed fields.
         exercises = workout.get("exercises", [])
         if not exercises and blocks:
-            # Extract exercises from all blocks
             for block in blocks:
-                block_exercises = block.get("exercises", [])
-                exercises.extend(block_exercises)
+                exercises.extend(block.get("exercises", []))
 
         if exercises:
-            response["workout"]["exercise_count"] = len(exercises)
-            # Include exercise names for preview
-            response["workout"]["exercise_names"] = [
-                ex.get("name", "Unknown") for ex in exercises[:10]
+            response["workout"]["exercise_count"] = (
+                workout["exercise_count"] if "exercise_count" in workout
+                else len(exercises)
+            )
+            response["workout"]["exercise_names"] = (
+                workout["exercise_names"] if "exercise_names" in workout
+                else self._build_exercise_names(exercises)
+            )
+            # Structured exercise data for progressive UI rendering
+            response["workout"]["exercises"] = [
+                {
+                    "name": ex.get("name", "Unknown"),
+                    "sets": ex.get("sets"),
+                    "reps": ex.get("reps"),
+                    "muscle_group": ex.get("muscle_group"),
+                    "notes": ex.get("notes"),
+                }
+                for ex in exercises
             ]
-            if len(exercises) > 10:
-                response["workout"]["exercise_names"].append(
-                    f"... and {len(exercises) - 10} more"
-                )
 
         return json.dumps(response)
+
+    @staticmethod
+    def _build_exercise_names(exercises: list) -> list:
+        """Build exercise name list capped at 10 with overflow indicator."""
+        names = [ex.get("name", "Unknown") for ex in exercises[:10]]
+        if len(exercises) > 10:
+            names.append(f"... and {len(exercises) - 10} more")
+        return names
 
     def _save_imported_workout(
         self, args: Dict[str, Any], ctx: FunctionContext

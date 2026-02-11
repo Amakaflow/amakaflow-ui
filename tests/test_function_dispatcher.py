@@ -3120,3 +3120,56 @@ class TestFormatIngestionResultPreviewMode:
         assert data["persisted"] is False
         assert "source_url" in data
         assert data["source_url"].startswith("uploaded:")
+
+    def test_computed_fields_passthrough(self, dispatcher, context):
+        """Ingestor computed fields (exercise_count, exercise_names) are passed through."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "title": "Computed Fields Workout",
+                "blocks": [
+                    {"exercises": [{"name": "Squats"}, {"name": "Lunges"}]},
+                ],
+                "exercises": [{"name": "Squats"}, {"name": "Lunges"}],
+                "exercise_count": 2,
+                "exercise_names": ["Squats", "Lunges"],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=test"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["workout"]["exercise_count"] == 2
+        assert data["workout"]["exercise_names"] == ["Squats", "Lunges"]
+
+    def test_fallback_when_computed_fields_missing(self, dispatcher, context):
+        """Older cached responses without computed fields still work via fallback."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True,
+            "workout": {
+                "title": "Legacy Cached Workout",
+                "blocks": [
+                    {"exercises": [{"name": "Deadlifts"}, {"name": "Rows"}]},
+                ],
+            },
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(dispatcher._client, "request", return_value=mock_response):
+            result = dispatcher.execute(
+                "import_from_youtube",
+                {"url": "https://youtube.com/watch?v=test"},
+                context,
+            )
+
+        data = json.loads(result)
+        assert data["workout"]["exercise_count"] == 2
+        assert data["workout"]["exercise_names"] == ["Deadlifts", "Rows"]

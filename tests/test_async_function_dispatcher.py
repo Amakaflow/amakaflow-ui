@@ -855,3 +855,40 @@ class TestIdPattern:
         ]
         for id_val in invalid_ids:
             assert not ID_PATTERN.match(id_val), f"Should reject: {id_val}"
+
+
+class TestFormatIngestionResultComputedFields:
+    """Tests for _format_ingestion_result computed field passthrough."""
+
+    def test_computed_fields_passthrough(self, dispatcher, context):
+        """Ingestor computed fields are passed through without recomputation."""
+        result = {
+            "success": True,
+            "workout": {
+                "title": "Computed Fields Workout",
+                "blocks": [
+                    {"exercises": [{"name": "Squats"}, {"name": "Lunges"}]},
+                ],
+                "exercises": [{"name": "Squats"}, {"name": "Lunges"}],
+                "exercise_count": 2,
+                "exercise_names": ["Squats", "Lunges"],
+            },
+        }
+        output = json.loads(dispatcher._format_ingestion_result(result, "YouTube video"))
+        assert output["workout"]["exercise_count"] == 2
+        assert output["workout"]["exercise_names"] == ["Squats", "Lunges"]
+
+    def test_fallback_when_computed_fields_missing(self, dispatcher, context):
+        """Older cached responses without computed fields still work."""
+        result = {
+            "success": True,
+            "workout": {
+                "title": "Legacy Workout",
+                "blocks": [
+                    {"exercises": [{"name": "Deadlifts"}, {"name": "Rows"}]},
+                ],
+            },
+        }
+        output = json.loads(dispatcher._format_ingestion_result(result, "YouTube video"))
+        assert output["workout"]["exercise_count"] == 2
+        assert output["workout"]["exercise_names"] == ["Deadlifts", "Rows"]
