@@ -421,8 +421,9 @@ export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, p
         return;
       }
 
-      // Instagram requires manual entry - open VideoIngestDialog
-      if (platform === 'instagram') {
+      // Instagram manual mode: open VideoIngestDialog for semi-manual entry
+      // Instagram auto-extract (Apify): add to sources list like YouTube/TikTok
+      if (platform === 'instagram' && !getInstagramAutoExtract()) {
         setPendingInstagramUrl(currentInput.trim());
         setShowVideoIngestDialog(true);
         setCurrentInput('');
@@ -535,6 +536,8 @@ export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, p
     switch (type) {
       case 'youtube': return <Youtube className="w-4 h-4 text-red-600" />;
       case 'tiktok': return <Music2 className="w-4 h-4 text-pink-600" />;
+      case 'instagram': return <Instagram className="w-4 h-4 text-purple-600" />;
+      case 'pinterest': return <ImageIcon className="w-4 h-4 text-red-500" />;
       case 'image': return <Image className="w-4 h-4" />;
       case 'ai-text': return <Sparkles className="w-4 h-4" />;
       default: return <Video className="w-4 h-4" />;
