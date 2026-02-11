@@ -25,7 +25,7 @@ for p in {ROOT, SRC}:
 
 # Import FastAPI app (main.py at repo root)
 from main import app
-from workout_ingestor_api.auth import get_current_user
+from workout_ingestor_api.auth import get_current_user, get_user_with_metadata
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +41,11 @@ async def mock_get_current_user() -> str:
     return TEST_USER_ID
 
 
+async def mock_get_user_with_metadata() -> dict:
+    """Mock auth dependency that returns a test user with pro subscription."""
+    return {"user_id": TEST_USER_ID, "metadata": {"subscription": "pro"}}
+
+
 # ---------------------------------------------------------------------------
 # Core Test Client
 # ---------------------------------------------------------------------------
@@ -51,6 +56,7 @@ def api_client() -> TestClient:
     """Shared FastAPI TestClient for workout-ingestor-api."""
     # Override auth dependency for all tests
     app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_user_with_metadata] = mock_get_user_with_metadata
     return TestClient(app)
 
 
@@ -59,6 +65,7 @@ def client() -> TestClient:
     """Per-test FastAPI TestClient (for tests needing fresh state)."""
     # Override auth dependency for all tests
     app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_user_with_metadata] = mock_get_user_with_metadata
     return TestClient(app)
 
 

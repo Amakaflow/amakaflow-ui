@@ -45,3 +45,6 @@ anthropic>=0.40.0  # Anthropic Claude API (official dependency)
 # Cloud transcription providers (AMA-229)
 deepgram-sdk>=3.0.0  # Deepgram Nova-3 for cloud transcription
 assemblyai>=0.23.0   # AssemblyAI Universal for cloud transcription
+
+# Instagram Reel ingestion via Apify (AMA-564)
+apify-client>=1.6.0

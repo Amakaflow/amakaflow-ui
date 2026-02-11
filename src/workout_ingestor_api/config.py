@@ -20,6 +20,7 @@ class Settings:
     OPENAI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None
     HELICONE_API_KEY: str | None = None
+    APIFY_API_TOKEN: str | None = None
 
     def __init__(self):
         # Environment
@@ -37,6 +38,7 @@ class Settings:
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
         self.HELICONE_API_KEY = os.getenv("HELICONE_API_KEY")
+        self.APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
 
 
 settings = Settings()

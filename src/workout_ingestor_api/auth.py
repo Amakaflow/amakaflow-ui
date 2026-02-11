@@ -122,3 +122,62 @@ async def get_optional_user(
         return await get_current_user(authorization, x_api_key)
     except HTTPException:
         return None
+
+
+async def get_user_with_metadata(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+) -> dict:
+    """
+    Authenticate and return user_id plus JWT metadata (e.g., subscription tier).
+
+    Returns dict: {"user_id": str, "metadata": dict}
+    - For API key auth: metadata is empty (admin access assumed).
+    - For JWT auth: metadata includes Clerk public metadata from token.
+    """
+    if x_api_key:
+        user_id = validate_api_key(x_api_key)
+        return {"user_id": user_id, "metadata": {"subscription": "admin"}}
+
+    if authorization:
+        return _validate_jwt_with_metadata(authorization)
+
+    raise HTTPException(
+        status_code=401,
+        detail="Missing authentication. Provide Authorization header or X-API-Key.",
+    )
+
+
+def _validate_jwt_with_metadata(authorization: str) -> dict:
+    """Validate Clerk JWT and return user_id plus metadata."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+
+    token = authorization.split(" ", 1)[1]
+    jwks_client = get_jwks_client()
+
+    if not jwks_client:
+        raise HTTPException(
+            status_code=500,
+            detail="JWT validation not configured (missing CLERK_DOMAIN)",
+        )
+
+    try:
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token missing user ID")
+        return {
+            "user_id": user_id,
+            "metadata": payload.get("metadata", payload.get("publicMetadata", payload.get("public_metadata", {}))),
+        }
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")

@@ -26,7 +26,7 @@ from fastapi import (
     Depends,
 )
 from fastapi.responses import JSONResponse, Response
-from workout_ingestor_api.auth import get_current_user, get_optional_user
+from workout_ingestor_api.auth import get_current_user, get_optional_user, get_user_with_metadata
 from pydantic import BaseModel
 
 from workout_ingestor_api.models import Workout, Block, Exercise
@@ -137,6 +137,11 @@ class ParseVoiceRequest(BaseModel):
     """Request model for voice workout parsing (AMA-5)."""
     transcription: str
     sport_hint: Optional[str] = None  # "running" | "cycling" | "strength" | "mobility" | "swimming" | "cardio"
+
+
+class InstagramReelRequest(BaseModel):
+    url: str
+    skip_cache: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -755,6 +760,96 @@ async def ingest_instagram_test(payload: InstagramTestRequest):
     response_payload["_filtered_items"] = filtered_items
 
     return JSONResponse(response_payload)
+
+
+# ---------------------------------------------------------------------------
+# Ingest: Instagram Reels via Apify (AMA-564)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ingest/instagram_reel")
+async def ingest_instagram_reel(
+    payload: InstagramReelRequest,
+    user_info: dict = Depends(get_user_with_metadata),
+):
+    """Ingest an Instagram Reel via Apify transcript extraction + LLM parsing."""
+    from workout_ingestor_api.services.instagram_reel_service import (
+        InstagramReelService,
+        InstagramReelServiceError,
+    )
+    from workout_ingestor_api.services.instagram_reel_cache_service import (
+        InstagramReelCacheService,
+    )
+
+    user_id = user_info["user_id"]
+    metadata = user_info["metadata"]
+
+    # Tier enforcement: free-tier users cannot use Apify extraction
+    # BYPASS_TIER_GATE=true skips this check for dev/staging environments
+    bypass_tier = os.getenv("BYPASS_TIER_GATE", "").lower() == "true"
+    subscription = metadata.get("subscription", "free")
+    if subscription == "free" and not bypass_tier:
+        raise HTTPException(
+            status_code=403,
+            detail="Instagram auto-extraction requires a Pro or Trainer subscription.",
+        )
+
+    url = payload.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    # Validate it's a proper Instagram URL using shortcode regex
+    shortcode_match = InstagramReelService._extract_shortcode(url)
+    if not shortcode_match:
+        raise HTTPException(
+            status_code=400,
+            detail="URL must be an Instagram Reel URL (instagram.com/reel/... or instagram.com/p/...)",
+        )
+
+    shortcode = shortcode_match
+
+    # Check cache first
+    if not payload.skip_cache and shortcode:
+        cached = InstagramReelCacheService.get_cached_workout(shortcode)
+        if cached:
+            InstagramReelCacheService.increment_cache_hit(shortcode)
+            workout_data = cached.get("workout_data", {})
+            workout_data.setdefault("_provenance", {})
+            workout_data["_provenance"].update({
+                "mode": "cached",
+                "source_url": url,
+                "shortcode": shortcode,
+                "cached_at": cached.get("ingested_at"),
+                "cache_hits": (cached.get("cache_hits", 0) or 0) + 1,
+            })
+            return JSONResponse(workout_data)
+
+    try:
+        result = InstagramReelService.ingest_reel(url=url, user_id=user_id)
+    except InstagramReelServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Instagram Reel ingestion failed: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Instagram Reel ingestion failed"
+        ) from exc
+
+    # Cache the result (non-blocking best-effort)
+    if shortcode:
+        try:
+            cache_data = {k: v for k, v in result.items() if not k.startswith("_")}
+            InstagramReelCacheService.save_workout(
+                shortcode=shortcode,
+                source_url=url,
+                workout_data=cache_data,
+                reel_metadata=result.get("_provenance", {}),
+                processing_method=result.get("_provenance", {}).get("extraction_method", "apify"),
+                user_id=user_id,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to cache reel workout: {e}")
+
+    return JSONResponse(result)
 
 
 # ---------------------------------------------------------------------------
