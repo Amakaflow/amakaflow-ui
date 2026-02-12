@@ -3,13 +3,22 @@
  *
  * Renders inline in the chat during tool execution. Shows the current
  * stage with an animated indicator and completed stages with checkmarks.
+ *
+ * Accepts an optional stageConfig prop to render any pipeline's stages.
  */
 
 import { Loader2, CheckCircle2, Search, User, Dumbbell, Sparkles } from 'lucide-react';
-import type { StageEvent, WorkoutStage } from '../../types/chat';
+import type { WorkoutStage } from '../../types/chat';
 import { cn } from '../ui/utils';
 
-const STAGE_CONFIG: Record<WorkoutStage, { icon: typeof Search; label: string }> = {
+export type StageConfig = Record<string, { icon: typeof Search; label: string }>;
+
+export interface GenericStageEvent {
+  stage: string;
+  message: string;
+}
+
+const DEFAULT_STAGE_CONFIG: Record<WorkoutStage, { icon: typeof Search; label: string }> = {
   analyzing: { icon: Sparkles, label: 'Analyzing request' },
   researching: { icon: User, label: 'Researching profile' },
   searching: { icon: Search, label: 'Searching exercises' },
@@ -17,15 +26,25 @@ const STAGE_CONFIG: Record<WorkoutStage, { icon: typeof Search; label: string }>
   complete: { icon: CheckCircle2, label: 'Complete' },
 };
 
+const DEFAULT_STAGES: WorkoutStage[] = ['analyzing', 'researching', 'searching', 'creating'];
+
 interface StageIndicatorProps {
-  currentStage: StageEvent | null;
-  completedStages: WorkoutStage[];
+  currentStage: GenericStageEvent | null;
+  completedStages: string[];
+  stageConfig?: StageConfig;
+  stages?: string[];
 }
 
-export function StageIndicator({ currentStage, completedStages }: StageIndicatorProps) {
+export function StageIndicator({
+  currentStage,
+  completedStages,
+  stageConfig,
+  stages,
+}: StageIndicatorProps) {
   if (!currentStage && completedStages.length === 0) return null;
 
-  const allStages: WorkoutStage[] = ['analyzing', 'researching', 'searching', 'creating'];
+  const config = stageConfig || DEFAULT_STAGE_CONFIG;
+  const allStages = stages || DEFAULT_STAGES;
 
   return (
     <div
@@ -33,8 +52,9 @@ export function StageIndicator({ currentStage, completedStages }: StageIndicator
       data-testid="stage-indicator"
     >
       {allStages.map((stage) => {
-        const config = STAGE_CONFIG[stage];
-        const Icon = config.icon;
+        const stageConf = config[stage];
+        if (!stageConf) return null;
+        const Icon = stageConf.icon;
         const isCompleted = completedStages.includes(stage);
         const isCurrent = currentStage?.stage === stage;
         const isInactive = !isCompleted && !isCurrent;
@@ -61,7 +81,7 @@ export function StageIndicator({ currentStage, completedStages }: StageIndicator
               isCompleted && 'text-muted-foreground line-through',
               isCurrent && 'text-foreground font-medium',
             )}>
-              {isCurrent && currentStage?.message ? currentStage.message : config.label}
+              {isCurrent && currentStage?.message ? currentStage.message : stageConf.label}
             </span>
           </div>
         );
