@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle, TrendingUp, FolderOpen } from 'lucide-react';
+import { Dumbbell, Settings, ChevronRight, ChevronDown, ArrowLeft, BarChart3, Users, Activity, CalendarDays, Plus, Layers, HelpCircle, TrendingUp, FolderOpen, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,7 @@ import { VolumeAnalytics } from './components/VolumeAnalytics';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
 import { ProgramDetail } from './components/ProgramDetail';
 import { ProgramsList } from './components/ProgramsList';
+import { CreateAIWorkout } from './components/CreateAIWorkout';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { ChatPanel } from './components/ChatPanel';
@@ -60,7 +61,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs';
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai';
 
 export default function App() {
   // Clerk authentication
@@ -1433,6 +1434,20 @@ export default function App() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button
+                  variant={currentView === 'create-ai' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setCurrentView('create-ai');
+                    });
+                  }}
+                  className="gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Create with AI
+                </Button>
+                <Button
                   variant={currentView === 'calendar' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => {
@@ -1954,6 +1969,10 @@ export default function App() {
               setCurrentView('program-detail');
             }}
           />
+        )}
+
+        {currentView === 'create-ai' && (
+          <CreateAIWorkout />
         )}
 
         {currentView === 'mobile-companion' && (
