@@ -9,8 +9,11 @@ export type GenerationStage = 'analyzing' | 'creating' | 'complete';
 // Pipeline stages for URL import
 export type ImportStage = 'fetching' | 'extracting' | 'parsing' | 'mapping' | 'complete';
 
+// Pipeline stages for save & push
+export type SaveStage = 'validating' | 'saving' | 'pushing' | 'scheduling' | 'complete';
+
 // Union of all pipeline stages
-export type PipelineStage = GenerationStage | ImportStage;
+export type PipelineStage = GenerationStage | ImportStage | SaveStage;
 
 export interface PipelineStageEvent {
   stage: PipelineStage;
