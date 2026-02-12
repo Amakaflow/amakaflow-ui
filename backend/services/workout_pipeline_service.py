@@ -150,7 +150,10 @@ class WorkoutPipelineService:
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
-            yield PipelineEvent("error", json.dumps({"stage": "analyzing", "message": "Cancelled", "recoverable": False}))
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "analyzing", "message": "Cancelled", "recoverable": False}),
+            )
             return
 
         body: dict = {"transcription": description}
@@ -173,7 +176,10 @@ class WorkoutPipelineService:
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
-            yield PipelineEvent("error", json.dumps({"stage": "creating", "message": "Cancelled", "recoverable": False}))
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "creating", "message": "Cancelled", "recoverable": False}),
+            )
             return
 
         try:
@@ -201,7 +207,11 @@ class WorkoutPipelineService:
             await self._record_status(run_id, "failed", error="Invalid response from workout service")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "creating", "message": "Received an invalid response from the workout service.", "recoverable": True}),
+                json.dumps({
+                    "stage": "creating",
+                    "message": "Received an invalid response from the workout service.",
+                    "recoverable": True,
+                }),
             )
             return
 
@@ -265,7 +275,8 @@ class WorkoutPipelineService:
             evaluator = WorkoutQualityEvaluator()
             score = evaluator.evaluate(workout, requested_equipment=equipment)
             logger.info(
-                "Workout quality score: overall=%.2f count=%.2f variety=%.2f volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
+                "Workout quality score: overall=%.2f count=%.2f variety=%.2f "
+                "volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
                 score.overall, score.exercise_count, score.variety,
                 score.volume_sanity, score.equipment_match, score.hallucination,
                 score.issues,
@@ -323,7 +334,10 @@ class WorkoutPipelineService:
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
-            yield PipelineEvent("error", json.dumps({"stage": "validating", "message": "Cancelled", "recoverable": False}))
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "validating", "message": "Cancelled", "recoverable": False}),
+            )
             return
 
         yield PipelineEvent(
@@ -365,7 +379,11 @@ class WorkoutPipelineService:
             await self._record_status(run_id, "failed", error="Invalid response from save service")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "saving", "message": "Received an invalid response from the save service.", "recoverable": True}),
+                json.dumps({
+                    "stage": "saving",
+                    "message": "Received an invalid response from the save service.",
+                    "recoverable": True,
+                }),
             )
             return
 

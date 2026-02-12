@@ -142,7 +142,11 @@ class URLImportPipelineService:
         if parsed.scheme not in ("http", "https"):
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "fetching", "message": "Only HTTP/HTTPS URLs are supported.", "recoverable": False}),
+                json.dumps({
+                    "stage": "fetching",
+                    "message": "Only HTTP/HTTPS URLs are supported.",
+                    "recoverable": False,
+                }),
             )
             return
 
@@ -180,7 +184,10 @@ class URLImportPipelineService:
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
-            yield PipelineEvent("error", json.dumps({"stage": "fetching", "message": "Cancelled", "recoverable": False}))
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "fetching", "message": "Cancelled", "recoverable": False}),
+            )
             return
 
         # Stage 2: Extracting
@@ -207,20 +214,31 @@ class URLImportPipelineService:
             await self._record_status(run_id, "failed", error="Import timed out")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "extracting", "message": "Import timed out. The video may be too long.", "recoverable": True}),
+                json.dumps({
+                    "stage": "extracting",
+                    "message": "Import timed out. The video may be too long.",
+                    "recoverable": True,
+                }),
             )
             return
         except httpx.HTTPError:
             await self._record_status(run_id, "failed", error="Failed to connect to import service")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "extracting", "message": "Failed to connect to import service.", "recoverable": True}),
+                json.dumps({
+                    "stage": "extracting",
+                    "message": "Failed to connect to import service.",
+                    "recoverable": True,
+                }),
             )
             return
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
-            yield PipelineEvent("error", json.dumps({"stage": "extracting", "message": "Cancelled", "recoverable": False}))
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "extracting", "message": "Cancelled", "recoverable": False}),
+            )
             return
 
         try:
@@ -229,7 +247,11 @@ class URLImportPipelineService:
             await self._record_status(run_id, "failed", error="Invalid response from import service")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "extracting", "message": "Received an invalid response from the import service.", "recoverable": True}),
+                json.dumps({
+                    "stage": "extracting",
+                    "message": "Received an invalid response from the import service.",
+                    "recoverable": True,
+                }),
             )
             return
 
@@ -257,7 +279,11 @@ class URLImportPipelineService:
             await self._record_status(run_id, "failed", error="No workout data in response")
             yield PipelineEvent(
                 "error",
-                json.dumps({"stage": "parsing", "message": "Could not extract workout data from this URL.", "recoverable": True}),
+                json.dumps({
+                    "stage": "parsing",
+                    "message": "Could not extract workout data from this URL.",
+                    "recoverable": True,
+                }),
             )
             return
 
@@ -342,7 +368,8 @@ class URLImportPipelineService:
             eval_workout = {**workout, "exercises": exercises}
             score = evaluator.evaluate(eval_workout, requested_equipment=None)
             logger.info(
-                "Workout quality score: overall=%.2f count=%.2f variety=%.2f volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
+                "Workout quality score: overall=%.2f count=%.2f variety=%.2f "
+                "volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
                 score.overall, score.exercise_count, score.variety,
                 score.volume_sanity, score.equipment_match, score.hallucination,
                 score.issues,

@@ -5,7 +5,10 @@ Ensures tool schemas are valid and match dispatcher handlers.
 
 import pytest
 
-from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS, PHASE_4_TOOLS, PHASE_5_TOOLS, ALL_TOOLS
+from backend.services.tool_schemas import (
+    PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS,
+    PHASE_4_TOOLS, PHASE_5_TOOLS, ALL_TOOLS,
+)
 from backend.services.function_dispatcher import FunctionDispatcher
 from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 

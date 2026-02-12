@@ -14,7 +14,11 @@ Architecture:
 import asyncio
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from backend.services.bulk_import_pipeline_service import BulkImportPipelineService
+    from backend.services.url_import_pipeline_service import URLImportPipelineService
 
 from fastapi import Depends, Header
 from supabase import Client, create_client
@@ -52,6 +56,7 @@ from backend.services.ai_client import AIClient, AsyncAIClient
 from backend.services.tts_service import TTSService
 from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 from backend.services.workout_pipeline_service import WorkoutPipelineService
+from backend.services.preview_store import PreviewStore
 from backend.services.program_pipeline_service import ProgramPipelineService, PreviewStore as ProgramPreviewStore
 from backend.services.rate_limiter import InMemoryRateLimiter
 from backend.services.apns_service import APNsService
