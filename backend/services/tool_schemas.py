@@ -60,10 +60,11 @@ PHASE_1_TOOLS: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "generate_ai_workout",
+        "name": "generate_workout",
         "description": (
-            "Generate a custom workout based on a natural language description "
-            "of what the user wants."
+            "Generate a custom workout based on a natural language description. "
+            "Returns a preview — the workout is NOT saved yet. "
+            "After the user reviews and confirms, call save_and_push_workout with the preview_id."
         ),
         "input_schema": {
             "type": "object",
@@ -88,6 +89,28 @@ PHASE_1_TOOLS: List[Dict[str, Any]] = [
                 },
             },
             "required": ["description"],
+        },
+    },
+    {
+        "name": "save_and_push_workout",
+        "description": (
+            "Save a previously generated workout preview to the user's library. "
+            "Requires a preview_id from a prior generate_workout call. "
+            "Optionally schedule it on the user's calendar."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "preview_id": {
+                    "type": "string",
+                    "description": "Preview ID from generate_workout result",
+                },
+                "schedule_date": {
+                    "type": "string",
+                    "description": "Optional date to schedule the workout (YYYY-MM-DD)",
+                },
+            },
+            "required": ["preview_id"],
         },
     },
     {

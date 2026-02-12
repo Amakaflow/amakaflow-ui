@@ -11,6 +11,7 @@ from backend.services.function_dispatcher import (
     FunctionDispatcher,
     FunctionExecutionError,
 )
+from backend.services.preview_store import PreviewStore
 
 
 @pytest.fixture
@@ -21,6 +22,24 @@ def dispatcher():
         calendar_api_url="http://calendar-api",
         ingestor_api_url="http://ingestor-api",
         timeout=5.0,
+    )
+
+
+@pytest.fixture
+def preview_store():
+    """Create a PreviewStore for testing."""
+    return PreviewStore(ttl_seconds=60)
+
+
+@pytest.fixture
+def dispatcher_with_preview(preview_store):
+    """Create a FunctionDispatcher with a preview store."""
+    return FunctionDispatcher(
+        mapper_api_url="http://mapper-api",
+        calendar_api_url="http://calendar-api",
+        ingestor_api_url="http://ingestor-api",
+        timeout=5.0,
+        preview_store=preview_store,
     )
 
 
@@ -255,7 +274,7 @@ class TestAddWorkoutToCalendar:
         assert "Missing required fields" in parsed["message"]
 
 
-class TestGenerateAiWorkout:
+class TestGenerateWorkout:
     def test_success(self, dispatcher, context):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -266,12 +285,15 @@ class TestGenerateAiWorkout:
 
         with patch.object(dispatcher._client, "request", return_value=mock_response):
             result = dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "15 minute HIIT workout"},
                 context,
             )
 
-        assert "Quick HIIT Session" in result
+        parsed = json.loads(result)
+        assert parsed["workout"]["name"] == "Quick HIIT Session"
+        assert parsed["preview_id"]
+        assert parsed["persisted"] is False
 
     def test_optional_parameters_passed(self, dispatcher, context):
         """Verify optional parameters (difficulty, duration, equipment) are passed to API."""
@@ -284,7 +306,7 @@ class TestGenerateAiWorkout:
 
         with patch.object(dispatcher._client, "request", return_value=mock_response) as mock_req:
             dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {
                     "description": "Build muscle",
                     "difficulty": "intermediate",
@@ -309,7 +331,7 @@ class TestGenerateAiWorkout:
 
         with patch.object(dispatcher._client, "request", return_value=mock_response):
             result = dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "vague"},
                 context,
             )
@@ -3173,3 +3195,133 @@ class TestFormatIngestionResultPreviewMode:
         data = json.loads(result)
         assert data["workout"]["exercise_count"] == 2
         assert data["workout"]["exercise_names"] == ["Deadlifts", "Rows"]
+
+
+# =============================================================================
+# Save and Push Workout Handler Tests
+# =============================================================================
+
+
+class TestSaveAndPushWorkout:
+    """Tests for save_and_push_workout handler (sync dispatcher)."""
+
+    def test_missing_preview_id_returns_error(self, dispatcher_with_preview, context):
+        """save_and_push_workout returns validation_error when preview_id is missing."""
+        result = dispatcher_with_preview.execute(
+            "save_and_push_workout", {}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "preview_id" in parsed["message"]
+
+    def test_no_preview_store_returns_error(self, dispatcher, context):
+        """save_and_push_workout returns error when preview store is not configured."""
+        result = dispatcher.execute(
+            "save_and_push_workout", {"preview_id": "p-123"}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "internal_error"
+
+    def test_expired_preview_returns_not_found(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout returns not_found when preview doesn't exist."""
+        result = dispatcher_with_preview.execute(
+            "save_and_push_workout", {"preview_id": "nonexistent"}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "not_found"
+        assert "expired" in parsed["message"].lower()
+
+    def test_wrong_user_cannot_access_preview(self, dispatcher_with_preview, preview_store):
+        """save_and_push_workout returns not_found when a different user tries to access."""
+        preview_store.put("p-123", "user-1", {"name": "Leg Day"})
+        other_ctx = FunctionContext(user_id="user-2", auth_token="Bearer test-token")
+
+        result = dispatcher_with_preview.execute(
+            "save_and_push_workout", {"preview_id": "p-123"}, other_ctx
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "not_found"
+
+    def test_success_saves_and_returns_workout(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout saves via mapper-api and returns success."""
+        preview_store.put("p-123", "user-1", {"name": "Push Day", "exercises": []})
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "workout": {"id": "w-saved-1", "name": "Push Day"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher_with_preview._client, "request", return_value=mock_response
+        ):
+            result = dispatcher_with_preview.execute(
+                "save_and_push_workout", {"preview_id": "p-123"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["success"] is True
+        assert parsed["persisted"] is True
+        assert parsed["workout_id"] == "w-saved-1"
+        assert parsed["title"] == "Push Day"
+
+        # Preview should be consumed (popped)
+        assert preview_store.get("p-123", "user-1") is None
+
+    def test_save_api_failure_returns_error(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout returns error when mapper-api call fails."""
+        preview_store.put("p-123", "user-1", {"name": "Fail Workout"})
+
+        with patch.object(
+            dispatcher_with_preview._client, "request",
+            side_effect=httpx.TimeoutException("timeout"),
+        ):
+            result = dispatcher_with_preview.execute(
+                "save_and_push_workout", {"preview_id": "p-123"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "save_failed"
+
+    def test_success_with_schedule_date(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout saves and schedules when schedule_date provided."""
+        preview_store.put("p-456", "user-1", {"name": "Leg Day"})
+
+        mock_save_response = MagicMock()
+        mock_save_response.json.return_value = {
+            "workout": {"id": "w-saved-2"},
+        }
+        mock_save_response.raise_for_status = MagicMock()
+
+        mock_calendar_response = MagicMock()
+        mock_calendar_response.json.return_value = {"event_id": "evt-1"}
+        mock_calendar_response.raise_for_status = MagicMock()
+
+        call_count = 0
+
+        def mock_request_fn(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return mock_save_response
+            return mock_calendar_response
+
+        with patch.object(
+            dispatcher_with_preview._client, "request",
+            side_effect=mock_request_fn,
+        ):
+            result = dispatcher_with_preview.execute(
+                "save_and_push_workout",
+                {"preview_id": "p-456", "schedule_date": "2026-02-15"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["success"] is True
+        assert parsed["scheduled_date"] == "2026-02-15"
+        assert call_count == 2  # save + calendar

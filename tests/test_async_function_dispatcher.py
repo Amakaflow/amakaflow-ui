@@ -23,6 +23,7 @@ from backend.services.async_function_dispatcher import (
     TIKTOK_ALLOWED_DOMAINS,
     ID_PATTERN,
 )
+from backend.services.preview_store import PreviewStore
 
 
 # =============================================================================
@@ -38,6 +39,24 @@ def dispatcher():
         calendar_api_url="http://calendar-api",
         ingestor_api_url="http://ingestor-api",
         timeout=5.0,
+    )
+
+
+@pytest.fixture
+def preview_store():
+    """Create a PreviewStore for testing."""
+    return PreviewStore(ttl_seconds=60)
+
+
+@pytest.fixture
+def dispatcher_with_preview(preview_store):
+    """Create an AsyncFunctionDispatcher with a preview store."""
+    return AsyncFunctionDispatcher(
+        mapper_api_url="http://mapper-api",
+        calendar_api_url="http://calendar-api",
+        ingestor_api_url="http://ingestor-api",
+        timeout=5.0,
+        preview_store=preview_store,
     )
 
 
@@ -591,12 +610,12 @@ class TestSearchWorkoutLibraryHandler:
         assert workout["difficulty"] is None
 
 
-class TestGenerateAiWorkoutHandler:
-    """Tests for generate_ai_workout handler."""
+class TestGenerateWorkoutHandler:
+    """Tests for generate_workout handler."""
 
     @pytest.mark.asyncio
     async def test_generates_workout(self, dispatcher, context):
-        """generate_ai_workout returns workout data."""
+        """generate_workout returns workout data with preview_id."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": True,
@@ -613,16 +632,18 @@ class TestGenerateAiWorkoutHandler:
         ) as mock_request:
             mock_request.return_value = mock_response
             result = await dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "20 min HIIT"},
                 context,
             )
 
-        assert "Generated HIIT" in result or "gen-123" in result
+        parsed = json.loads(result)
+        assert "preview_id" in parsed
+        assert parsed["persisted"] is False
 
     @pytest.mark.asyncio
-    async def test_generate_ai_workout_returns_structured_json(self, dispatcher, context):
-        """generate_ai_workout returns structured JSON with type, workout details, and exercises."""
+    async def test_generate_workout_returns_structured_json(self, dispatcher, context):
+        """generate_workout returns structured JSON with type, workout details, and exercises."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": True,
@@ -655,13 +676,14 @@ class TestGenerateAiWorkoutHandler:
         ) as mock_request:
             mock_request.return_value = mock_response
             result = await dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "30 min full body workout"},
                 context,
             )
 
         parsed = json.loads(result)
         assert parsed["type"] == "workout_generated"
+        assert "preview_id" in parsed
 
         workout = parsed["workout"]
         assert workout["name"] == "Full Body Blast"
@@ -683,8 +705,8 @@ class TestGenerateAiWorkoutHandler:
         assert exercises[1]["muscle_group"] == "legs"
 
     @pytest.mark.asyncio
-    async def test_generate_ai_workout_structured_with_missing_fields(self, dispatcher, context):
-        """generate_ai_workout handles exercises with missing optional fields gracefully."""
+    async def test_generate_workout_structured_with_missing_fields(self, dispatcher, context):
+        """generate_workout handles exercises with missing optional fields gracefully."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": True,
@@ -702,7 +724,7 @@ class TestGenerateAiWorkoutHandler:
         ) as mock_request:
             mock_request.return_value = mock_response
             result = await dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "stretching routine"},
                 context,
             )
@@ -723,8 +745,8 @@ class TestGenerateAiWorkoutHandler:
         assert exercises[0]["muscle_group"] is None
 
     @pytest.mark.asyncio
-    async def test_generate_ai_workout_failure_returns_error(self, dispatcher, context):
-        """generate_ai_workout returns error JSON when ingestor reports failure."""
+    async def test_generate_workout_failure_returns_error(self, dispatcher, context):
+        """generate_workout returns error JSON when ingestor reports failure."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "success": False,
@@ -736,7 +758,7 @@ class TestGenerateAiWorkoutHandler:
         ) as mock_request:
             mock_request.return_value = mock_response
             result = await dispatcher.execute(
-                "generate_ai_workout",
+                "generate_workout",
                 {"description": "something vague"},
                 context,
             )
@@ -892,3 +914,141 @@ class TestFormatIngestionResultComputedFields:
         output = json.loads(dispatcher._format_ingestion_result(result, "YouTube video"))
         assert output["workout"]["exercise_count"] == 2
         assert output["workout"]["exercise_names"] == ["Deadlifts", "Rows"]
+
+
+# =============================================================================
+# Save and Push Workout Handler Tests
+# =============================================================================
+
+
+class TestSaveAndPushWorkoutHandler:
+    """Tests for save_and_push_workout handler."""
+
+    @pytest.mark.asyncio
+    async def test_missing_preview_id_returns_error(self, dispatcher_with_preview, context):
+        """save_and_push_workout returns validation_error when preview_id is missing."""
+        result = await dispatcher_with_preview.execute(
+            "save_and_push_workout", {}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "validation_error"
+        assert "preview_id" in parsed["message"]
+
+    @pytest.mark.asyncio
+    async def test_no_preview_store_returns_error(self, dispatcher, context):
+        """save_and_push_workout returns error when preview store is not configured."""
+        result = await dispatcher.execute(
+            "save_and_push_workout", {"preview_id": "p-123"}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "internal_error"
+
+    @pytest.mark.asyncio
+    async def test_expired_preview_returns_not_found(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout returns not_found when preview doesn't exist."""
+        result = await dispatcher_with_preview.execute(
+            "save_and_push_workout", {"preview_id": "nonexistent"}, context
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "not_found"
+        assert "expired" in parsed["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_wrong_user_cannot_access_preview(self, dispatcher_with_preview, preview_store):
+        """save_and_push_workout returns not_found when a different user tries to access."""
+        preview_store.put("p-123", "user-1", {"name": "Leg Day"})
+        other_ctx = FunctionContext(user_id="user-2", auth_token="Bearer test-token")
+
+        result = await dispatcher_with_preview.execute(
+            "save_and_push_workout", {"preview_id": "p-123"}, other_ctx
+        )
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "not_found"
+
+    @pytest.mark.asyncio
+    async def test_success_saves_and_returns_workout(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout saves via mapper-api and returns success."""
+        preview_store.put("p-123", "user-1", {"name": "Push Day", "exercises": []})
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "workout": {"id": "w-saved-1", "name": "Push Day"},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            dispatcher_with_preview._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.return_value = mock_response
+            result = await dispatcher_with_preview.execute(
+                "save_and_push_workout", {"preview_id": "p-123"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["success"] is True
+        assert parsed["persisted"] is True
+        assert parsed["workout_id"] == "w-saved-1"
+        assert parsed["title"] == "Push Day"
+
+        # Preview should be consumed (popped)
+        assert preview_store.get("p-123", "user-1") is None
+
+    @pytest.mark.asyncio
+    async def test_save_api_failure_returns_error(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout returns error when mapper-api call fails."""
+        preview_store.put("p-123", "user-1", {"name": "Fail Workout"})
+
+        with patch.object(
+            dispatcher_with_preview._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.side_effect = httpx.TimeoutException("timeout")
+            result = await dispatcher_with_preview.execute(
+                "save_and_push_workout", {"preview_id": "p-123"}, context
+            )
+
+        parsed = json.loads(result)
+        assert parsed["error"] is True
+        assert parsed["code"] == "save_failed"
+
+    @pytest.mark.asyncio
+    async def test_success_with_schedule_date(self, dispatcher_with_preview, preview_store, context):
+        """save_and_push_workout saves and schedules when schedule_date provided."""
+        preview_store.put("p-456", "user-1", {"name": "Leg Day"})
+
+        mock_save_response = MagicMock()
+        mock_save_response.json.return_value = {
+            "workout": {"id": "w-saved-2"},
+        }
+        mock_save_response.raise_for_status = MagicMock()
+
+        mock_calendar_response = MagicMock()
+        mock_calendar_response.json.return_value = {"event_id": "evt-1"}
+        mock_calendar_response.raise_for_status = MagicMock()
+
+        call_count = 0
+
+        async def mock_request_fn(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return mock_save_response
+            return mock_calendar_response
+
+        with patch.object(
+            dispatcher_with_preview._client, "request", new_callable=AsyncMock
+        ) as mock_request:
+            mock_request.side_effect = mock_request_fn
+            result = await dispatcher_with_preview.execute(
+                "save_and_push_workout",
+                {"preview_id": "p-456", "schedule_date": "2026-02-15"},
+                context,
+            )
+
+        parsed = json.loads(result)
+        assert parsed["success"] is True
+        assert parsed["scheduled_date"] == "2026-02-15"
+        assert call_count == 2  # save + calendar

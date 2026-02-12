@@ -44,6 +44,7 @@ from infrastructure.db.async_chat_message_repository import AsyncSupabaseChatMes
 from infrastructure.db.async_rate_limit_repository import AsyncSupabaseRateLimitRepository
 from infrastructure.db.async_function_rate_limit_repository import AsyncSupabaseFunctionRateLimitRepository
 from infrastructure.db.async_tts_settings_repository import AsyncSupabaseTTSSettingsRepository
+from infrastructure.db.async_pipeline_run_repository import AsyncPipelineRunRepository
 
 # Services
 from backend.services.embedding_service import EmbeddingService
@@ -51,6 +52,8 @@ from backend.services.ai_client import AIClient, AsyncAIClient
 from backend.services.tts_service import TTSService
 from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 from backend.services.workout_pipeline_service import WorkoutPipelineService
+from backend.services.rate_limiter import InMemoryRateLimiter
+from backend.services.preview_store import PreviewStore
 
 # Use cases
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
@@ -392,6 +395,24 @@ async def get_async_tts_settings_repository(
     )
 
 
+async def get_async_pipeline_run_repository(
+    client: AsyncClient = Depends(get_supabase_async_client_required),
+) -> AsyncPipelineRunRepository:
+    """Get async pipeline run repository instance."""
+    return AsyncPipelineRunRepository(client)
+
+
+async def get_optional_pipeline_run_repository() -> Optional[AsyncPipelineRunRepository]:
+    """Get pipeline run repo if DB is available, None otherwise.
+
+    Used by WorkoutPipelineService for best-effort run persistence.
+    """
+    client = await get_supabase_async_client()
+    if client is None:
+        return None
+    return AsyncPipelineRunRepository(client)
+
+
 # =============================================================================
 # Service Providers
 # =============================================================================
@@ -445,6 +466,7 @@ def get_function_dispatcher(
         function_rate_limit_repo=function_rate_limit_repo,
         feature_flag_service=feature_flags,
         sync_rate_limit_per_hour=settings.sync_rate_limit_per_hour,
+        preview_store=get_preview_store(),
     )
 
 
@@ -513,7 +535,29 @@ async def get_async_function_dispatcher(
         function_rate_limit_repo=function_rate_limit_repo,
         feature_flag_service=feature_flags,
         sync_rate_limit_per_hour=settings.sync_rate_limit_per_hour,
+        preview_store=get_preview_store(),
     )
+
+
+# =============================================================================
+# Pipeline Rate Limiter & Preview Store (singletons)
+# =============================================================================
+
+
+@lru_cache
+def get_pipeline_rate_limiter() -> InMemoryRateLimiter:
+    """Get cached pipeline burst rate limiter."""
+    settings = _get_settings()
+    return InMemoryRateLimiter(
+        max_requests=settings.pipeline_burst_limit,
+        window_seconds=settings.pipeline_burst_window_seconds,
+    )
+
+
+@lru_cache
+def get_preview_store() -> PreviewStore:
+    """Get cached preview store for workout generate→save checkpoint."""
+    return PreviewStore(ttl_seconds=900)  # 15 minutes
 
 
 # =============================================================================
@@ -521,14 +565,19 @@ async def get_async_function_dispatcher(
 # =============================================================================
 
 
-def get_workout_pipeline_service(
+async def get_workout_pipeline_service(
     auth: "AuthContext" = Depends(get_auth_context),
     settings: Settings = Depends(get_settings),
+    pipeline_run_repo: Optional[AsyncPipelineRunRepository] = Depends(get_optional_pipeline_run_repository),
 ) -> WorkoutPipelineService:
     """Get workout pipeline service for standalone workout generation."""
     return WorkoutPipelineService(
         ingestor_url=settings.workout_ingestor_api_url,
         auth_token=auth.auth_token or "",
+        mapper_api_url=settings.mapper_api_url,
+        calendar_api_url=settings.calendar_api_url,
+        preview_store=get_preview_store(),
+        pipeline_run_repo=pipeline_run_repo,
     )
 
 
@@ -637,6 +686,8 @@ __all__ = [
     "get_async_rate_limit_repository",
     "get_async_function_rate_limit_repository",
     "get_async_tts_settings_repository",
+    "get_async_pipeline_run_repository",
+    "get_optional_pipeline_run_repository",
     # Services (sync)
     "get_embedding_service",
     "get_ai_client",
@@ -647,6 +698,8 @@ __all__ = [
     "get_async_ai_client",
     "get_async_function_dispatcher",
     # Workout Pipeline
+    "get_pipeline_rate_limiter",
+    "get_preview_store",
     "get_workout_pipeline_service",
     # Use Cases
     "get_generate_embeddings_use_case",

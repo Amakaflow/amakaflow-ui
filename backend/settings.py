@@ -215,6 +215,18 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Pipeline Burst Rate Limits
+    # -------------------------------------------------------------------------
+    pipeline_burst_limit: int = Field(
+        default=5,
+        description="Maximum pipeline requests per user per burst window",
+    )
+    pipeline_burst_window_seconds: int = Field(
+        default=60,
+        description="Burst rate limit window in seconds",
+    )
+
+    # -------------------------------------------------------------------------
     # OpenTelemetry (AMA-506)
     # -------------------------------------------------------------------------
     otel_enabled: bool = Field(

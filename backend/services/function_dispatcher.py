@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from application.ports.function_rate_limit_repository import FunctionRateLimitRepository
     from backend.services.feature_flag_service import FeatureFlagService
+    from backend.services.preview_store import PreviewStore
 from urllib.parse import urlparse
 
 import httpx
@@ -93,6 +94,7 @@ class FunctionDispatcher:
         function_rate_limit_repo: Optional["FunctionRateLimitRepository"] = None,
         feature_flag_service: Optional["FeatureFlagService"] = None,
         sync_rate_limit_per_hour: int = 3,
+        preview_store: Optional["PreviewStore"] = None,
     ):
         self._mapper_url = mapper_api_url
         self._calendar_url = calendar_api_url
@@ -103,12 +105,14 @@ class FunctionDispatcher:
         self._rate_limit_repo = function_rate_limit_repo
         self._feature_flags = feature_flag_service
         self._sync_rate_limit = sync_rate_limit_per_hour
+        self._preview_store = preview_store
 
         self._handlers: Dict[str, Callable[[Dict[str, Any], FunctionContext], str]] = {
             # Phase 1
             "search_workout_library": self._search_workout_library,
             "add_workout_to_calendar": self._add_workout_to_calendar,
-            "generate_ai_workout": self._generate_ai_workout,
+            "generate_workout": self._generate_workout,
+            "save_and_push_workout": self._save_and_push_workout,
             "navigate_to_page": self._navigate_to_page,
             # Phase 2
             "import_from_youtube": self._import_from_youtube,
@@ -432,22 +436,25 @@ class FunctionDispatcher:
 
         return f"Added workout to calendar on {date}" + (f" at {time}" if time else "")
 
-    def _generate_ai_workout(
+    def _generate_workout(
         self, args: Dict[str, Any], ctx: FunctionContext
     ) -> str:
-        """Generate a workout via workout-ingestor-api."""
+        """Generate a workout via workout-ingestor-api and store as preview.
+
+        Inner LLM note: The ingestor-api uses gpt-4o-mini / claude-3-5-sonnet-20241022
+        for parsing — both cheaper than the orchestrator model (claude-sonnet-4-20250514).
+        """
+        import uuid
+
         description = args.get("description", "")
 
         body: Dict[str, Any] = {
             "transcription": description,
         }
-        # Pass difficulty level if provided (beginner/intermediate/advanced)
         if args.get("difficulty"):
             body["difficulty"] = args["difficulty"]
-        # Pass duration hint if provided
         if args.get("duration_minutes"):
             body["duration_minutes"] = args["duration_minutes"]
-        # Pass equipment list if provided
         if args.get("equipment"):
             body["equipment"] = args["equipment"]
 
@@ -465,8 +472,106 @@ class FunctionDispatcher:
             )
 
         workout = result.get("workout", {})
-        name = workout.get("name", "Generated Workout")
-        return f"Generated workout: {name}"
+        preview_id = str(uuid.uuid4())
+
+        if self._preview_store:
+            self._preview_store.put(preview_id, ctx.user_id, workout)
+
+        return json.dumps({
+            "type": "workout_generated",
+            "preview_id": preview_id,
+            "persisted": False,
+            "workout": {
+                "name": workout.get("name", "Generated Workout"),
+                "exercises": [
+                    {
+                        "name": ex.get("name", "Unknown"),
+                        "sets": ex.get("sets"),
+                        "reps": ex.get("reps"),
+                        "muscle_group": ex.get("muscle_group"),
+                        "notes": ex.get("notes"),
+                    }
+                    for ex in workout.get("exercises", [])
+                ],
+                "duration_minutes": workout.get("duration_minutes"),
+                "difficulty": workout.get("difficulty"),
+            },
+            "next_step": (
+                "Present this workout to the user and ask if they want to save it. "
+                "If confirmed, call save_and_push_workout with the preview_id."
+            ),
+        })
+
+    def _save_and_push_workout(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Save a previously generated workout preview to the user's library."""
+        preview_id = args.get("preview_id")
+        if not preview_id:
+            return self._error_response(
+                "validation_error", "Missing required field: preview_id"
+            )
+
+        if not self._preview_store:
+            return self._error_response(
+                "internal_error", "Preview store not available"
+            )
+
+        workout_data = self._preview_store.pop(preview_id, ctx.user_id)
+        if workout_data is None:
+            return self._error_response(
+                "not_found",
+                "Preview not found or expired. Please generate the workout again.",
+            )
+
+        title = workout_data.get("name", "Generated Workout")
+
+        save_payload: Dict[str, Any] = {
+            "profile_id": ctx.user_id,
+            "workout_data": workout_data,
+            "device": "web",
+            "title": title,
+        }
+
+        try:
+            result = self._call_api(
+                "POST",
+                f"{self._mapper_url}/workouts/save",
+                ctx,
+                json=save_payload,
+            )
+        except FunctionExecutionError as e:
+            return self._error_response(
+                "save_failed",
+                f"Failed to save workout: {e.message}",
+            )
+
+        saved_workout = result.get("workout", result)
+        workout_id = saved_workout.get("id") or saved_workout.get("workout_id")
+
+        schedule_date = args.get("schedule_date")
+        if schedule_date and workout_id:
+            try:
+                self._call_api(
+                    "POST",
+                    f"{self._calendar_url}/calendar",
+                    ctx,
+                    json={"workout_id": workout_id, "scheduled_date": schedule_date},
+                )
+            except FunctionExecutionError:
+                logger.warning("Calendar scheduling failed for workout %s", workout_id)
+
+        response: Dict[str, Any] = {
+            "success": True,
+            "persisted": True,
+            "message": f"Workout '{title}' has been saved to your library!",
+            "workout_id": workout_id,
+            "title": title,
+        }
+        if schedule_date:
+            response["scheduled_date"] = schedule_date
+
+        return json.dumps(response)
 
     def _navigate_to_page(
         self, args: Dict[str, Any], ctx: FunctionContext

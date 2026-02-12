@@ -112,12 +112,20 @@ class TestToolSchemaContent:
         assert "date" in tool["input_schema"]["properties"]
         assert set(tool["input_schema"]["required"]) == {"workout_id", "date"}
 
-    def test_generate_ai_workout_schema(self):
-        """Verify generate_ai_workout has description required."""
-        tool = next(t for t in PHASE_1_TOOLS if t["name"] == "generate_ai_workout")
+    def test_generate_workout_schema(self):
+        """Verify generate_workout has description required."""
+        tool = next(t for t in PHASE_1_TOOLS if t["name"] == "generate_workout")
 
         assert "description" in tool["input_schema"]["properties"]
         assert "description" in tool["input_schema"]["required"]
+
+    def test_save_and_push_workout_schema(self):
+        """Verify save_and_push_workout has preview_id required."""
+        tool = next(t for t in PHASE_1_TOOLS if t["name"] == "save_and_push_workout")
+
+        assert "preview_id" in tool["input_schema"]["properties"]
+        assert "schedule_date" in tool["input_schema"]["properties"]
+        assert tool["input_schema"]["required"] == ["preview_id"]
 
     def test_navigate_to_page_schema(self):
         """Verify navigate_to_page has valid enum values."""

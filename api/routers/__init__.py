@@ -13,6 +13,7 @@ from api.routers.chat import router as chat_router
 from api.routers.embeddings import router as embeddings_router
 from api.routers.voice import router as voice_router
 from api.routers.workouts import router as workouts_router
+from api.routers.pipelines import router as pipelines_router
 
 __all__ = [
     "health_router",
@@ -20,4 +21,5 @@ __all__ = [
     "embeddings_router",
     "voice_router",
     "workouts_router",
+    "pipelines_router",
 ]
