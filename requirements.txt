@@ -30,6 +30,9 @@ elevenlabs>=1.0.0
 # SSE streaming
 sse-starlette>=1.6.0
 
+# APNs push notifications
+aioapns>=3.0
+
 # Testing
 pytest>=7.0.0
 pytest-asyncio>=0.21.0

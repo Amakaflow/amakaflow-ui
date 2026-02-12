@@ -16,6 +16,7 @@ import httpx
 
 if TYPE_CHECKING:
     from backend.services.preview_store import PreviewStore
+    from backend.services.apns_service import APNsService
     from infrastructure.db.async_pipeline_run_repository import AsyncPipelineRunRepository
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class WorkoutPipelineService:
         calendar_api_url: str = "",
         preview_store: Optional["PreviewStore"] = None,
         pipeline_run_repo: Optional["AsyncPipelineRunRepository"] = None,
+        apns_service: Optional["APNsService"] = None,
     ):
         self._ingestor_url = ingestor_url
         self._auth_token = auth_token
@@ -47,6 +49,7 @@ class WorkoutPipelineService:
         self._calendar_url = calendar_api_url
         self._preview_store = preview_store
         self._run_repo = pipeline_run_repo
+        self._apns = apns_service
 
     async def _record_status(
         self,
@@ -200,9 +203,9 @@ class WorkoutPipelineService:
         schedule_date: Optional[str] = None,
         cancel_event: Optional["asyncio.Event"] = None,
     ) -> AsyncGenerator[PipelineEvent, None]:
-        """Save a previewed workout to the library, optionally scheduling it.
+        """Save a previewed workout to the library, push to devices, optionally schedule.
 
-        Stages: validating → saving → (scheduling) → complete
+        Stages: validating → saving → (pushing) → (scheduling) → complete
         """
         # Create pipeline run record (best-effort)
         run_id: Optional[str] = None
@@ -300,6 +303,24 @@ class WorkoutPipelineService:
             yield PipelineEvent("error", json.dumps({"stage": "saving", "message": "Cancelled", "recoverable": False}))
             return
 
+        # Push notification to paired devices (non-fatal)
+        device_push_sent = 0
+        if self._apns and self._apns.enabled:
+            yield PipelineEvent(
+                "stage",
+                json.dumps({"stage": "pushing", "message": "Syncing to your devices..."}),
+            )
+
+            try:
+                results = await self._apns.send_to_user(
+                    user_id=user_id,
+                    payload={"workout_id": workout_id},
+                    auth_token=self._auth_token,
+                )
+                device_push_sent = sum(1 for r in results if r.success)
+            except Exception:
+                logger.warning("APNs push failed for workout %s", workout_id)
+
         # Optional calendar scheduling
         scheduled = False
         if schedule_date and self._calendar_url and workout_id:
@@ -332,5 +353,6 @@ class WorkoutPipelineService:
                 "workout_id": workout_id,
                 "title": workout_data.get("name", "Generated Workout"),
                 "scheduled_date": schedule_date if scheduled else None,
+                "devices_notified": device_push_sent,
             }),
         )

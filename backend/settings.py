@@ -235,6 +235,34 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # APNs Push Notifications (AMA-567 Phase D)
+    # -------------------------------------------------------------------------
+    apns_enabled: bool = Field(
+        default=False,
+        description="Enable APNs push notifications for device sync",
+    )
+    apns_team_id: Optional[str] = Field(
+        default=None,
+        description="Apple Developer Team ID",
+    )
+    apns_key_id: Optional[str] = Field(
+        default=None,
+        description="APNs auth key ID (from .p8 key)",
+    )
+    apns_key_base64: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded APNs .p8 private key",
+    )
+    apns_bundle_id: str = Field(
+        default="com.myamaka.AmakaFlowCompanion",
+        description="iOS app bundle identifier for APNs",
+    )
+    apns_use_sandbox: bool = Field(
+        default=True,
+        description="Use APNs sandbox (development) environment",
+    )
+
+    # -------------------------------------------------------------------------
     # OpenTelemetry (AMA-506)
     # -------------------------------------------------------------------------
     otel_enabled: bool = Field(

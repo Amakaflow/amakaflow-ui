@@ -54,6 +54,7 @@ from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 from backend.services.workout_pipeline_service import WorkoutPipelineService
 from backend.services.rate_limiter import InMemoryRateLimiter
 from backend.services.preview_store import PreviewStore
+from backend.services.apns_service import APNsService
 
 # Use cases
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
@@ -570,6 +571,13 @@ def get_preview_store() -> PreviewStore:
     return PreviewStore(ttl_seconds=900)  # 15 minutes
 
 
+@lru_cache
+def get_apns_service() -> APNsService:
+    """Get cached APNs push notification service (AMA-567 Phase D)."""
+    settings = _get_settings()
+    return APNsService(settings)
+
+
 # =============================================================================
 # Workout Pipeline Provider
 # =============================================================================
@@ -588,6 +596,7 @@ async def get_workout_pipeline_service(
         calendar_api_url=settings.calendar_api_url,
         preview_store=get_preview_store(),
         pipeline_run_repo=pipeline_run_repo,
+        apns_service=get_apns_service(),
     )
 
 
@@ -733,6 +742,8 @@ __all__ = [
     "get_pipeline_rate_limiter",
     "get_preview_store",
     "get_workout_pipeline_service",
+    # APNs Push (AMA-567)
+    "get_apns_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",
