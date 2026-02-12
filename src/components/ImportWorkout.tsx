@@ -84,6 +84,7 @@ export function ImportWorkout() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 id="import-url"
+                data-testid="import-url-input"
                 type="url"
                 placeholder="Paste a YouTube, TikTok, Instagram, or Pinterest URL..."
                 value={url}
@@ -98,6 +99,7 @@ export function ImportWorkout() {
               />
             </div>
             <Button
+              data-testid="import-url-submit"
               onClick={handleImport}
               disabled={pipeline.isStreaming || !url.trim()}
               className="gap-2 shrink-0"
@@ -110,7 +112,7 @@ export function ImportWorkout() {
 
         {/* Supported platforms hint */}
         {!pipeline.isStreaming && !pipeline.preview && !pipeline.error && (
-          <div className="text-xs text-muted-foreground space-y-1">
+          <div data-testid="supported-platforms-hint" className="text-xs text-muted-foreground space-y-1">
             <p className="font-medium">Supported platforms:</p>
             <div className="grid grid-cols-2 gap-1">
               {SUPPORTED_PLATFORMS.map((p) => (

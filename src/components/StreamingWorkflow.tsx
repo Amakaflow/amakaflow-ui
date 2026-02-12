@@ -55,10 +55,11 @@ export function StreamingWorkflow({
 
       {/* Error display */}
       {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+        <div data-testid="pipeline-error" className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
           {onRetry && (
             <button
+              data-testid="pipeline-error-retry"
               onClick={onRetry}
               className="mt-2 text-sm text-primary hover:underline"
             >
@@ -70,9 +71,9 @@ export function StreamingWorkflow({
 
       {/* Workout preview card */}
       {preview && (
-        <div className="rounded-lg border bg-card p-4 space-y-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+        <div data-testid="workout-preview-card" className="rounded-lg border bg-card p-4 space-y-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">{preview.workout.name}</h3>
+            <h3 data-testid="preview-workout-name" className="font-semibold text-lg">{preview.workout.name}</h3>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {preview.workout.difficulty && (
                 <span className="rounded-full bg-muted px-2 py-0.5">
@@ -92,6 +93,7 @@ export function StreamingWorkflow({
             {preview.workout.exercises.map((exercise, idx) => (
               <div
                 key={idx}
+                data-testid={`preview-exercise-${idx}`}
                 className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm"
               >
                 <div className="flex items-center gap-2">
@@ -120,6 +122,7 @@ export function StreamingWorkflow({
           <div className="flex items-center gap-2 pt-2">
             {onSave && (
               <button
+                data-testid="preview-save-btn"
                 onClick={onSave}
                 className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
@@ -128,6 +131,7 @@ export function StreamingWorkflow({
             )}
             {onRetry && (
               <button
+                data-testid="preview-retry-btn"
                 onClick={onRetry}
                 className="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
               >
