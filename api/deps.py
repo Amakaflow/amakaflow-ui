@@ -50,6 +50,7 @@ from backend.services.embedding_service import EmbeddingService
 from backend.services.ai_client import AIClient, AsyncAIClient
 from backend.services.tts_service import TTSService
 from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
+from backend.services.workout_pipeline_service import WorkoutPipelineService
 
 # Use cases
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
@@ -516,6 +517,22 @@ async def get_async_function_dispatcher(
 
 
 # =============================================================================
+# Workout Pipeline Provider
+# =============================================================================
+
+
+def get_workout_pipeline_service(
+    auth: "AuthContext" = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+) -> WorkoutPipelineService:
+    """Get workout pipeline service for standalone workout generation."""
+    return WorkoutPipelineService(
+        ingestor_url=settings.workout_ingestor_api_url,
+        auth_token=auth.auth_token or "",
+    )
+
+
+# =============================================================================
 # Use Case Providers
 # =============================================================================
 
@@ -629,6 +646,8 @@ __all__ = [
     # Services (async)
     "get_async_ai_client",
     "get_async_function_dispatcher",
+    # Workout Pipeline
+    "get_workout_pipeline_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",
