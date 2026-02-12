@@ -5,7 +5,7 @@
  * when the pipeline completes. Used by CreateAIWorkout and potentially other flows.
  */
 
-import { Sparkles, Dumbbell, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Dumbbell, CheckCircle2, ShieldCheck, Save, Send, CalendarPlus } from 'lucide-react';
 import { StageIndicator } from './ChatPanel/StageIndicator';
 import type { StageConfig } from './ChatPanel/StageIndicator';
 import type { PipelineStageEvent, PipelinePreview } from '../types/pipeline';
@@ -17,6 +17,16 @@ const DEFAULT_STAGE_CONFIG: StageConfig = {
 };
 
 const DEFAULT_STAGES = ['analyzing', 'creating'];
+
+export const SAVE_STAGE_CONFIG: StageConfig = {
+  validating: { icon: ShieldCheck, label: 'Validating workout' },
+  saving: { icon: Save, label: 'Saving to library' },
+  pushing: { icon: Send, label: 'Syncing to devices' },
+  scheduling: { icon: CalendarPlus, label: 'Adding to calendar' },
+  complete: { icon: CheckCircle2, label: 'Complete' },
+};
+
+export const SAVE_STAGES = ['validating', 'saving', 'pushing', 'scheduling'];
 
 interface StreamingWorkflowProps {
   currentStage: PipelineStageEvent | null;
