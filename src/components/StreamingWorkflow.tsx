@@ -3,12 +3,15 @@
  *
  * Wraps StageIndicator for stage progress and renders a workout preview card
  * when the pipeline completes. Used by CreateAIWorkout and potentially other flows.
+ *
+ * Supports nested sub-progress for batched operations (e.g., program generation).
  */
 
-import { Sparkles, Dumbbell, CheckCircle2, ShieldCheck, Save, Send, CalendarPlus } from 'lucide-react';
+import { Sparkles, Dumbbell, CheckCircle2, ShieldCheck, Save, Send, CalendarPlus, Compass, Link, Loader2, Circle } from 'lucide-react';
 import { StageIndicator } from './ChatPanel/StageIndicator';
 import type { StageConfig } from './ChatPanel/StageIndicator';
-import type { PipelineStageEvent, PipelinePreview } from '../types/pipeline';
+import type { PipelineStageEvent, PipelinePreview, PipelineSubProgress } from '../types/pipeline';
+import { cn } from './ui/utils';
 
 const DEFAULT_STAGE_CONFIG: StageConfig = {
   analyzing: { icon: Sparkles, label: 'Analyzing request' },
@@ -28,6 +31,21 @@ export const SAVE_STAGE_CONFIG: StageConfig = {
 
 export const SAVE_STAGES = ['validating', 'saving', 'pushing', 'scheduling'];
 
+export const PROGRAM_DESIGN_STAGE_CONFIG: StageConfig = {
+  designing: { icon: Compass, label: 'Designing program' },
+  complete: { icon: CheckCircle2, label: 'Complete' },
+};
+
+export const PROGRAM_DESIGN_STAGES = ['designing'];
+
+export const PROGRAM_GENERATE_STAGE_CONFIG: StageConfig = {
+  generating: { icon: Dumbbell, label: 'Generating workouts' },
+  mapping: { icon: Link, label: 'Matching exercises' },
+  complete: { icon: CheckCircle2, label: 'Complete' },
+};
+
+export const PROGRAM_GENERATE_STAGES = ['generating', 'mapping'];
+
 interface StreamingWorkflowProps {
   currentStage: PipelineStageEvent | null;
   completedStages: string[];
@@ -38,6 +56,7 @@ interface StreamingWorkflowProps {
   onRetry?: () => void;
   stageConfig?: StageConfig;
   stages?: string[];
+  subProgress?: PipelineSubProgress | null;
 }
 
 export function StreamingWorkflow({
@@ -50,17 +69,29 @@ export function StreamingWorkflow({
   onRetry,
   stageConfig = DEFAULT_STAGE_CONFIG,
   stages = DEFAULT_STAGES,
+  subProgress,
 }: StreamingWorkflowProps) {
   return (
     <div className="space-y-4">
       {/* Stage progress */}
       {(isStreaming || completedStages.length > 0) && (
-        <StageIndicator
-          currentStage={currentStage}
-          completedStages={completedStages}
-          stageConfig={stageConfig}
-          stages={stages}
-        />
+        <div className="space-y-1.5">
+          <StageIndicator
+            currentStage={currentStage}
+            completedStages={completedStages}
+            stageConfig={stageConfig}
+            stages={stages}
+          />
+
+          {/* Nested sub-progress (e.g., "Week 2 of 4") */}
+          {subProgress && currentStage && (
+            <SubProgressIndicator
+              current={subProgress.current}
+              total={subProgress.total}
+              label={currentStage.message}
+            />
+          )}
+        </div>
       )}
 
       {/* Error display */}
@@ -151,6 +182,61 @@ export function StreamingWorkflow({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * SubProgressIndicator — Nested progress for batched operations.
+ *
+ * Shows individual items (e.g., weeks) with completed/active/pending states.
+ */
+function SubProgressIndicator({
+  current,
+  total,
+  label,
+  itemLabel = 'Week',
+}: {
+  current: number;
+  total: number;
+  label?: string;
+  itemLabel?: string;
+}) {
+  return (
+    <div
+      className="ml-5 flex flex-col gap-1 rounded-md bg-muted/30 px-3 py-2 text-xs"
+      data-testid="sub-progress"
+    >
+      {Array.from({ length: total }, (_, i) => {
+        const itemNum = i + 1;
+        const isCompleted = itemNum < current;
+        const isActive = itemNum === current;
+
+        return (
+          <div
+            key={itemNum}
+            className={cn(
+              'flex items-center gap-2 transition-opacity duration-200',
+              !isCompleted && !isActive && 'opacity-40',
+            )}
+            data-testid={`sub-progress-item-${itemNum}`}
+          >
+            {isCompleted ? (
+              <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+            ) : isActive ? (
+              <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
+            ) : (
+              <Circle className="w-3 h-3 text-muted-foreground shrink-0" />
+            )}
+            <span className={cn(
+              isCompleted && 'text-muted-foreground',
+              isActive && 'text-foreground font-medium',
+            )}>
+              {itemLabel} {itemNum}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

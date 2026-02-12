@@ -3,11 +3,19 @@
  *
  * Tracks stages, content deltas, preview data, streaming state, and errors.
  * Supports AbortController cancellation and content buffering.
+ * Supports sub-progress for batched operations (e.g., "Week 2 of 4").
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { streamPipeline } from '../lib/pipeline-api';
-import type { PipelineStage, PipelineStageEvent, PipelinePreview, PipelineSSEEvent } from '../types/pipeline';
+import type {
+  PipelineStage,
+  PipelineStageEvent,
+  PipelinePreview,
+  PipelineProgramPreview,
+  PipelineSubProgress,
+  PipelineSSEEvent,
+} from '../types/pipeline';
 
 export interface UseStreamingPipelineReturn {
   start: (endpoint: string, body: Record<string, unknown>) => void;
@@ -16,6 +24,8 @@ export interface UseStreamingPipelineReturn {
   completedStages: PipelineStage[];
   content: string;
   preview: PipelinePreview | null;
+  programPreview: PipelineProgramPreview | null;
+  subProgress: PipelineSubProgress | null;
   isStreaming: boolean;
   error: string | null;
 }
@@ -25,6 +35,8 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
   const [completedStages, setCompletedStages] = useState<PipelineStage[]>([]);
   const [content, setContent] = useState('');
   const [preview, setPreview] = useState<PipelinePreview | null>(null);
+  const [programPreview, setProgramPreview] = useState<PipelineProgramPreview | null>(null);
+  const [subProgress, setSubProgress] = useState<PipelineSubProgress | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +83,8 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
       setCompletedStages([]);
       setContent('');
       setPreview(null);
+      setProgramPreview(null);
+      setSubProgress(null);
       setError(null);
       setIsStreaming(true);
 
@@ -83,14 +97,21 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
             case 'stage': {
               const stageData = event.data;
               setCurrentStage((prev) => {
-                // Move previous stage to completed when transitioning
+                // Move previous stage to completed when transitioning to different stage
                 if (prev && prev.stage !== stageData.stage) {
                   setCompletedStages((cs) =>
                     cs.includes(prev.stage) ? cs : [...cs, prev.stage]
                   );
+                  // Clear sub-progress when moving to a new stage
+                  setSubProgress(null);
                 }
                 return stageData;
               });
+
+              // Track sub-progress for batched operations
+              if (stageData.sub_progress) {
+                setSubProgress(stageData.sub_progress);
+              }
               break;
             }
             case 'content_delta': {
@@ -103,7 +124,12 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
               break;
             }
             case 'preview': {
-              setPreview(event.data);
+              // Distinguish between workout and program previews
+              if ('program' in event.data) {
+                setProgramPreview(event.data as PipelineProgramPreview);
+              } else {
+                setPreview(event.data as PipelinePreview);
+              }
               break;
             }
             case 'error': {
@@ -157,6 +183,8 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
     completedStages,
     content,
     preview,
+    programPreview,
+    subProgress,
     isStreaming,
     error,
   };

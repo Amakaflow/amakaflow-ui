@@ -240,4 +240,164 @@ describe('useStreamingPipeline', () => {
 
     expect(opts.signal!.aborted).toBe(true);
   });
+
+  describe('program pipeline support', () => {
+    it('initializes programPreview and subProgress as null', () => {
+      const { result } = renderHook(() => useStreamingPipeline());
+
+      expect(result.current.programPreview).toBeNull();
+      expect(result.current.subProgress).toBeNull();
+    });
+
+    it('sets programPreview for program preview events', () => {
+      const { result } = renderHook(() => useStreamingPipeline());
+
+      act(() => {
+        result.current.start('/api/programs/generate/stream', {});
+      });
+
+      const opts = captureStreamCall();
+      const programData = {
+        preview_id: 'prog-1',
+        program: {
+          name: 'Strength Builder',
+          goal: 'Build strength',
+          duration_weeks: 4,
+          sessions_per_week: 3,
+          weeks: [
+            {
+              week_number: 1,
+              focus: 'Hypertrophy',
+              is_deload: false,
+              workouts: [
+                { day_of_week: 1, name: 'Upper Body A', workout_type: 'strength' },
+              ],
+            },
+          ],
+        },
+      };
+
+      act(() => {
+        opts.onEvent({ event: 'preview', data: programData } as PipelineSSEEvent);
+      });
+
+      // Should route to programPreview, NOT preview
+      expect(result.current.programPreview).toEqual(programData);
+      expect(result.current.preview).toBeNull();
+    });
+
+    it('tracks sub-progress from stage events', () => {
+      const { result } = renderHook(() => useStreamingPipeline());
+
+      act(() => {
+        result.current.start('/api/programs/generate-workouts/stream', {});
+      });
+
+      const opts = captureStreamCall();
+
+      act(() => {
+        opts.onEvent({
+          event: 'stage',
+          data: {
+            stage: 'generating',
+            message: 'Generating Week 2 of 4',
+            sub_progress: { current: 2, total: 4 },
+          },
+        } as PipelineSSEEvent);
+      });
+
+      expect(result.current.subProgress).toEqual({ current: 2, total: 4 });
+      expect(result.current.currentStage).toEqual({
+        stage: 'generating',
+        message: 'Generating Week 2 of 4',
+        sub_progress: { current: 2, total: 4 },
+      });
+    });
+
+    it('clears sub-progress on stage transition', () => {
+      const { result } = renderHook(() => useStreamingPipeline());
+
+      act(() => {
+        result.current.start('/api/programs/generate-workouts/stream', {});
+      });
+
+      const opts = captureStreamCall();
+
+      // Start generating with sub-progress
+      act(() => {
+        opts.onEvent({
+          event: 'stage',
+          data: {
+            stage: 'generating',
+            message: 'Generating Week 3 of 4',
+            sub_progress: { current: 3, total: 4 },
+          },
+        } as PipelineSSEEvent);
+      });
+
+      expect(result.current.subProgress).toEqual({ current: 3, total: 4 });
+
+      // Transition to mapping stage (no sub_progress)
+      act(() => {
+        opts.onEvent({
+          event: 'stage',
+          data: { stage: 'mapping', message: 'Matching exercises...' },
+        } as PipelineSSEEvent);
+      });
+
+      // sub-progress should be cleared when transitioning to a new stage
+      expect(result.current.subProgress).toBeNull();
+      expect(result.current.currentStage).toEqual({
+        stage: 'mapping',
+        message: 'Matching exercises...',
+      });
+      expect(result.current.completedStages).toContain('generating');
+    });
+
+    it('resets programPreview and subProgress on new start', () => {
+      const { result } = renderHook(() => useStreamingPipeline());
+
+      // First stream: set programPreview and subProgress
+      act(() => {
+        result.current.start('/api/programs/generate/stream', {});
+      });
+
+      const opts1 = captureStreamCall();
+
+      act(() => {
+        opts1.onEvent({
+          event: 'stage',
+          data: {
+            stage: 'generating',
+            message: 'Generating Week 1 of 4',
+            sub_progress: { current: 1, total: 4 },
+          },
+        } as PipelineSSEEvent);
+      });
+
+      act(() => {
+        opts1.onEvent({
+          event: 'preview',
+          data: {
+            preview_id: 'prog-1',
+            program: {
+              name: 'Test Program',
+              weeks: [{ week_number: 1, is_deload: false, workouts: [] }],
+            },
+          },
+        } as PipelineSSEEvent);
+      });
+
+      expect(result.current.programPreview).not.toBeNull();
+      expect(result.current.subProgress).not.toBeNull();
+
+      // Start new stream - should reset
+      act(() => {
+        result.current.start('/api/programs/generate/stream', {});
+      });
+
+      expect(result.current.programPreview).toBeNull();
+      expect(result.current.subProgress).toBeNull();
+    });
+  });
 });
