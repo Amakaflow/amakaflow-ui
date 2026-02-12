@@ -1,10 +1,16 @@
 /**
  * Pipeline type definitions for standalone streaming workflows.
- * Used by the CreateAIWorkout flow and useStreamingPipeline hook.
+ * Used by the CreateAIWorkout, ImportWorkout flows, and useStreamingPipeline hook.
  */
 
-// Pipeline stages (subset of WorkoutStage, focused on standalone generation)
-export type PipelineStage = 'analyzing' | 'creating' | 'complete';
+// Pipeline stages for workout generation
+export type GenerationStage = 'analyzing' | 'creating' | 'complete';
+
+// Pipeline stages for URL import
+export type ImportStage = 'fetching' | 'extracting' | 'parsing' | 'mapping' | 'complete';
+
+// Union of all pipeline stages
+export type PipelineStage = GenerationStage | ImportStage;
 
 export interface PipelineStageEvent {
   stage: PipelineStage;
@@ -26,7 +32,13 @@ export interface PipelinePreview {
     exercises: PipelineExercise[];
     duration_minutes?: number;
     difficulty?: string;
+    exercise_count?: number;
+    block_count?: number;
   };
+  // Import-specific fields
+  source_url?: string;
+  platform?: string;
+  unmatched?: Array<{ name: string; suggestions?: string[] }>;
 }
 
 export interface PipelineErrorEvent {
