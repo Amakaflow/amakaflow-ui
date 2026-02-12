@@ -31,8 +31,6 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
   const abortRef = useRef<AbortController | null>(null);
   const contentBufferRef = useRef('');
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCountRef = useRef(0);
-  const maxRetries = 3;
 
   const flushContentBuffer = useCallback(() => {
     if (contentBufferRef.current) {
@@ -75,80 +73,67 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
       setPreview(null);
       setError(null);
       setIsStreaming(true);
-      retryCountRef.current = 0;
 
-      const executeStream = () => {
-        streamPipeline({
-          endpoint,
-          body,
-          signal: controller.signal,
-          onEvent: (event: PipelineSSEEvent) => {
-            switch (event.event) {
-              case 'stage': {
-                const stageData = event.data;
-                setCurrentStage((prev) => {
-                  // Move previous stage to completed when transitioning
-                  if (prev && prev.stage !== stageData.stage) {
-                    setCompletedStages((cs) =>
-                      cs.includes(prev.stage) ? cs : [...cs, prev.stage]
-                    );
-                  }
-                  return stageData;
-                });
-                break;
-              }
-              case 'content_delta': {
-                if (event.data.text) {
-                  contentBufferRef.current += event.data.text;
-                  if (!flushTimerRef.current) {
-                    flushTimerRef.current = setTimeout(flushContentBuffer, 80);
-                  }
+      streamPipeline({
+        endpoint,
+        body,
+        signal: controller.signal,
+        onEvent: (event: PipelineSSEEvent) => {
+          switch (event.event) {
+            case 'stage': {
+              const stageData = event.data;
+              setCurrentStage((prev) => {
+                // Move previous stage to completed when transitioning
+                if (prev && prev.stage !== stageData.stage) {
+                  setCompletedStages((cs) =>
+                    cs.includes(prev.stage) ? cs : [...cs, prev.stage]
+                  );
                 }
-                break;
+                return stageData;
+              });
+              break;
+            }
+            case 'content_delta': {
+              if (event.data.text) {
+                contentBufferRef.current += event.data.text;
+                if (!flushTimerRef.current) {
+                  flushTimerRef.current = setTimeout(flushContentBuffer, 80);
+                }
               }
-              case 'preview': {
-                setPreview(event.data);
-                break;
-              }
-              case 'error': {
-                setError(event.data.message || 'An error occurred');
-                setIsStreaming(false);
-                abortRef.current = null;
-                break;
-              }
+              break;
             }
-          },
-          onError: (err: Error) => {
-            if (err.name === 'AbortError') return;
-
-            if (retryCountRef.current < maxRetries) {
-              retryCountRef.current++;
-              const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 8000);
-              setTimeout(executeStream, delay);
-              return;
+            case 'preview': {
+              setPreview(event.data);
+              break;
             }
-
-            setError(err.message);
-            setIsStreaming(false);
-            abortRef.current = null;
-          },
-          onComplete: () => {
-            // Flush remaining content
-            if (flushTimerRef.current) {
-              clearTimeout(flushTimerRef.current);
-              flushTimerRef.current = null;
+            case 'error': {
+              setError(event.data.message || 'An error occurred');
+              setIsStreaming(false);
+              abortRef.current = null;
+              break;
             }
-            if (contentBufferRef.current) {
-              setContent((prev) => prev + contentBufferRef.current);
-              contentBufferRef.current = '';
-            }
-            setIsStreaming(false);
-            abortRef.current = null;
-          },
-        });
-      };
-
-      executeStream();
+          }
+        },
+        onError: (err: Error) => {
+          if (err.name === 'AbortError') return;
+          setError(err.message);
+          setIsStreaming(false);
+          abortRef.current = null;
+        },
+        onComplete: () => {
+          // Flush remaining content
+          if (flushTimerRef.current) {
+            clearTimeout(flushTimerRef.current);
+            flushTimerRef.current = null;
+          }
+          if (contentBufferRef.current) {
+            setContent((prev) => prev + contentBufferRef.current);
+            contentBufferRef.current = '';
+          }
+          setIsStreaming(false);
+          abortRef.current = null;
+        },
+      });
     },
     [flushContentBuffer],
   );
