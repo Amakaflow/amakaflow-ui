@@ -5,8 +5,9 @@ Ensures tool schemas are valid and match dispatcher handlers.
 
 import pytest
 
-from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS, PHASE_4_TOOLS, ALL_TOOLS
+from backend.services.tool_schemas import PHASE_1_TOOLS, PHASE_2_TOOLS, PHASE_3_TOOLS, PHASE_4_TOOLS, PHASE_5_TOOLS, ALL_TOOLS
 from backend.services.function_dispatcher import FunctionDispatcher
+from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 
 
 class TestToolSchemaStructure:
@@ -53,44 +54,80 @@ class TestToolSchemaStructure:
 
 
 class TestToolSchemaDispatcherAlignment:
-    """Verify schemas match dispatcher handlers."""
+    """Verify schemas match dispatcher handlers.
 
-    def test_tool_names_match_dispatcher_handlers(self):
-        """Every tool schema name must have a corresponding dispatcher handler."""
+    Phase 1-4 tools use the sync FunctionDispatcher.
+    Phase 5 tools (program pipeline) use the AsyncFunctionDispatcher.
+    """
+
+    SYNC_TOOLS = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS
+
+    def test_sync_dispatcher_tool_names_match(self):
+        """Sync dispatcher handlers match Phase 1-4 tool schemas."""
         dispatcher = FunctionDispatcher(
             mapper_api_url="http://test",
             calendar_api_url="http://test",
             ingestor_api_url="http://test",
         )
 
-        schema_names = {tool["name"] for tool in ALL_TOOLS}
+        schema_names = {tool["name"] for tool in self.SYNC_TOOLS}
         handler_names = set(dispatcher._handlers.keys())
 
-        # All schema names should have handlers
         missing_handlers = schema_names - handler_names
-        assert not missing_handlers, f"Schema tools without handlers: {missing_handlers}"
+        assert not missing_handlers, f"Schema tools without sync handlers: {missing_handlers}"
 
-        # All handlers should have schemas
         missing_schemas = handler_names - schema_names
-        assert not missing_schemas, f"Handlers without schema tools: {missing_schemas}"
+        assert not missing_schemas, f"Sync handlers without schema tools: {missing_schemas}"
 
-    def test_tool_count_matches(self):
-        """Number of tools should match number of handlers."""
+    def test_sync_dispatcher_tool_count_matches(self):
+        """Sync dispatcher handler count matches Phase 1-4 tool count."""
         dispatcher = FunctionDispatcher(
             mapper_api_url="http://test",
             calendar_api_url="http://test",
             ingestor_api_url="http://test",
         )
 
-        assert len(ALL_TOOLS) == len(dispatcher._handlers), (
-            f"Tool count mismatch: {len(ALL_TOOLS)} schemas vs {len(dispatcher._handlers)} handlers"
+        assert len(self.SYNC_TOOLS) == len(dispatcher._handlers), (
+            f"Tool count mismatch: {len(self.SYNC_TOOLS)} schemas vs {len(dispatcher._handlers)} handlers"
         )
 
+    @pytest.mark.asyncio
+    async def test_async_dispatcher_tool_names_match(self):
+        """Async dispatcher handlers match ALL tool schemas (Phases 1-5)."""
+        async with AsyncFunctionDispatcher(
+            mapper_api_url="http://test",
+            calendar_api_url="http://test",
+            ingestor_api_url="http://test",
+        ) as dispatcher:
+            schema_names = {tool["name"] for tool in ALL_TOOLS}
+            handler_names = set(dispatcher._handlers.keys())
+
+            missing_handlers = schema_names - handler_names
+            assert not missing_handlers, f"Schema tools without async handlers: {missing_handlers}"
+
+            missing_schemas = handler_names - schema_names
+            assert not missing_schemas, f"Async handlers without schema tools: {missing_schemas}"
+
+    @pytest.mark.asyncio
+    async def test_async_dispatcher_tool_count_matches(self):
+        """Async dispatcher handler count matches ALL_TOOLS count."""
+        async with AsyncFunctionDispatcher(
+            mapper_api_url="http://test",
+            calendar_api_url="http://test",
+            ingestor_api_url="http://test",
+        ) as dispatcher:
+            assert len(ALL_TOOLS) == len(dispatcher._handlers), (
+                f"Tool count mismatch: {len(ALL_TOOLS)} schemas vs {len(dispatcher._handlers)} handlers"
+            )
+
     def test_all_tools_is_combination_of_phases(self):
-        """ALL_TOOLS should be Phase 1 + Phase 2 + Phase 3 + Phase 4."""
-        expected_count = len(PHASE_1_TOOLS) + len(PHASE_2_TOOLS) + len(PHASE_3_TOOLS) + len(PHASE_4_TOOLS)
+        """ALL_TOOLS should be Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5."""
+        expected_count = (
+            len(PHASE_1_TOOLS) + len(PHASE_2_TOOLS) + len(PHASE_3_TOOLS)
+            + len(PHASE_4_TOOLS) + len(PHASE_5_TOOLS)
+        )
         assert len(ALL_TOOLS) == expected_count
-        assert ALL_TOOLS == PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS
+        assert ALL_TOOLS == PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS + PHASE_5_TOOLS
 
 
 class TestToolSchemaContent:
@@ -353,3 +390,58 @@ class TestSafetyBoundaries:
 
         assert rating_schema.get("minimum") == 1
         assert rating_schema.get("maximum") == 5
+
+
+class TestPhase5ToolSchemaContent:
+    """Verify Phase 5 program pipeline tool schemas are correct."""
+
+    def test_phase_5_tools_count(self):
+        """Phase 5 should have exactly 3 tools: generate_program, generate_program_workouts, save_program."""
+        assert len(PHASE_5_TOOLS) == 3
+        names = {t["name"] for t in PHASE_5_TOOLS}
+        assert names == {"generate_program", "generate_program_workouts", "save_program"}
+
+    def test_generate_program_required_fields(self):
+        """Verify generate_program required set matches spec."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "generate_program")
+        required = set(tool["input_schema"]["required"])
+        assert required == {
+            "goal",
+            "experience_level",
+            "duration_weeks",
+            "sessions_per_week",
+            "equipment",
+        }
+
+    def test_generate_program_goal_enum_matches_mapper(self):
+        """Verify weight_loss and sport_specific are present in goal enum."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "generate_program")
+        goal_enum = tool["input_schema"]["properties"]["goal"]["enum"]
+        assert "weight_loss" in goal_enum
+        assert "sport_specific" in goal_enum
+
+    def test_generate_program_workouts_requires_preview_id(self):
+        """Verify generate_program_workouts requires preview_id."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "generate_program_workouts")
+        assert "preview_id" in tool["input_schema"]["properties"]
+        assert tool["input_schema"]["required"] == ["preview_id"]
+
+    def test_save_program_requires_preview_id(self):
+        """Verify save_program requires preview_id."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "save_program")
+        assert "preview_id" in tool["input_schema"]["properties"]
+        assert tool["input_schema"]["required"] == ["preview_id"]
+
+    def test_save_program_has_optional_schedule_start_date(self):
+        """Verify save_program has schedule_start_date as an optional field."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "save_program")
+        assert "schedule_start_date" in tool["input_schema"]["properties"]
+        # It should NOT be in required
+        assert "schedule_start_date" not in tool["input_schema"].get("required", [])
+
+    def test_duration_weeks_bounds(self):
+        """Verify duration_weeks has minimum=4 and maximum=16."""
+        tool = next(t for t in PHASE_5_TOOLS if t["name"] == "generate_program")
+        duration = tool["input_schema"]["properties"]["duration_weeks"]
+        assert duration["minimum"] == 4
+        assert duration["maximum"] == 16

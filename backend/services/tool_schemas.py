@@ -543,5 +543,134 @@ PHASE_4_TOOLS: List[Dict[str, Any]] = [
     },
 ]
 
+PHASE_5_TOOLS: List[Dict[str, Any]] = [
+    {
+        "name": "generate_program",
+        "description": (
+            "Design a multi-week training program outline based on the user's goals, "
+            "experience, and schedule. Returns a preview with the program structure "
+            "(weeks, workout types, periodization). The user reviews and approves "
+            "the outline before workouts are generated. After approval, call "
+            "generate_program_workouts with the preview_id."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "goal": {
+                    "type": "string",
+                    "enum": [
+                        "strength",
+                        "hypertrophy",
+                        "weight_loss",
+                        "endurance",
+                        "general_fitness",
+                        "sport_specific",
+                    ],
+                    "description": "Primary training goal",
+                },
+                "experience_level": {
+                    "type": "string",
+                    "enum": ["beginner", "intermediate", "advanced"],
+                    "description": "User's training experience level",
+                },
+                "duration_weeks": {
+                    "type": "integer",
+                    "minimum": 4,
+                    "maximum": 16,
+                    "description": "Program duration in weeks (4-16)",
+                },
+                "sessions_per_week": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 6,
+                    "description": "Number of training sessions per week",
+                },
+                "time_per_session": {
+                    "type": "integer",
+                    "enum": [30, 45, 60, 90],
+                    "description": "Target session duration in minutes",
+                },
+                "equipment": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Available equipment",
+                },
+                "preferred_days": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Preferred training days (e.g., ['monday', 'wednesday', 'friday'])",
+                },
+                "injuries": {
+                    "type": "string",
+                    "description": "Any injuries or limitations to consider",
+                },
+                "focus_areas": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Muscle groups to emphasize (e.g., ['chest', 'back'])",
+                },
+                "avoid_exercises": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Exercises to avoid",
+                },
+            },
+            "required": [
+                "goal",
+                "experience_level",
+                "duration_weeks",
+                "sessions_per_week",
+                "equipment",
+            ],
+        },
+    },
+    {
+        "name": "generate_program_workouts",
+        "description": (
+            "Generate detailed workouts for a previously approved program outline. "
+            "Requires a preview_id from generate_program. Creates exercises for each "
+            "week sequentially with progressive variety. Returns a full program "
+            "preview for user confirmation. After approval, call save_program."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "preview_id": {
+                    "type": "string",
+                    "description": "Preview ID from generate_program result",
+                },
+            },
+            "required": ["preview_id"],
+        },
+    },
+    {
+        "name": "save_program",
+        "description": (
+            "Save a fully generated program to the user's library. "
+            "Requires a preview_id from generate_program_workouts. "
+            "Optionally schedules all sessions starting from a given date."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "preview_id": {
+                    "type": "string",
+                    "description": "Preview ID from generate_program_workouts result",
+                },
+                "schedule_start_date": {
+                    "type": "string",
+                    "description": (
+                        "Start date for scheduling all sessions (YYYY-MM-DD). "
+                        "Sessions will be placed on preferred days starting from this date."
+                    ),
+                },
+            },
+            "required": ["preview_id"],
+        },
+    },
+]
+
 # Combined list for convenience
-ALL_TOOLS: List[Dict[str, Any]] = PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS
+ALL_TOOLS: List[Dict[str, Any]] = (
+    PHASE_1_TOOLS + PHASE_2_TOOLS + PHASE_3_TOOLS + PHASE_4_TOOLS + PHASE_5_TOOLS
+)

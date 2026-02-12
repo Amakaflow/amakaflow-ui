@@ -148,6 +148,10 @@ class AsyncFunctionDispatcher:
             "sync_strava": self._sync_strava,
             "sync_garmin": self._sync_garmin,
             "get_strava_activities": self._get_strava_activities,
+            # Phase 5 — Program pipeline
+            "generate_program": self._generate_program,
+            "generate_program_workouts": self._generate_program_workouts,
+            "save_program": self._save_program,
         }
 
     async def close(self) -> None:
@@ -1566,3 +1570,274 @@ class AsyncFunctionDispatcher:
             lines.append(line)
 
         return "\n".join(lines)
+
+    # =========================================================================
+    # Phase 5 — Program pipeline handlers
+    # =========================================================================
+
+    async def _generate_program(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Design a program outline with periodization and return preview for approval."""
+        import uuid
+
+        goal = args.get("goal")
+        experience_level = args.get("experience_level")
+        duration_weeks = args.get("duration_weeks")
+        sessions_per_week = args.get("sessions_per_week")
+        equipment = args.get("equipment", [])
+
+        if any(v is None for v in [goal, experience_level, duration_weeks, sessions_per_week]):
+            return self._error_response(
+                "validation_error",
+                "Missing required fields: goal, experience_level, duration_weeks, sessions_per_week",
+            )
+
+        # Server-side validation
+        if not (4 <= duration_weeks <= 52):
+            return self._error_response(
+                "validation_error",
+                "duration_weeks must be between 4 and 52",
+            )
+
+        # Get periodization parameters from mapper-api
+        week_params = None
+        try:
+            result = await self._call_api(
+                "POST",
+                f"{self._mapper_url}/programs/periodization-plan",
+                ctx,
+                json={
+                    "duration_weeks": duration_weeks,
+                    "goal": goal,
+                    "experience_level": experience_level,
+                },
+            )
+            week_params = result.get("weeks", [])
+        except FunctionExecutionError:
+            logger.warning("Failed to fetch periodization plan")
+
+        preview_id = str(uuid.uuid4())
+        preferred_days = args.get("preferred_days", [])
+        time_per_session = args.get("time_per_session", 60)
+
+        program_outline = {
+            "name": f"{duration_weeks}-Week {goal.replace('_', ' ').title()} Program",
+            "goal": goal,
+            "experience_level": experience_level,
+            "duration_weeks": duration_weeks,
+            "sessions_per_week": sessions_per_week,
+            "time_per_session": time_per_session,
+            "equipment": equipment,
+            "periodization_model": week_params[0].get("focus", "linear") if week_params else "linear",
+            "weeks": [],
+        }
+
+        # Build week outlines from periodization parameters
+        for i in range(duration_weeks):
+            wp = week_params[i] if week_params and i < len(week_params) else {}
+            week = {
+                "week_number": i + 1,
+                "focus": wp.get("focus", "hypertrophy"),
+                "intensity_percentage": int(wp.get("intensity_percent", 0.7) * 100) if wp.get("intensity_percent") else 70,
+                "volume_modifier": wp.get("volume_modifier", 1.0),
+                "is_deload": wp.get("is_deload", False),
+                "notes": wp.get("notes"),
+                "workouts": [],
+            }
+            program_outline["weeks"].append(week)
+
+        # Store in preview store
+        if self._preview_store:
+            self._preview_store.put(preview_id, ctx.user_id, {
+                "type": "program_outline",
+                "program": program_outline,
+                "parameters": {
+                    "goal": goal,
+                    "experience_level": experience_level,
+                    "duration_weeks": duration_weeks,
+                    "sessions_per_week": sessions_per_week,
+                    "time_per_session": time_per_session,
+                    "equipment": equipment,
+                    "preferred_days": preferred_days,
+                    "injuries": args.get("injuries"),
+                    "focus_areas": args.get("focus_areas", []),
+                    "avoid_exercises": args.get("avoid_exercises", []),
+                },
+            })
+
+        return json.dumps({
+            "type": "program_outline",
+            "preview_id": preview_id,
+            "persisted": False,
+            "program": program_outline,
+            "next_step": (
+                "Present this program outline to the user. Show the week-by-week structure "
+                "including focus, intensity, and deload weeks. Ask if they approve the structure. "
+                "If confirmed, call generate_program_workouts with the preview_id."
+            ),
+        })
+
+    async def _generate_program_workouts(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Generate detailed workouts for an approved program outline."""
+        import uuid
+
+        preview_id = args.get("preview_id")
+        if not preview_id:
+            return self._error_response("validation_error", "Missing required field: preview_id")
+
+        if not self._preview_store:
+            return self._error_response("internal_error", "Preview store not available")
+
+        outline_data = self._preview_store.get(preview_id, ctx.user_id)
+        if outline_data is None or outline_data.get("type") != "program_outline":
+            return self._error_response(
+                "not_found",
+                "Program outline not found or expired. Please generate the program again.",
+            )
+
+        program = outline_data["program"]
+        params = outline_data["parameters"]
+        weeks = program.get("weeks", [])
+
+        # Generate workouts for each week via ingestor-api LLM calls.
+        # The dispatcher path uses the ProgramPipelineService for streaming;
+        # this handler creates structural placeholders for the tool-call response.
+        # Real workout generation with exercises happens in ProgramPipelineService.generate_workouts().
+        sessions_per_week = params.get("sessions_per_week", 3)
+        preferred_days = params.get("preferred_days", [])
+        day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        day_to_num = {d: i for i, d in enumerate(day_names)}
+
+        for week in weeks:
+            week_workouts = []
+            for session in range(sessions_per_week):
+                # Use preferred days if available, otherwise sequential
+                if session < len(preferred_days):
+                    day_of_week = day_to_num.get(preferred_days[session].lower(), session)
+                else:
+                    day_of_week = session
+                workout = {
+                    "day_of_week": day_of_week,
+                    "name": f"Week {week['week_number']} - Session {session + 1}",
+                    "workout_type": week.get("focus", "full_body"),
+                    "target_duration_minutes": params.get("time_per_session", 60),
+                    "exercises": [],  # Populated by ProgramPipelineService.generate_workouts()
+                }
+                week_workouts.append(workout)
+            week["workouts"] = week_workouts
+
+        # Consume old preview, create new one with full program
+        self._preview_store.pop(preview_id, ctx.user_id)
+        new_preview_id = str(uuid.uuid4())
+
+        self._preview_store.put(new_preview_id, ctx.user_id, {
+            "type": "program_full",
+            "program": program,
+            "parameters": params,
+        })
+
+        return json.dumps({
+            "type": "program_workouts_generated",
+            "preview_id": new_preview_id,
+            "persisted": False,
+            "program": program,
+            "next_step": (
+                "Present the full program with all workouts to the user. "
+                "Ask if they want to save it to their library. "
+                "If confirmed, call save_program with the preview_id. "
+                "Optionally ask if they want to schedule it starting from a specific date."
+            ),
+        })
+
+    async def _save_program(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Save a fully generated program to the user's library."""
+        preview_id = args.get("preview_id")
+        if not preview_id:
+            return self._error_response("validation_error", "Missing required field: preview_id")
+
+        if not self._preview_store:
+            return self._error_response("internal_error", "Preview store not available")
+
+        program_data = self._preview_store.pop(preview_id, ctx.user_id)
+        if program_data is None or program_data.get("type") != "program_full":
+            return self._error_response(
+                "not_found",
+                "Full program not found or expired. Please regenerate.",
+            )
+
+        program = program_data["program"]
+        weeks = program.get("weeks", [])
+        schedule_start_date = args.get("schedule_start_date")
+
+        # Save each workout via mapper-api
+        saved_workout_ids = []
+        for week in weeks:
+            for workout in week.get("workouts", []):
+                try:
+                    result = await self._call_api(
+                        "POST",
+                        f"{self._mapper_url}/workouts/save",
+                        ctx,
+                        json={
+                            "profile_id": ctx.user_id,
+                            "workout_data": workout,
+                            "device": "web",
+                            "title": workout.get("name", "Program Workout"),
+                        },
+                    )
+                    saved = result.get("workout", result)
+                    wid = saved.get("id") or saved.get("workout_id")
+                    if wid:
+                        saved_workout_ids.append(wid)
+                except FunctionExecutionError:
+                    logger.warning("Failed to save program workout: %s", workout.get("name"))
+
+        if not saved_workout_ids:
+            return self._error_response("save_failed", "Failed to save program workouts")
+
+        # Optional calendar scheduling
+        scheduled_count = 0
+        if schedule_start_date:
+            from datetime import datetime, timedelta
+            try:
+                start = datetime.strptime(schedule_start_date, "%Y-%m-%d")
+                workout_idx = 0
+                for week_idx, week in enumerate(weeks):
+                    week_start = start + timedelta(weeks=week_idx)
+                    for workout in week.get("workouts", []):
+                        if workout_idx >= len(saved_workout_ids):
+                            break
+                        day_of_week = workout.get("day_of_week", 0)
+                        python_weekday = (day_of_week - 1) % 7
+                        days_ahead = (python_weekday - week_start.weekday()) % 7
+                        workout_date = week_start + timedelta(days=days_ahead)
+                        try:
+                            await self._call_api(
+                                "POST",
+                                f"{self._calendar_url}/calendar",
+                                ctx,
+                                json={
+                                    "workout_id": saved_workout_ids[workout_idx],
+                                    "scheduled_date": workout_date.strftime("%Y-%m-%d"),
+                                },
+                            )
+                            scheduled_count += 1
+                        except FunctionExecutionError:
+                            pass
+                        workout_idx += 1
+            except Exception:
+                logger.warning("Calendar scheduling failed for program")
+
+        return json.dumps({
+            "type": "program_saved",
+            "program_name": program.get("name", "Training Program"),
+            "workout_count": len(saved_workout_ids),
+            "workout_ids": saved_workout_ids,
+            "scheduled_count": scheduled_count,
+            "schedule_start_date": schedule_start_date if scheduled_count > 0 else None,
+        })
