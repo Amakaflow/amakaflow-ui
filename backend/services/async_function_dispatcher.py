@@ -1639,7 +1639,10 @@ class AsyncFunctionDispatcher:
             week = {
                 "week_number": i + 1,
                 "focus": wp.get("focus", "hypertrophy"),
-                "intensity_percentage": int(wp.get("intensity_percent", 0.7) * 100) if wp.get("intensity_percent") else 70,
+                "intensity_percentage": (
+                    int(wp.get("intensity_percent", 0.7) * 100)
+                    if wp.get("intensity_percent") else 70
+                ),
                 "volume_modifier": wp.get("volume_modifier", 1.0),
                 "is_deload": wp.get("is_deload", False),
                 "notes": wp.get("notes"),

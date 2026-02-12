@@ -39,7 +39,10 @@ async def test_validates_urls(service):
 @pytest.mark.asyncio
 async def test_parallel_import_two_urls(service):
     """Two URLs run concurrently, each producing sub_pipeline events."""
-    mock_workout = {"success": True, "workout": {"name": "Test", "exercises": [{"name": "Squat", "sets": 3, "reps": 10}]}}
+    mock_workout = {
+        "success": True,
+        "workout": {"name": "Test", "exercises": [{"name": "Squat", "sets": 3, "reps": 10}]},
+    }
     with patch("backend.services.bulk_import_pipeline_service.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = MagicMock(status_code=200, json=MagicMock(return_value=mock_workout))

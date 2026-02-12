@@ -35,7 +35,7 @@ class APNsService:
         self._bundle_id = settings.apns_bundle_id
         self._use_sandbox = settings.apns_use_sandbox
         self._mapper_url = settings.mapper_api_url
-        self._client: Optional["_APNsClient"] = None
+        self._client = None
 
         if self._enabled:
             if not all([settings.apns_team_id, settings.apns_key_id, settings.apns_key_base64]):
@@ -44,7 +44,7 @@ class APNsService:
                 return
 
             try:
-                from aioapns import APNs, NotificationRequest
+                from aioapns import APNs
 
                 key_bytes = base64.b64decode(settings.apns_key_base64)
                 self._client = APNs(

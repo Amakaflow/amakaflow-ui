@@ -14,6 +14,16 @@ from typing import AsyncIterator
 logger = logging.getLogger(__name__)
 
 
+class PipelineConcurrencyExceeded(Exception):
+    """Raised when a user has too many active pipelines."""
+
+    pass
+
+
+# Backwards-compatible alias used by programs router
+ConcurrencyLimitExceeded = PipelineConcurrencyExceeded
+
+
 class PipelineConcurrencyLimiter:
     """In-memory per-user concurrency limiter for pipelines.
 
@@ -50,7 +60,7 @@ class PipelineConcurrencyLimiter:
         """Context manager: acquire on enter, release on exit (even on error)."""
         acquired = await self.acquire(user_id, run_id)
         if not acquired:
-            raise ConcurrencyLimitExceeded(
+            raise PipelineConcurrencyExceeded(
                 f"Too many active pipelines (max {self._max}). Please wait."
             )
         try:
@@ -58,13 +68,11 @@ class PipelineConcurrencyLimiter:
         finally:
             await self.release(user_id, run_id)
 
-    async def active_count(self, user_id: str) -> int:
-        """Get number of active pipelines for a user."""
-        async with self._lock:
-            return len(self._active.get(user_id, set()))
+    def user_active_count(self, user_id: str) -> int:
+        """Get number of active pipelines for a user (sync, no lock)."""
+        return len(self._active.get(user_id, set()))
 
-
-class ConcurrencyLimitExceeded(Exception):
-    """Raised when a user has too many active pipelines."""
-
-    pass
+    @property
+    def active_count(self) -> int:
+        """Get total number of active pipelines across all users."""
+        return sum(len(s) for s in self._active.values())
