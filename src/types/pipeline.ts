@@ -18,13 +18,34 @@ export type ProgramDesignStage = 'designing' | 'complete';
 // Pipeline stages for program workout generation (Phase 1b)
 export type ProgramGenerateStage = 'generating' | 'mapping' | 'complete';
 
+// Pipeline stages for bulk URL import
+export type BulkImportStage = 'validating' | 'importing' | 'complete';
+
 // Union of all pipeline stages
 export type PipelineStage =
   | GenerationStage
   | ImportStage
   | SaveStage
   | ProgramDesignStage
-  | ProgramGenerateStage;
+  | ProgramGenerateStage
+  | BulkImportStage;
+
+// Tracks an individual URL within a bulk import pipeline
+export interface BulkImportSubPipeline {
+  index: number;
+  url: string;
+  status: 'pending' | 'active' | 'complete' | 'failed';
+  title?: string;
+}
+
+// Bulk import preview returned after all URLs are processed
+export interface PipelineBulkPreview {
+  preview_id: string;
+  workouts: Array<{ name: string; exercise_count: number }>;
+  total_urls: number;
+  successful: number;
+  failed: number;
+}
 
 // Sub-progress for batched operations (e.g., "Week 2 of 4")
 export interface PipelineSubProgress {
@@ -36,6 +57,8 @@ export interface PipelineStageEvent {
   stage: PipelineStage;
   message: string;
   sub_progress?: PipelineSubProgress;
+  sub_pipeline_index?: number;
+  sub_pipeline_status?: 'pending' | 'active' | 'complete' | 'failed';
 }
 
 export interface PipelineExercise {
@@ -100,7 +123,7 @@ export interface PipelineErrorEvent {
 export type PipelineSSEEvent =
   | { event: 'stage'; data: PipelineStageEvent }
   | { event: 'content_delta'; data: { text?: string } }
-  | { event: 'preview'; data: PipelinePreview | PipelineProgramPreview }
+  | { event: 'preview'; data: PipelinePreview | PipelineProgramPreview | PipelineBulkPreview }
   | { event: 'error'; data: PipelineErrorEvent }
   | { event: 'complete'; data: Record<string, unknown> };
 
