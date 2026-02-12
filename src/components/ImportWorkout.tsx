@@ -58,10 +58,8 @@ export function ImportWorkout() {
     handleImport();
   };
 
-  const handleSave = () => {
-    if (!pipeline.preview?.source_url) return;
-    toast.info('Save coming soon — wiring to save endpoint in Phase D');
-  };
+  // TODO(Phase D): Wire handleSave to the save endpoint
+  // const handleSave = () => { ... };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -132,7 +130,7 @@ export function ImportWorkout() {
         preview={pipeline.preview}
         isStreaming={pipeline.isStreaming}
         error={pipeline.error}
-        onSave={pipeline.preview ? handleSave : undefined}
+        onSave={undefined}
         onRetry={handleRetry}
         stageConfig={IMPORT_STAGE_CONFIG}
         stages={IMPORT_STAGES}

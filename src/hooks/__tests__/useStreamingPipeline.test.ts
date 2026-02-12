@@ -224,4 +224,20 @@ describe('useStreamingPipeline', () => {
 
     expect(result.current.isStreaming).toBe(false);
   });
+
+  it('aborts stream on unmount', () => {
+    const { result, unmount } = renderHook(() => useStreamingPipeline());
+
+    act(() => {
+      result.current.start('/api/test', {});
+    });
+
+    const opts = captureStreamCall();
+    expect(opts.signal).toBeDefined();
+    expect(opts.signal!.aborted).toBe(false);
+
+    unmount();
+
+    expect(opts.signal!.aborted).toBe(true);
+  });
 });

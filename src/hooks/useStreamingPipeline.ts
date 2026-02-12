@@ -5,7 +5,7 @@
  * Supports AbortController cancellation and content buffering.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { streamPipeline } from '../lib/pipeline-api';
 import type { PipelineStage, PipelineStageEvent, PipelinePreview, PipelineSSEEvent } from '../types/pipeline';
 
@@ -137,6 +137,18 @@ export function useStreamingPipeline(): UseStreamingPipelineReturn {
     },
     [flushContentBuffer],
   );
+
+  // Cleanup on unmount: abort stream and clear flush timer
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, []);
 
   return {
     start,
