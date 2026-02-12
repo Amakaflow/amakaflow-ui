@@ -10,13 +10,13 @@ import { StageIndicator } from './ChatPanel/StageIndicator';
 import type { StageConfig } from './ChatPanel/StageIndicator';
 import type { PipelineStageEvent, PipelinePreview } from '../types/pipeline';
 
-const PIPELINE_STAGE_CONFIG: StageConfig = {
+const DEFAULT_STAGE_CONFIG: StageConfig = {
   analyzing: { icon: Sparkles, label: 'Analyzing request' },
   creating: { icon: Dumbbell, label: 'Generating exercises' },
   complete: { icon: CheckCircle2, label: 'Complete' },
 };
 
-const PIPELINE_STAGES = ['analyzing', 'creating'];
+const DEFAULT_STAGES = ['analyzing', 'creating'];
 
 interface StreamingWorkflowProps {
   currentStage: PipelineStageEvent | null;
@@ -26,6 +26,8 @@ interface StreamingWorkflowProps {
   error: string | null;
   onSave?: () => void;
   onRetry?: () => void;
+  stageConfig?: StageConfig;
+  stages?: string[];
 }
 
 export function StreamingWorkflow({
@@ -36,6 +38,8 @@ export function StreamingWorkflow({
   error,
   onSave,
   onRetry,
+  stageConfig = DEFAULT_STAGE_CONFIG,
+  stages = DEFAULT_STAGES,
 }: StreamingWorkflowProps) {
   return (
     <div className="space-y-4">
@@ -44,8 +48,8 @@ export function StreamingWorkflow({
         <StageIndicator
           currentStage={currentStage}
           completedStages={completedStages}
-          stageConfig={PIPELINE_STAGE_CONFIG}
-          stages={PIPELINE_STAGES}
+          stageConfig={stageConfig}
+          stages={stages}
         />
       )}
 
