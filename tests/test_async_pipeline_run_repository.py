@@ -138,6 +138,24 @@ class TestUpdateStatus:
         assert update_arg["error"] == "Connection refused"
 
 
+class TestUpdateCost:
+    @pytest.mark.asyncio
+    async def test_update_cost(self, mock_client, repo):
+        _, table_mock = mock_client
+        chain = _chain_mock(table_mock, [])
+
+        await repo.update_cost(
+            "run-1", input_tokens=500, output_tokens=200, estimated_cost_usd=0.003
+        )
+
+        table_mock.update.assert_called_once()
+        call_args = table_mock.update.call_args[0][0]
+        assert call_args["input_tokens"] == 500
+        assert call_args["output_tokens"] == 200
+        assert call_args["estimated_cost_usd"] == 0.003
+        chain.eq.assert_called_with("id", "run-1")
+
+
 class TestGet:
     @pytest.mark.asyncio
     async def test_returns_row_when_found(self, mock_client, repo):
@@ -188,6 +206,37 @@ class TestGet:
         await repo.get("run-1", "user-1")
 
         chain.limit.assert_called_with(1)
+
+
+class TestUpdateStage:
+    @pytest.mark.asyncio
+    async def test_update_stage(self, mock_client, repo):
+        _, table_mock = mock_client
+        chain = _chain_mock(table_mock, [])
+        await repo.update_stage("run-1", "creating", ["analyzing"], {"analyzing": {"result": "ok"}})
+        call_args = table_mock.update.call_args[0][0]
+        assert call_args["current_stage"] == "creating"
+        assert call_args["completed_stages"] == ["analyzing"]
+        assert call_args["stage_data"] == {"analyzing": {"result": "ok"}}
+
+
+class TestGetStageData:
+    @pytest.mark.asyncio
+    async def test_get_stage_data_found(self, mock_client, repo):
+        _, table_mock = mock_client
+        _chain_mock(table_mock, [
+            {"completed_stages": ["analyzing"], "current_stage": "creating", "stage_data": {}, "status": "running"}
+        ])
+        data = await repo.get_stage_data("run-1", "user-1")
+        assert data["current_stage"] == "creating"
+        assert data["completed_stages"] == ["analyzing"]
+
+    @pytest.mark.asyncio
+    async def test_get_stage_data_not_found(self, mock_client, repo):
+        _, table_mock = mock_client
+        _chain_mock(table_mock, [])
+        data = await repo.get_stage_data("run-1", "user-1")
+        assert data is None
 
 
 class TestTableName:

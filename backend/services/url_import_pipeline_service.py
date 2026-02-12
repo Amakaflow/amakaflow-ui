@@ -55,6 +55,8 @@ def detect_platform(url: str) -> Optional[str]:
     """Detect platform from URL domain. Returns None if unsupported."""
     try:
         parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return None
         domain = parsed.netloc.lower().replace("www.", "")
     except Exception:
         return None
@@ -331,3 +333,19 @@ class URLImportPipelineService:
                 "unmatched": unmatched,
             }),
         )
+
+        # Non-blocking quality evaluation
+        try:
+            from backend.services.workout_quality_evaluator import WorkoutQualityEvaluator
+            evaluator = WorkoutQualityEvaluator()
+            # Use flattened exercises for evaluation (blocks already extracted above)
+            eval_workout = {**workout, "exercises": exercises}
+            score = evaluator.evaluate(eval_workout, requested_equipment=None)
+            logger.info(
+                "Workout quality score: overall=%.2f count=%.2f variety=%.2f volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
+                score.overall, score.exercise_count, score.variety,
+                score.volume_sanity, score.equipment_match, score.hallucination,
+                score.issues,
+            )
+        except Exception:
+            logger.warning("Quality evaluation failed (non-blocking)")

@@ -66,6 +66,40 @@ class WorkoutPipelineService:
         except Exception:
             logger.warning("Failed to update pipeline run %s to %s", run_id, status)
 
+    async def _record_cost(
+        self,
+        run_id: Optional[str],
+        input_tokens: int,
+        output_tokens: int,
+        model: str = "haiku",
+    ) -> None:
+        """Best-effort update of pipeline cost. Never raises."""
+        if not self._run_repo or not run_id:
+            return
+        try:
+            from backend.services.cost_estimator import estimate_cost
+            cost = estimate_cost(model, input_tokens, output_tokens)
+            await self._run_repo.update_cost(run_id, input_tokens, output_tokens, cost)
+        except Exception:
+            logger.warning("Failed to record cost for pipeline run %s", run_id)
+
+    async def _record_stage(
+        self,
+        run_id: Optional[str],
+        current_stage: str,
+        completed_stages: list[str],
+        stage_data: Optional[dict] = None,
+    ) -> None:
+        """Best-effort update of pipeline stage progress. Never raises."""
+        if not self._run_repo or not run_id:
+            return
+        try:
+            await self._run_repo.update_stage(
+                run_id, current_stage, completed_stages, stage_data=stage_data,
+            )
+        except Exception:
+            logger.warning("Failed to update stage for pipeline run %s", run_id)
+
     async def generate(
         self,
         description: str,
@@ -74,11 +108,24 @@ class WorkoutPipelineService:
         equipment: Optional[list[str]] = None,
         user_id: Optional[str] = None,
         cancel_event: Optional["asyncio.Event"] = None,
+        resume_from: Optional[str] = None,
     ) -> AsyncGenerator[PipelineEvent, None]:
         """Generate a workout and yield SSE events as stages progress."""
-        # Create pipeline run record (best-effort)
+        # If resuming, load completed stages and skip them
+        skip_stages: set[str] = set()
         run_id: Optional[str] = None
-        if self._run_repo and user_id:
+
+        if resume_from and self._run_repo and user_id:
+            try:
+                stage_info = await self._run_repo.get_stage_data(resume_from, user_id)
+                if stage_info:
+                    skip_stages = set(stage_info.get("completed_stages") or [])
+                    run_id = resume_from
+            except Exception:
+                logger.warning("Failed to load resume data for %s", resume_from)
+
+        # Create pipeline run record (best-effort) — only if not resuming
+        if run_id is None and self._run_repo and user_id:
             try:
                 row = await self._run_repo.create(
                     user_id=user_id,
@@ -91,10 +138,15 @@ class WorkoutPipelineService:
             except Exception:
                 logger.warning("Failed to create pipeline run record")
 
-        yield PipelineEvent(
-            "stage",
-            json.dumps({"stage": "analyzing", "message": "Understanding your workout goals..."}),
-        )
+        completed_stages: list[str] = []
+
+        if "analyzing" not in skip_stages:
+            yield PipelineEvent(
+                "stage",
+                json.dumps({"stage": "analyzing", "message": "Understanding your workout goals..."}),
+            )
+
+        await self._record_stage(run_id, "analyzing", completed_stages)
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
@@ -109,10 +161,15 @@ class WorkoutPipelineService:
         if equipment:
             body["equipment"] = equipment
 
-        yield PipelineEvent(
-            "stage",
-            json.dumps({"stage": "creating", "message": "Generating exercises..."}),
-        )
+        completed_stages.append("analyzing")
+
+        if "creating" not in skip_stages:
+            yield PipelineEvent(
+                "stage",
+                json.dumps({"stage": "creating", "message": "Generating exercises..."}),
+            )
+
+        await self._record_stage(run_id, "creating", completed_stages)
 
         if cancel_event and cancel_event.is_set():
             await self._record_status(run_id, "cancelled")
@@ -167,7 +224,13 @@ class WorkoutPipelineService:
         if self._preview_store and user_id:
             self._preview_store.put(preview_id, user_id, workout)
 
+        completed_stages.append("creating")
         await self._record_status(run_id, "completed", result_data={"preview_id": preview_id})
+        await self._record_cost(run_id, input_tokens=0, output_tokens=0, model="haiku")
+        await self._record_stage(
+            run_id, "complete", completed_stages,
+            stage_data={"preview_id": preview_id},
+        )
 
         yield PipelineEvent(
             "stage",
@@ -195,6 +258,20 @@ class WorkoutPipelineService:
                 },
             }),
         )
+
+        # Non-blocking quality evaluation
+        try:
+            from backend.services.workout_quality_evaluator import WorkoutQualityEvaluator
+            evaluator = WorkoutQualityEvaluator()
+            score = evaluator.evaluate(workout, requested_equipment=equipment)
+            logger.info(
+                "Workout quality score: overall=%.2f count=%.2f variety=%.2f volume=%.2f equip=%.2f hallucination=%.2f issues=%s",
+                score.overall, score.exercise_count, score.variety,
+                score.volume_sanity, score.equipment_match, score.hallucination,
+                score.issues,
+            )
+        except Exception:
+            logger.warning("Quality evaluation failed (non-blocking)")
 
     async def save_and_push(
         self,
@@ -341,6 +418,7 @@ class WorkoutPipelineService:
                 logger.warning("Calendar scheduling failed for workout %s", workout_id)
 
         await self._record_status(run_id, "completed", result_data={"workout_id": workout_id})
+        await self._record_cost(run_id, input_tokens=0, output_tokens=0, model="haiku")
 
         yield PipelineEvent(
             "stage",

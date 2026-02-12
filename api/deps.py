@@ -622,7 +622,6 @@ async def get_url_import_pipeline_service(
     )
 
 
-# =============================================================================
 # Program Pipeline Providers
 # =============================================================================
 
@@ -645,6 +644,29 @@ def get_program_pipeline_service(
         mapper_api_url=settings.mapper_api_url,
         calendar_api_url=settings.calendar_api_url,
         preview_store=preview_store,
+    )
+
+
+# =============================================================================
+# Bulk Import Pipeline Provider
+# =============================================================================
+
+
+async def get_bulk_import_pipeline_service(
+    auth: "AuthContext" = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+    pipeline_run_repo: Optional[AsyncPipelineRunRepository] = Depends(get_optional_pipeline_run_repository),
+) -> "BulkImportPipelineService":
+    """Get bulk import pipeline service for parallel multi-URL import streaming."""
+    from backend.services.bulk_import_pipeline_service import BulkImportPipelineService
+
+    return BulkImportPipelineService(
+        ingestor_url=settings.workout_ingestor_api_url,
+        auth_token=auth.auth_token or "",
+        mapper_api_url=settings.mapper_api_url,
+        preview_store=get_preview_store(),
+        pipeline_run_repo=pipeline_run_repo,
+        max_concurrent=3,
     )
 
 
@@ -773,6 +795,8 @@ __all__ = [
     "get_program_pipeline_service",
     # APNs Push (AMA-567)
     "get_apns_service",
+    # Bulk Import Pipeline
+    "get_bulk_import_pipeline_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",
