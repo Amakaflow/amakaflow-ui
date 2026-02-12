@@ -174,7 +174,7 @@ def _add_sse_headers_middleware(app: FastAPI) -> None:
 
 def _include_routers(app: FastAPI) -> None:
     """Include all API routers in the application."""
-    from api.routers import health_router, chat_router, embeddings_router, voice_router, workouts_router, pipelines_router
+    from api.routers import health_router, chat_router, embeddings_router, voice_router, workouts_router, pipelines_router, programs_router
 
     # Health router (no prefix - /health at root)
     app.include_router(health_router)
@@ -193,6 +193,9 @@ def _include_routers(app: FastAPI) -> None:
 
     # Pipelines router (/api/pipelines/*)
     app.include_router(pipelines_router)
+
+    # Programs router (/api/programs/*)
+    app.include_router(programs_router)
 
 
 def _register_shutdown(app: FastAPI, settings: Settings) -> None:

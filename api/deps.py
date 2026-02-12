@@ -52,8 +52,8 @@ from backend.services.ai_client import AIClient, AsyncAIClient
 from backend.services.tts_service import TTSService
 from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
 from backend.services.workout_pipeline_service import WorkoutPipelineService
+from backend.services.program_pipeline_service import ProgramPipelineService, PreviewStore as ProgramPreviewStore
 from backend.services.rate_limiter import InMemoryRateLimiter
-from backend.services.preview_store import PreviewStore
 from backend.services.apns_service import APNsService
 
 # Use cases
@@ -622,6 +622,54 @@ async def get_url_import_pipeline_service(
     )
 
 
+# Program Pipeline Providers
+# =============================================================================
+
+
+@lru_cache
+def get_program_preview_store() -> ProgramPreviewStore:
+    """Get cached preview store singleton for program pipeline (shared across requests)."""
+    return ProgramPreviewStore()
+
+
+def get_program_pipeline_service(
+    auth: "AuthContext" = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+    preview_store: ProgramPreviewStore = Depends(get_program_preview_store),
+) -> ProgramPipelineService:
+    """Get program pipeline service for multi-checkpoint program generation."""
+    return ProgramPipelineService(
+        anthropic_api_key=settings.anthropic_api_key,
+        auth_token=auth.auth_token or "",
+        mapper_api_url=settings.mapper_api_url,
+        calendar_api_url=settings.calendar_api_url,
+        preview_store=preview_store,
+    )
+
+
+# =============================================================================
+# Bulk Import Pipeline Provider
+# =============================================================================
+
+
+async def get_bulk_import_pipeline_service(
+    auth: "AuthContext" = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+    pipeline_run_repo: Optional[AsyncPipelineRunRepository] = Depends(get_optional_pipeline_run_repository),
+) -> "BulkImportPipelineService":
+    """Get bulk import pipeline service for parallel multi-URL import streaming."""
+    from backend.services.bulk_import_pipeline_service import BulkImportPipelineService
+
+    return BulkImportPipelineService(
+        ingestor_url=settings.workout_ingestor_api_url,
+        auth_token=auth.auth_token or "",
+        mapper_api_url=settings.mapper_api_url,
+        preview_store=get_preview_store(),
+        pipeline_run_repo=pipeline_run_repo,
+        max_concurrent=3,
+    )
+
+
 # =============================================================================
 # Use Case Providers
 # =============================================================================
@@ -742,8 +790,13 @@ __all__ = [
     "get_pipeline_rate_limiter",
     "get_preview_store",
     "get_workout_pipeline_service",
+    # Program Pipeline
+    "get_program_preview_store",
+    "get_program_pipeline_service",
     # APNs Push (AMA-567)
     "get_apns_service",
+    # Bulk Import Pipeline
+    "get_bulk_import_pipeline_service",
     # Use Cases
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",

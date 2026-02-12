@@ -76,6 +76,58 @@ class AsyncPipelineRunRepository:
             .execute()
         )
 
+    async def update_cost(
+        self,
+        run_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        estimated_cost_usd: float,
+    ) -> None:
+        """Update token counts and estimated cost for a pipeline run."""
+        await (
+            self._client.table(self.TABLE)
+            .update({
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "estimated_cost_usd": estimated_cost_usd,
+            })
+            .eq("id", run_id)
+            .execute()
+        )
+
+    async def update_stage(
+        self,
+        run_id: str,
+        current_stage: str,
+        completed_stages: list[str],
+        stage_data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Update stage progress for resume support."""
+        update: Dict[str, Any] = {
+            "current_stage": current_stage,
+            "completed_stages": completed_stages,
+        }
+        if stage_data is not None:
+            update["stage_data"] = stage_data
+        await (
+            self._client.table(self.TABLE)
+            .update(update)
+            .eq("id", run_id)
+            .execute()
+        )
+
+    async def get_stage_data(self, run_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get stage data for resume. Returns None if not found."""
+        result = await (
+            self._client.table(self.TABLE)
+            .select("completed_stages, current_stage, stage_data, status")
+            .eq("id", run_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
     async def get(self, run_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a pipeline run by ID, scoped to the owning user.
 

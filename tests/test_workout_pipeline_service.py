@@ -172,6 +172,27 @@ async def test_request_body_includes_optional_fields(service):
         assert body["equipment"] == ["barbell", "dumbbells"]
 
 
+@pytest.mark.asyncio
+async def test_generate_records_cost_on_success():
+    """Successful generation calls _record_cost (best-effort)."""
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = {"id": "run-1"}
+    svc = WorkoutPipelineService(
+        ingestor_url="http://test:8004",
+        auth_token="Bearer test",
+        pipeline_run_repo=mock_repo,
+    )
+    mock_workout = {"success": True, "workout": {"name": "Test", "exercises": []}}
+    with patch("backend.services.workout_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = _mock_response(200, mock_workout)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_cls.return_value = mock_client
+        await _collect_events(svc.generate(description="test", user_id="u-1"))
+    mock_repo.update_cost.assert_called_once()
+
+
 # =============================================================================
 # save_and_push Tests
 # =============================================================================
@@ -395,3 +416,143 @@ async def test_save_and_push_cancellation_before_save(service_with_save, preview
 
     # Preview should NOT be consumed (not saved)
     assert preview_store.get("p-cancel", "user-1") is not None
+
+
+# =============================================================================
+# Stage Recording Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_generate_records_stages_on_success():
+    """Successful generation calls update_stage at each stage transition."""
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = {"id": "run-stage-1"}
+
+    # Capture snapshots of completed_stages at each call since the list is mutable
+    stage_snapshots = []
+
+    async def capture_update_stage(run_id, current_stage, completed_stages, **kwargs):
+        stage_snapshots.append({
+            "run_id": run_id,
+            "current_stage": current_stage,
+            "completed_stages": list(completed_stages),  # snapshot copy
+            "stage_data": kwargs.get("stage_data"),
+        })
+
+    mock_repo.update_stage.side_effect = capture_update_stage
+
+    svc = WorkoutPipelineService(
+        ingestor_url="http://test:8004",
+        auth_token="Bearer test",
+        pipeline_run_repo=mock_repo,
+    )
+    mock_workout = {"success": True, "workout": {"name": "Test", "exercises": []}}
+    with patch("backend.services.workout_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = _mock_response(200, mock_workout)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_cls.return_value = mock_client
+        await _collect_events(svc.generate(description="test", user_id="u-1"))
+
+    # Should have 3 update_stage calls: analyzing, creating, complete
+    assert len(stage_snapshots) == 3
+
+    # First call: entering "analyzing" stage with no completed stages
+    assert stage_snapshots[0]["current_stage"] == "analyzing"
+    assert stage_snapshots[0]["completed_stages"] == []
+
+    # Second call: entering "creating" stage with "analyzing" completed
+    assert stage_snapshots[1]["current_stage"] == "creating"
+    assert stage_snapshots[1]["completed_stages"] == ["analyzing"]
+
+    # Third call: entering "complete" stage with analyzing+creating completed
+    assert stage_snapshots[2]["current_stage"] == "complete"
+    assert stage_snapshots[2]["completed_stages"] == ["analyzing", "creating"]
+    assert stage_snapshots[2]["stage_data"] is not None
+    assert "preview_id" in stage_snapshots[2]["stage_data"]
+
+
+# =============================================================================
+# Resume Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_generate_resume_skips_completed_stages():
+    """Resuming from a run with 'analyzing' completed skips the analyzing stage event."""
+    mock_repo = AsyncMock()
+    mock_repo.get_stage_data.return_value = {
+        "status": "running",
+        "completed_stages": ["analyzing"],
+        "current_stage": "creating",
+        "stage_data": {},
+    }
+    svc = WorkoutPipelineService(
+        ingestor_url="http://test:8004",
+        auth_token="Bearer test",
+        pipeline_run_repo=mock_repo,
+    )
+    mock_workout = {"success": True, "workout": {"name": "Resumed", "exercises": []}}
+    with patch("backend.services.workout_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = _mock_response(200, mock_workout)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_cls.return_value = mock_client
+        events = await _collect_events(
+            svc.generate(
+                description="test",
+                user_id="u-1",
+                resume_from="run-resume-1",
+            )
+        )
+
+    # Should NOT have an "analyzing" stage event (it was skipped)
+    stage_events = [e for e in events if e.event == "stage"]
+    stage_names = [json.loads(e.data)["stage"] for e in stage_events]
+    assert "analyzing" not in stage_names
+    # Should still have creating and complete
+    assert "creating" in stage_names
+    assert "complete" in stage_names
+
+    # Should NOT have created a new pipeline run (reused the resumed one)
+    mock_repo.create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_generate_resume_falls_back_on_missing_data():
+    """When resume_from run is not found, falls back to creating a new run."""
+    mock_repo = AsyncMock()
+    mock_repo.get_stage_data.return_value = None
+    mock_repo.create.return_value = {"id": "new-run-1"}
+    svc = WorkoutPipelineService(
+        ingestor_url="http://test:8004",
+        auth_token="Bearer test",
+        pipeline_run_repo=mock_repo,
+    )
+    mock_workout = {"success": True, "workout": {"name": "Fallback", "exercises": []}}
+    with patch("backend.services.workout_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = _mock_response(200, mock_workout)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_cls.return_value = mock_client
+        events = await _collect_events(
+            svc.generate(
+                description="test",
+                user_id="u-1",
+                resume_from="nonexistent-run",
+            )
+        )
+
+    # Should have created a new pipeline run since resume data was not found
+    mock_repo.create.assert_called_once()
+
+    # All stages should be emitted (no skipping)
+    stage_events = [e for e in events if e.event == "stage"]
+    stage_names = [json.loads(e.data)["stage"] for e in stage_events]
+    assert "analyzing" in stage_names
+    assert "creating" in stage_names
+    assert "complete" in stage_names
