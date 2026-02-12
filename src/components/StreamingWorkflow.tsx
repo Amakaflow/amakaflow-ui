@@ -195,10 +195,12 @@ function SubProgressIndicator({
   current,
   total,
   label,
+  itemLabel = 'Week',
 }: {
   current: number;
   total: number;
   label?: string;
+  itemLabel?: string;
 }) {
   return (
     <div
@@ -230,7 +232,7 @@ function SubProgressIndicator({
               isCompleted && 'text-muted-foreground',
               isActive && 'text-foreground font-medium',
             )}>
-              Week {itemNum}
+              {itemLabel} {itemNum}
             </span>
           </div>
         );
