@@ -1,78 +1,70 @@
 """Per-user pipeline concurrency limiter.
 
-Enforces a maximum number of active pipelines per user.
-Uses in-memory tracking (suitable for single-instance deployments).
+Limits the number of active pipeline runs per user to prevent resource abuse.
+Used by both WorkoutPipelineService and ProgramPipelineService.
 
-Part of AMA-567 Phase E: Program pipeline (batched generation)
+Part of AMA-567 Phase E.
 """
 
 import asyncio
 import contextlib
 import logging
-from typing import Optional
+from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
 
 class PipelineConcurrencyLimiter:
-    """Limits the number of concurrent pipeline executions per user.
+    """In-memory per-user concurrency limiter for pipelines.
 
-    Thread-safe via asyncio.Lock. For multi-instance deployments,
-    replace with Redis-based tracking.
+    Tracks active pipeline runs per user and rejects new runs when the limit
+    is reached. Thread-safe via asyncio.Lock.
     """
 
     def __init__(self, max_per_user: int = 2):
-        self._max_per_user = max_per_user
+        self._max = max_per_user
         self._active: dict[str, set[str]] = {}  # user_id -> {run_id, ...}
         self._lock = asyncio.Lock()
 
     async def acquire(self, user_id: str, run_id: str) -> bool:
-        """Try to acquire a pipeline slot for the user.
-
-        Returns True if allowed, False if at the per-user limit.
-        """
+        """Try to acquire a pipeline slot. Returns True if allowed."""
         async with self._lock:
-            user_runs = self._active.setdefault(user_id, set())
-            if len(user_runs) >= self._max_per_user:
+            active = self._active.get(user_id, set())
+            if len(active) >= self._max:
                 return False
-            user_runs.add(run_id)
+            active.add(run_id)
+            self._active[user_id] = active
             return True
 
     async def release(self, user_id: str, run_id: str) -> None:
-        """Release a pipeline slot for the user."""
+        """Release a pipeline slot."""
         async with self._lock:
-            user_runs = self._active.get(user_id)
-            if user_runs:
-                user_runs.discard(run_id)
-                if not user_runs:
+            active = self._active.get(user_id)
+            if active:
+                active.discard(run_id)
+                if not active:
                     del self._active[user_id]
 
     @contextlib.asynccontextmanager
-    async def limit(self, user_id: str, run_id: str):
-        """Context manager: acquire on enter, release on exit.
-
-        Raises PipelineConcurrencyExceeded if at limit.
-        """
+    async def limit(self, user_id: str, run_id: str) -> AsyncIterator[None]:
+        """Context manager: acquire on enter, release on exit (even on error)."""
         acquired = await self.acquire(user_id, run_id)
         if not acquired:
-            raise PipelineConcurrencyExceeded(
-                f"Too many active pipelines (max {self._max_per_user}). Please wait."
+            raise ConcurrencyLimitExceeded(
+                f"Too many active pipelines (max {self._max}). Please wait."
             )
         try:
             yield
         finally:
             await self.release(user_id, run_id)
 
-    @property
-    def active_count(self) -> int:
-        """Total active pipelines across all users."""
-        return sum(len(runs) for runs in self._active.values())
-
-    def user_active_count(self, user_id: str) -> int:
-        """Number of active pipelines for a specific user."""
-        return len(self._active.get(user_id, set()))
+    async def active_count(self, user_id: str) -> int:
+        """Get number of active pipelines for a user."""
+        async with self._lock:
+            return len(self._active.get(user_id, set()))
 
 
-class PipelineConcurrencyExceeded(Exception):
-    """Raised when a user exceeds their pipeline concurrency limit."""
+class ConcurrencyLimitExceeded(Exception):
+    """Raised when a user has too many active pipelines."""
+
     pass
