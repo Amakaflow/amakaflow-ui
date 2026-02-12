@@ -135,7 +135,16 @@ class WorkoutPipelineService:
             )
             return
 
-        result = response.json()
+        try:
+            result = response.json()
+        except Exception:
+            await self._record_status(run_id, "failed", error="Invalid response from workout service")
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "creating", "message": "Received an invalid response from the workout service.", "recoverable": True}),
+            )
+            return
+
         if response.status_code != 200 or not result.get("success"):
             await self._record_status(run_id, "failed", error="Failed to generate workout")
             yield PipelineEvent(
@@ -270,10 +279,19 @@ class WorkoutPipelineService:
             )
             return
 
+        try:
+            save_result = save_response.json()
+        except Exception:
+            await self._record_status(run_id, "failed", error="Invalid response from save service")
+            yield PipelineEvent(
+                "error",
+                json.dumps({"stage": "saving", "message": "Received an invalid response from the save service.", "recoverable": True}),
+            )
+            return
+
         # Save succeeded — consume the preview so it can't be reused
         self._preview_store.pop(preview_id, user_id)
 
-        save_result = save_response.json()
         saved_workout = save_result.get("workout", save_result)
         workout_id = saved_workout.get("id") or saved_workout.get("workout_id")
 

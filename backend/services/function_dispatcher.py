@@ -121,6 +121,7 @@ class FunctionDispatcher:
             "import_from_pinterest": self._import_from_pinterest,
             "import_from_image": self._import_from_image,
             "save_imported_workout": self._save_imported_workout,
+            "import_workout_from_url": self._import_workout_from_url,
             # Phase 3
             "edit_workout": self._edit_workout,
             "export_workout": self._export_workout,
@@ -1023,6 +1024,34 @@ class FunctionDispatcher:
             "title": title,
             "location": "The workout is now available in your 'My Workouts' tab.",
         })
+
+    def _import_workout_from_url(
+        self, args: Dict[str, Any], ctx: FunctionContext
+    ) -> str:
+        """Import a workout from any supported URL (auto-detects platform)."""
+        url = args.get("url")
+        if not url:
+            return self._error_response(
+                "validation_error", "Missing required field: url"
+            )
+
+        from backend.services.url_import_pipeline_service import detect_platform
+
+        platform = detect_platform(url)
+        if not platform:
+            return self._error_response(
+                "validation_error",
+                "Unsupported URL. Supported platforms: YouTube, TikTok, Instagram, Pinterest.",
+            )
+
+        handler_map = {
+            "youtube": self._import_from_youtube,
+            "tiktok": self._import_from_tiktok,
+            "instagram": self._import_from_instagram,
+            "pinterest": self._import_from_pinterest,
+        }
+        handler = handler_map[platform]
+        return handler({"url": url, **{k: v for k, v in args.items() if k != "url"}}, ctx)
 
     # --- Phase 3: Workout Management Handlers ---
 

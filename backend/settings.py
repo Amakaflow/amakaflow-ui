@@ -219,11 +219,19 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     pipeline_burst_limit: int = Field(
         default=5,
-        description="Maximum pipeline requests per user per burst window",
+        description="Maximum generate/import pipeline requests per user per burst window",
     )
     pipeline_burst_window_seconds: int = Field(
         default=60,
         description="Burst rate limit window in seconds",
+    )
+    pipeline_save_burst_limit: int = Field(
+        default=10,
+        description="Maximum save pipeline requests per user per burst window",
+    )
+    pipeline_save_burst_window_seconds: int = Field(
+        default=60,
+        description="Save burst rate limit window in seconds",
     )
 
     # -------------------------------------------------------------------------

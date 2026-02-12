@@ -546,11 +546,21 @@ async def get_async_function_dispatcher(
 
 @lru_cache
 def get_pipeline_rate_limiter() -> InMemoryRateLimiter:
-    """Get cached pipeline burst rate limiter."""
+    """Get cached pipeline burst rate limiter for generate/import endpoints."""
     settings = _get_settings()
     return InMemoryRateLimiter(
         max_requests=settings.pipeline_burst_limit,
         window_seconds=settings.pipeline_burst_window_seconds,
+    )
+
+
+@lru_cache
+def get_save_rate_limiter() -> InMemoryRateLimiter:
+    """Get cached rate limiter for save endpoint (separate from generate/import)."""
+    settings = _get_settings()
+    return InMemoryRateLimiter(
+        max_requests=settings.pipeline_save_burst_limit,
+        window_seconds=settings.pipeline_save_burst_window_seconds,
     )
 
 
@@ -576,6 +586,28 @@ async def get_workout_pipeline_service(
         auth_token=auth.auth_token or "",
         mapper_api_url=settings.mapper_api_url,
         calendar_api_url=settings.calendar_api_url,
+        preview_store=get_preview_store(),
+        pipeline_run_repo=pipeline_run_repo,
+    )
+
+
+# =============================================================================
+# URL Import Pipeline Provider
+# =============================================================================
+
+
+async def get_url_import_pipeline_service(
+    auth: "AuthContext" = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+    pipeline_run_repo: Optional[AsyncPipelineRunRepository] = Depends(get_optional_pipeline_run_repository),
+) -> "URLImportPipelineService":
+    """Get URL import pipeline service for standalone URL import streaming."""
+    from backend.services.url_import_pipeline_service import URLImportPipelineService
+
+    return URLImportPipelineService(
+        ingestor_url=settings.workout_ingestor_api_url,
+        auth_token=auth.auth_token or "",
+        mapper_api_url=settings.mapper_api_url,
         preview_store=get_preview_store(),
         pipeline_run_repo=pipeline_run_repo,
     )

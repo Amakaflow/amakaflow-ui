@@ -2,6 +2,7 @@
 
 Tests for:
 - POST /api/workouts/generate/stream — SSE generation
+- POST /api/workouts/import/stream — SSE URL import
 - POST /api/workouts/save/stream — SSE save-and-push
 - Rate limiting (429 responses)
 - Request validation (Pydantic models)
@@ -20,10 +21,13 @@ from api.deps import (
     get_current_user as deps_get_current_user,
     get_auth_context,
     get_pipeline_rate_limiter,
+    get_save_rate_limiter,
+    get_url_import_pipeline_service,
     get_workout_pipeline_service,
     AuthContext,
 )
 from backend.services.rate_limiter import InMemoryRateLimiter, RateLimitResult
+from backend.services.url_import_pipeline_service import URLImportPipelineService
 from backend.services.workout_pipeline_service import (
     PipelineEvent,
     WorkoutPipelineService,
@@ -132,7 +136,7 @@ def save_client(workout_app, mock_pipeline_service_save, rate_limiter):
     workout_app.dependency_overrides[deps_get_current_user] = mock_auth
     workout_app.dependency_overrides[get_auth_context] = mock_auth_context
     workout_app.dependency_overrides[get_workout_pipeline_service] = lambda: mock_pipeline_service_save
-    workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+    workout_app.dependency_overrides[get_save_rate_limiter] = lambda: rate_limiter
     yield TestClient(workout_app)
     workout_app.dependency_overrides.clear()
 
@@ -348,7 +352,7 @@ class TestSaveStream:
 
     def test_unauthenticated_returns_401(self, workout_app, mock_pipeline_service_save, rate_limiter):
         workout_app.dependency_overrides[get_workout_pipeline_service] = lambda: mock_pipeline_service_save
-        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        workout_app.dependency_overrides[get_save_rate_limiter] = lambda: rate_limiter
         client = TestClient(workout_app)
         response = client.post(
             "/api/workouts/save/stream",
@@ -376,7 +380,7 @@ class TestSaveStreamErrorPaths:
         workout_app.dependency_overrides[deps_get_current_user] = mock_auth
         workout_app.dependency_overrides[get_auth_context] = mock_auth_context
         workout_app.dependency_overrides[get_workout_pipeline_service] = lambda: svc
-        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        workout_app.dependency_overrides[get_save_rate_limiter] = lambda: rate_limiter
         client = TestClient(workout_app)
 
         response = client.post(
@@ -405,7 +409,7 @@ class TestSaveStreamErrorPaths:
         workout_app.dependency_overrides[deps_get_current_user] = mock_auth
         workout_app.dependency_overrides[get_auth_context] = mock_auth_context
         workout_app.dependency_overrides[get_workout_pipeline_service] = lambda: svc
-        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        workout_app.dependency_overrides[get_save_rate_limiter] = lambda: rate_limiter
         client = TestClient(workout_app, raise_server_exceptions=False)
 
         response = client.post(
@@ -428,7 +432,7 @@ class TestSaveStreamRateLimit:
         workout_app.dependency_overrides[deps_get_current_user] = mock_auth
         workout_app.dependency_overrides[get_auth_context] = mock_auth_context
         workout_app.dependency_overrides[get_workout_pipeline_service] = lambda: mock_pipeline_service_save
-        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: exhausted_limiter
+        workout_app.dependency_overrides[get_save_rate_limiter] = lambda: exhausted_limiter
         client = TestClient(workout_app)
 
         response = client.post(
@@ -437,4 +441,197 @@ class TestSaveStreamRateLimit:
         )
         assert response.status_code == 429
         assert "Retry-After" in response.headers
+        workout_app.dependency_overrides.clear()
+
+
+# =============================================================================
+# POST /api/workouts/import/stream
+# =============================================================================
+
+
+@pytest.fixture
+def mock_import_pipeline_service():
+    svc = MagicMock(spec=URLImportPipelineService)
+
+    async def _mock_ingest(**kwargs):
+        yield PipelineEvent("stage", json.dumps({"stage": "fetching", "message": "Fetching YouTube video..."}))
+        yield PipelineEvent("stage", json.dumps({"stage": "extracting", "message": "Extracting content..."}))
+        yield PipelineEvent("stage", json.dumps({"stage": "parsing", "message": "Identifying exercises..."}))
+        yield PipelineEvent("stage", json.dumps({"stage": "mapping", "message": "Matching to library..."}))
+        yield PipelineEvent("stage", json.dumps({"stage": "complete", "message": "Workout ready!"}))
+        yield PipelineEvent("preview", json.dumps({
+            "preview_id": "p-import-1",
+            "source_url": "https://www.youtube.com/watch?v=abc",
+            "platform": "youtube",
+            "workout": {
+                "name": "Imported HIIT",
+                "exercises": [
+                    {"name": "Burpees", "sets": 3, "reps": 10, "muscle_group": "full_body"},
+                ],
+                "exercise_count": 1,
+                "block_count": 0,
+            },
+            "unmatched": [],
+        }))
+
+    svc.ingest = _mock_ingest
+    return svc
+
+
+@pytest.fixture
+def import_client(workout_app, mock_import_pipeline_service, rate_limiter):
+    workout_app.dependency_overrides[backend_get_current_user] = mock_auth
+    workout_app.dependency_overrides[deps_get_current_user] = mock_auth
+    workout_app.dependency_overrides[get_auth_context] = mock_auth_context
+    workout_app.dependency_overrides[get_url_import_pipeline_service] = lambda: mock_import_pipeline_service
+    workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+    yield TestClient(workout_app)
+    workout_app.dependency_overrides.clear()
+
+
+class TestImportStream:
+    def test_returns_sse_events(self, import_client):
+        response = import_client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers.get("content-type", "")
+
+        events = _parse_sse_events(response.text)
+        event_types = [e[0] for e in events]
+
+        assert event_types[0] == "stage"
+        assert events[0][1]["stage"] == "fetching"
+        assert "preview" in event_types
+        assert events[-1][0] == "preview"
+
+    def test_preview_event_has_import_fields(self, import_client):
+        response = import_client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        events = _parse_sse_events(response.text)
+        preview = [e for e in events if e[0] == "preview"]
+        assert len(preview) == 1
+        assert "preview_id" in preview[0][1]
+        assert preview[0][1]["platform"] == "youtube"
+        assert preview[0][1]["source_url"] == "https://www.youtube.com/watch?v=abc"
+        assert preview[0][1]["workout"]["name"] == "Imported HIIT"
+
+    def test_all_stages_present(self, import_client):
+        response = import_client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        events = _parse_sse_events(response.text)
+        stages = [e[1]["stage"] for e in events if e[0] == "stage"]
+        assert stages == ["fetching", "extracting", "parsing", "mapping", "complete"]
+
+    def test_empty_url_returns_422(self, import_client):
+        response = import_client.post(
+            "/api/workouts/import/stream",
+            json={"url": ""},
+        )
+        assert response.status_code == 422
+
+    def test_missing_url_returns_422(self, import_client):
+        response = import_client.post(
+            "/api/workouts/import/stream",
+            json={},
+        )
+        assert response.status_code == 422
+
+    def test_unauthenticated_returns_401(self, workout_app, mock_import_pipeline_service, rate_limiter):
+        workout_app.dependency_overrides[get_url_import_pipeline_service] = lambda: mock_import_pipeline_service
+        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        client = TestClient(workout_app)
+        response = client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        assert response.status_code == 401
+        workout_app.dependency_overrides.clear()
+
+
+class TestImportStreamErrorPaths:
+    def test_error_event_forwarded(self, workout_app, rate_limiter):
+        """Pipeline error events are forwarded as SSE error events."""
+        svc = MagicMock(spec=URLImportPipelineService)
+
+        async def _ingest_with_error(**kwargs):
+            yield PipelineEvent("stage", json.dumps({"stage": "fetching", "message": "..."}))
+            yield PipelineEvent("error", json.dumps({
+                "stage": "extracting",
+                "message": "Unsupported URL.",
+                "recoverable": False,
+            }))
+
+        svc.ingest = _ingest_with_error
+        workout_app.dependency_overrides[backend_get_current_user] = mock_auth
+        workout_app.dependency_overrides[deps_get_current_user] = mock_auth
+        workout_app.dependency_overrides[get_auth_context] = mock_auth_context
+        workout_app.dependency_overrides[get_url_import_pipeline_service] = lambda: svc
+        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        client = TestClient(workout_app)
+
+        response = client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://example.com/workout"},
+        )
+        assert response.status_code == 200
+        events = _parse_sse_events(response.text)
+        error_events = [e for e in events if e[0] == "error"]
+
+        assert len(error_events) == 1
+        assert error_events[0][1]["message"] == "Unsupported URL."
+        assert error_events[0][1]["recoverable"] is False
+        workout_app.dependency_overrides.clear()
+
+    def test_generator_exception_terminates_stream(self, workout_app, rate_limiter):
+        """Unhandled exception in pipeline generator terminates the SSE stream."""
+        svc = MagicMock(spec=URLImportPipelineService)
+
+        async def _ingest_crash(**kwargs):
+            yield PipelineEvent("stage", json.dumps({"stage": "fetching", "message": "..."}))
+            raise RuntimeError("Ingestor exploded")
+
+        svc.ingest = _ingest_crash
+        workout_app.dependency_overrides[backend_get_current_user] = mock_auth
+        workout_app.dependency_overrides[deps_get_current_user] = mock_auth
+        workout_app.dependency_overrides[get_auth_context] = mock_auth_context
+        workout_app.dependency_overrides[get_url_import_pipeline_service] = lambda: svc
+        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: rate_limiter
+        client = TestClient(workout_app, raise_server_exceptions=False)
+
+        response = client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        assert response.status_code == 200
+        events = _parse_sse_events(response.text)
+        assert len(events) >= 1
+        assert events[0][0] == "stage"
+        workout_app.dependency_overrides.clear()
+
+
+class TestImportStreamRateLimit:
+    def test_rate_limit_returns_429(self, workout_app, mock_import_pipeline_service):
+        exhausted_limiter = MagicMock(spec=InMemoryRateLimiter)
+        exhausted_limiter.check.return_value = RateLimitResult(allowed=False, retry_after=30.0)
+
+        workout_app.dependency_overrides[backend_get_current_user] = mock_auth
+        workout_app.dependency_overrides[deps_get_current_user] = mock_auth
+        workout_app.dependency_overrides[get_auth_context] = mock_auth_context
+        workout_app.dependency_overrides[get_url_import_pipeline_service] = lambda: mock_import_pipeline_service
+        workout_app.dependency_overrides[get_pipeline_rate_limiter] = lambda: exhausted_limiter
+        client = TestClient(workout_app)
+
+        response = client.post(
+            "/api/workouts/import/stream",
+            json={"url": "https://www.youtube.com/watch?v=abc"},
+        )
+        assert response.status_code == 429
+        assert "Retry-After" in response.headers
+        assert response.json()["detail"] == "Rate limit exceeded. Please try again shortly."
         workout_app.dependency_overrides.clear()

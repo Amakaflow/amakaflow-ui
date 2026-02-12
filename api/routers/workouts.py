@@ -1,6 +1,7 @@
-"""Workout generation and save streaming endpoints.
+"""Workout generation, import, and save streaming endpoints.
 
 POST /api/workouts/generate/stream — SSE stream for AI workout generation
+POST /api/workouts/import/stream   — SSE stream for URL import (YouTube, TikTok, etc.)
 POST /api/workouts/save/stream     — SSE stream for saving a previewed workout
 """
 
@@ -15,10 +16,13 @@ from sse_starlette.sse import EventSourceResponse
 from api.deps import (
     get_auth_context,
     get_pipeline_rate_limiter,
+    get_save_rate_limiter,
+    get_url_import_pipeline_service,
     get_workout_pipeline_service,
     AuthContext,
 )
 from backend.services.rate_limiter import InMemoryRateLimiter
+from backend.services.url_import_pipeline_service import URLImportPipelineService
 from backend.services.workout_pipeline_service import WorkoutPipelineService
 
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
@@ -76,6 +80,55 @@ async def generate_workout_stream(
     return EventSourceResponse(event_generator())
 
 
+class ImportFromURLRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2048)
+
+
+@router.post("/import/stream")
+async def import_from_url_stream(
+    body: ImportFromURLRequest,
+    request: Request,
+    auth: AuthContext = Depends(get_auth_context),
+    pipeline: URLImportPipelineService = Depends(get_url_import_pipeline_service),
+    rate_limiter: InMemoryRateLimiter = Depends(get_pipeline_rate_limiter),
+):
+    """Stream URL import progress as Server-Sent Events.
+
+    Imports a workout from YouTube, TikTok, Instagram, or Pinterest URLs.
+    Auto-detects the platform from the URL.
+
+    Returns an SSE stream with event types:
+    - stage: Pipeline progress updates (fetching, extracting, parsing, mapping, complete)
+    - preview: Imported workout data with preview_id
+    - error: Error details
+
+    Returns 429 if per-minute burst limit is exceeded.
+    Supports cancellation via client disconnect.
+    """
+    result = rate_limiter.check(auth.user_id)
+    if not result.allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please try again shortly."},
+            headers={"Retry-After": str(int(result.retry_after or 60))},
+        )
+
+    cancel_event = asyncio.Event()
+
+    async def event_generator():
+        async for event in pipeline.ingest(
+            url=body.url,
+            user_id=auth.user_id,
+            cancel_event=cancel_event,
+        ):
+            if await request.is_disconnected():
+                cancel_event.set()
+                break
+            yield {"event": event.event, "data": event.data}
+
+    return EventSourceResponse(event_generator())
+
+
 class SaveWorkoutRequest(BaseModel):
     preview_id: str = Field(..., min_length=1, max_length=64)
     schedule_date: Optional[str] = None
@@ -87,7 +140,7 @@ async def save_workout_stream(
     request: Request,
     auth: AuthContext = Depends(get_auth_context),
     pipeline: WorkoutPipelineService = Depends(get_workout_pipeline_service),
-    rate_limiter: InMemoryRateLimiter = Depends(get_pipeline_rate_limiter),
+    rate_limiter: InMemoryRateLimiter = Depends(get_save_rate_limiter),
 ):
     """Stream workout save progress as Server-Sent Events.
 

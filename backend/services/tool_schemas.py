@@ -259,6 +259,25 @@ PHASE_2_TOOLS: List[Dict[str, Any]] = [
             "required": ["source_url"],
         },
     },
+    {
+        "name": "import_workout_from_url",
+        "description": (
+            "Import a workout from any supported URL (YouTube, TikTok, Instagram, Pinterest). "
+            "Auto-detects the platform from the URL. Returns a preview with exercises — "
+            "the workout is NOT saved yet. After user confirms, call save_imported_workout "
+            "with the source_url."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to import from (YouTube, TikTok, Instagram, or Pinterest)",
+                },
+            },
+            "required": ["url"],
+        },
+    },
 ]
 
 PHASE_3_TOOLS: List[Dict[str, Any]] = [
