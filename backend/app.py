@@ -20,7 +20,6 @@ from backend.adapters.cir_to_garmin_yaml import to_garmin_yaml
 
 from backend.adapters.blocks_to_hyrox_yaml import (
     to_hyrox_yaml,
-    load_user_defaults,
     map_exercise_to_garmin,
 )
 from backend.adapters.blocks_to_hiit_garmin_yaml import to_hiit_garmin_yaml, is_hiit_workout
@@ -47,15 +46,10 @@ from backend.core.global_mappings import (
 )
 
 from backend.database import (
-    save_workout,
-    get_workouts,
+    # Note: save_workout, get_workouts, update_workout_export_status, delete_workout,
+    # toggle_workout_favorite, track_workout_usage, update_workout_tags, get_incoming_workouts
+    # removed — now served by api/routers/workouts.py (AMA-584)
     get_workout,
-    update_workout_export_status,
-    delete_workout,
-    # AMA-122: Workout Library Enhancements
-    toggle_workout_favorite,
-    track_workout_usage,
-    update_workout_tags,
     create_program,
     get_programs,
     get_program,
@@ -69,7 +63,6 @@ from backend.database import (
     # AMA-199: iOS Companion App Sync
     update_workout_ios_companion_sync,
     get_ios_companion_pending_workouts,
-    get_incoming_workouts,
     # AMA-200: Account Deletion
     get_account_deletion_preview,
     # AMA-268: Mobile Profile
@@ -176,274 +169,14 @@ def test_garmin_debug():
 # Note: /exercise/*, /mappings/* moved to api/routers/mapping.py (AMA-379)
 
 
-class UserDefaultsRequest(BaseModel):
-
-    distance_handling: str = "lap"  # "lap" or "distance"
-    default_exercise_value: str = "lap"  # "lap" or "button"
-    ignore_distance: bool = True
-
-
-@app.get("/settings/defaults")
-
-def get_defaults():
-
-    """Get current user default settings."""
-    return load_user_defaults()
-
-
-@app.put("/settings/defaults")
-
-def update_defaults(p: UserDefaultsRequest):
-
-    """Update user default settings."""
-    import yaml
-    import pathlib
-    
-    ROOT = pathlib.Path(__file__).resolve().parents[2]
-    USER_DEFAULTS_FILE = ROOT / "shared/settings/user_defaults.yaml"
-    
-    # Create directory if needed
-    USER_DEFAULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Save settings
-    data = {
-        "defaults": {
-            "distance_handling": p.distance_handling,
-            "default_exercise_value": p.default_exercise_value,
-            "ignore_distance": p.ignore_distance
-        }
-    }
-    
-    with open(USER_DEFAULTS_FILE, 'w') as f:
-        yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
-    
-    return {
-        "message": "Settings updated successfully",
-        "settings": data["defaults"]
-    }
+# Settings endpoints moved to api/routers/settings.py (AMA-585)
 
 
 # ============================================================================
-# Workout Storage Endpoints
+# Workout CRUD Endpoints — MOVED TO api/routers/workouts.py (AMA-381/AMA-584)
+# Removed: /workouts/save, /workouts, /workouts/incoming,
+#          /workouts/{id}, /workouts/{id}/export-status, DELETE /workouts/{id}
 # ============================================================================
-
-class SaveWorkoutRequest(BaseModel):
-    profile_id: str | None = None  # Deprecated: use auth instead
-    workout_data: dict
-    sources: list[str] = []
-    device: str
-    exports: dict | None = None
-    validation: dict | None = None
-    title: str | None = None
-    description: str | None = None
-    workout_id: str | None = None  # Optional: for explicit updates to existing workouts
-
-
-class UpdateWorkoutExportRequest(BaseModel):
-    profile_id: str | None = None  # Deprecated: use auth instead
-    is_exported: bool = True
-    exported_to_device: str | None = None
-
-
-@app.post("/workouts/save")
-def save_workout_endpoint(
-    request: SaveWorkoutRequest,
-    user_id: str = Depends(get_current_user)
-):
-    """Save a workout to Supabase before syncing to device.
-
-    With deduplication: if a workout with the same profile_id, title, and device
-    already exists, it will be updated instead of creating a duplicate.
-    """
-    result = save_workout(
-        profile_id=user_id,
-        workout_data=request.workout_data,
-        sources=request.sources,
-        device=request.device,
-        exports=request.exports,
-        validation=request.validation,
-        title=request.title,
-        description=request.description,
-        workout_id=request.workout_id
-    )
-
-    if result:
-        return {
-            "success": True,
-            "workout_id": result.get("id"),
-            "message": "Workout saved successfully"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to save workout. Check server logs."
-        }
-
-
-@app.get("/workouts")
-def get_workouts_endpoint(
-    user_id: str = Depends(get_current_user),
-    device: str = Query(None, description="Filter by device"),
-    is_exported: bool = Query(None, description="Filter by export status"),
-    limit: int = Query(50, ge=1, le=100, description="Maximum number of workouts")
-):
-    """Get workouts for the authenticated user, optionally filtered by device and export status."""
-    workouts = get_workouts(
-        profile_id=user_id,
-        device=device,
-        is_exported=is_exported,
-        limit=limit
-    )
-
-    # Include sync status for each workout (AMA-307)
-    for workout in workouts:
-        workout_id = workout.get("id")
-        if workout_id:
-            workout["sync_status"] = get_workout_sync_status(workout_id, user_id)
-
-    return {
-        "success": True,
-        "workouts": workouts,
-        "count": len(workouts)
-    }
-
-
-@app.get("/workouts/incoming")
-def get_incoming_workouts_endpoint(
-    user_id: str = Depends(get_current_user),
-    limit: int = Query(50, ge=1, le=100, description="Maximum number of workouts")
-):
-    """
-    Get incoming workouts that haven't been completed yet (AMA-236).
-
-    This endpoint returns workouts that have been pushed to iOS Companion App
-    but have not yet been recorded as completed in workout_completions.
-
-    Use this instead of /workouts to get a filtered list of workouts
-    that still need to be done.
-
-    Args:
-        user_id: Authenticated user ID (from Clerk JWT)
-        limit: Maximum number of workouts to return
-
-    Returns:
-        List of pending workouts in iOS Companion format
-    """
-    workouts = get_incoming_workouts(user_id, limit=limit)
-
-    # Transform each workout to iOS companion format (same as /ios-companion/pending)
-    transformed = []
-    for workout_record in workouts:
-        workout_data = workout_record.get("workout_data", {})
-        title = workout_record.get("title") or workout_data.get("title", "Workout")
-
-        # Use to_workoutkit to properly transform intervals
-        try:
-            workoutkit_dto = to_workoutkit(workout_data)
-            intervals = [interval.model_dump() for interval in workoutkit_dto.intervals]
-            sport = workoutkit_dto.sportType
-        except Exception as e:
-            logger.warning(f"Failed to transform workout {workout_record.get('id')}: {e}")
-            intervals = []
-            sport = "strengthTraining"
-            for block in workout_data.get("blocks", []):
-                for exercise in block.get("exercises", []):
-                    intervals.append(convert_exercise_to_interval(exercise))
-
-        # Calculate total duration from intervals
-        total_duration = calculate_intervals_duration(intervals)
-
-        transformed.append({
-            "id": workout_record.get("id"),
-            "name": title,
-            "sport": sport,
-            "duration": total_duration,
-            "source": "amakaflow",
-            "sourceUrl": None,
-            "intervals": intervals,
-            "pushedAt": workout_record.get("ios_companion_synced_at"),
-            "createdAt": workout_record.get("created_at"),
-        })
-
-    return {
-        "success": True,
-        "workouts": transformed,
-        "count": len(transformed)
-    }
-
-
-# ============================================================================
-# Workout Completion Endpoints - MOVED TO api/routers/workouts.py (AMA-381)
-# ============================================================================
-
-
-@app.get("/workouts/{workout_id}")
-def get_workout_endpoint(
-    workout_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """Get a single workout by ID."""
-    workout = get_workout(workout_id, user_id)
-
-    if workout:
-        # Include sync status in response (AMA-307)
-        sync_status = get_workout_sync_status(workout_id, user_id)
-        workout["sync_status"] = sync_status
-        return {
-            "success": True,
-            "workout": workout
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Workout not found"
-        }
-
-
-@app.put("/workouts/{workout_id}/export-status")
-def update_workout_export_endpoint(
-    workout_id: str,
-    request: UpdateWorkoutExportRequest,
-    user_id: str = Depends(get_current_user)
-):
-    """Update workout export status after syncing to device."""
-    success = update_workout_export_status(
-        workout_id=workout_id,
-        profile_id=user_id,
-        is_exported=request.is_exported,
-        exported_to_device=request.exported_to_device
-    )
-    
-    if success:
-        return {
-            "success": True,
-            "message": "Export status updated successfully"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to update export status"
-        }
-
-
-@app.delete("/workouts/{workout_id}")
-def delete_workout_endpoint(
-    workout_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """Delete a workout."""
-    success = delete_workout(workout_id, user_id)
-    
-    if success:
-        return {
-            "success": True,
-            "message": "Workout deleted successfully"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to delete workout"
-        }
 
 
 class PushWorkoutToIOSCompanionRequest(BaseModel):
@@ -2506,21 +2239,9 @@ async def bulk_import_cancel(
 
 
 # ============================================================================
-# Workout Library Enhancements (AMA-122)
+# Workout Library: favorite/used/tags — MOVED TO api/routers/workouts.py (AMA-584)
+# Removed: PATCH /workouts/{id}/favorite, /used, /tags
 # ============================================================================
-
-class ToggleFavoriteRequest(BaseModel):
-    profile_id: str
-    is_favorite: bool
-
-
-class TrackUsageRequest(BaseModel):
-    profile_id: str
-
-
-class UpdateTagsRequest(BaseModel):
-    profile_id: str
-    tags: List[str]
 
 
 class CreateProgramRequest(BaseModel):
@@ -2552,71 +2273,6 @@ class CreateTagRequest(BaseModel):
     profile_id: str
     name: str
     color: Optional[str] = None
-
-
-@app.patch("/workouts/{workout_id}/favorite")
-def toggle_workout_favorite_endpoint(workout_id: str, request: ToggleFavoriteRequest):
-    """Toggle favorite status for a workout."""
-    result = toggle_workout_favorite(
-        workout_id=workout_id,
-        profile_id=request.profile_id,
-        is_favorite=request.is_favorite
-    )
-
-    if result:
-        return {
-            "success": True,
-            "workout": result,
-            "message": "Favorite status updated"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to update favorite status"
-        }
-
-
-@app.patch("/workouts/{workout_id}/used")
-def track_workout_usage_endpoint(workout_id: str, request: TrackUsageRequest):
-    """Track that a workout was used (update last_used_at and increment times_completed)."""
-    result = track_workout_usage(
-        workout_id=workout_id,
-        profile_id=request.profile_id
-    )
-
-    if result:
-        return {
-            "success": True,
-            "workout": result,
-            "message": "Usage tracked"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to track usage"
-        }
-
-
-@app.patch("/workouts/{workout_id}/tags")
-def update_workout_tags_endpoint(workout_id: str, request: UpdateTagsRequest):
-    """Update tags for a workout."""
-    result = update_workout_tags(
-        workout_id=workout_id,
-        profile_id=request.profile_id,
-        tags=request.tags
-    )
-
-    if result:
-        return {
-            "success": True,
-            "workout": result,
-            "message": "Tags updated"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to update tags"
-        }
 
 
 # ============================================================================
