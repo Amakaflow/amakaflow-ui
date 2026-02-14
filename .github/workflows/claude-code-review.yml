@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review]
 
 jobs:
   code-review:
@@ -19,10 +19,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Dismiss stale reviews
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            for (const review of reviews.data) {
+              if (review.user.login === 'github-actions[bot]' && review.state === 'CHANGES_REQUESTED') {
+                await github.rest.pulls.dismissReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  review_id: review.id,
+                  message: 'Dismissed: new review in progress.'
+                });
+              }
+            }
+
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_sticky_comment: true
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"'
           prompt: |
             You are a senior code reviewer for a FastAPI Python backend (mapper-api).
@@ -42,20 +64,16 @@ jobs:
             - **Minor** — nice to have (naming, style, small improvements)
             - **Nitpick** — optional (formatting, conventions)
 
-            After writing your review, you MUST do two things:
+            After writing your review, submit a formal PR review with the appropriate verdict using the GitHub API:
+            - If there are ANY Critical issues: submit with event "REQUEST_CHANGES"
+            - If there are only Important/Minor/Nitpick issues: submit with event "COMMENT"
+            - If there are no issues: submit with event "APPROVE"
 
-            1. Post the full review as a PR comment using `gh pr comment`.
-
-            2. Submit a formal PR review with the appropriate verdict using the GitHub API:
-               - If there are ANY Critical issues: submit with event "REQUEST_CHANGES"
-               - If there are only Important/Minor/Nitpick issues: submit with event "COMMENT"
-               - If there are no issues: submit with event "APPROVE"
-
-               Use this command to submit the formal review:
-               ```
-               gh api repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews \
-                 -f event="REQUEST_CHANGES" \
-                 -f body="Review verdict: **Request changes** — see review comment for details."
-               ```
-               Replace the event and body as appropriate for COMMENT or APPROVE verdicts.
-               Get the PR number from `gh pr view --json number --jq .number`.
+            Use this command to submit the formal review:
+            ```
+            gh api repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews \
+              -f event="REQUEST_CHANGES" \
+              -f body="Review verdict: **Request changes** — see review comment for details."
+            ```
+            Replace the event and body as appropriate for COMMENT or APPROVE verdicts.
+            Get the PR number from `gh pr view --json number --jq .number`.
