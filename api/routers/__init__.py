@@ -3,6 +3,7 @@ Router package for AmakaFlow Mapper API.
 
 Part of AMA-378: Create api/routers skeleton and wiring
 Updated in AMA-299: Add exercises router for exercise matching
+Updated in AMA-594: Add tags router for user tag management
 
 This package contains all API routers organized by domain:
 - health: Health check endpoints
@@ -12,6 +13,7 @@ This package contains all API routers organized by domain:
 - pairing: Mobile device pairing and authentication
 - completions: Workout completion tracking
 - exercises: Canonical exercise lookup and matching (AMA-299)
+- tags: User tag management (AMA-594)
 """
 
 from api.routers.health import router as health_router
@@ -23,6 +25,7 @@ from api.routers.completions import router as completions_router
 from api.routers.exercises import router as exercises_router
 from api.routers.progression import router as progression_router
 from api.routers.programs import router as programs_router
+from api.routers.tags import router as tags_router
 
 __all__ = [
     "health_router",
@@ -34,4 +37,5 @@ __all__ = [
     "exercises_router",
     "progression_router",
     "programs_router",
+    "tags_router",
 ]

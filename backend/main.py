@@ -99,6 +99,7 @@ def _include_routers(app: FastAPI) -> None:
 
     Part of AMA-378: Router wiring for modular API structure.
     Updated in AMA-593: Add programs router
+    Updated in AMA-594: Add tags router
     """
     from api.routers import (
         health_router,
@@ -110,6 +111,7 @@ def _include_routers(app: FastAPI) -> None:
         exercises_router,
         progression_router,
         programs_router,
+        tags_router,
     )
 
     # Health router (no prefix - /health at root)
@@ -129,6 +131,8 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(progression_router)
     # Workout programs (AMA-593)
     app.include_router(programs_router)
+    # User tags (AMA-594)
+    app.include_router(tags_router)
 
 
 def _log_feature_flags(settings: Settings) -> None:
