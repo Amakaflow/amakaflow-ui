@@ -20,7 +20,6 @@ from backend.adapters.cir_to_garmin_yaml import to_garmin_yaml
 
 from backend.adapters.blocks_to_hyrox_yaml import (
     to_hyrox_yaml,
-    load_user_defaults,
     map_exercise_to_garmin,
 )
 from backend.adapters.blocks_to_hiit_garmin_yaml import to_hiit_garmin_yaml, is_hiit_workout
@@ -170,51 +169,7 @@ def test_garmin_debug():
 # Note: /exercise/*, /mappings/* moved to api/routers/mapping.py (AMA-379)
 
 
-class UserDefaultsRequest(BaseModel):
-
-    distance_handling: str = "lap"  # "lap" or "distance"
-    default_exercise_value: str = "lap"  # "lap" or "button"
-    ignore_distance: bool = True
-
-
-@app.get("/settings/defaults")
-
-def get_defaults():
-
-    """Get current user default settings."""
-    return load_user_defaults()
-
-
-@app.put("/settings/defaults")
-
-def update_defaults(p: UserDefaultsRequest):
-
-    """Update user default settings."""
-    import yaml
-    import pathlib
-    
-    ROOT = pathlib.Path(__file__).resolve().parents[2]
-    USER_DEFAULTS_FILE = ROOT / "shared/settings/user_defaults.yaml"
-    
-    # Create directory if needed
-    USER_DEFAULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Save settings
-    data = {
-        "defaults": {
-            "distance_handling": p.distance_handling,
-            "default_exercise_value": p.default_exercise_value,
-            "ignore_distance": p.ignore_distance
-        }
-    }
-    
-    with open(USER_DEFAULTS_FILE, 'w') as f:
-        yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
-    
-    return {
-        "message": "Settings updated successfully",
-        "settings": data["defaults"]
-    }
+# Settings endpoints moved to api/routers/settings.py (AMA-585)
 
 
 # ============================================================================

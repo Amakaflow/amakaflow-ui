@@ -109,6 +109,7 @@ def _include_routers(app: FastAPI) -> None:
         exercises_router,
         progression_router,
         programs_router,
+        settings_router,
     )
 
     # Health router (no prefix - /health at root)
@@ -128,6 +129,8 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(progression_router)
     # Program periodization (AMA-567 Phase E)
     app.include_router(programs_router)
+    # User settings (AMA-585)
+    app.include_router(settings_router)
 
 
 def _log_feature_flags(settings: Settings) -> None:
