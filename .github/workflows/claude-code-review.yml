@@ -23,9 +23,11 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"'
           prompt: |
             You are a senior code reviewer for a FastAPI Python backend (mapper-api).
-            Review this PR thoroughly for:
+
+            First, use `gh pr diff` to review the changes. Then review this PR thoroughly for:
 
             1. **Critical issues**: Runtime errors, crashes, incorrect function signatures, data loss
             2. **Security**: Auth gaps, injection, input validation, secrets exposure
@@ -41,3 +43,5 @@ jobs:
             - **Nitpick** — optional (formatting, conventions)
 
             End with a verdict: **Approve**, **Approve with comments**, or **Request changes**.
+
+            Post your review as a PR comment using `gh pr comment`.
