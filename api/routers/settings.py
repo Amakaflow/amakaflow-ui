@@ -1,94 +1,218 @@
 """
-Settings Router
+Settings router for user default preferences.
 
-Handles user default settings for workout processing.
-- GET /settings/defaults: Retrieve current user settings
-- PUT /settings/defaults: Update user default settings
+Provides GET/PUT endpoints for managing user-specific settings
+like distance units and exercise defaults.
+
+Part of AMA-585: Extract settings router from monolithic app.py
 """
-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-import yaml
+import os
 import pathlib
-import logging
+import tempfile
+from typing import Literal
 
+import yaml
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from backend.auth import get_current_user
 from backend.adapters.blocks_to_hyrox_yaml import load_user_defaults
 
-logger = logging.getLogger(__name__)
+# Type aliases for valid setting values
+DISTANCE_HANDLING_OPTIONS = Literal["percentage", "distance_unit"]
+DEFAULT_EXERCISE_VALUE_OPTIONS = Literal["rep_range", "percentage", "time"]
 
 router = APIRouter(
     prefix="/settings",
     tags=["settings"],
-    responses={404: {"description": "Not found"}},
 )
 
 
-class UserDefaultsRequest(BaseModel):
-    """Request model for updating user defaults."""
-    distance_handling: str
-    default_exercise_value: str
-    ignore_distance: bool
+class UserSettingsRequest(BaseModel):
+    """Request model for updating user settings."""
+    distance_handling: DISTANCE_HANDLING_OPTIONS = Field(
+        description="How to handle distance values in workouts"
+    )
+    default_exercise_value: DEFAULT_EXERCISE_VALUE_OPTIONS = Field(
+        description="Default value type for exercises"
+    )
+    ignore_distance: bool = Field(
+        default=False,
+        description="Whether to ignore distance in workout calculations"
+    )
 
-
-@router.get("/defaults")
-def get_defaults():
-    """
-    Get current user default settings.
-    
-    Returns:
-        dict: Current user default settings (distance_handling, default_exercise_value, ignore_distance)
-    """
-    try:
-        return load_user_defaults()
-    except Exception as e:
-        logger.error(f"Error loading user defaults: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load user defaults")
-
-
-@router.put("/defaults")
-def update_defaults(p: UserDefaultsRequest):
-    """
-    Update user default settings.
-    
-    Args:
-        p (UserDefaultsRequest): Settings to update
-        - distance_handling: How to handle distance values
-        - default_exercise_value: Default value for exercises
-        - ignore_distance: Whether to ignore distance in workouts
-    
-    Returns:
-        dict: Confirmation message and updated settings
-        
-    Raises:
-        HTTPException: If settings file cannot be written
-    """
-    try:
-        ROOT = pathlib.Path(__file__).resolve().parents[2]
-        USER_DEFAULTS_FILE = ROOT / "shared/settings/user_defaults.yaml"
-        
-        # Create directory if needed
-        USER_DEFAULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Prepare data structure
-        data = {
-            "defaults": {
-                "distance_handling": p.distance_handling,
-                "default_exercise_value": p.default_exercise_value,
-                "ignore_distance": p.ignore_distance
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "distance_handling": "percentage",
+                "default_exercise_value": "rep_range",
+                "ignore_distance": False
             }
         }
-        
-        # Save settings to YAML file
-        with open(USER_DEFAULTS_FILE, 'w') as f:
-            yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
-        
-        logger.info(f"Updated user defaults: {data['defaults']}")
-        
-        return {
-            "message": "Settings updated successfully",
-            "settings": data["defaults"]
+
+
+class UserSettingsResponse(BaseModel):
+    """Response model for user settings."""
+    distance_handling: DISTANCE_HANDLING_OPTIONS
+    default_exercise_value: DEFAULT_EXERCISE_VALUE_OPTIONS
+    ignore_distance: bool
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "distance_handling": "percentage",
+                "default_exercise_value": "rep_range",
+                "ignore_distance": False
+            }
         }
-        
+
+
+class SettingsUpdateResponse(BaseModel):
+    """Response for successful settings update."""
+    message: str
+    settings: UserSettingsResponse
+
+
+def get_settings_file_path() -> pathlib.Path:
+    """
+    Get the path to the user defaults settings file.
+
+    Returns:
+        pathlib.Path: Path to shared/settings/user_defaults.yaml
+    """
+    root = pathlib.Path(__file__).resolve().parents[2]
+    return root / "shared/settings/user_defaults.yaml"
+
+
+def save_user_defaults(settings_dict: dict) -> None:
+    """
+    Save user default settings to YAML file with atomic writes.
+
+    Uses tempfile + os.replace() to ensure atomicity and prevent
+    race conditions from partial writes during concurrent requests.
+
+    Args:
+        settings_dict: Dictionary containing distance_handling,
+                      default_exercise_value, ignore_distance
+
+    Raises:
+        FileNotFoundError: If settings directory cannot be created
+        yaml.YAMLError: If YAML serialization fails
+        OSError: If file write operation fails
+    """
+    settings_path = get_settings_file_path()
+
+    # Ensure directory exists
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise FileNotFoundError(
+            f"Cannot create settings directory {settings_path.parent}: {e}"
+        ) from e
+
+    # Prepare data structure
+    data = {"defaults": settings_dict}
+
+    # Write to temp file first (atomic operation prevents partial writes)
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            dir=str(settings_path.parent),
+            suffix=".yaml",
+            delete=False,
+            encoding="utf-8"
+        ) as tmp_file:
+            yaml.safe_dump(data, tmp_file, sort_keys=False, default_flow_style=False)
+            tmp_path = tmp_file.name
+
+        # Atomic replace (ensures settings are either fully updated or unchanged)
+        os.replace(tmp_path, str(settings_path))
+
+    except yaml.YAMLError as e:
+        raise ValueError(f"Failed to serialize settings as YAML: {e}") from e
+    except OSError as e:
+        # Clean up temp file if replace failed
+        try:
+            if 'tmp_path' in locals():
+                os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise OSError(f"Failed to write settings file: {e}") from e
+
+
+@router.get(
+    "/defaults",
+    response_model=UserSettingsResponse,
+    summary="Get user default settings",
+    description="Retrieve the current user's default settings for workouts",
+)
+def get_defaults(current_user=Depends(get_current_user)) -> UserSettingsResponse:
+    """
+    Get current user default settings.
+
+    Returns:
+        UserSettingsResponse: Current user's default settings
+
+    Raises:
+        HTTPException: If settings cannot be loaded (500 error)
+    """
+    try:
+        settings = load_user_defaults()
+        return UserSettingsResponse(**settings)
     except Exception as e:
-        logger.error(f"Error updating user defaults: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update user defaults")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load user settings: {str(e)}"
+        ) from e
+
+
+@router.put(
+    "/defaults",
+    response_model=SettingsUpdateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update user default settings",
+    description="Update the current user's default settings for workouts",
+)
+def update_defaults(
+    settings: UserSettingsRequest,
+    current_user=Depends(get_current_user)
+) -> SettingsUpdateResponse:
+    """
+    Update user default settings.
+
+    Validates input and atomically writes settings to YAML file.
+
+    Args:
+        settings: New settings values
+        current_user: Current authenticated user (from dependency)
+
+    Returns:
+        SettingsUpdateResponse: Confirmation message and updated settings
+
+    Raises:
+        HTTPException: If settings cannot be saved (500 error)
+    """
+    try:
+        settings_dict = {
+            "distance_handling": settings.distance_handling,
+            "default_exercise_value": settings.default_exercise_value,
+            "ignore_distance": settings.ignore_distance,
+        }
+
+        save_user_defaults(settings_dict)
+
+        return SettingsUpdateResponse(
+            message="Settings updated successfully",
+            settings=UserSettingsResponse(**settings_dict),
+        )
+
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Settings directory error: {str(e)}",
+        ) from e
+    except (ValueError, OSError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save user settings: {str(e)}",
+        ) from e
