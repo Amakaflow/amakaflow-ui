@@ -21,9 +21,9 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
-from backend.auth import get_current_user
+from api.deps import get_current_user
 from backend.follow_along_database import (
     save_follow_along_workout,
     get_follow_along_workouts,
@@ -31,6 +31,7 @@ from backend.follow_along_database import (
     update_follow_along_garmin_sync,
     update_follow_along_apple_watch_sync,
     update_follow_along_ios_companion_sync,
+    delete_follow_along_workout,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,32 +45,39 @@ router = APIRouter(
 # Request Models
 class CreateFollowAlongManualRequest(BaseModel):
     """Request to create a follow-along workout with manually entered data."""
-    sourceUrl: str = Field(description="Source video URL (Instagram, YouTube, TikTok, Vimeo)")
+    sourceUrl: HttpUrl = Field(description="Source video URL (Instagram, YouTube, TikTok, Vimeo)")
     title: str = Field(description="Workout title")
     description: Optional[str] = Field(None, description="Workout description")
     steps: List[Dict[str, Any]] = Field(description="Workout steps/exercises")
     source: Optional[str] = Field(None, description="Source platform (instagram, youtube, tiktok, vimeo, other)")
-    thumbnailUrl: Optional[str] = Field(None, description="Thumbnail image URL")
+    thumbnailUrl: Optional[HttpUrl] = Field(None, description="Thumbnail image URL")
 
 
 class IngestFollowAlongRequest(BaseModel):
     """Request to ingest a follow-along workout from video URL."""
-    instagramUrl: str = Field(description="Instagram video URL")
+    sourceUrl: HttpUrl = Field(description="Video URL (Instagram, YouTube, TikTok, Vimeo)")
+    source: Optional[str] = Field(None, description="Source platform (instagram, youtube, tiktok, vimeo, other)")
+
+
+class PushResponse(BaseModel):
+    """Response for push operations."""
+    success: bool
+    message: str
 
 
 class PushToGarminRequest(BaseModel):
     """Request to push follow-along workout to Garmin."""
-    scheduleDate: Optional[str] = Field(None, description="Schedule date (YYYY-MM-DD format)")
+    garminWorkoutId: str = Field(description="Garmin workout ID")
 
 
 class PushToAppleWatchRequest(BaseModel):
     """Request to push follow-along workout to Apple Watch."""
-    pass
+    appleWatchWorkoutId: str = Field(description="Apple Watch workout ID")
 
 
 class PushToIOSCompanionRequest(BaseModel):
     """Request to push follow-along workout to iOS Companion."""
-    pass
+    iosCompanionWorkoutId: str = Field(description="iOS Companion workout ID")
 
 
 class VoiceSettings(BaseModel):
@@ -81,7 +89,7 @@ class VoiceSettings(BaseModel):
 class CreateFollowAlongFromWorkoutRequest(BaseModel):
     """Request to create a follow-along from an existing workout."""
     workout: Dict[str, Any] = Field(description="Workout data")
-    sourceUrl: Optional[str] = Field(None, description="Source video URL")
+    sourceUrl: Optional[HttpUrl] = Field(None, description="Source video URL")
     followAlongConfig: Optional[Dict[str, Any]] = Field(None, description="Follow-along configuration")
     stepConfigs: Optional[List[Dict[str, Any]]] = Field(None, description="Per-step video configuration")
     voiceSettings: Optional[VoiceSettings] = Field(None, description="Voice guidance settings")
@@ -92,7 +100,6 @@ class FollowAlongWorkoutResponse(BaseModel):
     """Response containing follow-along workout data."""
     success: bool
     followAlongWorkout: Optional[Dict[str, Any]] = None
-    items: Optional[List[Dict[str, Any]]] = None
     message: Optional[str] = None
 
 
@@ -108,7 +115,7 @@ class FollowAlongListResponse(BaseModel):
     summary="Create follow-along workout manually",
     description="Create a follow-along workout with manually entered data",
 )
-async def create_follow_along(
+def create_follow_along(
     request: CreateFollowAlongManualRequest,
     user_id: str = Depends(get_current_user),
 ) -> FollowAlongWorkoutResponse:
@@ -129,7 +136,7 @@ async def create_follow_along(
         # Detect source platform if not provided
         source = request.source
         if not source:
-            video_url = request.sourceUrl.lower()
+            video_url = str(request.sourceUrl).lower()
             if "instagram.com" in video_url:
                 source = "instagram"
             elif "youtube.com" in video_url or "youtu.be" in video_url:
@@ -156,11 +163,11 @@ async def create_follow_along(
         workout = save_follow_along_workout(
             user_id=user_id,
             source=source,
-            source_url=request.sourceUrl,
+            source_url=str(request.sourceUrl),
             title=request.title,
             description=request.description,
             video_duration_sec=None,
-            thumbnail_url=request.thumbnailUrl,
+            thumbnail_url=str(request.thumbnailUrl) if request.thumbnailUrl else None,
             video_proxy_url=None,
             steps=formatted_steps,
         )
@@ -192,7 +199,7 @@ async def create_follow_along(
     summary="Ingest follow-along from video URL",
     description="Ingest a follow-along workout from a video URL (Instagram, YouTube, TikTok, Vimeo)",
 )
-async def ingest_follow_along(
+def ingest_follow_along(
     request: IngestFollowAlongRequest,
     user_id: str = Depends(get_current_user),
 ) -> FollowAlongWorkoutResponse:
@@ -203,19 +210,34 @@ async def ingest_follow_along(
     on supported platforms.
 
     Args:
-        request: Ingest request with Instagram URL
+        request: Ingest request with video URL and optional source platform
         user_id: Current authenticated user ID
 
     Returns:
         FollowAlongWorkoutResponse: Ingested workout or error message
     """
     try:
+        # Detect source platform if not provided
+        source = request.source
+        if not source:
+            video_url = str(request.sourceUrl).lower()
+            if "instagram.com" in video_url:
+                source = "instagram"
+            elif "youtube.com" in video_url or "youtu.be" in video_url:
+                source = "youtube"
+            elif "tiktok.com" in video_url:
+                source = "tiktok"
+            elif "vimeo.com" in video_url:
+                source = "vimeo"
+            else:
+                source = "other"
+
         # Extract and save follow-along workout from video
         # TODO: Implement AI extraction from video metadata
         workout = save_follow_along_workout(
             user_id=user_id,
-            source="instagram",
-            source_url=request.instagramUrl,
+            source=source,
+            source_url=str(request.sourceUrl),
             title="Follow-along Workout",
             description=None,
             video_duration_sec=None,
@@ -225,13 +247,13 @@ async def ingest_follow_along(
         )
 
         if workout:
-            logger.info(f"Ingested follow-along workout from {request.instagramUrl}")
+            logger.info(f"Ingested follow-along workout from {request.sourceUrl}")
             return FollowAlongWorkoutResponse(
                 success=True,
                 followAlongWorkout=workout,
             )
         else:
-            logger.warning(f"Failed to ingest workout from {request.instagramUrl}")
+            logger.warning(f"Failed to ingest workout from {request.sourceUrl}")
             return FollowAlongWorkoutResponse(
                 success=False,
                 message="Failed to ingest workout from URL",
@@ -251,7 +273,7 @@ async def ingest_follow_along(
     summary="List follow-along workouts",
     description="Get all follow-along workouts for the authenticated user",
 )
-async def list_follow_along(
+def list_follow_along(
     user_id: str = Depends(get_current_user),
 ) -> FollowAlongListResponse:
     """
@@ -284,7 +306,7 @@ async def list_follow_along(
     summary="Create follow-along from existing workout",
     description="Create a follow-along workout from an existing workout definition",
 )
-async def create_follow_along_from_workout(
+def create_follow_along_from_workout(
     request: CreateFollowAlongFromWorkoutRequest,
     user_id: str = Depends(get_current_user),
 ) -> FollowAlongWorkoutResponse:
@@ -312,7 +334,7 @@ async def create_follow_along_from_workout(
         workout = save_follow_along_workout(
             user_id=user_id,
             source="other",
-            source_url=request.sourceUrl,
+            source_url=str(request.sourceUrl) if request.sourceUrl else None,
             title=title,
             description=workout_data.get("description"),
             video_duration_sec=None,
@@ -348,7 +370,7 @@ async def create_follow_along_from_workout(
     summary="Get follow-along workout by ID",
     description="Retrieve a specific follow-along workout by its ID",
 )
-async def get_follow_along(
+def get_follow_along(
     workout_id: str,
     user_id: str = Depends(get_current_user),
 ) -> FollowAlongWorkoutResponse:
@@ -389,13 +411,14 @@ async def get_follow_along(
 
 @router.delete(
     "/{workout_id}",
+    response_model=PushResponse,
     summary="Delete follow-along workout",
     description="Delete a follow-along workout",
 )
-async def delete_follow_along(
+def delete_follow_along(
     workout_id: str,
     user_id: str = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> PushResponse:
     """
     Delete a follow-along workout.
 
@@ -407,12 +430,12 @@ async def delete_follow_along(
         Success message
     """
     try:
-        # TODO: Implement delete_follow_along_workout in database module
+        delete_follow_along_workout(workout_id, user_id)
         logger.info(f"Deleted follow-along workout {workout_id} for user {user_id}")
-        return {
-            "success": True,
-            "message": f"Follow-along workout {workout_id} deleted successfully",
-        }
+        return PushResponse(
+            success=True,
+            message=f"Follow-along workout {workout_id} deleted successfully",
+        )
     except Exception as e:
         logger.error(f"Error deleting follow-along workout: {e}")
         raise HTTPException(
@@ -423,21 +446,21 @@ async def delete_follow_along(
 
 @router.post(
     "/{workout_id}/push/garmin",
-    response_model=Dict[str, Any],
+    response_model=PushResponse,
     summary="Push follow-along to Garmin",
     description="Push a follow-along workout to Garmin device",
 )
-async def push_to_garmin(
+def push_to_garmin(
     workout_id: str,
     request: PushToGarminRequest,
     user_id: str = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> PushResponse:
     """
     Push a follow-along workout to Garmin device.
 
     Args:
         workout_id: ID of the follow-along workout
-        request: Push request with optional schedule date
+        request: Push request with Garmin workout ID
         user_id: Current authenticated user ID
 
     Returns:
@@ -445,17 +468,17 @@ async def push_to_garmin(
     """
     try:
         # Update Garmin sync status
-        await update_follow_along_garmin_sync(
+        update_follow_along_garmin_sync(
             workout_id=workout_id,
             user_id=user_id,
-            schedule_date=request.scheduleDate,
+            garmin_workout_id=request.garminWorkoutId,
         )
 
         logger.info(f"Pushed follow-along workout {workout_id} to Garmin for user {user_id}")
-        return {
-            "success": True,
-            "message": f"Follow-along workout {workout_id} pushed to Garmin",
-        }
+        return PushResponse(
+            success=True,
+            message=f"Follow-along workout {workout_id} pushed to Garmin",
+        )
     except Exception as e:
         logger.error(f"Error pushing to Garmin: {e}")
         raise HTTPException(
@@ -466,21 +489,21 @@ async def push_to_garmin(
 
 @router.post(
     "/{workout_id}/push/apple-watch",
-    response_model=Dict[str, Any],
+    response_model=PushResponse,
     summary="Push follow-along to Apple Watch",
     description="Push a follow-along workout to Apple Watch",
 )
-async def push_to_apple_watch(
+def push_to_apple_watch(
     workout_id: str,
     request: PushToAppleWatchRequest,
     user_id: str = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> PushResponse:
     """
     Push a follow-along workout to Apple Watch.
 
     Args:
         workout_id: ID of the follow-along workout
-        request: Push request
+        request: Push request with Apple Watch workout ID
         user_id: Current authenticated user ID
 
     Returns:
@@ -488,16 +511,17 @@ async def push_to_apple_watch(
     """
     try:
         # Update Apple Watch sync status
-        await update_follow_along_apple_watch_sync(
+        update_follow_along_apple_watch_sync(
             workout_id=workout_id,
             user_id=user_id,
+            apple_watch_workout_id=request.appleWatchWorkoutId,
         )
 
         logger.info(f"Pushed follow-along workout {workout_id} to Apple Watch for user {user_id}")
-        return {
-            "success": True,
-            "message": f"Follow-along workout {workout_id} pushed to Apple Watch",
-        }
+        return PushResponse(
+            success=True,
+            message=f"Follow-along workout {workout_id} pushed to Apple Watch",
+        )
     except Exception as e:
         logger.error(f"Error pushing to Apple Watch: {e}")
         raise HTTPException(
@@ -508,21 +532,21 @@ async def push_to_apple_watch(
 
 @router.post(
     "/{workout_id}/push/ios-companion",
-    response_model=Dict[str, Any],
+    response_model=PushResponse,
     summary="Push follow-along to iOS Companion",
     description="Push a follow-along workout to iOS Companion app",
 )
-async def push_to_ios_companion(
+def push_to_ios_companion(
     workout_id: str,
     request: PushToIOSCompanionRequest,
     user_id: str = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> PushResponse:
     """
     Push a follow-along workout to iOS Companion app.
 
     Args:
         workout_id: ID of the follow-along workout
-        request: Push request
+        request: Push request with iOS Companion workout ID
         user_id: Current authenticated user ID
 
     Returns:
@@ -530,16 +554,17 @@ async def push_to_ios_companion(
     """
     try:
         # Update iOS Companion sync status
-        await update_follow_along_ios_companion_sync(
+        update_follow_along_ios_companion_sync(
             workout_id=workout_id,
             user_id=user_id,
+            ios_companion_workout_id=request.iosCompanionWorkoutId,
         )
 
         logger.info(f"Pushed follow-along workout {workout_id} to iOS Companion for user {user_id}")
-        return {
-            "success": True,
-            "message": f"Follow-along workout {workout_id} pushed to iOS Companion",
-        }
+        return PushResponse(
+            success=True,
+            message=f"Follow-along workout {workout_id} pushed to iOS Companion",
+        )
     except Exception as e:
         logger.error(f"Error pushing to iOS Companion: {e}")
         raise HTTPException(
