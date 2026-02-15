@@ -102,6 +102,7 @@ def _include_routers(app: FastAPI) -> None:
     Updated in AMA-593: Add programs router
     Updated in AMA-594: Add tags router
     Updated in AMA-596: Add account router
+    Updated in AMA-597: Move debug/testing endpoints to health router
     """
     from api.routers import (
         account_router,

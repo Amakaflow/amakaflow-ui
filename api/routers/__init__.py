@@ -6,9 +6,10 @@ Updated in AMA-299: Add exercises router for exercise matching
 Updated in AMA-594: Add tags router for user tag management
 Updated in AMA-591: Add bulk import router
 Updated in AMA-596: Add account router
+Updated in AMA-597: Move debug/testing endpoints to health router
 
 This package contains all API routers organized by domain:
-- health: Health check endpoints
+- health: Health check and debug/testing endpoints (AMA-597)
 - mapping: Exercise mapping and transformation endpoints
 - exports: Workout export endpoints (Garmin, FIT, ZWO, etc.)
 - workouts: Workout CRUD and library management
