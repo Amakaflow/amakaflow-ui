@@ -56,9 +56,8 @@ from backend.database import (
     toggle_workout_favorite,
     track_workout_usage,
     update_workout_tags,
-    get_user_tags,
-    create_user_tag,
-    delete_user_tag,
+    # AMA-594: Tag endpoints moved to api/routers/tags.py
+    # get_user_tags, create_user_tag, delete_user_tag,
     # AMA-199: iOS Companion App Sync
     update_workout_ios_companion_sync,
     get_ios_companion_pending_workouts,
@@ -2444,12 +2443,6 @@ class UpdateTagsRequest(BaseModel):
     tags: List[str]
 
 
-class CreateTagRequest(BaseModel):
-    profile_id: str
-    name: str
-    color: Optional[str] = None
-
-
 @app.patch("/workouts/{workout_id}/favorite")
 def toggle_workout_favorite_endpoint(workout_id: str, request: ToggleFavoriteRequest):
     """Toggle favorite status for a workout."""
@@ -2515,66 +2508,7 @@ def update_workout_tags_endpoint(workout_id: str, request: UpdateTagsRequest):
         }
 
 
-# ============================================================================
-# User Tags Endpoints (AMA-122)
-# ============================================================================
-
-@app.get("/tags")
-def get_tags_endpoint(
-    profile_id: str = Query(..., description="User profile ID")
-):
-    """Get all tags for a user."""
-    tags = get_user_tags(profile_id)
-
-    return {
-        "success": True,
-        "tags": tags,
-        "count": len(tags)
-    }
-
-
-@app.post("/tags")
-def create_tag_endpoint(request: CreateTagRequest):
-    """Create a new user tag."""
-    result = create_user_tag(
-        profile_id=request.profile_id,
-        name=request.name,
-        color=request.color
-    )
-
-    if result:
-        return {
-            "success": True,
-            "tag": result,
-            "message": "Tag created"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to create tag (may already exist)"
-        }
-
-
-@app.delete("/tags/{tag_id}")
-def delete_tag_endpoint(
-    tag_id: str,
-    profile_id: str = Query(..., description="User profile ID")
-):
-    """Delete a user tag."""
-    success = delete_user_tag(tag_id, profile_id)
-
-    if success:
-        return {
-            "success": True,
-            "message": "Tag deleted"
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to delete tag"
-        }
-
-
+# Note: /tags endpoints moved to api/routers/tags.py (AMA-594)
 # Note: /exercises/match/batch moved to api/routers/mapping.py (AMA-379)
 
 
