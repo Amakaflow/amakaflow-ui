@@ -14,10 +14,12 @@ This router contains endpoints for:
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends, HTTPException
 from pydantic import BaseModel
+
+from api.deps import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,6 @@ router = APIRouter(
 
 class CreateProgramRequest(BaseModel):
     """Request for creating a program."""
-    profile_id: str
     name: str
     description: Optional[str] = None
     color: Optional[str] = None
@@ -42,7 +43,6 @@ class CreateProgramRequest(BaseModel):
 
 class UpdateProgramRequest(BaseModel):
     """Request for updating a program."""
-    profile_id: str
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
@@ -53,10 +53,61 @@ class UpdateProgramRequest(BaseModel):
 
 class AddToProgramRequest(BaseModel):
     """Request for adding a workout or follow-along to a program."""
-    profile_id: str
     workout_id: Optional[str] = None
     follow_along_id: Optional[str] = None
     day_order: Optional[int] = None
+
+
+# =============================================================================
+# Response Models
+# =============================================================================
+
+
+class CreateProgramResponse(BaseModel):
+    """Response for creating a program."""
+    success: bool
+    program: Optional[dict] = None
+    message: str
+
+
+class GetProgramsResponse(BaseModel):
+    """Response for getting all programs."""
+    success: bool
+    programs: list[dict] = []
+    count: int
+
+
+class GetProgramResponse(BaseModel):
+    """Response for getting a single program."""
+    success: bool
+    program: Optional[dict] = None
+    message: Optional[str] = None
+
+
+class UpdateProgramResponse(BaseModel):
+    """Response for updating a program."""
+    success: bool
+    program: Optional[dict] = None
+    message: str
+
+
+class DeleteProgramResponse(BaseModel):
+    """Response for deleting a program."""
+    success: bool
+    message: str
+
+
+class AddToProgramResponse(BaseModel):
+    """Response for adding to a program."""
+    success: bool
+    member: Optional[dict] = None
+    message: str
+
+
+class RemoveFromProgramResponse(BaseModel):
+    """Response for removing from a program."""
+    success: bool
+    message: str
 
 
 # =============================================================================
@@ -64,13 +115,16 @@ class AddToProgramRequest(BaseModel):
 # =============================================================================
 
 
-@router.post("/programs")
-def create_program_endpoint(request: CreateProgramRequest):
+@router.post("/programs", response_model=CreateProgramResponse)
+async def create_program_endpoint(
+    request: CreateProgramRequest,
+    current_user: str = Depends(get_current_user),
+):
     """Create a new workout program."""
     from backend.database import create_program
-    
+
     result = create_program(
-        profile_id=request.profile_id,
+        profile_id=current_user,
         name=request.name,
         description=request.description,
         color=request.color,
@@ -84,22 +138,22 @@ def create_program_endpoint(request: CreateProgramRequest):
             "message": "Program created"
         }
     else:
-        return {
-            "success": False,
-            "message": "Failed to create program"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to create program"
+        )
 
 
-@router.get("/programs")
-def get_programs_endpoint(
-    profile_id: str = Query(..., description="User profile ID"),
-    include_inactive: bool = Query(False, description="Include inactive programs")
+@router.get("/programs", response_model=GetProgramsResponse)
+async def get_programs_endpoint(
+    include_inactive: bool = Query(False, description="Include inactive programs"),
+    current_user: str = Depends(get_current_user),
 ):
     """Get all programs for a user."""
     from backend.database import get_programs
-    
+
     programs = get_programs(
-        profile_id=profile_id,
+        profile_id=current_user,
         include_inactive=include_inactive
     )
 
@@ -110,15 +164,15 @@ def get_programs_endpoint(
     }
 
 
-@router.get("/programs/{program_id}")
-def get_program_endpoint(
+@router.get("/programs/{program_id}", response_model=GetProgramResponse)
+async def get_program_endpoint(
     program_id: str,
-    profile_id: str = Query(..., description="User profile ID")
+    current_user: str = Depends(get_current_user),
 ):
     """Get a single program with its members."""
     from backend.database import get_program
-    
-    program = get_program(program_id, profile_id)
+
+    program = get_program(program_id, current_user)
 
     if program:
         return {
@@ -126,20 +180,24 @@ def get_program_endpoint(
             "program": program
         }
     else:
-        return {
-            "success": False,
-            "message": "Program not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Program not found"
+        )
 
 
-@router.patch("/programs/{program_id}")
-def update_program_endpoint(program_id: str, request: UpdateProgramRequest):
+@router.patch("/programs/{program_id}", response_model=UpdateProgramResponse)
+async def update_program_endpoint(
+    program_id: str,
+    request: UpdateProgramRequest,
+    current_user: str = Depends(get_current_user),
+):
     """Update a program."""
     from backend.database import update_program
-    
+
     result = update_program(
         program_id=program_id,
-        profile_id=request.profile_id,
+        profile_id=current_user,
         name=request.name,
         description=request.description,
         color=request.color,
@@ -155,21 +213,21 @@ def update_program_endpoint(program_id: str, request: UpdateProgramRequest):
             "message": "Program updated"
         }
     else:
-        return {
-            "success": False,
-            "message": "Failed to update program"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to update program"
+        )
 
 
-@router.delete("/programs/{program_id}")
-def delete_program_endpoint(
+@router.delete("/programs/{program_id}", response_model=DeleteProgramResponse)
+async def delete_program_endpoint(
     program_id: str,
-    profile_id: str = Query(..., description="User profile ID")
+    current_user: str = Depends(get_current_user),
 ):
     """Delete a program."""
     from backend.database import delete_program
-    
-    success = delete_program(program_id, profile_id)
+
+    success = delete_program(program_id, current_user)
 
     if success:
         return {
@@ -177,20 +235,24 @@ def delete_program_endpoint(
             "message": "Program deleted"
         }
     else:
-        return {
-            "success": False,
-            "message": "Failed to delete program"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to delete program"
+        )
 
 
-@router.post("/programs/{program_id}/members")
-def add_to_program_endpoint(program_id: str, request: AddToProgramRequest):
+@router.post("/programs/{program_id}/members", response_model=AddToProgramResponse)
+async def add_to_program_endpoint(
+    program_id: str,
+    request: AddToProgramRequest,
+    current_user: str = Depends(get_current_user),
+):
     """Add a workout or follow-along to a program."""
     from backend.database import add_workout_to_program
-    
+
     result = add_workout_to_program(
         program_id=program_id,
-        profile_id=request.profile_id,
+        profile_id=current_user,
         workout_id=request.workout_id,
         follow_along_id=request.follow_along_id,
         day_order=request.day_order
@@ -203,22 +265,22 @@ def add_to_program_endpoint(program_id: str, request: AddToProgramRequest):
             "message": "Added to program"
         }
     else:
-        return {
-            "success": False,
-            "message": "Failed to add to program"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to add to program"
+        )
 
 
-@router.delete("/programs/{program_id}/members/{member_id}")
-def remove_from_program_endpoint(
+@router.delete("/programs/{program_id}/members/{member_id}", response_model=RemoveFromProgramResponse)
+async def remove_from_program_endpoint(
     program_id: str,
     member_id: str,
-    profile_id: str = Query(..., description="User profile ID")
+    current_user: str = Depends(get_current_user),
 ):
     """Remove a workout from a program."""
     from backend.database import remove_workout_from_program
-    
-    success = remove_workout_from_program(member_id, profile_id)
+
+    success = remove_workout_from_program(member_id, current_user)
 
     if success:
         return {
@@ -226,7 +288,7 @@ def remove_from_program_endpoint(
             "message": "Removed from program"
         }
     else:
-        return {
-            "success": False,
-            "message": "Failed to remove from program"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to remove from program"
+        )

@@ -98,10 +98,13 @@ def _include_routers(app: FastAPI) -> None:
     """Include all API routers in the application.
 
     Part of AMA-378: Router wiring for modular API structure.
+    Updated in AMA-591: Add bulk import router.
     Updated in AMA-593: Add programs router
     Updated in AMA-594: Add tags router
+    Updated in AMA-596: Add account router
     """
     from api.routers import (
+        account_router,
         health_router,
         mapping_router,
         exports_router,
@@ -112,6 +115,9 @@ def _include_routers(app: FastAPI) -> None:
         progression_router,
         programs_router,
         tags_router,
+        settings_router,
+        sync_router,
+        bulk_import_router,
     )
 
     # Health router (no prefix - /health at root)
@@ -133,6 +139,14 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(programs_router)
     # User tags (AMA-594)
     app.include_router(tags_router)
+    # User settings (AMA-585)
+    app.include_router(settings_router)
+    # Account management (AMA-596)
+    app.include_router(account_router)
+    # Device sync (iOS, Android, Garmin) (AMA-589)
+    app.include_router(sync_router)
+    # Bulk import workflow (AMA-591)
+    app.include_router(bulk_import_router)
 
 
 def _log_feature_flags(settings: Settings) -> None:
