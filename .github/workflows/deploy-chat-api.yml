@@ -31,6 +31,19 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: test-key
         run: pytest -x -q
 
+      - name: Verify app starts
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+        run: |
+          python -c "
+          from backend.main import app
+          routes = [r.path for r in app.routes if hasattr(r, 'path')]
+          print(f'App loaded: {len(routes)} routes')
+          assert len(routes) > 10, f'Too few routes ({len(routes)}), something is broken'
+          "
+
   deploy:
     needs: lint-and-test
     runs-on: ubuntu-latest
