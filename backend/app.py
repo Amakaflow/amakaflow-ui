@@ -71,14 +71,13 @@ from backend.database import (
     confirm_sync,
     report_sync_failed,
     get_workout_sync_status,
-)
-from backend.follow_along_database import (
+    # Follow-along workouts (consolidated from follow_along_database.py)
     save_follow_along_workout,
     get_follow_along_workouts,
     get_follow_along_workout,
     update_follow_along_garmin_sync,
     update_follow_along_apple_watch_sync,
-    update_follow_along_ios_companion_sync
+    update_follow_along_ios_companion_sync,
 )
 from backend.mobile_pairing import (
     GeneratePairingResponse,
