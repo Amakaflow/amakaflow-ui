@@ -215,7 +215,7 @@ export function ExerciseSearch({ onSelect, onClose, device }: Props) {
           {/* Results */}
           {!loading && (
             <ScrollArea className="h-[400px]">
-              <div className="space-y-2 pr-4">
+              <div data-assistant-target="exercise-search-results" className="space-y-2 pr-4">
                 {filteredExercises.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Dumbbell className="w-12 h-12 mx-auto mb-3 opacity-20" />

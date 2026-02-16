@@ -854,6 +854,7 @@ export function UnifiedWorkouts({
               setPageIndex(0);
             }}
             placeholder="Search workouts..."
+            data-assistant-target="search-input"
             className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <select
@@ -1036,7 +1037,7 @@ export function UnifiedWorkouts({
 
           {/* Workout List */}
           <ScrollArea className="h-[calc(100vh-280px)]">
-        <div className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
+        <div data-assistant-target="library-results" className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
           {displayedWorkouts.map((workout) => {
             const isVideo = workout._original.type === 'follow-along';
             const hasSyncStatus =
