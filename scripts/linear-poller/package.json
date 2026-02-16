@@ -1,0 +1,19 @@
+{
+  "name": "linear-antfarm-poller",
+  "version": "1.0.0",
+  "description": "Polls Linear for Todo tickets assigned to an agent and dispatches Antfarm workflows",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/poller.ts",
+    "once": "tsx src/poller.ts --once",
+    "dry-run": "tsx src/poller.ts --dry-run",
+    "status": "tsx src/poller.ts --status"
+  },
+  "dependencies": {
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}

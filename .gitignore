@@ -25,3 +25,7 @@ Thumbs.db
 
 # Docker
 .docker/
+
+# Node
+node_modules/
+poller-state.json
