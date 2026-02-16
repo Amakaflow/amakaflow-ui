@@ -11,12 +11,6 @@ import type {
   ChatState,
   ChatAction,
   ChatToolCall,
-  StageEvent,
-  WorkoutStage,
-  GeneratedWorkout,
-  WorkoutSearchResults,
-  TimelineStep,
-  ActionVisualization,
 } from '../types/chat';
 import { useChatStream } from '../hooks/useChatStream';
 
@@ -227,16 +221,18 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'SET_ASSISTANT_WORKING':
       return { ...state, assistantWorking: action.isWorking };
 
-    case 'ADD_TIMELINE_STEP':
+    case 'ADD_TIMELINE_STEP': {
+      const newTimeline = [...state.timeline, action.step];
       return {
         ...state,
-        timeline: [...state.timeline, action.step],
+        timeline: newTimeline,
         currentStepLabel: action.step.label,
         stepCount: {
-          current: state.timeline.filter(s => s.status === 'completed').length,
-          total: state.timeline.length + 1,
+          current: newTimeline.filter(s => s.status === 'completed').length,
+          total: newTimeline.length,
         },
       };
+    }
 
     case 'UPDATE_TIMELINE_STEP': {
       const timeline = state.timeline.map(s =>

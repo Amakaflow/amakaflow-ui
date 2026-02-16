@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { chatReducer, initialChatState } from '../ChatContext';
-import type { ChatState, ChatAction, ChatMessage, ChatToolCall } from '../../types/chat';
+import type { ChatState, ChatAction, ChatMessage, ChatToolCall, TimelineStep, ActionVisualization } from '../../types/chat';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -184,6 +184,250 @@ describe('chatReducer', () => {
     it('SET_RATE_LIMIT stores usage/limit info', () => {
       const s = chatReducer(initialChatState, { type: 'SET_RATE_LIMIT', info: { usage: 45, limit: 50 } });
       expect(s.rateLimitInfo).toEqual({ usage: 45, limit: 50 });
+    });
+  });
+
+  // Visualization state (AMA-631)
+  describe('Visualization state (AMA-631)', () => {
+    const step1: TimelineStep = { id: 's1', toolName: 'search', label: 'Searching...', status: 'pending' };
+    const step2: TimelineStep = { id: 's2', toolName: 'generate', label: 'Generating...', status: 'pending' };
+    const viz: ActionVisualization = { target: '#input', type: 'cursor-click', label: 'Clicking input' };
+
+    // -- SET_ASSISTANT_WORKING --
+    describe('SET_ASSISTANT_WORKING', () => {
+      it('sets assistantWorking to true', () => {
+        const s = chatReducer(initialChatState, { type: 'SET_ASSISTANT_WORKING', isWorking: true });
+        expect(s.assistantWorking).toBe(true);
+      });
+
+      it('sets assistantWorking to false', () => {
+        const s = chatReducer(stateWith({ assistantWorking: true }), { type: 'SET_ASSISTANT_WORKING', isWorking: false });
+        expect(s.assistantWorking).toBe(false);
+      });
+    });
+
+    // -- ADD_TIMELINE_STEP --
+    describe('ADD_TIMELINE_STEP', () => {
+      it('appends step to empty timeline', () => {
+        const s = chatReducer(initialChatState, { type: 'ADD_TIMELINE_STEP', step: step1 });
+        expect(s.timeline).toHaveLength(1);
+        expect(s.timeline[0]).toEqual(step1);
+      });
+
+      it('sets currentStepLabel to the new step label', () => {
+        const s = chatReducer(initialChatState, { type: 'ADD_TIMELINE_STEP', step: step1 });
+        expect(s.currentStepLabel).toBe('Searching...');
+      });
+
+      it('increments total in stepCount', () => {
+        const s = chatReducer(initialChatState, { type: 'ADD_TIMELINE_STEP', step: step1 });
+        expect(s.stepCount).toEqual({ current: 0, total: 1 });
+      });
+
+      it('appends multiple steps sequentially', () => {
+        let s = chatReducer(initialChatState, { type: 'ADD_TIMELINE_STEP', step: step1 });
+        s = chatReducer(s, { type: 'ADD_TIMELINE_STEP', step: step2 });
+        expect(s.timeline).toHaveLength(2);
+        expect(s.currentStepLabel).toBe('Generating...');
+        expect(s.stepCount).toEqual({ current: 0, total: 2 });
+      });
+
+      it('counts already-completed steps in current when adding a new step', () => {
+        const completedStep: TimelineStep = { ...step1, status: 'completed' };
+        const state = stateWith({ timeline: [completedStep], stepCount: { current: 1, total: 1 } });
+        const s = chatReducer(state, { type: 'ADD_TIMELINE_STEP', step: step2 });
+        expect(s.stepCount).toEqual({ current: 1, total: 2 });
+      });
+    });
+
+    // -- UPDATE_TIMELINE_STEP --
+    describe('UPDATE_TIMELINE_STEP', () => {
+      it('updates status of matching step by id', () => {
+        const state = stateWith({ timeline: [step1] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'running' });
+        expect(s.timeline[0].status).toBe('running');
+      });
+
+      it('sets result on matching step', () => {
+        const state = stateWith({ timeline: [step1] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'completed', result: 'Found 3 results' });
+        expect(s.timeline[0].result).toBe('Found 3 results');
+      });
+
+      it('updates stepCount.current when step completes', () => {
+        const running: TimelineStep = { ...step1, status: 'running' };
+        const state = stateWith({ timeline: [running, step2], stepCount: { current: 0, total: 2 } });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'completed' });
+        expect(s.stepCount).toEqual({ current: 1, total: 2 });
+      });
+
+      it('sets currentStepLabel to the running step label', () => {
+        const state = stateWith({ timeline: [step1, step2] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's2', status: 'running' });
+        expect(s.currentStepLabel).toBe('Generating...');
+      });
+
+      it('sets currentStepLabel to null when no step is running', () => {
+        const running: TimelineStep = { ...step1, status: 'running' };
+        const state = stateWith({ timeline: [running], currentStepLabel: 'Searching...' });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'completed' });
+        expect(s.currentStepLabel).toBeNull();
+      });
+
+      it('leaves non-matching steps unchanged', () => {
+        const state = stateWith({ timeline: [step1, step2] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'completed' });
+        expect(s.timeline[1]).toEqual(step2);
+      });
+
+      it('handles update for non-existent id gracefully (no crash)', () => {
+        const state = stateWith({ timeline: [step1] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 'nonexistent', status: 'completed' });
+        expect(s.timeline).toHaveLength(1);
+        expect(s.timeline[0].status).toBe('pending'); // unchanged
+      });
+
+      it('handles error status', () => {
+        const state = stateWith({ timeline: [step1] });
+        const s = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'error', result: 'Timeout' });
+        expect(s.timeline[0].status).toBe('error');
+        expect(s.timeline[0].result).toBe('Timeout');
+      });
+    });
+
+    // -- SET_ACTIVE_VISUALIZATION --
+    describe('SET_ACTIVE_VISUALIZATION', () => {
+      it('sets activeVisualization', () => {
+        const s = chatReducer(initialChatState, { type: 'SET_ACTIVE_VISUALIZATION', visualization: viz });
+        expect(s.activeVisualization).toEqual(viz);
+      });
+
+      it('clears activeVisualization with null', () => {
+        const state = stateWith({ activeVisualization: viz });
+        const s = chatReducer(state, { type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
+        expect(s.activeVisualization).toBeNull();
+      });
+    });
+
+    // -- CLEAR_TIMELINE --
+    describe('CLEAR_TIMELINE', () => {
+      it('resets timeline, stepCount, currentStepLabel, activeVisualization, and assistantWorking', () => {
+        const state = stateWith({
+          timeline: [step1, step2],
+          stepCount: { current: 1, total: 2 },
+          currentStepLabel: 'Generating...',
+          activeVisualization: viz,
+          assistantWorking: true,
+        });
+        const s = chatReducer(state, { type: 'CLEAR_TIMELINE' });
+        expect(s.timeline).toEqual([]);
+        expect(s.stepCount).toEqual({ current: 0, total: 0 });
+        expect(s.currentStepLabel).toBeNull();
+        expect(s.activeVisualization).toBeNull();
+        expect(s.assistantWorking).toBe(false);
+      });
+
+      it('is idempotent on already-clear state', () => {
+        const s = chatReducer(initialChatState, { type: 'CLEAR_TIMELINE' });
+        expect(s.timeline).toEqual([]);
+        expect(s.assistantWorking).toBe(false);
+      });
+    });
+
+    // -- Side effects on existing actions --
+    describe('START_ASSISTANT_MESSAGE resets visualization state', () => {
+      it('clears timeline and sets assistantWorking=true', () => {
+        const state = stateWith({
+          timeline: [step1],
+          assistantWorking: false,
+          activeVisualization: viz,
+          currentStepLabel: 'old label',
+          stepCount: { current: 1, total: 1 },
+        });
+        const s = chatReducer(state, { type: 'START_ASSISTANT_MESSAGE', message: makeAssistantMsg() });
+        expect(s.timeline).toEqual([]);
+        expect(s.assistantWorking).toBe(true);
+        expect(s.activeVisualization).toBeNull();
+        expect(s.currentStepLabel).toBeNull();
+        expect(s.stepCount).toEqual({ current: 0, total: 0 });
+      });
+    });
+
+    describe('FINALIZE_ASSISTANT_MESSAGE clears visualization working state', () => {
+      it('sets assistantWorking=false and clears activeVisualization but keeps timeline', () => {
+        const state = stateWith({
+          messages: [makeAssistantMsg()],
+          isStreaming: true,
+          assistantWorking: true,
+          timeline: [{ ...step1, status: 'completed' }],
+          activeVisualization: viz,
+          currentStepLabel: 'Searching...',
+        });
+        const s = chatReducer(state, { type: 'FINALIZE_ASSISTANT_MESSAGE', tokens_used: 50, latency_ms: 200 });
+        expect(s.assistantWorking).toBe(false);
+        expect(s.activeVisualization).toBeNull();
+        expect(s.currentStepLabel).toBeNull();
+        // timeline is preserved so user can see completed steps
+        expect(s.timeline).toHaveLength(1);
+      });
+    });
+
+    describe('CLEAR_SESSION resets all visualization state', () => {
+      it('resets visualization fields alongside session fields', () => {
+        const state = stateWith({
+          sessionId: 'abc',
+          messages: [makeUserMsg()],
+          assistantWorking: true,
+          timeline: [step1],
+          activeVisualization: viz,
+          currentStepLabel: 'Searching...',
+          stepCount: { current: 0, total: 1 },
+        });
+        const s = chatReducer(state, { type: 'CLEAR_SESSION' });
+        expect(s.assistantWorking).toBe(false);
+        expect(s.timeline).toEqual([]);
+        expect(s.activeVisualization).toBeNull();
+        expect(s.currentStepLabel).toBeNull();
+        expect(s.stepCount).toEqual({ current: 0, total: 0 });
+      });
+    });
+
+    // -- Full lifecycle sequence --
+    describe('Full lifecycle: ADD -> UPDATE -> FINALIZE', () => {
+      it('tracks stepCount through a realistic multi-step flow', () => {
+        let s = chatReducer(initialChatState, { type: 'START_ASSISTANT_MESSAGE', message: makeAssistantMsg() });
+        expect(s.assistantWorking).toBe(true);
+
+        // Add step 1 (pending)
+        s = chatReducer(s, { type: 'ADD_TIMELINE_STEP', step: { ...step1, status: 'pending' } });
+        expect(s.stepCount).toEqual({ current: 0, total: 1 });
+
+        // Step 1 starts running
+        s = chatReducer(s, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'running' });
+        expect(s.currentStepLabel).toBe('Searching...');
+
+        // Add step 2 while step 1 is running
+        s = chatReducer(s, { type: 'ADD_TIMELINE_STEP', step: { ...step2, status: 'pending' } });
+        expect(s.stepCount).toEqual({ current: 0, total: 2 });
+
+        // Step 1 completes
+        s = chatReducer(s, { type: 'UPDATE_TIMELINE_STEP', id: 's1', status: 'completed', result: 'done' });
+        expect(s.stepCount).toEqual({ current: 1, total: 2 });
+
+        // Step 2 starts running
+        s = chatReducer(s, { type: 'UPDATE_TIMELINE_STEP', id: 's2', status: 'running' });
+        expect(s.currentStepLabel).toBe('Generating...');
+
+        // Step 2 completes
+        s = chatReducer(s, { type: 'UPDATE_TIMELINE_STEP', id: 's2', status: 'completed' });
+        expect(s.stepCount).toEqual({ current: 2, total: 2 });
+        expect(s.currentStepLabel).toBeNull();
+
+        // Finalize keeps timeline
+        s = chatReducer(s, { type: 'FINALIZE_ASSISTANT_MESSAGE', tokens_used: 100, latency_ms: 500 });
+        expect(s.assistantWorking).toBe(false);
+        expect(s.timeline).toHaveLength(2);
+      });
     });
   });
 
