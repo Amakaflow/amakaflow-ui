@@ -4295,6 +4295,17 @@ html {
   }
 }
 
+@keyframes outline-pulse {
+  0%, 100% {
+    outline-color: #2dd4bf; /* teal-400 */
+    opacity: 1;
+  }
+  50% {
+    outline-color: #14b8a6; /* teal-500 */
+    opacity: 0.7;
+  }
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
