@@ -143,6 +143,36 @@ export type SSEEventData =
   | { event: 'error'; data: ErrorEvent };
 
 // ============================================================================
+// Assistant Visualization Types (AMA-629)
+// ============================================================================
+
+export type VisualizationType = 'cursor-click' | 'typing' | 'ghost-preview' | 'outline-pulse';
+
+export interface ActionVisualization {
+  target: string;
+  type: VisualizationType;
+  label: string;
+  data?: Record<string, unknown>;
+}
+
+export interface TimelineStep {
+  id: string;
+  toolName: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
+  result?: string;
+}
+
+export interface AssistantVisualizationState {
+  isWorking: boolean;
+  currentStepLabel: string | null;
+  stepCount: number;
+  timeline: TimelineStep[];
+  activeVisualization: ActionVisualization | null;
+  speed: number;
+}
+
+// ============================================================================
 // Chat State
 // ============================================================================
 
