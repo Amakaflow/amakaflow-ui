@@ -45,52 +45,52 @@ const ACTION_MAP: Record<string, Omit<ActionConfig, 'label'>> & { label: Record<
   // Tool name : config (label is a template string)
   generate_workout: {
     label: 'Generating your workout',
-    target: '#workout-preview',
+    target: '[data-assistant-target="workout-preview"]',
     type: 'ghost-preview',
   },
   save_and_push_workout: {
     label: 'Saving workout',
-    target: '#workout-list',
+    target: '[data-assistant-target="workout-list"]',
     type: 'inline',
   },
   search_workout_library: {
     label: 'Searching workout library',
-    target: '#library-results',
+    target: '[data-assistant-target="library-results"]',
     type: 'ghost-preview',
   },
   navigate_to_page: {
     label: 'Navigating to {page}',
-    target: '#main-content',
+    target: '[data-assistant-target="main-content"]',
     type: 'none',
   },
   lookup_user_profile: {
     label: 'Looking up your profile',
-    target: '#user-profile',
+    target: '[data-assistant-target="user-profile"]',
     type: 'inline',
   },
   get_user_preferences: {
     label: 'Loading your preferences',
-    target: '#preferences-panel',
+    target: '[data-assistant-target="preferences-panel"]',
     type: 'inline',
   },
   get_workout_history: {
     label: 'Fetching workout history',
-    target: '#workout-history',
+    target: '[data-assistant-target="workout-history"]',
     type: 'ghost-preview',
   },
   create_workout_plan: {
     label: 'Creating workout plan',
-    target: '#workout-plan',
+    target: '[data-assistant-target="workout-plan"]',
     type: 'ghost-preview',
   },
   search_exercises: {
     label: 'Searching exercises',
-    target: '#exercise-search-results',
+    target: '[data-assistant-target="exercise-search-results"]',
     type: 'ghost-preview',
   },
   log_workout: {
     label: 'Logging workout',
-    target: '#workout-log',
+    target: '[data-assistant-target="workout-log"]',
     type: 'inline',
   },
 };

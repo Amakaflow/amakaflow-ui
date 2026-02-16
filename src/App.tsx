@@ -1465,6 +1465,7 @@ export default function App() {
                 <Button
                   variant={currentView === 'calendar' ? 'default' : 'ghost'}
                   size="sm"
+                  data-assistant-target="nav-calendar"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
@@ -1479,6 +1480,7 @@ export default function App() {
                 <Button
                   variant={currentView === 'workouts' ? 'default' : 'ghost'}
                   size="sm"
+                  data-assistant-target="nav-library"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
@@ -1493,6 +1495,7 @@ export default function App() {
                 <Button
                   variant={currentView === 'programs' ? 'default' : 'ghost'}
                   size="sm"
+                  data-assistant-target="nav-programs"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
@@ -1507,6 +1510,7 @@ export default function App() {
                 <Button
                   variant={currentView === 'analytics' ? 'default' : 'ghost'}
                   size="sm"
+                  data-assistant-target="nav-analytics"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
@@ -1521,6 +1525,7 @@ export default function App() {
                 <Button
                   variant={currentView === 'exercise-history' ? 'default' : 'ghost'}
                   size="sm"
+                  data-assistant-target="nav-history"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
@@ -1597,6 +1602,7 @@ export default function App() {
               <Button
                 variant="ghost"
                 size="sm"
+                data-assistant-target="nav-settings"
                 onClick={() => {
                   checkUnsavedChanges(() => {
                     clearWorkflowState();
@@ -1670,7 +1676,7 @@ export default function App() {
       )}
 
            {/* Main Content */}
-           <div className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
+           <div data-assistant-target="main-content" className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
         {/* Welcome Guide (shown on home view) */}
         {currentView === 'home' && (
           <>
@@ -1736,6 +1742,7 @@ export default function App() {
         )}
 
         {currentView === 'workflow' && currentStep === 'structure' && workout && (
+          <div data-assistant-target="workout-log">
           <StructureWorkout
             workout={workout}
             onWorkoutChange={(updatedWorkout) => {
@@ -1793,6 +1800,7 @@ export default function App() {
               });
             }}
           />
+          </div>
         )}
 
         {currentView === 'workflow' && currentStep === 'validate' && validation && workout && (
@@ -1840,7 +1848,9 @@ export default function App() {
         )}
 
         {currentView === 'exercise-history' && user && (
-          <ExerciseHistory user={user} />
+          <div data-assistant-target="workout-history">
+            <ExerciseHistory user={user} />
+          </div>
         )}
 
         {currentView === 'volume-analytics' && user && (
@@ -1855,6 +1865,7 @@ export default function App() {
         )}
 
         {currentView === 'settings' && (
+          <div data-assistant-target="preferences-panel">
           <UserSettings
             user={user}
             onBack={() => setCurrentView('workflow')}
@@ -1903,6 +1914,7 @@ export default function App() {
             }}
             onNavigateToMobileCompanion={() => setCurrentView('mobile-companion')}
           />
+          </div>
         )}
 
         {currentView === 'help' && (
@@ -1916,18 +1928,21 @@ export default function App() {
         )}
 
         {currentView === 'calendar' && (
-          <Calendar
-            userId={user.id}
-            userLocation={{
-              address: user.address,
-              city: user.city,
-              state: user.state,
-              zipCode: user.zipCode,
-            }}
-          />
+          <div data-assistant-target="calendar-section">
+            <Calendar
+              userId={user.id}
+              userLocation={{
+                address: user.address,
+                city: user.city,
+                state: user.state,
+                zipCode: user.zipCode,
+              }}
+            />
+          </div>
         )}
 
         {currentView === 'workouts' && (
+          <div data-assistant-target="workout-list">
           <UnifiedWorkouts
             profileId={user.id}
             onEditWorkout={(item) => {
@@ -1974,9 +1989,11 @@ export default function App() {
               setCurrentView('program-detail');
             }}
           />
+          </div>
         )}
 
         {currentView === 'programs' && (
+          <div data-assistant-target="workout-plan">
           <ProgramsList
             userId={user.id}
             onViewProgram={(programId) => {
@@ -1984,14 +2001,19 @@ export default function App() {
               setCurrentView('program-detail');
             }}
           />
+          </div>
         )}
 
         {currentView === 'create-ai' && (
-          <CreateAIWorkout />
+          <div data-assistant-target="workout-preview">
+            <CreateAIWorkout />
+          </div>
         )}
 
         {currentView === 'import-url' && (
-          <ImportWorkout />
+          <div data-assistant-target="import-section">
+            <ImportWorkout />
+          </div>
         )}
 
         {currentView === 'mobile-companion' && (
@@ -2002,6 +2024,7 @@ export default function App() {
         )}
 
         {currentView === 'bulk-import' && (
+          <div data-assistant-target="import-section">
           <BulkImport
             userId={user.id}
             onBack={() => {
@@ -2014,6 +2037,7 @@ export default function App() {
               setCurrentView('calendar');
             }}
           />
+          </div>
         )}
 
         {currentView === 'program-detail' && selectedProgramId && (

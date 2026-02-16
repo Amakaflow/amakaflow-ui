@@ -15,7 +15,7 @@ describe('useActionMap', () => {
 
       expect(config.label).toBe('Generating your workout');
       expect(config.type).toBe('ghost-preview');
-      expect(config.target).toBe('#workout-preview');
+      expect(config.target).toBe('[data-assistant-target="workout-preview"]');
     });
 
     it('interpolates label + target for navigate_to_page with page arg', () => {
@@ -23,7 +23,7 @@ describe('useActionMap', () => {
       const config = result.current.getActionConfig('navigate_to_page', { page: 'library' });
 
       expect(config.label).toBe('Navigating to library');
-      expect(config.target).toBe('#main-content');
+      expect(config.target).toBe('[data-assistant-target="main-content"]');
       expect(config.type).toBe('none');
     });
 
@@ -44,14 +44,14 @@ describe('getActionConfig (standalone)', () => {
 
     expect(config.label).toBe('Generating your workout');
     expect(config.type).toBe('ghost-preview');
-    expect(config.target).toBe('#workout-preview');
+    expect(config.target).toBe('[data-assistant-target="workout-preview"]');
   });
 
   it('interpolates label + target for navigate_to_page with page arg', () => {
     const config = getActionConfig('navigate_to_page', { page: 'library' });
 
     expect(config.label).toBe('Navigating to library');
-    expect(config.target).toBe('#main-content');
+    expect(config.target).toBe('[data-assistant-target="main-content"]');
     expect(config.type).toBe('none');
   });
 
@@ -74,7 +74,7 @@ describe('getActionConfig (standalone)', () => {
 
     expect(config.label).toBe('Saving workout');
     expect(config.type).toBe('inline');
-    expect(config.target).toBe('#workout-list');
+    expect(config.target).toBe('[data-assistant-target="workout-list"]');
   });
 
   it('returns correct config for search_workout_library', () => {
@@ -82,6 +82,6 @@ describe('getActionConfig (standalone)', () => {
 
     expect(config.label).toBe('Searching workout library');
     expect(config.type).toBe('ghost-preview');
-    expect(config.target).toBe('#library-results');
+    expect(config.target).toBe('[data-assistant-target="library-results"]');
   });
 });
