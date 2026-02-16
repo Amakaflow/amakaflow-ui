@@ -198,6 +198,12 @@ export interface ChatState {
   workoutData: GeneratedWorkout | null;
   /** Search results from tool queries */
   searchResults: WorkoutSearchResults | null;
+  /** Assistant visualization state (AMA-576) */
+  assistantWorking: boolean;
+  timeline: TimelineStep[];
+  activeVisualization: ActionVisualization | null;
+  currentStepLabel: string | null;
+  stepCount: { current: number; total: number };
 }
 
 // ============================================================================
@@ -224,4 +230,9 @@ export type ChatAction =
   | { type: 'SET_SEARCH_RESULTS'; data: WorkoutSearchResults }
   | { type: 'CLEAR_WORKOUT_DATA' }
   | { type: 'CLEAR_SESSION' }
-  | { type: 'LOAD_SESSION'; sessionId: string; messages: ChatMessage[] };
+  | { type: 'LOAD_SESSION'; sessionId: string; messages: ChatMessage[] }
+  | { type: 'SET_ASSISTANT_WORKING'; isWorking: boolean }
+  | { type: 'ADD_TIMELINE_STEP'; step: TimelineStep }
+  | { type: 'UPDATE_TIMELINE_STEP'; id: string; status: TimelineStep['status']; result?: string }
+  | { type: 'SET_ACTIVE_VISUALIZATION'; visualization: ActionVisualization | null }
+  | { type: 'CLEAR_TIMELINE' };
