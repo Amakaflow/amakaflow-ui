@@ -7,12 +7,14 @@
 
 import { useCallback, useRef } from 'react';
 import { streamChat } from '../lib/chat-api';
+import { getActionConfig } from './useActionMap';
 import type {
   ChatMessage,
   ChatAction,
   ChatState,
   SSEEventData,
   RateLimitInfo,
+  VisualizationType,
 } from '../types/chat';
 
 interface UseChatStreamOptions {
@@ -27,6 +29,12 @@ interface UseChatStreamReturn {
 
 function nextMessageId(): string {
   return `msg_${crypto.randomUUID()}`;
+}
+
+/** Map useActionMap visualization types to chat.ts VisualizationType */
+function toVisualizationType(type: string): VisualizationType {
+  if (type === 'ghost-preview') return 'ghost-preview';
+  return 'outline-pulse';
 }
 
 export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseChatStreamReturn {
@@ -117,6 +125,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
               case 'message_start':
                 dispatch({ type: 'SET_SESSION_ID', sessionId: event.data.session_id });
                 dispatch({ type: 'CLEAR_WORKOUT_DATA' });
+                dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: true });
                 break;
 
               case 'content_delta':
@@ -127,7 +136,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 }
                 break;
 
-              case 'function_call':
+              case 'function_call': {
                 dispatch({
                   type: 'ADD_FUNCTION_CALL',
                   toolCall: {
@@ -136,7 +145,29 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                     status: 'running',
                   },
                 });
+                // Wire timeline visualization
+                const actionConfig = getActionConfig(event.data.name, {});
+                dispatch({
+                  type: 'ADD_TIMELINE_STEP',
+                  step: {
+                    id: event.data.id,
+                    toolName: event.data.name,
+                    label: actionConfig.label,
+                    status: 'running',
+                  },
+                });
+                if (actionConfig.type !== 'none') {
+                  dispatch({
+                    type: 'SET_ACTIVE_VISUALIZATION',
+                    visualization: {
+                      target: actionConfig.target ?? '',
+                      type: toVisualizationType(actionConfig.type),
+                      label: actionConfig.label,
+                    },
+                  });
+                }
                 break;
+              }
 
               case 'function_result': {
                 dispatch({
@@ -144,6 +175,13 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                   toolUseId: event.data.tool_use_id,
                   result: event.data.result,
                 });
+                dispatch({
+                  type: 'UPDATE_TIMELINE_STEP',
+                  id: event.data.tool_use_id,
+                  status: 'completed',
+                  result: event.data.result,
+                });
+                dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
 
                 // Parse structured workout data from tool results
                 try {
@@ -211,6 +249,8 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 const { data } = event;
                 dispatch({ type: 'SET_ERROR', error: data.message });
                 dispatch({ type: 'SET_STREAMING', isStreaming: false });
+                dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: false });
+                dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
                 if (data.usage !== undefined && data.limit !== undefined) {
                   const info: RateLimitInfo = { usage: data.usage, limit: data.limit };
                   dispatch({ type: 'SET_RATE_LIMIT', info });
@@ -233,6 +273,8 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
             dispatch({ type: 'SET_ERROR', error: error.message });
             dispatch({ type: 'SET_STREAMING', isStreaming: false });
+            dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: false });
+            dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
             abortRef.current = null;
           },
           onComplete: () => {
