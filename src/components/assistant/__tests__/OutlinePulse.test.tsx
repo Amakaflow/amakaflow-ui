@@ -2,7 +2,7 @@
  * Unit tests for OutlinePulse component.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { OutlinePulse } from '../OutlinePulse';
 
