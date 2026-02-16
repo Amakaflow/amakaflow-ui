@@ -15,6 +15,8 @@ import type {
   WorkoutStage,
   GeneratedWorkout,
   WorkoutSearchResults,
+  TimelineStep,
+  ActionVisualization,
 } from '../types/chat';
 import { useChatStream } from '../hooks/useChatStream';
 
@@ -48,6 +50,11 @@ export const initialChatState: ChatState = {
   completedStages: [],
   workoutData: null,
   searchResults: null,
+  assistantWorking: false,
+  timeline: [],
+  activeVisualization: null,
+  currentStepLabel: null,
+  stepCount: { current: 0, total: 0 },
 };
 
 function createInitialState(): ChatState {
@@ -79,7 +86,19 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { ...state, messages: [...state.messages, action.message] };
 
     case 'START_ASSISTANT_MESSAGE':
-      return { ...state, messages: [...state.messages, action.message], currentStage: null, completedStages: [], workoutData: null, searchResults: null };
+      return {
+        ...state,
+        messages: [...state.messages, action.message],
+        currentStage: null,
+        completedStages: [],
+        workoutData: null,
+        searchResults: null,
+        timeline: [],
+        assistantWorking: true,
+        activeVisualization: null,
+        currentStepLabel: null,
+        stepCount: { current: 0, total: 0 },
+      };
 
     case 'APPEND_CONTENT_DELTA': {
       const messages = [...state.messages];
@@ -138,8 +157,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         pendingImports: action.pending_imports || [],
         currentStage: null,
         completedStages: [],
+        assistantWorking: false,
+        activeVisualization: null,
+        currentStepLabel: null,
         // Keep workoutData/searchResults so cards persist after streaming ends.
         // They get cleared in START_ASSISTANT_MESSAGE when the next message begins.
+        // Keep timeline so user can see completed steps after message ends.
       };
     }
 
@@ -164,6 +187,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         completedStages: [],
         workoutData: null,
         searchResults: null,
+        assistantWorking: false,
+        timeline: [],
+        activeVisualization: null,
+        currentStepLabel: null,
+        stepCount: { current: 0, total: 0 },
       };
 
     case 'LOAD_SESSION':
@@ -195,6 +223,47 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
     case 'CLEAR_WORKOUT_DATA':
       return { ...state, workoutData: null, searchResults: null };
+
+    case 'SET_ASSISTANT_WORKING':
+      return { ...state, assistantWorking: action.isWorking };
+
+    case 'ADD_TIMELINE_STEP':
+      return {
+        ...state,
+        timeline: [...state.timeline, action.step],
+        currentStepLabel: action.step.label,
+        stepCount: {
+          current: state.timeline.filter(s => s.status === 'completed').length,
+          total: state.timeline.length + 1,
+        },
+      };
+
+    case 'UPDATE_TIMELINE_STEP': {
+      const timeline = state.timeline.map(s =>
+        s.id === action.id ? { ...s, status: action.status, result: action.result } : s,
+      );
+      const doneCount = timeline.filter(s => s.status === 'completed').length;
+      const activeStep = timeline.find(s => s.status === 'running');
+      return {
+        ...state,
+        timeline,
+        currentStepLabel: activeStep?.label ?? null,
+        stepCount: { current: doneCount, total: timeline.length },
+      };
+    }
+
+    case 'SET_ACTIVE_VISUALIZATION':
+      return { ...state, activeVisualization: action.visualization };
+
+    case 'CLEAR_TIMELINE':
+      return {
+        ...state,
+        timeline: [],
+        currentStepLabel: null,
+        stepCount: { current: 0, total: 0 },
+        activeVisualization: null,
+        assistantWorking: false,
+      };
 
     default:
       return state;
