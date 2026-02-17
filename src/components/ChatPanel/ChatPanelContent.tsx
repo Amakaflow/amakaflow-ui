@@ -167,6 +167,7 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
                 workoutData={isLastAssistantMsg ? state.workoutData : undefined}
                 searchResults={isLastAssistantMsg ? state.searchResults : undefined}
                 isGenerating={isGenerating}
+                timeline={isLastAssistantMsg ? state.timeline : undefined}
               />
             );
           })}
