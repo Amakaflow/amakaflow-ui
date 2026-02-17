@@ -9,10 +9,14 @@ import React, { useState } from 'react';
 interface StepCounterProps {
   /** Number of completed steps (0 = render nothing) */
   count: number;
+  /** Number of errored steps (shown separately in label) */
+  errorCount?: number;
   /** Child components to render inside (typically TimelineRail) */
   children: React.ReactNode;
   /** Optional className for custom styling */
   className?: string;
+  /** Unique ID for aria-controls (avoids collisions when multiple instances exist) */
+  contentId?: string;
 }
 
 /**
@@ -22,9 +26,9 @@ interface StepCounterProps {
  * - Click toggles children visibility
  * - Children hidden by default (collapsed)
  */
-export function StepCounter({ count, children, className = '' }: StepCounterProps) {
-  // count={0} → render nothing
-  if (count === 0) {
+export function StepCounter({ count, errorCount = 0, children, className = '', contentId }: StepCounterProps) {
+  // Nothing to show when no steps completed or errored
+  if (count === 0 && errorCount === 0) {
     return null;
   }
 
@@ -52,7 +56,7 @@ export function StepCounter({ count, children, className = '' }: StepCounterProp
           cursor-pointer
         "
         aria-expanded={isExpanded}
-        aria-controls="step-counter-content"
+        aria-controls={contentId ?? 'step-counter-content'}
       >
         {/* Chevron icon */}
         <span
@@ -83,12 +87,15 @@ export function StepCounter({ count, children, className = '' }: StepCounterProp
         {/* Step count text */}
         <span className="flex-1 text-left">
           {count} {count === 1 ? 'step' : 'steps'} completed
+          {errorCount > 0 && (
+            <span className="text-red-400">, {errorCount} failed</span>
+          )}
         </span>
       </button>
 
       {/* Collapsible content */}
       <div
-        id="step-counter-content"
+        id={contentId ?? 'step-counter-content'}
         className={`
           overflow-hidden
           transition-all duration-200 ease-in-out
