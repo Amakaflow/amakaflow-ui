@@ -9,3 +9,6 @@ venv/
 dist/
 build/
 .worktrees/
+
+# Eval reports (generated, not committed)
+evals/reports/*.json
