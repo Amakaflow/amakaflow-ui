@@ -1,0 +1,169 @@
+name: Agent Validation Gate
+
+on:
+  push:
+    branches: ['agent/**']
+
+concurrency:
+  group: agent-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      ENVIRONMENT: test
+      OPENAI_API_KEY: test-key
+      ANTHROPIC_API_KEY: test-key
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      HELICONE_ENABLED: "false"
+      HELICONE_API_KEY: ""
+      OTEL_ENABLED: "false"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        id: install
+        timeout-minutes: 10
+        run: |
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Run linter
+        id: lint
+        timeout-minutes: 5
+        if: always() && steps.install.outcome == 'success'
+        run: ruff check .
+
+      - name: Run tests
+        id: tests
+        timeout-minutes: 10
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          pytest tests/ \
+            -m "not slow and not e2e and not golden and not load" \
+            --junitxml=test-results.xml
+
+      - name: Verify app starts
+        id: app-check
+        timeout-minutes: 2
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          python -c "
+          from backend.main import app
+          routes = [r.path for r in app.routes if hasattr(r, 'path')]
+          print(f'App loaded: {len(routes)} routes')
+          assert len(routes) > 10, f'Too few routes ({len(routes)}), something is broken'
+          "
+
+      - name: Determine outcome
+        if: always()
+        id: outcome
+        run: |
+          if [ "${{ steps.install.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=install" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.lint.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=lint" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.tests.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=test" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.app-check.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=app-check" >> "$GITHUB_OUTPUT"
+          else
+            echo "ci_outcome=success" >> "$GITHUB_OUTPUT"
+            echo "failed_step=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate test summary
+        if: always()
+        id: summary
+        run: |
+          SUMMARY=""
+
+          if [ -f "test-results.xml" ]; then
+            T=$(grep -oP 'tests="\K[0-9]+' test-results.xml | head -1)
+            F=$(grep -oP 'failures="\K[0-9]+' test-results.xml | head -1)
+            E=$(grep -oP 'errors="\K[0-9]+' test-results.xml | head -1)
+            S=$(grep -oP 'skipped="\K[0-9]+' test-results.xml | head -1)
+            TOTAL=${T:-0}
+            FAILS=${F:-0}
+            ERRS=${E:-0}
+            SKIP=${S:-0}
+            PASSED=$((TOTAL - FAILS - ERRS - SKIP))
+            SUMMARY="**Tests:** ${PASSED} passed, ${FAILS} failed, ${ERRS} errors, ${SKIP} skipped (${TOTAL} total)"
+          else
+            SUMMARY="**Tests:** No results found."
+          fi
+
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="No test results found."
+          fi
+
+          {
+            echo "markdown<<EOF"
+            echo -e "$SUMMARY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Capture failure logs
+        if: always() && steps.outcome.outputs.ci_outcome == 'failure'
+        id: failure-logs
+        run: |
+          LOGS=""
+          FAILED="${{ steps.outcome.outputs.failed_step }}"
+
+          if [ "$FAILED" == "install" ]; then
+            LOGS="Dependency installation failed. Check workflow run for full output."
+          elif [ "$FAILED" == "lint" ]; then
+            LOGS="Lint check failed. Check workflow run for full output."
+          elif [ "$FAILED" == "test" ]; then
+            if [ -f "test-results.xml" ]; then
+              LOGS=$(grep -h '<failure' test-results.xml 2>/dev/null | head -20 | sed 's/<[^>]*>//g' | head -c 2000)
+            fi
+            if [ -z "$LOGS" ]; then
+              LOGS="Tests failed. Check workflow run for full output."
+            fi
+          elif [ "$FAILED" == "app-check" ]; then
+            LOGS="App startup verification failed. Check workflow run for full output."
+          fi
+
+          {
+            echo "logs<<EOF"
+            echo "$LOGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-test-results
+          path: test-results.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Validation Gate
+        if: always()
+        uses: supergeri/amakaflow-automation/.github/actions/validation-gate@main
+        with:
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          repo-name: chat-api
+          ci-outcome: ${{ steps.outcome.outputs.ci_outcome }}
+          failed-step: ${{ steps.outcome.outputs.failed_step }}
+          failure-logs: ${{ steps.failure-logs.outputs.logs }}
+          test-results-summary: ${{ steps.summary.outputs.markdown }}

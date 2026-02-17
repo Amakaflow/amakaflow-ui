@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ENVIRONMENT: test
+      OPENAI_API_KEY: test-key
+      ANTHROPIC_API_KEY: test-key
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      HELICONE_ENABLED: "false"
+      HELICONE_API_KEY: ""
+      OTEL_ENABLED: "false"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: |
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Run linter
+        timeout-minutes: 5
+        run: ruff check .
+
+      - name: Run tests
+        timeout-minutes: 10
+        run: |
+          pytest tests/ \
+            -m "not slow and not e2e and not golden and not load"
+
+      - name: Verify app starts
+        timeout-minutes: 2
+        run: |
+          python -c "
+          from backend.main import app
+          routes = [r.path for r in app.routes if hasattr(r, 'path')]
+          print(f'App loaded: {len(routes)} routes')
+          assert len(routes) > 10, f'Too few routes ({len(routes)}), something is broken'
+          "
