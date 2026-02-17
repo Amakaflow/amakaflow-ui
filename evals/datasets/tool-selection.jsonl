@@ -1,0 +1,40 @@
+{"id": "ts_001", "prompt": "Find me a 20 minute HIIT workout", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout", "navigate_to_page"]}
+{"id": "ts_002", "prompt": "Show me some leg workouts", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_003", "prompt": "Search for strength training programs", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_004", "prompt": "Do I have any cardio workouts saved?", "expected_tool": "search_workout_library", "not_tools": ["navigate_to_page"]}
+{"id": "ts_005", "prompt": "Find a 30 minute full body routine", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_006", "prompt": "Show me quick 10 minute ab workouts", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_007", "prompt": "I want to find upper body exercises", "expected_tool": "search_workout_library", "not_tools": []}
+{"id": "ts_008", "prompt": "Any yoga sessions available?", "expected_tool": "search_workout_library", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_009", "prompt": "Create a hypertrophy program for 4 days a week", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_010", "prompt": "Generate a beginner strength program", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_011", "prompt": "Make me a push/pull/legs split", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library", "navigate_to_page"]}
+{"id": "ts_012", "prompt": "Design a 6-week progressive overload program", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_013", "prompt": "Build me a workout for someone who can only train 3 days per week with dumbbells", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_014", "prompt": "I need a custom HIIT circuit focusing on fat loss", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_015", "prompt": "Create a bodyweight-only program for traveling", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_016", "prompt": "Generate a powerlifting peaking program for my upcoming meet", "expected_tool": "generate_ai_workout", "not_tools": ["search_workout_library"]}
+{"id": "ts_017", "prompt": "Schedule my leg day for next Tuesday at 6am", "expected_tool": "add_workout_to_calendar", "not_tools": ["search_workout_library", "generate_ai_workout"]}
+{"id": "ts_018", "prompt": "Add this workout to my calendar for tomorrow morning", "expected_tool": "add_workout_to_calendar", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_019", "prompt": "Put my upper body workout on Wednesday at 5pm", "expected_tool": "add_workout_to_calendar", "not_tools": ["search_workout_library"]}
+{"id": "ts_020", "prompt": "Schedule a rest day for Sunday", "expected_tool": "add_workout_to_calendar", "not_tools": ["generate_ai_workout"]}
+{"id": "ts_021", "prompt": "Take me to the calendar page", "expected_tool": "navigate_to_page", "not_tools": ["add_workout_to_calendar", "search_workout_library"]}
+{"id": "ts_022", "prompt": "Go to my workout history", "expected_tool": "navigate_to_page", "not_tools": ["search_workout_library"]}
+{"id": "ts_023", "prompt": "Open settings", "expected_tool": "navigate_to_page", "not_tools": ["search_workout_library", "generate_ai_workout"]}
+{"id": "ts_024", "prompt": "Show me the home page", "expected_tool": "navigate_to_page", "not_tools": ["search_workout_library"]}
+{"id": "ts_025", "prompt": "Navigate to my profile", "expected_tool": "navigate_to_page", "not_tools": []}
+{"id": "ts_026", "prompt": "Import this workout from YouTube: https://youtube.com/watch?v=abc123", "expected_tool": "import_from_youtube", "not_tools": ["search_workout_library", "generate_ai_workout"]}
+{"id": "ts_027", "prompt": "Get the workout from this video https://www.youtube.com/watch?v=xyz789", "expected_tool": "import_from_youtube", "not_tools": ["import_from_tiktok"]}
+{"id": "ts_028", "prompt": "Import from this TikTok: https://tiktok.com/@user/video/123", "expected_tool": "import_from_tiktok", "not_tools": ["import_from_youtube"]}
+{"id": "ts_029", "prompt": "Grab the exercises from this TikTok video https://vm.tiktok.com/abc", "expected_tool": "import_from_tiktok", "not_tools": ["import_from_youtube", "search_workout_library"]}
+{"id": "ts_030", "prompt": "Import this Instagram reel: https://instagram.com/reel/abc123", "expected_tool": "import_from_instagram", "not_tools": ["import_from_youtube", "import_from_tiktok"]}
+{"id": "ts_031", "prompt": "Get the workout from this IG post https://www.instagram.com/p/xyz", "expected_tool": "import_from_instagram", "not_tools": ["import_from_youtube"]}
+{"id": "ts_032", "prompt": "Import from this Pinterest board: https://pinterest.com/pin/123", "expected_tool": "import_from_pinterest", "not_tools": ["import_from_youtube", "import_from_instagram"]}
+{"id": "ts_033", "prompt": "What's the weather like today?", "expected_tool": null, "not_tools": ["search_workout_library", "generate_ai_workout", "navigate_to_page"]}
+{"id": "ts_034", "prompt": "Tell me a joke", "expected_tool": null, "not_tools": ["search_workout_library", "generate_ai_workout"]}
+{"id": "ts_035", "prompt": "What's your name?", "expected_tool": null, "not_tools": ["search_workout_library", "generate_ai_workout", "navigate_to_page"]}
+{"id": "ts_036", "prompt": "Can you write me a poem about fitness?", "expected_tool": null, "not_tools": ["generate_ai_workout", "search_workout_library"]}
+{"id": "ts_037", "prompt": "How do I cook pasta?", "expected_tool": null, "not_tools": ["search_workout_library", "generate_ai_workout"]}
+{"id": "ts_038", "prompt": "What are the benefits of stretching before a workout?", "expected_tool": null, "not_tools": ["generate_ai_workout", "search_workout_library"]}
+{"id": "ts_039", "prompt": "I imported a workout yesterday but can't find it, can you search for it?", "expected_tool": "search_workout_library", "not_tools": ["import_from_youtube"]}
+{"id": "ts_040", "prompt": "Create a 5x5 strength program and then schedule it for Monday", "expected_tool": "generate_ai_workout", "not_tools": ["navigate_to_page"]}
