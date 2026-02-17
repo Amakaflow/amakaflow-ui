@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useClerkUser } from '../lib/clerk-auth';
 import { supabase } from '../lib/supabase';
 import { CHAT_ENABLED, CHAT_BETA_PERIOD, CHAT_VOICE_ENABLED } from '../lib/env';
 import type {
@@ -38,7 +38,7 @@ function parseJsonbValue<T>(value: unknown, defaultValue: T): T {
  * Hook to get resolved chat feature flags for the current user.
  */
 export function useChatFeatureFlags(): UseChatFeatureFlagsResult {
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user, isLoaded: isUserLoaded } = useClerkUser();
   const [flags, setFlags] = useState<ChatFeatureFlags>(DEFAULT_CHAT_FLAGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +75,10 @@ export function useChatFeatureFlags(): UseChatFeatureFlagsResult {
         // chat_enabled: env var kills it, otherwise check DB
         chat_enabled: CHAT_ENABLED && parseJsonbValue(dbFlags.chat_enabled, DEFAULT_CHAT_FLAGS.chat_enabled),
 
-        // chat_beta_period: env var or DB
-        chat_beta_period: CHAT_BETA_PERIOD || parseJsonbValue(dbFlags.chat_beta_period, DEFAULT_CHAT_FLAGS.chat_beta_period),
+        // chat_beta_period: explicit env var overrides DB, otherwise use DB/default
+        chat_beta_period: import.meta.env.VITE_CHAT_BETA_PERIOD !== undefined
+          ? CHAT_BETA_PERIOD
+          : parseJsonbValue(dbFlags.chat_beta_period, DEFAULT_CHAT_FLAGS.chat_beta_period),
 
         // chat_beta_access: DB user flag > Clerk metadata > default
         chat_beta_access:
