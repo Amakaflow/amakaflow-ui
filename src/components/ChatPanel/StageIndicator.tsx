@@ -54,7 +54,6 @@ export function StageIndicator({
       {allStages.map((stage) => {
         const stageConf = config[stage];
         if (!stageConf) return null;
-        const Icon = stageConf.icon;
         const isCompleted = completedStages.includes(stage);
         const isCurrent = currentStage?.stage === stage;
         const isInactive = !isCompleted && !isCurrent;
@@ -72,10 +71,8 @@ export function StageIndicator({
           >
             {isCompleted ? (
               <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-            ) : isCurrent ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
             ) : (
-              <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
             )}
             <span className={cn(
               isCompleted && 'text-muted-foreground line-through',
