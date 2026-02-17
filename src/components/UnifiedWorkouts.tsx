@@ -818,6 +818,7 @@ export function UnifiedWorkouts({
               size="sm"
               onClick={() => setViewMode('cards')}
               className="gap-2"
+              data-testid="view-mode-cards"
             >
               <LayoutGrid className="w-4 h-4" />
               Cards
@@ -827,6 +828,7 @@ export function UnifiedWorkouts({
               size="sm"
               onClick={() => setViewMode('compact')}
               className="gap-2"
+              data-testid="view-mode-compact"
             >
               <List className="w-4 h-4" />
               Compact
@@ -855,6 +857,7 @@ export function UnifiedWorkouts({
             }}
             placeholder="Search workouts..."
             data-assistant-target="search-input"
+            data-testid="workout-search-input"
             className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <select
@@ -1050,6 +1053,7 @@ export function UnifiedWorkouts({
               return (
                 <div
                   key={workout.id}
+                  data-testid={`workout-item-${workout.id}`}
                   className={`flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors group ${
                     selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40' : ''
                   }`}
@@ -1235,6 +1239,7 @@ export function UnifiedWorkouts({
                       disabled={deletingId === workout.id}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                       title="Delete"
+                      data-testid={`workout-delete-${workout.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -1247,6 +1252,7 @@ export function UnifiedWorkouts({
             return (
               <Card
                 key={workout.id}
+                data-testid={`workout-item-${workout.id}`}
                 className={`hover:shadow-md transition-all border-border/50 bg-card ${
                   selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40 shadow-sm' : ''
                 }`}
@@ -1452,6 +1458,7 @@ export function UnifiedWorkouts({
                       onClick={() => handleDeleteClick(workout.id)}
                       disabled={deletingId === workout.id}
                       className="h-9 gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 font-medium"
+                      data-testid={`workout-delete-${workout.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
                       {deletingId === workout.id ? 'Deleting...' : 'Delete'}
@@ -1502,21 +1509,26 @@ export function UnifiedWorkouts({
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && handleDeleteCancel()}>
-        <AlertDialogContent>
+        <AlertDialogContent data-testid="delete-confirmation-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Workout</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle data-testid="delete-confirmation-title">Delete Workout</AlertDialogTitle>
+            <AlertDialogDescription data-testid="delete-confirmation-description">
               Are you sure you want to delete this workout? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel} disabled={!!deletingId}>
+            <AlertDialogCancel 
+              onClick={handleDeleteCancel} 
+              disabled={!!deletingId}
+              data-testid="delete-confirmation-cancel"
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={!!deletingId}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="delete-confirmation-confirm"
             >
               {deletingId ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
