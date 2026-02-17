@@ -1,7 +1,7 @@
 /**
  * Integration test — full assistant visualization reducer flow.
  *
- * Exercises: SET_ASSISTANT_WORKING → ADD_TIMELINE_STEP → UPDATE_TIMELINE_STEP
+ * Exercises: START_ASSISTANT_MESSAGE → ADD_TIMELINE_STEP → UPDATE_TIMELINE_STEP
  *            → FINALIZE_ASSISTANT_MESSAGE → CLEAR_TIMELINE
  *
  * Tests the reducer directly (no React rendering) to verify state transitions.
@@ -85,6 +85,20 @@ describe('Assistant visualization — full reducer flow', () => {
     expect(state.timeline[0].status).toBe('error');
     expect(state.timeline[0].result).toBe('API timeout');
     expect(state.stepCount).toEqual({ current: 0, total: 1 });
+    // No running step remains, so label should clear
+    expect(state.currentStepLabel).toBeNull();
+  });
+
+  it('UPDATE_TIMELINE_STEP with unknown id is a no-op', () => {
+    let state = stateWithAssistantMessage();
+    state = chatReducer(state, { type: 'ADD_TIMELINE_STEP', step: makeStep('s1', 'Working') });
+
+    const before = state;
+    state = chatReducer(state, { type: 'UPDATE_TIMELINE_STEP', id: 'nonexistent', status: 'completed' });
+
+    expect(state.timeline).toHaveLength(1);
+    expect(state.timeline[0].status).toBe('running');
+    expect(state.stepCount).toEqual(before.stepCount);
   });
 
   it('SET_ACTIVE_VISUALIZATION sets and clears visualization', () => {
@@ -114,9 +128,21 @@ describe('Assistant visualization — full reducer flow', () => {
     expect(state.isStreaming).toBe(false);
     expect(state.activeVisualization).toBeNull();
     expect(state.currentStepLabel).toBeNull();
-    // Timeline should persist so user can view completed steps
+    // Timeline and stepCount persist so UI can show "1/1 completed" after stream ends
     expect(state.timeline).toHaveLength(1);
     expect(state.timeline[0].status).toBe('completed');
+    expect(state.stepCount).toEqual({ current: 1, total: 1 });
+  });
+
+  it('ADD_TIMELINE_STEP with duplicate id appends both copies', () => {
+    let state = stateWithAssistantMessage();
+    state = chatReducer(state, { type: 'ADD_TIMELINE_STEP', step: makeStep('s1', 'First') });
+    state = chatReducer(state, { type: 'ADD_TIMELINE_STEP', step: makeStep('s1', 'Duplicate') });
+
+    // Reducer appends blindly — caller must ensure unique IDs
+    expect(state.timeline).toHaveLength(2);
+    expect(state.timeline[0].label).toBe('First');
+    expect(state.timeline[1].label).toBe('Duplicate');
   });
 
   it('CLEAR_TIMELINE resets all visualization state', () => {
