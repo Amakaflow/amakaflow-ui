@@ -140,6 +140,18 @@ describe('FloatingPill', () => {
     expect(pingSpan).toHaveClass('bg-emerald-400');
   });
 
+  it('hides step counter when totalSteps is 0', () => {
+    render(
+      <FloatingPill
+        visible={true}
+        currentStep={0}
+        totalSteps={0}
+        label="Processing"
+      />
+    );
+    expect(screen.queryByText(/of/)).not.toBeInTheDocument();
+  });
+
   it('renders with different step values', () => {
     const { rerender } = render(
       <FloatingPill

@@ -71,10 +71,12 @@ export function FloatingPill({
           {label}
         </span>
 
-        {/* Step counter */}
-        <span className="text-xs text-slate-400">
-          {currentStep} of {totalSteps}
-        </span>
+        {/* Step counter — hidden until first timeline step arrives */}
+        {totalSteps > 0 && (
+          <span className="text-xs text-slate-400">
+            {currentStep} of {totalSteps}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -35,7 +35,6 @@ export function BorderTrace({ active = false }: BorderTraceProps) {
         )`,
         animation: active ? 'border-trace-spin 3s linear infinite' : 'none',
       }}
-      role="status"
       aria-hidden="true"
     />
   );

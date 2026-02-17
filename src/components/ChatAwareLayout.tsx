@@ -4,6 +4,10 @@
  * On desktop (md+), adds right padding to prevent content from being
  * obscured by the chat side panel. Also renders visualization overlays
  * (BorderTrace, FloatingPill) when the AI assistant is working.
+ *
+ * Overlays are extracted into AssistantOverlays so that streaming-token
+ * state mutations only re-render the lightweight overlay tree, not all
+ * page children.
  */
 
 import { useChat } from '../context/ChatContext';
@@ -14,9 +18,30 @@ interface ChatAwareLayoutProps {
   children: React.ReactNode;
 }
 
-/** No-op stub until OutlinePulse (AMA-635) is built */
+// TODO(AMA-635): Replace stub with real OutlinePulse import
 function OutlinePulseStub(_props: { target: string }) {
   return null;
+}
+
+/** Subscribes to ChatContext independently so children don't re-render on every state change. */
+function AssistantOverlays() {
+  const { state } = useChat();
+
+  return (
+    <>
+      <BorderTrace active={state.assistantWorking} />
+      <FloatingPill
+        visible={state.assistantWorking}
+        label={state.currentStepLabel ?? 'Processing...'}
+        currentStep={state.stepCount.current}
+        totalSteps={state.stepCount.total}
+      />
+      {/* OutlinePulse — swap stub for real import when AMA-635 is complete */}
+      {state.activeVisualization?.target && (
+        <OutlinePulseStub target={state.activeVisualization.target} />
+      )}
+    </>
+  );
 }
 
 export function ChatAwareLayout({ children }: ChatAwareLayoutProps) {
@@ -30,19 +55,7 @@ export function ChatAwareLayout({ children }: ChatAwareLayoutProps) {
       style={{ scrollbarGutter: 'stable' }}
     >
       {children}
-
-      {/* AMA-576: Assistant visualization overlays */}
-      <BorderTrace active={state.assistantWorking} />
-      <FloatingPill
-        visible={state.assistantWorking}
-        label={state.currentStepLabel ?? 'Processing...'}
-        currentStep={state.stepCount.current}
-        totalSteps={state.stepCount.total}
-      />
-      {/* OutlinePulse — swap stub for real import when AMA-635 is complete */}
-      {state.activeVisualization?.target && (
-        <OutlinePulseStub target={state.activeVisualization.target} />
-      )}
+      <AssistantOverlays />
     </div>
   );
 }
