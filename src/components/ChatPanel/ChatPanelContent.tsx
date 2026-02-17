@@ -12,8 +12,8 @@
  * - ChatInput for sending messages
  */
 
-import { useRef, useEffect } from 'react';
-import { MessageSquare, X, Trash2, ArrowLeft, Settings } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { MessageSquare, X, Trash2, ArrowLeft, Settings, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { useChat } from '../../context/ChatContext';
@@ -22,6 +22,12 @@ import { ChatInput } from './ChatInput';
 import { BetaFeedbackWidget } from './BetaFeedbackWidget';
 import { useChatFeatureFlags } from '../../hooks/useChatFeatureFlags';
 import { CHAT_BETA_PERIOD } from '../../lib/env';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface ChatPanelContentProps {
   /** Mobile variant uses compact header with back arrow */
@@ -30,10 +36,19 @@ interface ChatPanelContentProps {
   onClose?: () => void;
 }
 
+/** Suggested actions shown in empty state */
+const SUGGESTED_ACTIONS = [
+  { label: 'Create a workout', prompt: 'Create a new workout for me' },
+  { label: 'Find workouts', prompt: 'Find workouts matching my goals' },
+  { label: 'Import workout', prompt: 'Import a workout from URL' },
+  { label: 'Explain features', prompt: 'What can you help me with?' },
+];
+
 export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelContentProps) {
   const { state, closePanel, sendMessage, clearSession } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
   const { flags } = useChatFeatureFlags();
+  const [showSettings, setShowSettings] = useState(false);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -94,13 +109,35 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
             </div>
           </>
         ) : (
-          // Desktop header - with icon and title
+          // Desktop header - with icon, title, new chat dropdown, and settings
           <>
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-primary" />
               <h3 className="font-semibold text-sm">AI Assistant</h3>
             </div>
             <div className="flex items-center gap-1">
+              {/* New chat dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    title="New chat"
+                    aria-label="New chat"
+                    data-testid="chat-new-chat-button"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={clearSession}>
+                    <Plus className="w-3.5 h-3.5 mr-2" />
+                    New chat
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Clear conversation button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -111,6 +148,18 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
                 data-testid="chat-clear-button"
               >
                 <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+              {/* Settings button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setShowSettings(!showSettings)}
+                title="Chat settings"
+                aria-label="Chat settings"
+                data-testid="chat-settings-button"
+              >
+                <Settings className="w-3.5 h-3.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -137,9 +186,22 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
               data-testid="chat-empty-state"
             >
               <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-6">
                 Ask me anything about your workouts, training plans, or AmakaFlow features.
               </p>
+              <div className="flex flex-col gap-2 w-full max-w-[280px]">
+                {SUGGESTED_ACTIONS.map((action) => (
+                  <Button
+                    key={action.label}
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start text-left h-auto py-2 px-3 whitespace-normal"
+                    onClick={() => sendMessage(action.prompt)}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -186,6 +248,26 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
+
+      {/* Settings panel */}
+      {showSettings && !isMobile && (
+        <div className="border-t p-4 bg-muted/30" data-testid="chat-settings-panel">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-sm">Chat Settings</h4>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setShowSettings(false)}
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Chat settings coming soon. You can clear your conversation history using the trash icon.
+          </p>
+        </div>
+      )}
 
       {/* Beta feedback widget for testers */}
       {isBetaTester && (
