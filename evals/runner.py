@@ -26,7 +26,7 @@ from evals.config import (
     SUITE_REGISTRY,
 )
 from evals.loader import DatasetError, list_available_suites, load_dataset, validate_dataset
-from evals.models import EvalCase, EvalReport, JudgeResult, SuiteResult
+from evals.models import EvalReport, JudgeResult, SuiteResult
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ def run_evals(
 
     if all_errors:
         raise DatasetError(
-            f"Dataset validation failed:\n" + "\n".join(f"  - {e}" for e in all_errors)
+            "Dataset validation failed:\n" + "\n".join(f"  - {e}" for e in all_errors)
         )
 
     report = EvalReport(
