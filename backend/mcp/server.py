@@ -9,7 +9,7 @@ MCP Protocol Reference: https://modelcontextprotocol.io/
 import json
 import logging
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from backend.services.tool_schemas import ALL_TOOLS, PHASE_1_TOOLS, PHASE_2_TOOLS
 
@@ -57,7 +57,7 @@ MCP_TOOL_EXECUTION_ERROR = -32003
 
 class ToolNotFoundError(Exception):
     """Error when a requested tool is not found."""
-    
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
@@ -87,7 +87,7 @@ class MCPTool:
     inputSchema: Dict[str, Any]
 
 
-@dataclass 
+@dataclass
 class MCPToolsListResult:
     """MCP tools/list result."""
     tools: List[MCPTool]
@@ -107,11 +107,11 @@ class MCPToolCallRequest:
 
 class MCPServer:
     """MCP Server that exposes chat-api tools via the Model Context Protocol.
-    
+
     This server implements the MCP specification to allow AI models and external
     clients to invoke chat-api tools (workout search, calendar scheduling, etc.)
     via a standardized protocol.
-    
+
     Usage:
         server = MCPServer(function_dispatcher=dispatcher)
         result = server.handle_request(request)
@@ -131,7 +131,7 @@ class MCPServer:
         async_function_dispatcher: Optional[Any] = None,
     ):
         """Initialize the MCP server.
-        
+
         Args:
             function_dispatcher: Sync FunctionDispatcher for Phase 1-4 tools
             async_function_dispatcher: AsyncFunctionDispatcher for all tools
@@ -146,10 +146,10 @@ class MCPServer:
 
     def _convert_tool_schema(self, tool_schema: Dict[str, Any]) -> MCPTool:
         """Convert tool_schemas.py format to MCP tool format.
-        
+
         Args:
             tool_schema: Tool schema from tool_schemas.py
-            
+
         Returns:
             MCPTool in MCP format
         """
@@ -161,7 +161,7 @@ class MCPServer:
 
     def get_tools(self) -> List[MCPTool]:
         """Get all available tools in MCP format.
-        
+
         Returns:
             List of MCPTool objects
         """
@@ -169,10 +169,10 @@ class MCPServer:
 
     def get_tools_by_phase(self, phase: int) -> List[MCPTool]:
         """Get tools for a specific phase.
-        
+
         Args:
             phase: Phase number (1-5)
-            
+
         Returns:
             List of MCPTool objects for the specified phase
         """
@@ -180,16 +180,16 @@ class MCPServer:
             1: PHASE_1_TOOLS,
             2: PHASE_2_TOOLS,
         }
-        
+
         tools = phase_tools.get(phase, [])
         return [self._convert_tool_schema(tool) for tool in tools]
 
     def find_tool(self, name: str) -> Optional[Dict[str, Any]]:
         """Find a tool by name.
-        
+
         Args:
             name: Tool name to find
-            
+
         Returns:
             Tool schema if found, None otherwise
         """
@@ -200,16 +200,16 @@ class MCPServer:
 
     def initialize(self, params: Optional[Dict[str, Any]] = None) -> MCPInitializeResult:
         """Initialize the MCP server.
-        
+
         Args:
             params: Optional initialization parameters from client
-            
+
         Returns:
             MCPInitializeResult with server capabilities
         """
         self._initialized = True
         logger.info("MCP Server initialized")
-        
+
         return MCPInitializeResult(
             protocolVersion=self.PROTOCOL_VERSION,
             capabilities=self.CAPABILITIES,
@@ -218,7 +218,7 @@ class MCPServer:
 
     def list_tools(self) -> MCPToolsListResult:
         """List all available tools.
-        
+
         Returns:
             MCPToolsListResult with all tools
         """
@@ -230,14 +230,14 @@ class MCPServer:
         arguments: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Call a tool with the given arguments.
-        
+
         Args:
             name: Tool name to call
             arguments: Tool arguments
-            
+
         Returns:
             Tool execution result
-            
+
         Raises:
             ToolNotFoundError: If tool not found
             ValueError: If invalid arguments
@@ -245,13 +245,13 @@ class MCPServer:
         tool = self.find_tool(name)
         if not tool:
             raise ToolNotFoundError(f"Tool not found: {name}")
-        
+
         # Validate required arguments
         required = tool["input_schema"].get("required", [])
         missing = [field for field in required if field not in arguments]
         if missing:
             raise ValueError(f"Missing required arguments: {missing}")
-        
+
         # In a real implementation, this would call the function dispatcher
         # For now, return a mock response for contract testing
         return {
@@ -262,17 +262,17 @@ class MCPServer:
 
     def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle an MCP JSON-RPC request.
-        
+
         Args:
             request: JSON-RPC request dictionary
-            
+
         Returns:
             JSON-RPC response dictionary
         """
         # Handle notification (no id)
         request_id = request.get("id")
         method = request.get("method")
-        
+
         try:
             # Validate JSON-RPC version
             if request.get("jsonrpc") != "2.0":
@@ -281,7 +281,7 @@ class MCPServer:
                     JSONRPC_INVALID_REQUEST,
                     "Invalid JSON-RPC version",
                 )
-            
+
             # Handle methods
             if method == "initialize":
                 result = self.initialize(request.get("params"))
@@ -293,7 +293,7 @@ class MCPServer:
                         "serverInfo": result.serverInfo,
                     }
                 )
-            
+
             elif method == "tools/list":
                 result = self.list_tools()
                 return self._success_response(
@@ -309,32 +309,32 @@ class MCPServer:
                         ]
                     }
                 )
-            
+
             elif method == "tools/call":
                 params = request.get("params", {})
                 tool_name = params.get("name")
                 arguments = params.get("arguments", {})
-                
+
                 if not tool_name:
                     return self._error_response(
                         request_id,
                         JSONRPC_INVALID_PARAMS,
                         "Missing tool name",
                     )
-                
+
                 result = self.call_tool(tool_name, arguments)
                 return self._success_response(
                     request_id,
                     {"content": [{"type": "text", "text": json.dumps(result)}]}
                 )
-            
+
             else:
                 return self._error_response(
                     request_id,
                     JSONRPC_METHOD_NOT_FOUND,
                     f"Method not found: {method}",
                 )
-                
+
         except ToolNotFoundError as e:
             return self._error_response(
                 request_id,
@@ -402,24 +402,23 @@ def create_mcp_server(
     ingestor_api_url: str = "http://localhost:8002",
 ) -> MCPServer:
     """Create and configure an MCP server.
-    
+
     Args:
         mapper_api_url: URL for mapper API
-        calendar_api_url: URL for calendar API  
+        calendar_api_url: URL for calendar API
         ingestor_api_url: URL for workout ingestor API
-        
+
     Returns:
         Configured MCPServer instance
     """
     # Import here to avoid circular imports
     from backend.services.function_dispatcher import FunctionDispatcher
-    from backend.services.async_function_dispatcher import AsyncFunctionDispatcher
-    
+
     sync_dispatcher = FunctionDispatcher(
         mapper_api_url=mapper_api_url,
         calendar_api_url=calendar_api_url,
         ingestor_api_url=ingestor_api_url,
     )
-    
+
     # Return server without async dispatcher for simpler setup
     return MCPServer(function_dispatcher=sync_dispatcher)
