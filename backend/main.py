@@ -93,9 +93,19 @@ def _init_sentry(settings: Settings) -> None:
 
 def _configure_cors(app: FastAPI) -> None:
     """Configure CORS middleware for the application."""
+    # Restrict to specific trusted domains for production security
+    # Add environment-specific origins as needed
+    trusted_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+    # Add production domains from environment if configured
+    production_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    trusted_origins.extend([origin.strip() for origin in production_origins if origin.strip()])
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:3001", "*"],
+        allow_origins=trusted_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -125,6 +135,7 @@ def _include_routers(app: FastAPI) -> None:
         programs_router,
         tags_router,
         settings_router,
+        follow_along_router,
         sync_router,
         bulk_import_router,
     )
@@ -150,6 +161,8 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(tags_router)
     # User settings (AMA-585)
     app.include_router(settings_router)
+    # Follow-along workouts (AMA-356)
+    app.include_router(follow_along_router)
     # Account management (AMA-596)
     app.include_router(account_router)
     # Device sync (iOS, Android, Garmin) (AMA-589)
