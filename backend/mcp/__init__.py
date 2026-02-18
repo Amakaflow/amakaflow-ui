@@ -5,7 +5,7 @@ via the Model Context Protocol.
 
 Usage:
     from backend.mcp import MCPServer
-    
+
     server = MCPServer()
     result = server.handle_request(request)
 """
@@ -32,13 +32,13 @@ from backend.mcp.server import (
 __all__ = [
     "MCPServer",
     "MCPTool",
-    "MCPRequest", 
+    "MCPRequest",
     "MCPResponse",
     "MCPError",
     "create_mcp_server",
     # Error codes
     "JSONRPC_PARSE_ERROR",
-    "JSONRPC_INVALID_REQUEST", 
+    "JSONRPC_INVALID_REQUEST",
     "JSONRPC_METHOD_NOT_FOUND",
     "JSONRPC_INVALID_PARAMS",
     "JSONRPC_INTERNAL_ERROR",
