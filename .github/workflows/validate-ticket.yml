@@ -73,7 +73,7 @@ jobs:
           fi
 
           # Check 4: Checkboxes
-          if ! echo "$DESCRIPTION" | grep -qF '- [ ]'; then
+          if ! echo "$DESCRIPTION" | grep -qF -- '- [ ]'; then
             FAILURES="${FAILURES}\n- Acceptance criteria has no \`- [ ]\` checkboxes"
           fi
 
