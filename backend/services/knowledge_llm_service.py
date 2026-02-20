@@ -13,8 +13,6 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from backend.services.ai_client import StreamEvent
-
 logger = logging.getLogger(__name__)
 
 # Model constants
