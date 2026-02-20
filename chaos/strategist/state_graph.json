@@ -19,21 +19,32 @@
         "auth-login",
         "auth-signup",
         "empty-state-no-workouts",
-        "empty-state-no-kb-cards"
+        "empty-state-no-kb-cards",
+        "schedule-calendar",
+        "schedule-create-event",
+        "schedule-edit-event",
+        "schedule-day-view",
+        "schedule-week-view",
+        "schedule-event-detail",
+        "empty-state-no-schedule"
       ],
       "ai_features": [
         "workout-generation",
         "kb-summarise",
         "kb-tag-discover",
         "kb-relationships",
-        "chat-response-quality"
+        "chat-response-quality",
+        "schedule-suggest-workout"
       ],
       "edge_states": [
         "session-expiry-mid-flow",
         "loading-timeout",
         "concurrent-edit",
         "empty-form-submit",
-        "error-state-api-down"
+        "error-state-api-down",
+        "schedule-conflict-same-timeslot",
+        "schedule-past-date-entry",
+        "schedule-delete-recurring-event"
       ]
     },
     "ios": {

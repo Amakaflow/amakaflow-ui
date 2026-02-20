@@ -72,6 +72,42 @@
       "description": "Let session expire naturally by waiting, then attempt an action",
       "weight": 0.6,
       "applicable_surfaces": ["all"]
+    },
+    {
+      "id": "schedule-double-book",
+      "description": "Create two events at the exact same date and time to trigger a conflict",
+      "weight": 0.9,
+      "applicable_surfaces": ["schedule-create-event", "schedule-calendar"]
+    },
+    {
+      "id": "schedule-past-date",
+      "description": "Attempt to schedule a workout in the past (yesterday, last week)",
+      "weight": 0.8,
+      "applicable_surfaces": ["schedule-create-event", "schedule-edit-event"]
+    },
+    {
+      "id": "schedule-far-future",
+      "description": "Schedule a workout 2+ years in the future",
+      "weight": 0.7,
+      "applicable_surfaces": ["schedule-create-event"]
+    },
+    {
+      "id": "schedule-delete-mid-edit",
+      "description": "Start editing a scheduled event, then delete it before saving",
+      "weight": 0.9,
+      "applicable_surfaces": ["schedule-edit-event", "schedule-event-detail"]
+    },
+    {
+      "id": "schedule-rapid-create",
+      "description": "Create 5+ events in rapid succession without waiting for each to confirm",
+      "weight": 0.8,
+      "applicable_surfaces": ["schedule-create-event", "schedule-calendar"]
+    },
+    {
+      "id": "schedule-abandon-mid-create",
+      "description": "Fill in partial event details then navigate away without saving",
+      "weight": 0.9,
+      "applicable_surfaces": ["schedule-create-event", "schedule-edit-event"]
     }
   ]
 }
