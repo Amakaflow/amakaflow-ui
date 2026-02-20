@@ -84,11 +84,14 @@ class AIClient:
         create_kwargs: Dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
-            "system": system,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             "messages": messages,
         }
         if tools:
-            create_kwargs["tools"] = tools
+            create_kwargs["tools"] = [*tools[:-1], {**tools[-1], "cache_control": {"type": "ephemeral"}}]
+
+        cache_read_tokens = 0
+        cache_write_tokens = 0
 
         with tracer.start_as_current_span(
             "anthropic.messages.stream",
@@ -105,6 +108,8 @@ class AIClient:
                             msg = getattr(event, "message", None)
                             if msg and hasattr(msg, "usage"):
                                 input_tokens = getattr(msg.usage, "input_tokens", 0)
+                                cache_read_tokens = getattr(msg.usage, "cache_read_input_tokens", 0)
+                                cache_write_tokens = getattr(msg.usage, "cache_creation_input_tokens", 0)
 
                         elif event.type == "content_block_delta":
                             # Record TTFT on first content delta
@@ -171,6 +176,10 @@ class AIClient:
                     span.set_attribute("llm.output_tokens", output_tokens)
                     span.set_attribute("llm.total_seconds", total_seconds)
                     span.set_attribute("llm.stop_reason", stop_reason)
+                    span.set_attribute("llm.cache_read_tokens", cache_read_tokens)
+                    span.set_attribute("llm.cache_write_tokens", cache_write_tokens)
+                    if cache_read_tokens or cache_write_tokens:
+                        logger.debug("Prompt cache: read=%d write=%d", cache_read_tokens, cache_write_tokens)
 
                     yield StreamEvent(
                         event="message_end",
@@ -265,11 +274,14 @@ class AsyncAIClient:
         create_kwargs: Dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
-            "system": system,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             "messages": messages,
         }
         if tools:
-            create_kwargs["tools"] = tools
+            create_kwargs["tools"] = [*tools[:-1], {**tools[-1], "cache_control": {"type": "ephemeral"}}]
+
+        cache_read_tokens = 0
+        cache_write_tokens = 0
 
         with tracer.start_as_current_span(
             "anthropic.messages.stream",
@@ -286,6 +298,8 @@ class AsyncAIClient:
                             msg = getattr(event, "message", None)
                             if msg and hasattr(msg, "usage"):
                                 input_tokens = getattr(msg.usage, "input_tokens", 0)
+                                cache_read_tokens = getattr(msg.usage, "cache_read_input_tokens", 0)
+                                cache_write_tokens = getattr(msg.usage, "cache_creation_input_tokens", 0)
 
                         elif event.type == "content_block_delta":
                             # Record TTFT on first content delta
@@ -350,6 +364,10 @@ class AsyncAIClient:
                     span.set_attribute("llm.output_tokens", output_tokens)
                     span.set_attribute("llm.total_seconds", total_seconds)
                     span.set_attribute("llm.stop_reason", stop_reason)
+                    span.set_attribute("llm.cache_read_tokens", cache_read_tokens)
+                    span.set_attribute("llm.cache_write_tokens", cache_write_tokens)
+                    if cache_read_tokens or cache_write_tokens:
+                        logger.debug("Prompt cache: read=%d write=%d", cache_read_tokens, cache_write_tokens)
 
                     yield StreamEvent(
                         event="message_end",
