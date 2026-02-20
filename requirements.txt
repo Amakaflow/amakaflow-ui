@@ -30,6 +30,9 @@ elevenlabs>=1.0.0
 # SSE streaming
 sse-starlette>=1.6.0
 
+# KB content extraction (AMA-656)
+readability-lxml>=0.8.1
+
 # APNs push notifications
 aioapns>=3.0
 
