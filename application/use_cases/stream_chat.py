@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import time
+from datetime import date
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
@@ -177,11 +178,20 @@ class StreamChatUseCase:
 
         usage = self._rate_limit_repo.get_monthly_usage(user_id)
         if usage >= monthly_limit:
+            # Calculate retry_after: seconds until first day of next month
+            today = date.today()
+            if today.month == 12:
+                next_month = date(today.year + 1, 1, 1)
+            else:
+                next_month = date(today.year, today.month + 1, 1)
+            retry_after = (next_month - today).total_seconds()
+
             yield _sse("error", {
                 "type": "rate_limit_exceeded",
                 "message": f"Monthly message limit ({monthly_limit}) reached. Upgrade for more.",
                 "usage": usage,
                 "limit": monthly_limit,
+                "retry_after": int(retry_after),
             })
             return
 
