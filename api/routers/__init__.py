@@ -15,6 +15,7 @@ from api.routers.voice import router as voice_router
 from api.routers.workouts import router as workouts_router
 from api.routers.pipelines import router as pipelines_router
 from api.routers.programs import router as programs_router
+from api.routers.knowledge import router as knowledge_router
 
 __all__ = [
     "health_router",
@@ -24,4 +25,5 @@ __all__ = [
     "workouts_router",
     "pipelines_router",
     "programs_router",
+    "knowledge_router",
 ]
