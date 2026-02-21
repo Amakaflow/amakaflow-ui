@@ -40,6 +40,8 @@ export function ImportWorkout() {
   const [clarificationPreview, setClarificationPreview] = useState<PipelinePreview | null>(null);
   const pipeline = useStreamingPipeline();
 
+  // Only transition to clarification after streaming has fully ended;
+  // mid-stream preview events are ignored because isStreaming is still true at that point.
   useEffect(() => {
     if (!pipeline.isStreaming && pipeline.preview?.needs_clarification && (pipeline.preview.ambiguous_blocks?.length ?? 0) > 0) {
       setClarificationPreview(pipeline.preview);
@@ -127,6 +129,7 @@ export function ImportWorkout() {
       <div className="max-w-2xl mx-auto space-y-6">
         {urlInputBlock}
         <ClarificationScreen
+          key={clarificationPreview.preview_id}
           preview={clarificationPreview}
           onConfirm={(_selections) => {
             // Patch selected structures back onto the preview blocks
