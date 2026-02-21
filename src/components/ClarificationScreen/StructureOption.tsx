@@ -20,7 +20,7 @@ export function StructureOption({ value, isSelected, isAiGuess, onSelect }: Stru
       className={[
         'w-full text-left rounded-md border p-3 transition-colors',
         isSelected
-          ? 'border-primary bg-primary/5'
+          ? 'border-blue-500 bg-blue-500/10'
           : 'border-border bg-background hover:bg-accent/50',
       ].join(' ')}
     >
@@ -29,11 +29,11 @@ export function StructureOption({ value, isSelected, isAiGuess, onSelect }: Stru
         <div
           className={[
             'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
-            isSelected ? 'border-primary' : 'border-muted-foreground',
+            isSelected ? 'border-blue-500' : 'border-muted-foreground',
           ].join(' ')}
         >
           {isSelected && (
-            <div className="h-2 w-2 rounded-full bg-primary" />
+            <div className="h-2 w-2 rounded-full bg-blue-500" />
           )}
         </div>
 
