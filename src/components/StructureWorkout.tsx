@@ -403,32 +403,6 @@ function DraggableBlock({
     ? block.restOverride.restSec
     : workoutSettings?.defaultRestSec;
 
-  // Get structure-specific display info
-  const getStructureInfo = () => {
-    const parts: string[] = [];
-    if (block.structure === 'rounds' && block.rounds) {
-      parts.push(`${block.rounds} rounds`);
-    }
-    if (block.structure === 'sets' && block.sets) {
-      parts.push(`${block.sets} sets`);
-    }
-    if (block.rest_between_rounds_sec) {
-      parts.push(`Rest: ${block.rest_between_rounds_sec}s`);
-    }
-    if (block.rest_between_sets_sec) {
-      parts.push(`Rest: ${block.rest_between_sets_sec}s`);
-    }
-    if (block.time_work_sec && block.time_rest_sec) {
-      parts.push(`Work: ${block.time_work_sec}s / Rest: ${block.time_rest_sec}s`);
-    }
-    if (block.time_cap_sec) {
-      const minutes = Math.floor(block.time_cap_sec / 60);
-      const seconds = block.time_cap_sec % 60;
-      parts.push(`Cap: ${minutes}:${String(seconds).padStart(2, '0')}`);
-    }
-    return parts;
-  };
-
   return (
     <div ref={drop}>
       {/* Drop zone indicator at top of block */}
@@ -1207,26 +1181,6 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
-  // Helper to format rest settings for display - returns null if not configured
-  const getRestSettingsLabel = (): string | null => {
-    const settings = workoutWithIds.settings;
-    // Only show if explicitly configured
-    if (!settings?.defaultRestType) {
-      return null;  // Not configured - don't show
-    }
-    if (settings.defaultRestType === 'button') {
-      return 'Rest: Lap Button';  // TODO: Make device-aware (Garmin = Lap, Apple = Action, etc.)
-    }
-    if (settings.defaultRestType === 'timed' && settings.defaultRestSec) {
-      const mins = Math.floor(settings.defaultRestSec / 60);
-      const secs = settings.defaultRestSec % 60;
-      if (mins > 0 && secs > 0) return `Rest: ${mins}m ${secs}s`;
-      if (mins > 0) return `Rest: ${mins}m`;
-      return `Rest: ${secs}s`;
-    }
-    return null;
-  };
-
   const hasWarmupBlock = (workoutWithIds.blocks || []).some(b => b.structure === 'warmup');
   const hasCooldownBlock = (workoutWithIds.blocks || []).some(b => b.structure === 'cooldown');
   const hasDefaultRest = !!workoutWithIds.settings?.defaultRestSec;
@@ -1686,16 +1640,6 @@ export function StructureWorkout({
                     ex.reps = null;
                   }
                 });
-              }
-
-              // Warm-up configuration (block-level properties)
-              block.warmup_enabled = updates.warmupEnabled ?? false;
-              if (updates.warmupEnabled) {
-                block.warmup_activity = updates.warmupActivity;
-                block.warmup_duration_sec = updates.warmupDurationSec ?? null;
-              } else {
-                block.warmup_activity = undefined;
-                block.warmup_duration_sec = null;
               }
 
               onWorkoutChange(newWorkout);
