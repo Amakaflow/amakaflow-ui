@@ -69,7 +69,7 @@ export interface PipelineExercise {
   notes?: string;
 }
 
-export interface AmbiguousBlock {
+export interface PipelineAmbiguousBlock {
   id: string;
   label?: string;
   structure: string | null;
@@ -92,9 +92,9 @@ export interface PipelinePreview {
   source_url?: string;
   platform?: string;
   unmatched?: Array<{ name: string; suggestions?: string[] }>;
-  // AMA-714 clarification fields
+  // Clarification fields (AMA-714 backend, AMA-716 UI)
   needs_clarification?: boolean;
-  ambiguous_blocks?: AmbiguousBlock[];
+  ambiguous_blocks?: PipelineAmbiguousBlock[];
 }
 
 // Program-specific preview (returned by generate_program and generate_program_workouts)
