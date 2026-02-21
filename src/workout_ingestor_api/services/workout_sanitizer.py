@@ -52,4 +52,23 @@ def sanitize_workout_data(workout_data: Dict) -> Dict:
         elif structure == "superset":
             # Structure says superset but no valid supersets — reset
             block["structure"] = None
+
+        # Normalize rest field aliases → rest_between_rounds_sec
+        if "rest_sec" in block and "rest_between_rounds_sec" not in block:
+            block["rest_between_rounds_sec"] = block.pop("rest_sec")
+        elif "rest_sec" in block:
+            block.pop("rest_sec")  # already has rest_between_rounds_sec, discard alias
+        if "rest_between_sec" in block and "rest_between_rounds_sec" not in block:
+            block["rest_between_rounds_sec"] = block.pop("rest_between_sec")
+        elif "rest_between_sec" in block:
+            block.pop("rest_between_sec")
+
+        # Default missing exercise type to "strength"
+        for exercise in block.get("exercises", []):
+            if not exercise.get("type"):
+                exercise["type"] = "strength"
+        for superset in block.get("supersets", []):
+            for exercise in superset.get("exercises", []):
+                if not exercise.get("type"):
+                    exercise["type"] = "strength"
     return workout_data

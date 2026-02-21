@@ -9,6 +9,7 @@ AMA-564: superset detection from paired exercises on same line.
 import copy
 import pytest
 from workout_ingestor_api.services.instagram_reel_service import InstagramReelService
+from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data
 
 
 # ---------------------------------------------------------------------------
@@ -483,3 +484,40 @@ class TestEdgeCases:
         assert result["blocks"][0]["rounds"] == 3
         assert result["blocks"][0]["time_cap_sec"] == 600
         assert result["blocks"][0]["custom_field"] == "should survive"
+
+
+# --- AMA-711: rest alias normalization + exercise type defaulting ---
+
+def test_rest_sec_alias_normalized():
+    data = {"blocks": [{"rest_sec": 90, "exercises": [], "supersets": []}]}
+    result = sanitize_workout_data(data)
+    block = result["blocks"][0]
+    assert block.get("rest_between_rounds_sec") == 90
+    assert "rest_sec" not in block
+
+def test_rest_between_sec_alias_normalized():
+    data = {"blocks": [{"rest_between_sec": 60, "exercises": [], "supersets": []}]}
+    result = sanitize_workout_data(data)
+    block = result["blocks"][0]
+    assert block.get("rest_between_rounds_sec") == 60
+    assert "rest_between_sec" not in block
+
+def test_existing_rest_between_rounds_sec_not_overwritten():
+    data = {"blocks": [{"rest_between_rounds_sec": 120, "rest_sec": 90, "exercises": [], "supersets": []}]}
+    result = sanitize_workout_data(data)
+    assert result["blocks"][0]["rest_between_rounds_sec"] == 120
+
+def test_exercise_type_defaulted_to_strength():
+    data = {"blocks": [{"exercises": [{"name": "Squat", "sets": 3}], "supersets": []}]}
+    result = sanitize_workout_data(data)
+    assert result["blocks"][0]["exercises"][0]["type"] == "strength"
+
+def test_superset_exercise_type_defaulted():
+    data = {"blocks": [{"exercises": [], "supersets": [{"exercises": [{"name": "Squat"}]}]}]}
+    result = sanitize_workout_data(data)
+    assert result["blocks"][0]["supersets"][0]["exercises"][0]["type"] == "strength"
+
+def test_existing_exercise_type_not_overwritten():
+    data = {"blocks": [{"exercises": [{"name": "Run", "type": "cardio"}], "supersets": []}]}
+    result = sanitize_workout_data(data)
+    assert result["blocks"][0]["exercises"][0]["type"] == "cardio"

@@ -58,6 +58,11 @@ from workout_ingestor_api.services.voice_dictionary_service import (
     VoiceSettings,
 )
 from workout_ingestor_api.api.youtube_ingest import ingest_youtube_impl
+import workout_ingestor_api.services.url_router as _url_router_module
+import workout_ingestor_api.services.adapters as _adapters_module
+from workout_ingestor_api.services.adapters.base import PlatformFetchError, MediaContent
+import workout_ingestor_api.services.unified_cache_service as _unified_cache_module
+import workout_ingestor_api.services.unified_parser as _unified_parser_module
 # ---------------------------------------------------------------------------
 # Build / git metadata
 # ---------------------------------------------------------------------------
@@ -142,6 +147,11 @@ class ParseVoiceRequest(BaseModel):
 class InstagramReelRequest(BaseModel):
     url: str
     skip_cache: bool = False
+
+
+class IngestUrlRequest(BaseModel):
+    url: str
+    user_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -598,75 +608,60 @@ async def ingest_image_vision(
 
 
 @router.post("/ingest/url")
-async def ingest_url(url: str = Body(..., embed=True)):
-    """Ingest workout from generic video URL."""
-    instagram_post_pattern = re.compile(r"instagram\.com/p/([A-Za-z0-9_-]+)")
-    instagram_reel_pattern = re.compile(r"instagram\.com/reel/([A-Za-z0-9_-]+)")
-    instagram_tv_pattern = re.compile(r"instagram\.com/tv/([A-Za-z0-9_-]+)")
-
-    is_instagram_post = bool(instagram_post_pattern.search(url))
-    is_instagram_video = bool(
-        instagram_reel_pattern.search(url) or instagram_tv_pattern.search(url)
-    )
-
-    try:
-        title, desc, dl_url = VideoService.extract_video_info(url)
-    except Exception as e:
-        error_str = str(e)
-        if (
-            is_instagram_post
-            and not is_instagram_video
-            and ("no video" in error_str.lower() or "instagram" in error_str.lower())
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Instagram image posts are not supported by this endpoint. "
-                    "Use /ingest/instagram_test instead."
-                ),
-            )
-        raise HTTPException(status_code=400, detail=f"Could not read URL: {e}")
-
-    collected_text = f"{title}\n{desc}".strip()
-    ocr_text = ""
-
-    if dl_url:
-        tmpdir = tempfile.mkdtemp(prefix="ingest_url_")
-        try:
-            video_path = os.path.join(tmpdir, "video.mp4")
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    dl_url,
-                    "-t",
-                    "30",
-                    "-an",
-                    video_path,
-                ],
-                check=True,
-            )
-            VideoService.sample_frames(video_path, tmpdir, fps=0.75, max_secs=25)
-            ocr_text = OCRService.ocr_many_images_to_text(tmpdir, fast_mode=True)
-        except subprocess.CalledProcessError:
-            pass
-        finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
-
-    merged_text = "\n".join(t for t in [collected_text, ocr_text] if t).strip()
-    if not merged_text:
+def ingest_url(
+    body: IngestUrlRequest,
+    current_user: str = Depends(get_optional_user),
+):
+    """Universal URL ingestion endpoint — routes to the correct platform adapter."""
+    # 1. Route
+    routing = _url_router_module.route_url(body.url)
+    if routing is None:
         raise HTTPException(
-            status_code=422, detail="No text found in video or description"
+            status_code=400,
+            detail="Unsupported URL — no adapter registered for this platform",
         )
 
-    wk = ParserService.parse_free_text_to_workout(merged_text, source=url)
-    if title:
-        wk.title = title[:80]
-    return JSONResponse(wk.convert_to_new_structure().model_dump())
+    # 2. Cache check
+    cached = _unified_cache_module.UnifiedCacheService.get(routing.source_id, routing.platform)
+    if cached:
+        return cached
+
+    # 3. Fetch via adapter
+    try:
+        adapter = _adapters_module.get_adapter(routing.platform)
+        media: MediaContent = adapter.fetch(body.url, routing.source_id)
+    except PlatformFetchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except KeyError:
+        raise HTTPException(status_code=400, detail=f"No adapter registered for platform: {routing.platform}")
+
+    if not (media.primary_text or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="No extractable text found (no transcript or caption)",
+        )
+
+    # 4. Parse
+    try:
+        user_id = body.user_id or current_user
+        parser = _unified_parser_module.UnifiedParser()
+        workout_data = parser.parse(media, platform=routing.platform, user_id=user_id)
+    except _unified_parser_module.UnifiedParserError as e:
+        raise HTTPException(status_code=422, detail=f"Failed to extract workout: {e}")
+
+    # 5. Cache save (before building response)
+    _unified_cache_module.UnifiedCacheService.save(routing.source_id, routing.platform, workout_data)
+
+    # 6. Validate with Pydantic, then add provenance to the response dict
+    response_dict = Workout(**workout_data).model_dump()
+    response_dict.setdefault("_provenance", {})
+    response_dict["_provenance"].update({
+        "mode": routing.platform,
+        "source_url": str(body.url),
+        "source_id": routing.source_id,
+        "platform": routing.platform,
+    })
+    return response_dict
 
 
 # ---------------------------------------------------------------------------
