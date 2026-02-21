@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from './ui/alert';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { WorkoutStructure, Exercise, Block, Superset, RestType, WorkoutSettings } from '../types/workout';
+import { WorkoutStructure, Exercise, Block, Superset, RestType, WorkoutSettings, WorkoutStructureType } from '../types/workout';
 import { DeviceId, getDevicesByIds, getDeviceById, Device, getPrimaryExportDestinations } from '../lib/devices';
 import { ExerciseSearch } from './ExerciseSearch';
 import { Badge } from './ui/badge';
-import { addIdsToWorkout, generateId, getStructureDisplayName, getBlockKeyMetric } from '../lib/workout-utils';
+import { addIdsToWorkout, generateId, getStructureDisplayName, getBlockKeyMetric, getStructureDefaults, formatRestSecs } from '../lib/workout-utils';
 import { BlockConfigRow } from './BlockConfigRow';
+import { AddBlockTypePicker } from './AddBlockTypePicker';
+import { WarmupSuggestionStrip, CooldownSuggestionStrip, DefaultRestStrip } from './WorkoutSuggestionStrips';
 import { EditExerciseDialog } from './EditExerciseDialog';
 import { EditBlockDialog, BlockUpdates } from './EditBlockDialog';
 import { WorkoutSettingsDialog } from './WorkoutSettingsDialog';
@@ -859,6 +861,36 @@ export function StructureWorkout({
   const [addingToSuperset, setAddingToSuperset] = useState<{ blockIdx: number; supersetIdx: number } | null>(null);
   const [collapseSignal, setCollapseSignal] = useState<{ action: 'collapse' | 'expand'; timestamp: number } | undefined>(undefined);
   const [jsonCopied, setJsonCopied] = useState(false);
+  const [showAddBlockPicker, setShowAddBlockPicker] = useState(false);
+  const [skippedWarmup, setSkippedWarmup] = useState(false);
+  const [skippedCooldown, setSkippedCooldown] = useState(false);
+  const [skippedRest, setSkippedRest] = useState(false);
+
+  // Auto-migrate legacy workoutWarmup setting to a real warmup block (one-time on mount)
+  useEffect(() => {
+    const warmup = workout?.settings?.workoutWarmup;
+    if (warmup?.enabled) {
+      const hasWarmupBlock = workout.blocks?.some(b => b.structure === 'warmup');
+      if (!hasWarmupBlock) {
+        const newWorkout = cloneWorkout(workout);
+        const warmupBlock: Block = {
+          id: generateId(),
+          label: 'Warm-up',
+          structure: 'warmup',
+          exercises: [],
+          ...getStructureDefaults('warmup'),
+          warmup_activity: warmup.activity,
+          warmup_duration_sec: warmup.durationSec ?? null,
+          warmup_enabled: true,
+        };
+        newWorkout.blocks = [warmupBlock, ...(newWorkout.blocks || [])];
+        if (newWorkout.settings) {
+          newWorkout.settings = { ...newWorkout.settings, workoutWarmup: undefined };
+        }
+        onWorkoutChange(newWorkout);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const availableDevices = getDevicesByIds(userSelectedDevices);
 
@@ -1142,16 +1174,23 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
-  const addBlock = () => {
+  const addBlock = (structure?: WorkoutStructureType) => {
     const newWorkout = cloneWorkout(workoutWithIds);
+    const defaults = structure ? getStructureDefaults(structure) : {};
+    const displayName = structure ? getStructureDisplayName(structure) : null;
+    const label = displayName
+      ? displayName.charAt(0).toUpperCase() + displayName.slice(1).toLowerCase()
+      : `Block ${(workoutWithIds.blocks || []).length + 1}`;
     const newBlock: Block = {
       id: generateId(),
-      label: `Block ${(workoutWithIds.blocks || []).length + 1}`,
-      structure: null,
+      label,
+      structure: structure ?? null,
       exercises: [],
+      ...defaults,
     };
     newWorkout.blocks.push(newBlock);
     onWorkoutChange(newWorkout);
+    setShowAddBlockPicker(false);
   };
 
   const updateBlock = (blockIdx: number, updates: Partial<Block>) => {
@@ -1188,6 +1227,15 @@ export function StructureWorkout({
     return null;
   };
 
+  const hasWarmupBlock = (workoutWithIds.blocks || []).some(b => b.structure === 'warmup');
+  const hasCooldownBlock = (workoutWithIds.blocks || []).some(b => b.structure === 'cooldown');
+  const hasDefaultRest = !!workoutWithIds.settings?.defaultRestSec;
+  const hasAnyBlock = (workoutWithIds.blocks || []).length > 0;
+
+  const showWarmupStrip = hasAnyBlock && !hasWarmupBlock && !skippedWarmup;
+  const showCooldownStrip = hasAnyBlock && !hasCooldownBlock && !skippedCooldown;
+  const showRestStrip = hasAnyBlock && !hasDefaultRest && !skippedRest;
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="space-y-6">
@@ -1201,22 +1249,13 @@ export function StructureWorkout({
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 </div>
-                {/* Workout Settings Badges - only show if configured */}
-                <div className="flex items-center gap-2 mt-2">
-                  {getRestSettingsLabel() && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <Clock className="w-3 h-3" />
-                      {getRestSettingsLabel()}
-                    </Badge>
-                  )}
-                  {workoutWithIds.settings?.workoutWarmup?.enabled && (
-                    <Badge variant="outline" className="text-xs">
-                      Warm-up: {workoutWithIds.settings.workoutWarmup.activity === 'custom'
-                        ? 'Custom'
-                        : workoutWithIds.settings.workoutWarmup.activity?.replace('_', ' ')}
-                    </Badge>
-                  )}
-                </div>
+                {/* Default rest indicator */}
+                {hasDefaultRest && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default rest: {formatRestSecs(workoutWithIds.settings!.defaultRestSec!)} · applied to all blocks unless overridden
+                    <button className="ml-2 underline" onClick={() => setShowWorkoutSettings(true)}>Edit</button>
+                  </p>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -1399,30 +1438,52 @@ export function StructureWorkout({
             <span>Drag blocks and exercises to reorder</span>
           </div>
           <div className="flex gap-2">
-            <Button 
-              onClick={() => setCollapseSignal({ action: 'collapse', timestamp: Date.now() })} 
-              variant="outline" 
+            <Button
+              onClick={() => setCollapseSignal({ action: 'collapse', timestamp: Date.now() })}
+              variant="outline"
               size="sm"
               className="gap-2"
             >
               <Minimize2 className="w-4 h-4" />
               Collapse All
             </Button>
-            <Button 
-              onClick={() => setCollapseSignal({ action: 'expand', timestamp: Date.now() })} 
-              variant="outline" 
+            <Button
+              onClick={() => setCollapseSignal({ action: 'expand', timestamp: Date.now() })}
+              variant="outline"
               size="sm"
               className="gap-2"
             >
               <Maximize2 className="w-4 h-4" />
               Expand All
             </Button>
-            <Button onClick={addBlock} variant="outline" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add Block
-            </Button>
           </div>
         </div>
+
+        {/* Suggestion strips */}
+        {showWarmupStrip && (
+          <WarmupSuggestionStrip
+            onAdd={() => {
+              const newWorkout = cloneWorkout(workoutWithIds);
+              const warmupBlock: Block = {
+                id: generateId(),
+                label: 'Warm-up',
+                structure: 'warmup',
+                exercises: [],
+                warmup_enabled: true,
+                ...getStructureDefaults('warmup'),
+              };
+              newWorkout.blocks.unshift(warmupBlock);
+              onWorkoutChange(newWorkout);
+            }}
+            onSkip={() => setSkippedWarmup(true)}
+          />
+        )}
+        {showRestStrip && (
+          <DefaultRestStrip
+            onSet={() => setShowWorkoutSettings(true)}
+            onSkip={() => setSkippedRest(true)}
+          />
+        )}
 
         <ScrollArea className="h-[calc(100vh-400px)] min-h-[400px]">
           <div className="space-y-4 pr-4 pb-8">
@@ -1461,6 +1522,39 @@ export function StructureWorkout({
             )}
           </div>
         </ScrollArea>
+
+        {/* Cooldown strip at bottom */}
+        {showCooldownStrip && (
+          <CooldownSuggestionStrip
+            onAdd={() => {
+              const newWorkout = cloneWorkout(workoutWithIds);
+              const cooldownBlock: Block = {
+                id: generateId(),
+                label: 'Cool-down',
+                structure: 'cooldown',
+                exercises: [],
+                warmup_enabled: true,
+                ...getStructureDefaults('cooldown'),
+              };
+              newWorkout.blocks.push(cooldownBlock);
+              onWorkoutChange(newWorkout);
+            }}
+            onSkip={() => setSkippedCooldown(true)}
+          />
+        )}
+
+        {/* Add Block — type picker */}
+        {showAddBlockPicker ? (
+          <AddBlockTypePicker
+            onSelect={(structure) => addBlock(structure)}
+            onCancel={() => setShowAddBlockPicker(false)}
+          />
+        ) : (
+          <Button onClick={() => setShowAddBlockPicker(true)} variant="outline" className="gap-2" aria-label="Add Block">
+            <Plus className="w-4 h-4" />
+            Add Block
+          </Button>
+        )}
 
         {/* Exercise Search Modal */}
         {showExerciseSearch && addingToBlock !== null && (
