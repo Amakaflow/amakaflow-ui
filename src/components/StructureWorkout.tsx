@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code, Download, Send, Info, Clock, Copy } from 'lucide-react';
+import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code, Download, Send, Info, Clock, Copy, Settings2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
@@ -12,10 +12,27 @@ import { WorkoutStructure, Exercise, Block, Superset, RestType, WorkoutSettings 
 import { DeviceId, getDevicesByIds, getDeviceById, Device, getPrimaryExportDestinations } from '../lib/devices';
 import { ExerciseSearch } from './ExerciseSearch';
 import { Badge } from './ui/badge';
-import { addIdsToWorkout, generateId, getStructureDisplayName } from '../lib/workout-utils';
+import { addIdsToWorkout, generateId, getStructureDisplayName, getBlockKeyMetric } from '../lib/workout-utils';
+import { BlockConfigRow } from './BlockConfigRow';
 import { EditExerciseDialog } from './EditExerciseDialog';
 import { EditBlockDialog, BlockUpdates } from './EditBlockDialog';
 import { WorkoutSettingsDialog } from './WorkoutSettingsDialog';
+
+// ── Block type visual system ──────────────────────────────────────────────────
+const STRUCTURE_STYLES: Record<string, { border: string; badge: string }> = {
+  circuit:    { border: 'border-l-4 border-l-green-500',   badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  rounds:     { border: 'border-l-4 border-l-green-400',   badge: 'bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300' },
+  emom:       { border: 'border-l-4 border-l-blue-500',    badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+  amrap:      { border: 'border-l-4 border-l-orange-500',  badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  tabata:     { border: 'border-l-4 border-l-red-500',     badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
+  'for-time': { border: 'border-l-4 border-l-purple-500',  badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  sets:       { border: 'border-l-4 border-l-neutral-400', badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300' },
+  regular:    { border: 'border-l-4 border-l-neutral-400', badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300' },
+  superset:   { border: 'border-l-4 border-l-amber-500',   badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  warmup:     { border: 'border-l-4 border-l-slate-300',   badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  cooldown:   { border: 'border-l-4 border-l-slate-300',   badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  default:    { border: 'border-l-4 border-l-neutral-300', badge: 'bg-neutral-100 text-neutral-600' },
+};
 
 // ============================================================================
 // Immutable helpers for Workout cloning (Industry-standard: avoid JSON.parse(JSON.stringify))
@@ -336,6 +353,7 @@ function DraggableBlock({
   }));
 
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [showConfig, setShowConfig] = useState(false);
   // Track collapsed state per superset (keyed by superset index)
   const [collapsedSupersets, setCollapsedSupersets] = useState<Record<number, boolean>>({});
 
@@ -419,91 +437,80 @@ function DraggableBlock({
       )}
       
       <div ref={dragPreview}>
-        <Card 
+        <Card
           className={`transition-all ${isDragging ? 'opacity-40 rotate-1 scale-95' : 'opacity-100'} ${isOver && canDrop ? 'ring-2 ring-primary shadow-lg' : ''}`}
         >
-          <CardHeader className="bg-muted/30">
-            <div className="flex items-center gap-2">
-              <div 
-                ref={drag}
-                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground hover:bg-muted/50 p-1 rounded transition-colors"
-              >
-                <GripVertical className="w-5 h-5" />
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-0 h-auto hover:bg-transparent"
-              >
-                {isCollapsed ? (
-                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                ) : (
-                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
+          {(() => {
+            const styles = STRUCTURE_STYLES[block.structure ?? ''] ?? STRUCTURE_STYLES.default;
+            return (
+              <>
+                <CardHeader className={`${styles.border} pl-4 bg-muted/20`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {/* Drag handle */}
+                    <div
+                      ref={drag}
+                      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <GripVertical className="w-5 h-5" />
+                    </div>
+
+                    {/* Collapse exercises toggle */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsCollapsed(!isCollapsed)}
+                      className="p-0 h-auto hover:bg-transparent shrink-0"
+                      title={isCollapsed ? 'Expand exercises' : 'Collapse exercises'}
+                    >
+                      {isCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+                    </Button>
+
+                    {/* Type badge */}
+                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded ${styles.badge}`}>
+                      {getStructureDisplayName(block.structure)}
+                    </span>
+
+                    {/* Block name */}
+                    <span className="font-medium text-sm truncate flex-1">{block.label}</span>
+
+                    {/* Key metric */}
+                    {block.structure && (
+                      <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                        {getBlockKeyMetric(block)}
+                      </span>
+                    )}
+
+                    {/* Configure button */}
+                    {block.structure && (
+                      <Button
+                        size="sm"
+                        variant={showConfig ? 'secondary' : 'ghost'}
+                        onClick={() => setShowConfig(!showConfig)}
+                        className="shrink-0 gap-1 text-xs h-7"
+                        aria-label="configure"
+                      >
+                        <Settings2 className="w-3 h-3" />
+                        Configure
+                      </Button>
+                    )}
+
+                    {/* Edit block name button */}
+                    <Button size="sm" variant="ghost" onClick={onEditBlock} title="Edit block name" className="shrink-0 p-1 h-7">
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                {/* Config row — inline, no dialog */}
+                {showConfig && (
+                  <BlockConfigRow
+                    block={block}
+                    onUpdate={(updates) => onUpdateBlock(updates)}
+                  />
                 )}
-              </Button>
-              <div className="flex items-center gap-2 flex-1">
-                <CardTitle className="text-lg">{block.label}</CardTitle>
-                <Button size="sm" variant="ghost" onClick={onEditBlock} title="Edit Block">
-                  <Edit2 className="w-4 h-4" />
-                </Button>
-                {isCollapsed && (
-                  <Badge variant="secondary" className="text-xs">
-                    {totalExerciseCount} exercise{totalExerciseCount !== 1 ? 's' : ''}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {block.structure && (
-                  <Badge variant="outline">{getStructureDisplayName(block.structure)}</Badge>
-                )}
-                {/* Rest indicator - only show if explicitly configured (block override or workout default) */}
-                {(() => {
-                  // Only show if rest is explicitly configured
-                  const hasBlockOverride = block.restOverride?.enabled;
-                  const hasWorkoutDefault = workoutSettings?.defaultRestType;
-
-                  if (!hasBlockOverride && !hasWorkoutDefault) {
-                    return null;  // Not configured - don't show
-                  }
-
-                  const restType = hasBlockOverride
-                    ? block.restOverride?.restType
-                    : workoutSettings?.defaultRestType;
-                  const restSec = hasBlockOverride
-                    ? block.restOverride?.restSec
-                    : workoutSettings?.defaultRestSec;
-
-                  let label: string;
-                  if (restType === 'button') {
-                    label = 'Rest: Lap Button';  // TODO: Make device-aware
-                  } else if (restSec) {
-                    const mins = Math.floor(restSec / 60);
-                    const secs = restSec % 60;
-                    if (mins > 0 && secs > 0) label = `Rest: ${mins}m ${secs}s`;
-                    else if (mins > 0) label = `Rest: ${mins}m`;
-                    else label = `Rest: ${secs}s`;
-                  } else {
-                    return null;  // No valid rest config
-                  }
-
-                  return (
-                    <Badge variant={hasBlockOverride ? "secondary" : "outline"} className="text-xs gap-1">
-                      <Clock className="w-3 h-3" />
-                      {label}
-                    </Badge>
-                  );
-                })()}
-              </div>
-            </div>
-            {!isCollapsed && getStructureInfo().length > 0 && (
-              <div className="flex gap-4 text-xs text-muted-foreground mt-2">
-                {getStructureInfo().map((info, idx) => (
-                  <span key={idx}>{info}</span>
-                ))}
-              </div>
-            )}
-          </CardHeader>
+              </>
+            );
+          })()}
           {!isCollapsed && (
             <CardContent className="space-y-4">
               {/* Exercises at index 0 (before supersets) - show if supersets exist */}
