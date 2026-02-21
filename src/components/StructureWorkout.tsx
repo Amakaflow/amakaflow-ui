@@ -355,7 +355,7 @@ function DraggableBlock({
   }));
 
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [showConfig, setShowConfig] = useState(false);
+  const [showConfig, setShowConfig] = useState(true);
   // Track collapsed state per superset (keyed by superset index)
   const [collapsedSupersets, setCollapsedSupersets] = useState<Record<number, boolean>>({});
 
@@ -809,6 +809,10 @@ export function StructureWorkout({
     workout?.blocks?.map(b => b?.exercises?.map(e => e?.id || '').join(',') || '').join('|') || '',
     workout?.blocks?.map(b => b?.supersets?.map(ss => ss?.id || '').join(',') || '').join('|') || '',
     workout?.blocks?.map(b => b?.supersets?.map(ss => ss?.exercises?.map(e => e?.id || '').join(',') || '').join('|') || '').join('||') || '',
+    // Include block structural config fields (rounds, rest, time caps, etc.)
+    workout?.blocks?.map(b =>
+      `${b?.structure ?? ''}|${b?.rounds ?? ''}|${b?.rest_between_rounds_sec ?? ''}|${b?.rest_between_sets_sec ?? ''}|${b?.time_cap_sec ?? ''}|${b?.time_work_sec ?? ''}|${b?.time_rest_sec ?? ''}|${b?.sets ?? ''}|${b?.warmup_duration_sec ?? ''}|${b?.warmup_activity ?? ''}`
+    ).join('^^') ?? '',
     // Include exercise names to detect when new exercises are added
     workout?.blocks?.map(b => b?.exercises?.map(e => e?.name || '').join(',') || '').join('|') || '',
     workout?.blocks?.map(b => b?.supersets?.map(ss => ss?.exercises?.map(e => e?.name || '').join(',') || '').join('|') || '').join('||') || '',
