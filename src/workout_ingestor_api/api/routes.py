@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import json
+import uuid
 from datetime import datetime
 from typing import Optional, Dict, List
 
@@ -29,7 +30,7 @@ from fastapi.responses import JSONResponse, Response
 from workout_ingestor_api.auth import get_current_user, get_optional_user, get_user_with_metadata
 from pydantic import BaseModel
 
-from workout_ingestor_api.models import Workout, Block, Exercise
+from workout_ingestor_api.models import Workout, Block, Exercise, STRUCTURE_CONFIDENCE_THRESHOLD
 from workout_ingestor_api.services.ocr_service import OCRService
 from workout_ingestor_api.services.parser_service import ParserService
 from workout_ingestor_api.services.video_service import VideoService
@@ -649,10 +650,27 @@ def ingest_url(
     except _unified_parser_module.UnifiedParserError as e:
         raise HTTPException(status_code=422, detail=f"Failed to extract workout: {e}")
 
-    # 5. Cache save (before building response)
+    # 5. Inject block identity and source provenance
+    for block in workout_data.get("blocks", []):
+        if not block.get("id"):
+            block["id"] = str(uuid.uuid4())
+        if not block.get("source"):
+            block["source"] = {
+                "platform": routing.platform,
+                "source_id": routing.source_id,
+                "source_url": str(body.url),
+            }
+
+    # 6. Compute needs_clarification
+    workout_data["needs_clarification"] = any(
+        block.get("structure_confidence", 1.0) < STRUCTURE_CONFIDENCE_THRESHOLD
+        for block in workout_data.get("blocks", [])
+    )
+
+    # 7. Cache save (before building response)
     _unified_cache_module.UnifiedCacheService.save(routing.source_id, routing.platform, workout_data)
 
-    # 6. Validate with Pydantic, then add provenance to the response dict
+    # 8. Validate with Pydantic, then add provenance to the response dict
     response_dict = Workout(**workout_data).model_dump()
     response_dict.setdefault("_provenance", {})
     response_dict["_provenance"].update({

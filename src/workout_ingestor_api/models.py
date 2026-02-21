@@ -1,9 +1,12 @@
 """Data models for workout ingestion."""
+import uuid
 from pydantic import BaseModel, Field, computed_field
-from typing import List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 
 # AMA-213: Workout type detection
 WorkoutType = Literal['strength', 'circuit', 'hiit', 'cardio', 'follow_along', 'mixed']
+
+STRUCTURE_CONFIDENCE_THRESHOLD = 0.8
 
 
 class Exercise(BaseModel):
@@ -40,7 +43,7 @@ class Superset(BaseModel):
 class Block(BaseModel):
     """
     Represents a block or section of a workout.
-    
+
     Structure types:
     - 'superset': 2 exercises back to back with no rest between, rest after the pair
     - 'circuit': Multiple exercises back to back with no rest between, rest after the circuit
@@ -52,10 +55,17 @@ class Block(BaseModel):
     - 'sets': Fixed number of sets with rest between
     - 'regular': Standard workout with rest between exercises
     """
-    label: Optional[str] = None
-    
+
     class Config:
-        extra = "ignore"  # Ignore extra fields like 'id', 'supersets' from UI
+        extra = "ignore"  # Ignore extra fields like 'supersets' from UI; declared fields (id, source, etc.) are accepted normally
+
+    label: Optional[str] = None
+
+    # Portability and confidence fields (AMA-714)
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source: Optional[Dict[str, str]] = None  # {platform, source_id, source_url}
+    structure_confidence: float = Field(default=1.0, ge=0.0, le=1.0)  # 0.0–1.0; <0.8 triggers app clarification
+    structure_options: List[str] = Field(default_factory=list)  # LLM candidate structures
     structure: Optional[Literal[
         'superset',
         'circuit', 
@@ -97,6 +107,7 @@ class Workout(BaseModel):
     # AMA-213: Workout type detection
     workout_type: Optional[WorkoutType] = None
     workout_type_confidence: Optional[float] = None
+    needs_clarification: bool = False  # True if any block has structure_confidence < threshold
 
     class Config:
         extra = "ignore"  # Ignore extra fields from UI
@@ -155,6 +166,10 @@ class Workout(BaseModel):
             # Create new block with converted structure
             converted_block = Block(
                 label=block.label,
+                id=block.id,                                      # preserve identity
+                source=block.source,                               # preserve provenance
+                structure_confidence=block.structure_confidence,   # preserve confidence
+                structure_options=block.structure_options,         # preserve options
                 structure=structure,
                 exercises=exercises,
                 rounds=block.rounds,
@@ -177,4 +192,5 @@ class Workout(BaseModel):
             # AMA-213: Preserve workout type detection
             workout_type=self.workout_type,
             workout_type_confidence=self.workout_type_confidence,
+            needs_clarification=self.needs_clarification,
         )

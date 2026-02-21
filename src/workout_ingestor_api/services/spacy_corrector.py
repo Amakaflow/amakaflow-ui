@@ -56,6 +56,11 @@ class SpacyCorrector:
             if has_per_side:
                 self._apply_per_side(block)
 
+            # Upgrade confidence if explicit round signal found in raw text
+            if rounds is not None and block.get("structure_confidence", 0.0) < 1.0:
+                block["structure_confidence"] = 1.0
+                block["structure_options"] = []
+
         return workout_data
 
     @staticmethod

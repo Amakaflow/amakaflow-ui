@@ -1,3 +1,5 @@
+import uuid as _uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -118,3 +120,84 @@ class TestWorkoutComputedFields:
         converted = workout.convert_to_new_structure()
         assert converted.exercise_count == 3
         assert [e.name for e in converted.exercises] == ["A", "B", "C"]
+
+
+class TestBlockPortabilityFields:
+    def test_block_gets_uuid_id_by_default(self):
+        block = Block(label="Test")
+        assert block.id is not None
+        _uuid.UUID(block.id)
+
+    def test_block_id_is_unique_per_instance(self):
+        b1 = Block(label="A")
+        b2 = Block(label="B")
+        assert b1.id != b2.id
+
+    def test_block_id_preserved_when_provided(self):
+        fixed_id = str(_uuid.uuid4())
+        block = Block(label="Test", id=fixed_id)
+        assert block.id == fixed_id
+
+    def test_block_source_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.source is None
+
+    def test_block_source_roundtrips(self):
+        src = {"platform": "instagram", "source_id": "abc123", "source_url": "https://instagram.com/p/abc123/"}
+        block = Block(label="Test", source=src)
+        assert block.source == src
+
+    def test_block_structure_confidence_defaults_to_1(self):
+        block = Block(label="Test")
+        assert block.structure_confidence == 1.0
+
+    def test_block_structure_options_defaults_to_empty(self):
+        block = Block(label="Test")
+        assert block.structure_options == []
+
+    def test_block_structure_options_roundtrips(self):
+        block = Block(label="Test", structure_confidence=0.4, structure_options=["circuit", "straight_sets"])
+        assert block.structure_confidence == 0.4
+        assert block.structure_options == ["circuit", "straight_sets"]
+
+    def test_workout_needs_clarification_defaults_to_false(self):
+        workout = Workout(title="Test")
+        assert workout.needs_clarification is False
+
+    def test_workout_needs_clarification_roundtrips(self):
+        workout = Workout(title="Test", needs_clarification=True)
+        assert workout.needs_clarification is True
+
+    def test_block_id_survives_model_dump_and_reload(self):
+        original = Block(label="Test", structure="circuit")
+        dumped = original.model_dump()
+        reloaded = Block(**dumped)
+        assert reloaded.id == original.id
+
+    def test_structure_confidence_threshold_constant_exists(self):
+        from workout_ingestor_api.models import STRUCTURE_CONFIDENCE_THRESHOLD
+        assert 0.0 < STRUCTURE_CONFIDENCE_THRESHOLD < 1.0
+
+    def test_convert_to_new_structure_preserves_portability_fields(self):
+        """convert_to_new_structure must not drop id, source, or confidence fields."""
+        fixed_id = str(_uuid.uuid4())
+        src = {"platform": "instagram", "source_id": "abc", "source_url": "https://..."}
+        workout = Workout(
+            title="Test",
+            needs_clarification=True,
+            blocks=[Block(
+                label="Block",
+                id=fixed_id,
+                source=src,
+                structure_confidence=0.4,
+                structure_options=["circuit", "straight_sets"],
+                exercises=[],
+            )]
+        )
+        converted = workout.convert_to_new_structure()
+        block = converted.blocks[0]
+        assert block.id == fixed_id
+        assert block.source == src
+        assert block.structure_confidence == 0.4
+        assert block.structure_options == ["circuit", "straight_sets"]
+        assert converted.needs_clarification is True
