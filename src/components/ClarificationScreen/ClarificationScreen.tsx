@@ -4,6 +4,8 @@ import { Button } from '../ui/button';
 import type { PipelinePreview } from '../../types/pipeline';
 import { ClarificationCard } from './ClarificationCard';
 
+const CONFIDENCE_THRESHOLD = 0.8; // blocks below this score are flagged for user clarification
+
 interface ClarificationScreenProps {
   preview: PipelinePreview;
   onConfirm: (selections: Record<string, string>) => void;
@@ -20,23 +22,20 @@ export function ClarificationScreen({ preview, onConfirm, onBack }: Clarificatio
         );
         return false;
       }
-      return block.structure_confidence < 0.8;
+      return block.structure_confidence < CONFIDENCE_THRESHOLD;
     });
   }, [preview.ambiguous_blocks]);
 
-  // Build initial selections from each block's structure field
-  const buildInitialSelections = (): Record<string, string> => {
+  const initialSelections = useMemo(() => {
     const result: Record<string, string> = {};
     for (const block of ambiguousBlocks) {
       result[block.id] = block.structure ?? '';
     }
     return result;
-  };
+  }, [ambiguousBlocks]);
 
-  const initialSelectionsRef = useRef<Record<string, string>>(buildInitialSelections());
-  const [selections, setSelections] = useState<Record<string, string>>(
-    buildInitialSelections,
-  );
+  const initialSelectionsRef = useRef(initialSelections);
+  const [selections, setSelections] = useState(initialSelections);
   const [showBackWarning, setShowBackWarning] = useState(false);
 
   const handleSelect = (blockId: string, value: string) => {
@@ -55,6 +54,10 @@ export function ClarificationScreen({ preview, onConfirm, onBack }: Clarificatio
       onBack();
     }
   };
+
+  const allSelected = ambiguousBlocks.every(
+    (block) => (selections[block.id] ?? '') !== ''
+  );
 
   const n = ambiguousBlocks.length;
   const blockWord = n === 1 ? 'block' : 'blocks';
@@ -126,7 +129,7 @@ export function ClarificationScreen({ preview, onConfirm, onBack }: Clarificatio
         <Button variant="ghost" onClick={() => onConfirm(selections)}>
           Skip — use best guesses
         </Button>
-        <Button onClick={() => onConfirm(selections)}>Save to Library</Button>
+        <Button onClick={() => onConfirm(selections)} disabled={!allSelected}>Save to Library</Button>
       </div>
     </div>
   );

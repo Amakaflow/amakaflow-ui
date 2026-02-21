@@ -28,7 +28,7 @@ export function ClarificationCard({
   return (
     <div
       data-testid="clarification-card"
-      className="rounded-lg border bg-white p-4 shadow-sm space-y-3"
+      className="rounded-lg border bg-card p-4 shadow-sm space-y-3"
     >
       {/* Header row */}
       <div className="flex items-center justify-between">
@@ -47,7 +47,11 @@ export function ClarificationCard({
       <p className="text-sm font-medium">How is this block structured?</p>
 
       {/* Structure options */}
-      <div className="space-y-2">
+      <div
+        className="space-y-2"
+        role="radiogroup"
+        aria-label="Block structure"
+      >
         {block.structure_options.map((option) => (
           <StructureOption
             key={option}
