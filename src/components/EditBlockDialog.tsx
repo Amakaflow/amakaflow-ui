@@ -6,8 +6,8 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
-import { Block, RestType, WarmupActivity, WorkoutSettings } from '../types/workout';
+import { Info } from 'lucide-react';
+import { Block, RestType, WorkoutSettings } from '../types/workout';
 
 // Updates that can be applied from EditBlockDialog
 export interface BlockUpdates {
@@ -22,10 +22,6 @@ export interface BlockUpdates {
   reps?: number | null;
   applyRepsRange?: boolean;
   repsRange?: string | null;
-  // Warm-up configuration
-  warmupEnabled?: boolean;
-  warmupActivity?: WarmupActivity;
-  warmupDurationSec?: number | null;
 }
 
 interface EditBlockDialogProps {
@@ -46,16 +42,6 @@ const formatDuration = (seconds: number): string => {
   return `${seconds}s`;
 };
 
-// Warm-up activity display names
-const WARMUP_ACTIVITIES: { value: WarmupActivity; label: string }[] = [
-  { value: 'stretching', label: 'Stretching' },
-  { value: 'jump_rope', label: 'Jump Rope' },
-  { value: 'air_bike', label: 'Air Bike' },
-  { value: 'treadmill', label: 'Treadmill' },
-  { value: 'stairmaster', label: 'Stairmaster' },
-  { value: 'rowing', label: 'Rowing' },
-  { value: 'custom', label: 'Custom' },
-];
 
 export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose }: EditBlockDialogProps) {
   // Block name
@@ -77,13 +63,6 @@ export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose 
   const [applyRepsRange, setApplyRepsRange] = useState(false);
   const [repsRange, setRepsRange] = useState('');
 
-  // Warm-up configuration
-  const [warmupEnabled, setWarmupEnabled] = useState(false);
-  const [warmupActivity, setWarmupActivity] = useState<WarmupActivity>('stretching');
-  const [warmupDurationSec, setWarmupDurationSec] = useState(300); // 5 min default
-
-  // UI state
-  const [showWarmup, setShowWarmup] = useState(false);
 
   // Get all exercises in block (including supersets)
   const getAllExercises = () => {
@@ -142,11 +121,6 @@ export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose 
         : null;
       setRepsRange(commonRange ?? '');
 
-      // Warm-up configuration
-      setWarmupEnabled(block.warmup_enabled ?? false);
-      setWarmupActivity(block.warmup_activity ?? 'stretching');
-      setWarmupDurationSec(block.warmup_duration_sec ?? 300);
-      setShowWarmup(block.warmup_enabled ?? false);
     }
   }, [block]);
 
@@ -165,10 +139,6 @@ export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose 
       // Rep Range only applies if toggle is on
       applyRepsRange,
       repsRange: applyRepsRange ? repsRange : null,
-      // Warm-up configuration
-      warmupEnabled,
-      warmupActivity: warmupEnabled ? warmupActivity : undefined,
-      warmupDurationSec: warmupEnabled ? warmupDurationSec : null,
     });
     onClose();
   };
@@ -383,99 +353,6 @@ export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose 
                     Press lap button when ready to continue to next exercise
                   </p>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* Block Warm-Up Configuration (collapsible) */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={warmupEnabled}
-                  onCheckedChange={(checked) => {
-                    setWarmupEnabled(checked);
-                    if (checked) setShowWarmup(true);
-                  }}
-                />
-                <span
-                  className="text-sm font-medium cursor-pointer select-none"
-                  onClick={() => setShowWarmup(!showWarmup)}
-                >
-                  Block Warm-Up
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowWarmup(!showWarmup)}
-                className="p-1 hover:bg-muted rounded"
-              >
-                {showWarmup ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-
-            {showWarmup && (
-              <div className="p-3 pt-0 space-y-4 border-t">
-                {/* Warm-up Activity */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Activity</Label>
-                  <Select
-                    value={warmupActivity}
-                    onValueChange={(value: WarmupActivity) => setWarmupActivity(value)}
-                    disabled={!warmupEnabled}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WARMUP_ACTIVITIES.map((activity) => (
-                        <SelectItem key={activity.value} value={activity.value}>
-                          {activity.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Warm-up Duration */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Duration</Label>
-                    <span className="text-sm font-medium">{formatDuration(warmupDurationSec)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[warmupDurationSec]}
-                      onValueChange={(values) => setWarmupDurationSec(values[0])}
-                      min={60}
-                      max={1200}
-                      step={30}
-                      className="flex-1"
-                      disabled={!warmupEnabled}
-                    />
-                    <Input
-                      type="number"
-                      value={Math.floor(warmupDurationSec / 60)}
-                      onChange={(e) => {
-                        const minutes = parseInt(e.target.value) || 0;
-                        setWarmupDurationSec(Math.max(60, Math.min(1200, minutes * 60)));
-                      }}
-                      className="w-16 h-8 text-center"
-                      min={1}
-                      max={20}
-                      disabled={!warmupEnabled}
-                    />
-                    <span className="text-xs text-muted-foreground">min</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Warm-up activity before the first exercise in this block
-                </p>
               </div>
             )}
           </div>

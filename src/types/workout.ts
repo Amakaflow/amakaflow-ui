@@ -47,7 +47,7 @@ export interface Exercise {
   warmup_reps?: number | null;      // Reps per warm-up set (may differ from working reps)
 }
 
-export type WorkoutStructureType = 
+export type WorkoutStructureType =
   | 'superset'    // 2 exercises back to back, no rest between, rest after pair
   | 'circuit'     // Multiple exercises back to back, no rest between, rest after circuit
   | 'tabata'      // Work/rest intervals (typically 20s work, 10s rest)
@@ -56,7 +56,9 @@ export type WorkoutStructureType =
   | 'for-time'    // Complete as fast as possible
   | 'rounds'      // Fixed number of rounds
   | 'sets'        // Fixed number of sets with rest between
-  | 'regular';    // Standard workout with rest between exercises
+  | 'regular'     // Standard workout with rest between exercises
+  | 'warmup'      // Warm-up block (activity + duration)
+  | 'cooldown';   // Cool-down block (activity + duration)
 
 export interface Block {
   id?: string; // Unique ID for drag-and-drop stability
