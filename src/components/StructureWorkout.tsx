@@ -159,33 +159,7 @@ function DraggableExercise({
     if (exercise.distance_m) parts.push(`${exercise.distance_m}m`);
     if (exercise.distance_range) parts.push(`${exercise.distance_range}`);
 
-    // Show rest info - only if explicitly configured on exercise, block, or workout
-    // For supersets: rest happens after the superset, not after each set within
-    if (!isInSuperset) {
-      // Check if exercise has explicit rest settings
-      const hasExerciseRest = exercise.rest_type || exercise.rest_sec;
-      // Check if block/workout has configured rest
-      const hasEffectiveRest = effectiveRestType || effectiveRestSec;
-
-      if (hasExerciseRest || hasEffectiveRest) {
-        const restType = exercise.rest_type || effectiveRestType;
-        const restSec = exercise.rest_sec ?? effectiveRestSec;
-
-        if (restType === 'button') {
-          parts.push(`⏱️ Lap Button rest`);
-        } else if (restSec && restSec > 0) {
-          const mins = Math.floor(restSec / 60);
-          const secs = restSec % 60;
-          if (mins > 0 && secs > 0) {
-            parts.push(`⏱️ ${mins}m ${secs}s rest`);
-          } else if (mins > 0) {
-            parts.push(`⏱️ ${mins}m rest`);
-          } else {
-            parts.push(`⏱️ ${restSec}s rest`);
-          }
-        }
-      }
-    }
+    // Rest is configured at block level (BlockConfigRow) — not shown per-exercise in the editor.
     return parts.length > 0 ? parts.join(' • ') : null;
   };
 
