@@ -1,4 +1,4 @@
-import { Block, Exercise, WorkoutStructure, Superset, ValidationResponse } from '../types/workout';
+import { Block, Exercise, WorkoutStructure, Superset, ValidationResponse, WorkoutStructureType, WarmupActivity } from '../types/workout';
 
 /**
  * Generate a unique ID for blocks and exercises
@@ -94,8 +94,88 @@ export function cloneBlock(block: Block): Block {
  * Get structure display name
  */
 export function getStructureDisplayName(structure: string | null): string {
-  if (!structure) return 'Single';
-  return structure.toUpperCase();
+  if (!structure) return 'BLOCK';
+  const MAP: Record<string, string> = {
+    'warmup': 'WARM-UP',
+    'cooldown': 'COOLDOWN',
+    'for-time': 'FOR TIME',
+    'emom': 'EMOM',
+    'amrap': 'AMRAP',
+    'hiit': 'HIIT',
+  };
+  return MAP[structure] ?? structure.toUpperCase();
+}
+
+/** Format seconds into human-readable rest label. */
+export function formatRestSecs(sec: number): string {
+  if (sec <= 90) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+/** Format seconds as MM:SS string. */
+export function formatMMSS(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Return the key metric string shown in a block's header. */
+export function getBlockKeyMetric(block: Block): string {
+  switch (block.structure) {
+    case 'circuit':
+    case 'rounds': {
+      const parts: string[] = [];
+      if (block.rounds) parts.push(`${block.rounds} rnds`);
+      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest`);
+      return parts.length ? parts.join(' · ') : 'Configure →';
+    }
+    case 'emom': {
+      const mins = block.time_cap_sec ? Math.floor(block.time_cap_sec / 60) : block.rounds ?? null;
+      const workSec = block.time_work_sec;
+      if (mins && workSec) return `${mins} min · ${workSec}s/station`;
+      if (mins) return `${mins} min`;
+      return 'Configure →';
+    }
+    case 'amrap':
+      return block.time_cap_sec ? `Cap: ${formatMMSS(block.time_cap_sec)}` : 'Configure →';
+    case 'for-time':
+      return block.time_cap_sec ? `Cap: ${formatMMSS(block.time_cap_sec)}` : 'For Time';
+    case 'tabata': {
+      const parts: string[] = [];
+      if (block.time_work_sec) parts.push(`${block.time_work_sec}s on`);
+      if (block.time_rest_sec) parts.push(`${block.time_rest_sec}s off`);
+      if (block.rounds) parts.push(`${block.rounds} rnds`);
+      return parts.length ? parts.join(' · ') : 'Configure →';
+    }
+    case 'sets':
+    case 'regular': {
+      const parts: string[] = [];
+      if (block.sets) parts.push(`${block.sets} sets`);
+      if (block.rest_between_sets_sec) parts.push(`${formatRestSecs(block.rest_between_sets_sec)} rest`);
+      return parts.length ? parts.join(' · ') : 'Configure →';
+    }
+    case 'superset': {
+      const parts: string[] = [];
+      if (block.rounds) parts.push(`${block.rounds} rnds`);
+      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest`);
+      return parts.length ? parts.join(' · ') : 'Configure →';
+    }
+    case 'warmup':
+    case 'cooldown': {
+      const parts: string[] = [];
+      if (block.warmup_duration_sec) {
+        const m = Math.floor(block.warmup_duration_sec / 60);
+        const s = block.warmup_duration_sec % 60;
+        parts.push(s > 0 ? `${m}m ${s}s` : `${m} min`);
+      }
+      if (block.warmup_activity) parts.push(block.warmup_activity.replace(/_/g, ' '));
+      return parts.length ? parts.join(' · ') : 'Configure →';
+    }
+    default:
+      return '';
+  }
 }
 
 /**
@@ -239,6 +319,19 @@ export function getStructureDefaults(structure: WorkoutStructureType | null): Pa
         time_cap_sec: null,
         rounds: null,
         sets: null,
+        rest_between_rounds_sec: null,
+        rest_between_sets_sec: null,
+      };
+    case 'warmup':
+    case 'cooldown':
+      return {
+        warmup_duration_sec: 300,
+        warmup_activity: 'stretching' as WarmupActivity,
+        rounds: null,
+        sets: null,
+        time_work_sec: null,
+        time_rest_sec: null,
+        time_cap_sec: null,
         rest_between_rounds_sec: null,
         rest_between_sets_sec: null,
       };
