@@ -314,6 +314,26 @@ class URLImportPipelineService:
             yield PipelineEvent("error", json.dumps({"stage": "mapping", "message": "Cancelled", "recoverable": False}))
             return
 
+        # Extract clarification fields produced by the ingestor (AMA-717)
+        needs_clarification = workout.get("needs_clarification", False)
+
+        ambiguous_blocks = []
+        for block in workout.get("blocks", []):
+            confidence = block.get("structure_confidence", 1.0)
+            options = block.get("structure_options", [])
+            if confidence < 0.8 and options:
+                ambiguous_blocks.append({
+                    "id": block.get("id", ""),
+                    "label": block.get("label"),
+                    "structure": block.get("structure"),
+                    "structure_confidence": confidence,
+                    "structure_options": options,
+                    "exercises": [
+                        {"name": ex.get("name", "Unknown")}
+                        for ex in block.get("exercises", [])
+                    ],
+                })
+
         # Stage 5: Preview (CHECKPOINT)
         title = workout.get("title") or workout.get("name", "Imported Workout")
         preview_id = str(uuid.uuid4())
@@ -357,6 +377,8 @@ class URLImportPipelineService:
                     "exercise_count": len(exercises),
                 },
                 "unmatched": unmatched,
+                "needs_clarification": needs_clarification,
+                "ambiguous_blocks": ambiguous_blocks,
             }),
         )
 

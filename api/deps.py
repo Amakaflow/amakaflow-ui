@@ -65,6 +65,12 @@ from backend.services.apns_service import APNsService
 from application.use_cases.generate_embeddings import GenerateEmbeddingsUseCase
 from application.use_cases.stream_chat import StreamChatUseCase
 from application.use_cases.async_stream_chat import AsyncStreamChatUseCase
+from infrastructure.db.knowledge_repository import SupabaseKnowledgeRepository
+from backend.services.knowledge_llm_service import KnowledgeLLMService
+from backend.services.content_extractors.article_extractor import ArticleExtractor
+from backend.services.content_extractors.youtube_extractor import YouTubeExtractor
+from application.use_cases.ingest_knowledge import IngestKnowledgeUseCase
+from application.use_cases.search_knowledge import SearchKnowledgeUseCase
 
 
 # =============================================================================
@@ -747,6 +753,40 @@ async def get_async_stream_chat_use_case(
     )
 
 
+def get_knowledge_repository(
+    client: Client = Depends(get_supabase_client_required),
+) -> SupabaseKnowledgeRepository:
+    """Get knowledge repository instance (per-request)."""
+    return SupabaseKnowledgeRepository(client)
+
+
+@lru_cache
+def get_knowledge_llm_service() -> KnowledgeLLMService:
+    """Get cached KnowledgeLLMService instance."""
+    return KnowledgeLLMService(ai_client=get_async_ai_client())
+
+
+def get_ingest_knowledge_use_case(
+    repo: SupabaseKnowledgeRepository = Depends(get_knowledge_repository),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
+) -> IngestKnowledgeUseCase:
+    """Get ingest knowledge use case with extractors wired."""
+    return IngestKnowledgeUseCase(
+        repo=repo,
+        llm_service=get_knowledge_llm_service(),
+        embedding_service=embedding_service,
+        extractors=[ArticleExtractor(), YouTubeExtractor()],
+    )
+
+
+def get_search_knowledge_use_case(
+    repo: SupabaseKnowledgeRepository = Depends(get_knowledge_repository),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
+) -> SearchKnowledgeUseCase:
+    """Get search knowledge use case."""
+    return SearchKnowledgeUseCase(repo=repo, embedding_service=embedding_service)
+
+
 # =============================================================================
 # Exports
 # =============================================================================
@@ -806,4 +846,9 @@ __all__ = [
     "get_generate_embeddings_use_case",
     "get_stream_chat_use_case",
     "get_async_stream_chat_use_case",
+    # Knowledge Base (AMA-662)
+    "get_knowledge_repository",
+    "get_knowledge_llm_service",
+    "get_ingest_knowledge_use_case",
+    "get_search_knowledge_use_case",
 ]

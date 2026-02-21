@@ -30,6 +30,9 @@ elevenlabs>=1.0.0
 # SSE streaming
 sse-starlette>=1.6.0
 
+# KB content extraction (AMA-656)
+readability-lxml>=0.8.1
+
 # APNs push notifications
 aioapns>=3.0
 
@@ -37,6 +40,9 @@ aioapns>=3.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 pyyaml>=6.0.0,<7.0.0
+
+# KB content extractors (AMA-657)
+youtube-transcript-api>=0.6.0
 
 # Load testing (optional, for tests/load/)
 locust>=2.20.0,<3.0.0
@@ -51,3 +57,6 @@ opentelemetry-instrumentation-fastapi>=0.43b0
 opentelemetry-instrumentation-httpx>=0.43b0
 opentelemetry-instrumentation-logging>=0.43b0
 opentelemetry-propagator-b3>=1.22.0
+
+# spaCy NER (AMA-686)
+spacy>=3.8.0

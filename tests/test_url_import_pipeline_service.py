@@ -525,3 +525,251 @@ async def test_pipeline_run_recorded_on_failure(preview_store):
     status_calls = mock_repo.update_status.call_args_list
     statuses = [c.args[1] for c in status_calls]
     assert "failed" in statuses
+
+
+# =============================================================================
+# AMA-717: Clarification Fields in Preview SSE Event Tests
+# =============================================================================
+
+
+def _make_ingestor_mock(json_data: dict):
+    """Helper to build a patched AsyncClient that returns the given JSON."""
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_response(200, json_data)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+@pytest.mark.asyncio
+async def test_preview_contains_needs_clarification_true_and_ambiguous_blocks(service):
+    """When ingestor returns needs_clarification=True and blocks with low confidence
+    and non-empty options, preview SSE event contains both fields with correct shape."""
+    mock_result = {
+        "success": True,
+        "workout": {
+            "title": "Ambiguous Circuit",
+            "needs_clarification": True,
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "label": "Block A",
+                    "structure": "circuit",
+                    "structure_confidence": 0.6,
+                    "structure_options": ["circuit", "straight_sets"],
+                    "exercises": [
+                        {"name": "Push-up"},
+                        {"name": "Squat"},
+                    ],
+                },
+                {
+                    "id": "block-2",
+                    "label": "Block B",
+                    "structure": "superset",
+                    "structure_confidence": 0.5,
+                    "structure_options": ["superset", "circuit"],
+                    "exercises": [
+                        {"name": "Pull-up"},
+                    ],
+                },
+            ],
+        },
+    }
+
+    with patch("backend.services.url_import_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = _make_ingestor_mock(mock_result)
+        mock_cls.return_value = mock_client
+
+        events = await _collect_events(
+            service.ingest(url="https://www.youtube.com/watch?v=abc")
+        )
+
+    preview_event = next(e for e in events if e.event == "preview")
+    preview = json.loads(preview_event.data)
+
+    assert preview["needs_clarification"] is True
+    assert len(preview["ambiguous_blocks"]) == 2
+
+    block = preview["ambiguous_blocks"][0]
+    assert block["id"] == "block-1"
+    assert block["label"] == "Block A"
+    assert block["structure"] == "circuit"
+    assert block["structure_confidence"] == 0.6
+    assert block["structure_options"] == ["circuit", "straight_sets"]
+    assert block["exercises"] == [{"name": "Push-up"}, {"name": "Squat"}]
+
+    block2 = preview["ambiguous_blocks"][1]
+    assert block2["id"] == "block-2"
+    assert block2["exercises"] == [{"name": "Pull-up"}]
+
+
+@pytest.mark.asyncio
+async def test_preview_needs_clarification_false_yields_empty_ambiguous_blocks(service):
+    """When ingestor returns needs_clarification=False, preview contains
+    needs_clarification=False and ambiguous_blocks=[]."""
+    mock_result = {
+        "success": True,
+        "workout": {
+            "title": "Clear Workout",
+            "needs_clarification": False,
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "label": "Block A",
+                    "structure": "straight_sets",
+                    "structure_confidence": 0.95,
+                    "structure_options": ["straight_sets"],
+                    "exercises": [{"name": "Bench Press"}],
+                }
+            ],
+        },
+    }
+
+    with patch("backend.services.url_import_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = _make_ingestor_mock(mock_result)
+        mock_cls.return_value = mock_client
+
+        events = await _collect_events(
+            service.ingest(url="https://www.youtube.com/watch?v=abc")
+        )
+
+    preview_event = next(e for e in events if e.event == "preview")
+    preview = json.loads(preview_event.data)
+
+    assert preview["needs_clarification"] is False
+    assert preview["ambiguous_blocks"] == []
+
+
+@pytest.mark.asyncio
+async def test_high_confidence_blocks_excluded_from_ambiguous_blocks(service):
+    """Blocks with structure_confidence >= 0.8 are excluded from ambiguous_blocks
+    even when needs_clarification=True."""
+    mock_result = {
+        "success": True,
+        "workout": {
+            "title": "Mixed Confidence",
+            "needs_clarification": True,
+            "blocks": [
+                {
+                    "id": "block-low",
+                    "label": "Low Confidence",
+                    "structure": "circuit",
+                    "structure_confidence": 0.7,
+                    "structure_options": ["circuit", "straight_sets"],
+                    "exercises": [{"name": "Burpee"}],
+                },
+                {
+                    "id": "block-high",
+                    "label": "High Confidence",
+                    "structure": "straight_sets",
+                    "structure_confidence": 0.9,
+                    "structure_options": ["straight_sets", "circuit"],
+                    "exercises": [{"name": "Deadlift"}],
+                },
+                {
+                    "id": "block-exact",
+                    "label": "Exactly 0.8",
+                    "structure": "superset",
+                    "structure_confidence": 0.8,
+                    "structure_options": ["superset", "circuit"],
+                    "exercises": [{"name": "Curl"}],
+                },
+            ],
+        },
+    }
+
+    with patch("backend.services.url_import_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = _make_ingestor_mock(mock_result)
+        mock_cls.return_value = mock_client
+
+        events = await _collect_events(
+            service.ingest(url="https://www.youtube.com/watch?v=abc")
+        )
+
+    preview_event = next(e for e in events if e.event == "preview")
+    preview = json.loads(preview_event.data)
+
+    assert preview["needs_clarification"] is True
+    # Only the block with confidence 0.7 should appear; 0.9 and 0.8 are excluded
+    assert len(preview["ambiguous_blocks"]) == 1
+    assert preview["ambiguous_blocks"][0]["id"] == "block-low"
+
+
+@pytest.mark.asyncio
+async def test_blocks_with_empty_structure_options_excluded_from_ambiguous_blocks(service):
+    """Blocks with empty structure_options list are excluded from ambiguous_blocks
+    even when confidence is low."""
+    mock_result = {
+        "success": True,
+        "workout": {
+            "title": "No Options Workout",
+            "needs_clarification": True,
+            "blocks": [
+                {
+                    "id": "block-no-opts",
+                    "label": "No Options",
+                    "structure": "circuit",
+                    "structure_confidence": 0.5,
+                    "structure_options": [],
+                    "exercises": [{"name": "Jump Rope"}],
+                },
+                {
+                    "id": "block-with-opts",
+                    "label": "With Options",
+                    "structure": "superset",
+                    "structure_confidence": 0.6,
+                    "structure_options": ["superset", "circuit"],
+                    "exercises": [{"name": "Row"}],
+                },
+            ],
+        },
+    }
+
+    with patch("backend.services.url_import_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = _make_ingestor_mock(mock_result)
+        mock_cls.return_value = mock_client
+
+        events = await _collect_events(
+            service.ingest(url="https://www.youtube.com/watch?v=abc")
+        )
+
+    preview_event = next(e for e in events if e.event == "preview")
+    preview = json.loads(preview_event.data)
+
+    # Only the block with non-empty options should be in ambiguous_blocks
+    assert len(preview["ambiguous_blocks"]) == 1
+    assert preview["ambiguous_blocks"][0]["id"] == "block-with-opts"
+
+
+@pytest.mark.asyncio
+async def test_missing_needs_clarification_key_defaults_to_false(service):
+    """When ingestor response has no needs_clarification key, preview defaults to
+    needs_clarification=False without raising a KeyError."""
+    mock_result = {
+        "success": True,
+        "workout": {
+            "title": "No Clarification Key",
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "structure_confidence": 0.6,
+                    "structure_options": ["circuit"],
+                    "exercises": [{"name": "Squat"}],
+                }
+            ],
+        },
+    }
+
+    with patch("backend.services.url_import_pipeline_service.httpx.AsyncClient") as mock_cls:
+        mock_client = _make_ingestor_mock(mock_result)
+        mock_cls.return_value = mock_client
+
+        # Should not raise KeyError
+        events = await _collect_events(
+            service.ingest(url="https://www.youtube.com/watch?v=abc")
+        )
+
+    preview_event = next(e for e in events if e.event == "preview")
+    preview = json.loads(preview_event.data)
+
+    assert preview["needs_clarification"] is False

@@ -177,6 +177,7 @@ def _include_routers(app: FastAPI) -> None:
     from api.routers import (
         health_router, chat_router, embeddings_router,
         voice_router, workouts_router, pipelines_router, programs_router,
+        knowledge_router,
     )
 
     # Health router (no prefix - /health at root)
@@ -199,6 +200,9 @@ def _include_routers(app: FastAPI) -> None:
 
     # Programs router (/api/programs/*)
     app.include_router(programs_router)
+
+    # Knowledge Base router (/api/knowledge/*)
+    app.include_router(knowledge_router)
 
 
 def _register_shutdown(app: FastAPI, settings: Settings) -> None:
