@@ -844,31 +844,8 @@ export function StructureWorkout({
   const [skippedCooldown, setSkippedCooldown] = useState(false);
   const [skippedRest, setSkippedRest] = useState(false);
 
-  // Auto-migrate legacy workoutWarmup setting to a real warmup block (one-time on mount)
-  useEffect(() => {
-    const warmup = workout?.settings?.workoutWarmup;
-    if (warmup?.enabled) {
-      const hasWarmupBlock = workout.blocks?.some(b => b.structure === 'warmup');
-      if (!hasWarmupBlock) {
-        const newWorkout = cloneWorkout(workout);
-        const warmupBlock: Block = {
-          id: generateId(),
-          label: 'Warm-up',
-          structure: 'warmup',
-          exercises: [],
-          ...getStructureDefaults('warmup'),
-          warmup_activity: warmup.activity,
-          warmup_duration_sec: warmup.durationSec ?? null,
-          warmup_enabled: true,
-        };
-        newWorkout.blocks = [warmupBlock, ...(newWorkout.blocks || [])];
-        if (newWorkout.settings) {
-          newWorkout.settings = { ...newWorkout.settings, workoutWarmup: undefined };
-        }
-        onWorkoutChange(newWorkout);
-      }
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Legacy workoutWarmup migration removed — each workout starts fresh.
+  // Warmup blocks are added explicitly by the user via the suggestion strip.
 
   const availableDevices = getDevicesByIds(userSelectedDevices);
 
