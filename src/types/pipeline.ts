@@ -69,6 +69,15 @@ export interface PipelineExercise {
   notes?: string;
 }
 
+export interface AmbiguousBlock {
+  id: string;
+  label?: string;
+  structure: string | null;
+  structure_confidence: number;
+  structure_options: string[];
+  exercises: Array<{ name: string }>;
+}
+
 export interface PipelinePreview {
   preview_id: string;
   workout: {
@@ -83,6 +92,9 @@ export interface PipelinePreview {
   source_url?: string;
   platform?: string;
   unmatched?: Array<{ name: string; suggestions?: string[] }>;
+  // AMA-714 clarification fields
+  needs_clarification?: boolean;
+  ambiguous_blocks?: AmbiguousBlock[];
 }
 
 // Program-specific preview (returned by generate_program and generate_program_workouts)
