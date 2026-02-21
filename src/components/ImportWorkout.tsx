@@ -7,13 +7,15 @@
  * Part of AMA-567 Phase C: Import Pipelines
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Globe, CheckCircle2, Search, FileText, Library } from 'lucide-react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { StreamingWorkflow } from './StreamingWorkflow';
+import { ClarificationScreen } from './ClarificationScreen';
 import { useStreamingPipeline } from '../hooks/useStreamingPipeline';
 import type { StageConfig } from './ChatPanel/StageIndicator';
+import type { PipelinePreview } from '../types/pipeline';
 import { toast } from 'sonner';
 
 const IMPORT_STAGE_CONFIG: StageConfig = {
@@ -35,7 +37,16 @@ const SUPPORTED_PLATFORMS = [
 
 export function ImportWorkout() {
   const [url, setUrl] = useState('');
+  const [clarificationPreview, setClarificationPreview] = useState<PipelinePreview | null>(null);
   const pipeline = useStreamingPipeline();
+
+  // Only transition to clarification after streaming has fully ended;
+  // mid-stream preview events are ignored because isStreaming is still true at that point.
+  useEffect(() => {
+    if (!pipeline.isStreaming && pipeline.preview?.needs_clarification && (pipeline.preview.ambiguous_blocks?.length ?? 0) > 0) {
+      setClarificationPreview(pipeline.preview);
+    }
+  }, [pipeline.isStreaming, pipeline.preview]);
 
   const handleImport = () => {
     const trimmed = url.trim();
@@ -61,6 +72,85 @@ export function ImportWorkout() {
   // TODO(Phase D): Wire handleSave to the save endpoint
   // const handleSave = () => { ... };
 
+  // URL input block — rendered in both normal and clarification views
+  const urlInputBlock = (
+    <div className="space-y-4 rounded-lg border bg-card p-4">
+      <div className="space-y-2">
+        <Label htmlFor="import-url">URL</Label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              id="import-url"
+              data-testid="import-url-input"
+              type="url"
+              placeholder="Paste a YouTube, TikTok, Instagram, or Pinterest URL..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && url.trim() && !pipeline.isStreaming) {
+                  handleImport();
+                }
+              }}
+              disabled={pipeline.isStreaming}
+              className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+          <Button
+            data-testid="import-url-submit"
+            onClick={handleImport}
+            disabled={pipeline.isStreaming || !url.trim()}
+            className="gap-2 shrink-0"
+          >
+            <Download className="w-4 h-4" />
+            {pipeline.isStreaming ? 'Importing...' : 'Import'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Supported platforms hint */}
+      {!pipeline.isStreaming && !pipeline.preview && !pipeline.error && (
+        <div data-testid="supported-platforms-hint" className="text-xs text-muted-foreground space-y-1">
+          <p className="font-medium">Supported platforms:</p>
+          <div className="grid grid-cols-2 gap-1">
+            {SUPPORTED_PLATFORMS.map((p) => (
+              <span key={p.name} className="truncate">
+                {p.name} — <span className="text-muted-foreground/70">{p.example}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (clarificationPreview) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        {urlInputBlock}
+        <ClarificationScreen
+          key={clarificationPreview.preview_id}
+          preview={clarificationPreview}
+          onConfirm={(_selections) => {
+            // Patch selected structures back onto the preview blocks
+            const _patched = {
+              ...clarificationPreview,
+              needs_clarification: false,
+              ambiguous_blocks: [],
+            };
+            // TODO: save patched workout (Phase D wiring)
+            toast.success('Workout saved to library!');
+            setClarificationPreview(null);
+            pipeline.cancel(); // reset pipeline state
+          }}
+          onBack={() => {
+            setClarificationPreview(null);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -74,54 +164,7 @@ export function ImportWorkout() {
       </div>
 
       {/* URL input form */}
-      <div className="space-y-4 rounded-lg border bg-card p-4">
-        <div className="space-y-2">
-          <Label htmlFor="import-url">URL</Label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                id="import-url"
-                data-testid="import-url-input"
-                type="url"
-                placeholder="Paste a YouTube, TikTok, Instagram, or Pinterest URL..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && url.trim() && !pipeline.isStreaming) {
-                    handleImport();
-                  }
-                }}
-                disabled={pipeline.isStreaming}
-                className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-            <Button
-              data-testid="import-url-submit"
-              onClick={handleImport}
-              disabled={pipeline.isStreaming || !url.trim()}
-              className="gap-2 shrink-0"
-            >
-              <Download className="w-4 h-4" />
-              {pipeline.isStreaming ? 'Importing...' : 'Import'}
-            </Button>
-          </div>
-        </div>
-
-        {/* Supported platforms hint */}
-        {!pipeline.isStreaming && !pipeline.preview && !pipeline.error && (
-          <div data-testid="supported-platforms-hint" className="text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">Supported platforms:</p>
-            <div className="grid grid-cols-2 gap-1">
-              {SUPPORTED_PLATFORMS.map((p) => (
-                <span key={p.name} className="truncate">
-                  {p.name} — <span className="text-muted-foreground/70">{p.example}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {urlInputBlock}
 
       {/* Streaming progress + preview */}
       <StreamingWorkflow

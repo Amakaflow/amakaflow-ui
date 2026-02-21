@@ -373,7 +373,7 @@ export async function deleteWorkoutFromHistory(
  */
 export async function clearWorkoutHistory(): Promise<void> {
   try {
-    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(getHistoryKey());
   } catch (err) {
     console.error('Failed to clear workout history:', err);
   }
@@ -406,7 +406,7 @@ export async function clearAllWorkoutHistory(profileId?: string): Promise<boolea
     }
 
     try {
-      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(getHistoryKey());
       console.log('[clearAllWorkoutHistory] Cleared localStorage');
     } catch (err) {
       console.error('[clearAllWorkoutHistory] Error clearing localStorage:', err);

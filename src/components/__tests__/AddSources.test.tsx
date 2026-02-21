@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AddSources } from '../AddSources';
 
+vi.mock('@clerk/clerk-react', () => ({
+  useUser: () => ({ user: { id: 'test-user', fullName: 'Test User' } }),
+}));
+
 describe('AddSources', () => {
   const mockOnGenerate = vi.fn();
   const mockOnLoadTemplate = vi.fn();
@@ -30,15 +34,14 @@ describe('AddSources', () => {
   it('should render tabs for different source types', () => {
     render(<AddSources {...defaultProps} />);
 
-    // We now expect YouTube + Image tabs (and at least one more tab)
-    const youtubeTab = screen.getByRole('tab', { name: /YouTube/i });
+    const videoTab = screen.getByRole('tab', { name: /Video/i });
     const imageTab = screen.getByRole('tab', { name: /Image/i });
 
     const allTabs = screen.getAllByRole('tab');
 
-    expect(youtubeTab).toBeInTheDocument();
+    expect(videoTab).toBeInTheDocument();
     expect(imageTab).toBeInTheDocument();
-    expect(allTabs.length).toBeGreaterThanOrEqual(2); // handles any third tab label safely
+    expect(allTabs.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should have generate button', () => {

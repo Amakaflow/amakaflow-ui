@@ -82,7 +82,7 @@ describe('ActivityHistory', () => {
       );
 
       expect(screen.getByText(/no activity history yet/i)).toBeInTheDocument();
-      expect(screen.getByText(/complete workouts with the ios companion app/i)).toBeInTheDocument();
+      expect(screen.getByText(/complete workouts with the ios or android companion app/i)).toBeInTheDocument();
     });
   });
 
@@ -153,7 +153,7 @@ describe('ActivityHistory', () => {
         />
       );
 
-      expect(screen.getByText('Apple Watch')).toBeInTheDocument();
+      expect(screen.getByText('iOS Companion')).toBeInTheDocument();
       expect(screen.getByText('Garmin')).toBeInTheDocument();
       expect(screen.getByText('Manual')).toBeInTheDocument();
     });
