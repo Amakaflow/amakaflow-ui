@@ -130,23 +130,23 @@ export function BlockConfigRow({
   }
 
   if (structure === 'emom') {
+    const timeCap = block.time_cap_sec != null ? Math.round(block.time_cap_sec / 60) : null;
     return (
       <div className="flex flex-wrap gap-6 p-3 bg-muted/30 rounded-lg border-t">
-        <Field label="Duration (min)">
+        <Field label="Rounds">
           <Stepper
             value={block.rounds ?? null}
             onChange={v => onUpdate({ rounds: v })}
             min={1}
-            max={60}
+            max={99}
           />
         </Field>
-        <Field label="Work / station (s)">
+        <Field label="Time Cap (min)">
           <Stepper
-            value={block.time_work_sec ?? null}
-            onChange={v => onUpdate({ time_work_sec: v })}
-            min={5}
-            step={5}
-            format={v => `${v}s`}
+            value={timeCap}
+            onChange={v => onUpdate({ time_cap_sec: v * 60 })}
+            min={1}
+            max={120}
           />
         </Field>
       </div>

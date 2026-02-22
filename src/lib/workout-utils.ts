@@ -244,10 +244,10 @@ export function getStructureDefaults(structure: WorkoutStructureType | null): Pa
       };
     case 'emom':
       return {
-        time_work_sec: 30,
         rounds: 10,
+        time_cap_sec: 1200, // 20 min default time cap
+        time_work_sec: null,
         time_rest_sec: null,
-        time_cap_sec: null,
         sets: null,
         rest_between_rounds_sec: null,
         rest_between_sets_sec: null,
