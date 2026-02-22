@@ -156,6 +156,7 @@ function DraggableExercise({
         parts.push(`${seconds}s`);
       }
     }
+    if (exercise.calories) parts.push(`${exercise.calories} cal`);
     if (exercise.distance_m) parts.push(`${exercise.distance_m}m`);
     if (exercise.distance_range) parts.push(`${exercise.distance_range}`);
 
