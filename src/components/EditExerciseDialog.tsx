@@ -8,8 +8,9 @@ import { Switch } from './ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { Exercise, RestType } from '../types/workout';
+import { formatDuration, formatDistance } from '../lib/formatExercise';
 
 interface EditExerciseDialogProps {
   open: boolean;
@@ -20,24 +21,60 @@ interface EditExerciseDialogProps {
 
 type ExerciseType = 'sets-reps' | 'duration' | 'distance' | 'calories';
 
-// Format duration in seconds to human-readable format
-const formatDuration = (seconds: number): string => {
-  if (seconds >= 60) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSec = seconds % 60;
-    return remainingSec > 0 ? `${minutes}m ${remainingSec}s` : `${minutes}m`;
-  }
-  return `${seconds}s`;
-};
-
-// Format distance in meters to human-readable format
-const formatDistance = (meters: number): string => {
-  if (meters >= 1000) {
-    const km = meters / 1000;
-    return km % 1 === 0 ? `${km}km` : `${km.toFixed(1)}km`;
-  }
-  return `${meters}m`;
-};
+// Time Cap toggle UI (shared component for Distance and Calories tabs)
+const TimeCapToggle = ({ 
+  timeCapEnabled, 
+  setTimeCapEnabled, 
+  timeCapSec, 
+  setTimeCapSec 
+}: { 
+  timeCapEnabled: boolean; 
+  setTimeCapEnabled: (enabled: boolean) => void; 
+  timeCapSec: number; 
+  setTimeCapSec: (sec: number) => void;
+}) => (
+  <div className="border rounded-lg overflow-hidden">
+    <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={timeCapEnabled}
+          onCheckedChange={(checked) => {
+            setTimeCapEnabled(checked);
+          }}
+        />
+        <span className="text-sm font-medium">Time Cap</span>
+      </div>
+      <Timer className="w-4 h-4 text-muted-foreground" />
+    </div>
+    {timeCapEnabled && (
+      <div className="p-3 pt-0 space-y-3 border-t">
+        <p className="text-xs text-muted-foreground">
+          Set a maximum time to complete this exercise
+        </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Time Cap</Label>
+            <span className="text-sm font-medium">{formatDuration(timeCapSec)}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-muted-foreground w-8">0s</span>
+            <Slider
+              value={[timeCapSec]}
+              onValueChange={(values) => {
+                setTimeCapSec(values[0]);
+              }}
+              min={0}
+              max={600}
+              step={5}
+              className="flex-1"
+            />
+            <span className="text-xs text-muted-foreground w-8 text-right">10m</span>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
 export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExerciseDialogProps) {
   // Track if dialog should stay open (prevent closing on re-renders)
@@ -48,6 +85,11 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
   // Determine initial exercise type
   const getInitialType = (): ExerciseType => {
     if (!exercise) return 'sets-reps';
+    // AMA-729: If exercise has both sets and duration_sec (duration per set), treat as sets-reps
+    if (exercise.sets !== null && exercise.sets !== undefined && 
+        exercise.duration_sec !== null && exercise.duration_sec !== undefined) {
+      return 'sets-reps';
+    }
     if (exercise.calories !== null && exercise.calories !== undefined) return 'calories';
     // Check for distance (including 0, but not null/undefined)
     if (exercise.distance_m !== null && exercise.distance_m !== undefined) return 'distance';
@@ -76,6 +118,12 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
   const [warmupSets, setWarmupSets] = useState(2);
   const [warmupReps, setWarmupReps] = useState(12);
   const [showWarmupSection, setShowWarmupSection] = useState(false);
+
+  // AMA-729: Multi-metric modifier state
+  const [durationPerSetEnabled, setDurationPerSetEnabled] = useState(false);
+  const [durationPerSetSec, setDurationPerSetSec] = useState(30);
+  const [timeCapEnabled, setTimeCapEnabled] = useState(false);
+  const [timeCapSec, setTimeCapSec] = useState(300); // 5 minutes default
 
   // Sync internal open state with prop - only open when prop becomes true, never close from prop
   useEffect(() => {
@@ -116,6 +164,18 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       setWarmupSets(exercise.warmup_sets ?? 2);
       setWarmupReps(exercise.warmup_reps ?? 12);
       setShowWarmupSection(hasWarmup); // Auto-expand if warmup is configured
+
+      // AMA-729: Multi-metric modifier initialization
+      // Duration per set: if exercise has both sets and duration_sec, it's enabled
+      const hasDurationPerSet = exercise.sets !== null && exercise.sets !== undefined && 
+                               exercise.duration_sec !== null && exercise.duration_sec !== undefined;
+      setDurationPerSetEnabled(hasDurationPerSet);
+      setDurationPerSetSec(hasDurationPerSet ? (exercise.duration_sec ?? 30) : 30);
+      
+      // Time cap: if exercise has time_cap_sec, it's enabled
+      const hasTimeCap = exercise.time_cap_sec !== null && exercise.time_cap_sec !== undefined;
+      setTimeCapEnabled(hasTimeCap);
+      setTimeCapSec(hasTimeCap ? (exercise.time_cap_sec ?? 300) : 300);
     }
   }, [exercise]);
 
@@ -136,6 +196,10 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     warmupEnabled?: boolean;
     warmupSets?: number;
     warmupReps?: number;
+    durationPerSetEnabled?: boolean;
+    durationPerSetSec?: number;
+    timeCapEnabled?: boolean;
+    timeCapSec?: number;
   }) => {
     if (!exercise) return;
 
@@ -154,6 +218,10 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     const currentWarmupEnabled = overrides?.warmupEnabled ?? warmupEnabled;
     const currentWarmupSets = overrides?.warmupSets ?? warmupSets;
     const currentWarmupReps = overrides?.warmupReps ?? warmupReps;
+    const currentDurationPerSetEnabled = overrides?.durationPerSetEnabled ?? durationPerSetEnabled;
+    const currentDurationPerSetSec = overrides?.durationPerSetSec ?? durationPerSetSec;
+    const currentTimeCapEnabled = overrides?.timeCapEnabled ?? timeCapEnabled;
+    const currentTimeCapSec = overrides?.timeCapSec ?? timeCapSec;
 
     const updates: Partial<Exercise> = {
       name: currentName,
@@ -170,10 +238,13 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.sets = currentSets;
       updates.reps = currentRepsRange ? null : currentReps;
       updates.reps_range = currentRepsRange || null;
-      updates.duration_sec = null;
+      // AMA-729: Duration per set (when enabled, save duration_sec; otherwise clear)
+      updates.duration_sec = currentDurationPerSetEnabled ? currentDurationPerSetSec : null;
       updates.distance_m = null;
       updates.distance_range = null;
       updates.calories = null;
+      // Time cap doesn't apply to sets-reps in this context (only distance/calories)
+      updates.time_cap_sec = null;
     } else if (currentExerciseType === 'duration') {
       updates.duration_sec = currentDurationSec;
       updates.sets = null;
@@ -185,6 +256,8 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
       updates.warmup_sets = null;
       updates.warmup_reps = null;
+      // Clear modifiers for duration type
+      updates.time_cap_sec = null;
     } else if (currentExerciseType === 'distance') {
       // Allow 0 as a valid distance value
       updates.distance_m = currentDistanceRange ? null : (currentDistanceM !== null && currentDistanceM !== undefined ? currentDistanceM : null);
@@ -197,6 +270,8 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
       updates.warmup_sets = null;
       updates.warmup_reps = null;
+      // AMA-729: Time cap for distance
+      updates.time_cap_sec = currentTimeCapEnabled ? currentTimeCapSec : null;
     } else if (currentExerciseType === 'calories') {
       updates.calories = currentCaloriesVal;
       updates.distance_m = null;
@@ -207,6 +282,8 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.reps_range = null;
       updates.warmup_sets = null;
       updates.warmup_reps = null;
+      // AMA-729: Time cap for calories
+      updates.time_cap_sec = currentTimeCapEnabled ? currentTimeCapSec : null;
     }
 
     // DEBUG: Log warmup data being saved
@@ -215,14 +292,37 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       warmup_reps: updates.warmup_reps,
       exerciseType: currentExerciseType,
       warmupEnabled: currentWarmupEnabled,
+      duration_sec: updates.duration_sec,
+      time_cap_sec: updates.time_cap_sec,
     });
     onSave(updates);
-  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, caloriesVal, restSec, restType, notes, warmupEnabled, warmupSets, warmupReps, onSave]);
+  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, caloriesVal, restSec, restType, notes, warmupEnabled, warmupSets, warmupReps, durationPerSetEnabled, durationPerSetSec, timeCapEnabled, timeCapSec, onSave]);
 
   // Handle tab change - clear other fields immediately
   const handleTabChange = (newType: ExerciseType) => {
     setExerciseType(newType);
-    updateExerciseImmediately({ exerciseType: newType });
+    
+    // AMA-729: Clear modifiers appropriately based on tab change
+    if (newType === 'duration') {
+      // Duration tab: clear both modifiers
+      setDurationPerSetEnabled(false);
+      setTimeCapEnabled(false);
+      updateExerciseImmediately({ 
+        exerciseType: newType,
+        durationPerSetEnabled: false,
+        timeCapEnabled: false,
+      });
+    } else if (newType === 'distance' || newType === 'calories') {
+      // Distance/Calories: clear Duration per set, preserve Time Cap
+      setDurationPerSetEnabled(false);
+      updateExerciseImmediately({ 
+        exerciseType: newType,
+        durationPerSetEnabled: false,
+      });
+    } else {
+      // Sets/Reps: preserve current state
+      updateExerciseImmediately({ exerciseType: newType });
+    }
   };
 
   const handleClose = () => {
@@ -509,6 +609,74 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
                     </div>
                   )}
                 </div>
+
+                {/* AMA-729: Optional Modifiers Section - Sets/Reps */}
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Optional Modifiers</p>
+                  
+                  {/* Duration per set */}
+                  <div className="border rounded-lg overflow-hidden mb-3">
+                    <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={durationPerSetEnabled}
+                          onCheckedChange={(checked) => {
+                            setDurationPerSetEnabled(checked);
+                            updateExerciseImmediately({ durationPerSetEnabled: checked });
+                          }}
+                        />
+                        <span className="text-sm font-medium">Duration per set</span>
+                      </div>
+                      <Timer className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    {durationPerSetEnabled && (
+                      <div className="p-3 pt-0 space-y-3 border-t">
+                        <p className="text-xs text-muted-foreground">
+                          e.g., 3 × 30s holds
+                        </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Duration</Label>
+                            <span className="text-sm font-medium">{formatDuration(durationPerSetSec)}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs text-muted-foreground w-8">5s</span>
+                            <Slider
+                              value={[durationPerSetSec]}
+                              onValueChange={(values) => {
+                                setDurationPerSetSec(values[0]);
+                                updateExerciseImmediately({ durationPerSetSec: values[0] });
+                              }}
+                              min={5}
+                              max={300}
+                              step={5}
+                              className="flex-1"
+                            />
+                            <span className="text-xs text-muted-foreground w-8 text-right">5m</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded border border-blue-500/20">
+                          <span className="font-medium text-blue-500">Preview:</span>{' '}
+                          {sets} × {formatDuration(durationPerSetSec)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Time Cap for Sets/Reps */}
+                  <TimeCapToggle 
+                    timeCapEnabled={timeCapEnabled}
+                    setTimeCapEnabled={(enabled) => {
+                      setTimeCapEnabled(enabled);
+                      updateExerciseImmediately({ timeCapEnabled: enabled });
+                    }}
+                    timeCapSec={timeCapSec}
+                    setTimeCapSec={(sec) => {
+                      setTimeCapSec(sec);
+                      updateExerciseImmediately({ timeCapSec: sec });
+                    }}
+                  />
+                </div>
               </TabsContent>
 
               {/* Duration Tab */}
@@ -609,6 +777,29 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
                     Use this instead of Distance for ranges
                   </p>
                 </div>
+
+                {/* AMA-729: Optional Time Cap for Distance */}
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Optional Modifiers</p>
+                  <TimeCapToggle 
+                    timeCapEnabled={timeCapEnabled}
+                    setTimeCapEnabled={(enabled) => {
+                      setTimeCapEnabled(enabled);
+                      updateExerciseImmediately({ timeCapEnabled: enabled });
+                    }}
+                    timeCapSec={timeCapSec}
+                    setTimeCapSec={(sec) => {
+                      setTimeCapSec(sec);
+                      updateExerciseImmediately({ timeCapSec: sec });
+                    }}
+                  />
+                  {timeCapEnabled && (
+                    <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded border border-blue-500/20 mt-3">
+                      <span className="font-medium text-blue-500">Preview:</span>{' '}
+                      {formatDistance(distanceM)} within {formatDuration(timeCapSec)}
+                    </p>
+                  )}
+                </div>
               </TabsContent>
 
               {/* Calories Tab */}
@@ -651,6 +842,29 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
                   <p className="text-xs text-muted-foreground">
                     For machines measured in calories (rowing, ski erg, air bike)
                   </p>
+                </div>
+
+                {/* AMA-729: Optional Time Cap for Calories */}
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Optional Modifiers</p>
+                  <TimeCapToggle 
+                    timeCapEnabled={timeCapEnabled}
+                    setTimeCapEnabled={(enabled) => {
+                      setTimeCapEnabled(enabled);
+                      updateExerciseImmediately({ timeCapEnabled: enabled });
+                    }}
+                    timeCapSec={timeCapSec}
+                    setTimeCapSec={(sec) => {
+                      setTimeCapSec(sec);
+                      updateExerciseImmediately({ timeCapSec: sec });
+                    }}
+                  />
+                  {timeCapEnabled && (
+                    <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded border border-blue-500/20 mt-3">
+                      <span className="font-medium text-blue-500">Preview:</span>{' '}
+                      {caloriesVal} cal within {formatDuration(timeCapSec)}
+                    </p>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
