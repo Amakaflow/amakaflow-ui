@@ -36,6 +36,7 @@ export interface Exercise {
   rest_type?: RestType; // How rest is triggered: 'timed' (default) or 'button'
   distance_m: number | null;
   distance_range: string | null;
+  calories?: number | null; // Calorie target (e.g. rowing machine, ski erg measured in cals)
   type: 'strength' | 'cardio' | 'HIIT' | 'interval' | string;
   followAlongUrl?: string | null; // Instagram, TikTok, YouTube, or any video URL for this exercise
   notes?: string | null;
