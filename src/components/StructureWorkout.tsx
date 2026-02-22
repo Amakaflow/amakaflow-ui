@@ -19,6 +19,7 @@ import { WarmupSuggestionStrip, CooldownSuggestionStrip, DefaultRestStrip } from
 import { EditExerciseDialog } from './EditExerciseDialog';
 import { EditBlockDialog, BlockUpdates } from './EditBlockDialog';
 import { WorkoutSettingsDialog } from './WorkoutSettingsDialog';
+import { ConfirmDialog } from './ConfirmDialog';
 
 // ── Block type visual system ──────────────────────────────────────────────────
 const STRUCTURE_STYLES: Record<string, { border: string; badge: string }> = {
@@ -35,6 +36,21 @@ const STRUCTURE_STYLES: Record<string, { border: string; badge: string }> = {
   cooldown:   { border: 'border-l-4 border-l-slate-300',   badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
   default:    { border: 'border-l-4 border-l-neutral-300', badge: 'bg-neutral-100 text-neutral-600' },
 };
+
+// Structure types for the dropdown selector
+const STRUCTURE_TYPE_OPTIONS: { value: WorkoutStructureType; label: string }[] = [
+  { value: 'superset', label: 'Superset' },
+  { value: 'circuit', label: 'Circuit' },
+  { value: 'tabata', label: 'Tabata' },
+  { value: 'emom', label: 'EMOM' },
+  { value: 'amrap', label: 'AMRAP' },
+  { value: 'for-time', label: 'For Time' },
+  { value: 'rounds', label: 'Rounds' },
+  { value: 'sets', label: 'Sets' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'warmup', label: 'Warm-up' },
+  { value: 'cooldown', label: 'Cool-down' },
+];
 
 // ============================================================================
 // Immutable helpers for Workout cloning (Industry-standard: avoid JSON.parse(JSON.stringify))
@@ -289,6 +305,7 @@ function DraggableBlock({
   onDeleteSuperset,
   onUpdateBlock,
   onEditBlock,
+  onDeleteBlock,
   collapseSignal,
 }: {
   block: Block;
@@ -305,6 +322,7 @@ function DraggableBlock({
   onExerciseDrop: (item: DraggableExerciseData, targetIdx: number, targetSupersetIdx?: number) => void;
   onUpdateBlock: (updates: Partial<Block>) => void;
   onEditBlock: () => void;
+  onDeleteBlock: () => void;
   collapseSignal?: { action: 'collapse' | 'expand'; timestamp: number };
 }) {
   const [{ isDragging }, drag, dragPreview] = useDrag(() => ({
@@ -333,6 +351,8 @@ function DraggableBlock({
   const [showConfig, setShowConfig] = useState(true);
   // Track collapsed state per superset (keyed by superset index)
   const [collapsedSupersets, setCollapsedSupersets] = useState<Record<number, boolean>>({});
+  // AMA-731: Block deletion confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const toggleSupersetCollapse = (supersetIdx: number) => {
     setCollapsedSupersets(prev => ({
@@ -416,10 +436,25 @@ function DraggableBlock({
                       {isCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
                     </Button>
 
-                    {/* Type badge */}
-                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded ${styles.badge}`}>
-                      {getStructureDisplayName(block.structure)}
-                    </span>
+                    {/* AMA-731: Block type selector - replaces the static type badge */}
+                    <Select
+                      value={block.structure ?? ''}
+                      onValueChange={(value) => {
+                        const newStructure = value as WorkoutStructureType;
+                        onUpdateBlock({ structure: newStructure });
+                      }}
+                    >
+                      <SelectTrigger className={`shrink-0 h-7 text-xs gap-1 ${styles.badge} border-0`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STRUCTURE_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
                     {/* Block name */}
                     <span className="font-medium text-sm truncate flex-1">{block.label}</span>
@@ -449,8 +484,31 @@ function DraggableBlock({
                     <Button size="sm" variant="ghost" onClick={onEditBlock} title="Edit block name" className="shrink-0 p-1 h-7">
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
+
+                    {/* AMA-731: Delete block button */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      title="Delete block"
+                      className="shrink-0 p-1 h-7 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </CardHeader>
+
+                {/* AMA-731: Delete block confirmation dialog */}
+                <ConfirmDialog
+                  open={showDeleteConfirm}
+                  onOpenChange={setShowDeleteConfirm}
+                  title="Delete Block"
+                  description={`Are you sure you want to delete "${block.label}" and all its exercises? This action cannot be undone.`}
+                  confirmText="Delete"
+                  cancelText="Cancel"
+                  variant="destructive"
+                  onConfirm={onDeleteBlock}
+                />
 
                 {/* Config row — inline, no dialog */}
                 {showConfig && (
@@ -1129,6 +1187,15 @@ export function StructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
+  // AMA-731: Delete a block from the workout
+  const deleteBlock = (blockIdx: number) => {
+    const newWorkout = cloneWorkout(workoutWithIds);
+    if (newWorkout.blocks[blockIdx]) {
+      newWorkout.blocks.splice(blockIdx, 1);
+    }
+    onWorkoutChange(newWorkout);
+  };
+
   // Handle workout-level settings changes (AMA-96)
   const handleWorkoutSettingsSave = (title: string, settings: WorkoutSettings) => {
     const newWorkout = cloneWorkout(workoutWithIds);
@@ -1426,6 +1493,7 @@ export function StructureWorkout({
                   onDeleteSuperset={(supersetIdx) => deleteSuperset(blockIdx, supersetIdx)}
                   onUpdateBlock={(updates) => updateBlock(blockIdx, updates)}
                   onEditBlock={() => setEditingBlockIdx(blockIdx)}
+                  onDeleteBlock={() => deleteBlock(blockIdx)}
                   collapseSignal={collapseSignal}
                 />
               ))
