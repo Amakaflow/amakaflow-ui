@@ -1,0 +1,72 @@
+name: Workout Import QA
+
+on:
+  schedule:
+    # Nightly at 06:00 UTC (1am EST)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/workout_import_qa.py'
+      - 'scripts/test_workout_import_qa.py'
+      - 'fixtures/workout-qa-urls.json'
+      - '.github/workflows/workout-qa.yml'
+
+env:
+  VITE_CLERK_PUBLISHABLE_KEY: placeholder
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements-qa.txt
+          playwright install chromium --with-deps
+      
+      - name: Start services
+        run: |
+          docker-compose up -d
+          # Wait for services to be ready
+          bash scripts/wait-for-services.sh http://localhost:3000 http://localhost:8004/health 120 5
+      
+      - name: Run QA tests
+        run: |
+          python scripts/workout_import_qa.py \
+            --urls fixtures/workout-qa-urls.json \
+            --timeout 120
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-artifacts
+          path: |
+            artifacts/screenshots/
+            artifacts/workout-qa-report.md
+          retention-days: 7
+      
+      - name: Set has_issues output
+        run: |
+          if [ -f "$GITHUB_OUTPUT" ]; then
+            source $GITHUB_OUTPUT
+            echo "has_issues=$has_issues"
+          else
+            echo "has_issues=false"
+          fi
+      
+      - name: Stop services
+        if: always()
+        run: docker-compose down
