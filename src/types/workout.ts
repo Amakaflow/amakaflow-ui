@@ -46,6 +46,9 @@ export interface Exercise {
   // Warm-up sets are lighter preparatory sets performed before working sets
   warmup_sets?: number | null;      // Number of warm-up sets (e.g., 1, 2, 3)
   warmup_reps?: number | null;      // Reps per warm-up set (may differ from working reps)
+
+  // AMA-729: Multi-metric modifiers
+  time_cap_sec?: number | null;     // Time cap for distance/calories exercises (e.g., 5min cap for 1000m)
 }
 
 export type WorkoutStructureType =
