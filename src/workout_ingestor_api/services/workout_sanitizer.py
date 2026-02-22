@@ -71,4 +71,10 @@ def sanitize_workout_data(workout_data: Dict) -> Dict:
             for exercise in superset.get("exercises", []):
                 if not exercise.get("type"):
                     exercise["type"] = "strength"
+
+    # Filter out blocks with no exercises AND no supersets (empty blocks)
+    workout_data["blocks"] = [
+        block for block in blocks
+        if block.get("exercises") or block.get("supersets")
+    ]
     return workout_data

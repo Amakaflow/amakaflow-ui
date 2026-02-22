@@ -262,6 +262,7 @@ Full response format:
 
 Rules:
 - Only include actual exercises mentioned, not random sentences
+- If a block has no exercises AND no supersets, do NOT include it in the output. Every block must contain at least one exercise or superset.
 - If sets/reps aren't stated, use reasonable defaults (3-4 sets, 8-12 reps for strength)
 - Include helpful notes from the transcript about form, tempo, or technique
 - Standardize exercise names (e.g. "RDLS" → "Romanian Deadlifts")

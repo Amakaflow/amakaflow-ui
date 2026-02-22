@@ -489,21 +489,21 @@ class TestEdgeCases:
 # --- AMA-711: rest alias normalization + exercise type defaulting ---
 
 def test_rest_sec_alias_normalized():
-    data = {"blocks": [{"rest_sec": 90, "exercises": [], "supersets": []}]}
+    data = {"blocks": [{"rest_sec": 90, "exercises": [{"name": "Squat", "sets": 3}], "supersets": []}]}
     result = sanitize_workout_data(data)
     block = result["blocks"][0]
     assert block.get("rest_between_rounds_sec") == 90
     assert "rest_sec" not in block
 
 def test_rest_between_sec_alias_normalized():
-    data = {"blocks": [{"rest_between_sec": 60, "exercises": [], "supersets": []}]}
+    data = {"blocks": [{"rest_between_sec": 60, "exercises": [{"name": "Squat", "sets": 3}], "supersets": []}]}
     result = sanitize_workout_data(data)
     block = result["blocks"][0]
     assert block.get("rest_between_rounds_sec") == 60
     assert "rest_between_sec" not in block
 
 def test_existing_rest_between_rounds_sec_not_overwritten():
-    data = {"blocks": [{"rest_between_rounds_sec": 120, "rest_sec": 90, "exercises": [], "supersets": []}]}
+    data = {"blocks": [{"rest_between_rounds_sec": 120, "rest_sec": 90, "exercises": [{"name": "Squat", "sets": 3}], "supersets": []}]}
     result = sanitize_workout_data(data)
     assert result["blocks"][0]["rest_between_rounds_sec"] == 120
 
