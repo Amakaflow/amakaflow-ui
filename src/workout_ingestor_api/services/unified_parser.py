@@ -48,6 +48,9 @@ class UnifiedParser:
         )
         client = AIClientFactory.create_openai_client(context=context)
 
+        logger.info(f"[unified_parser] primary_text ({len(media.primary_text)} chars): {media.primary_text[:500]!r}")
+        logger.info(f"[unified_parser] title: {media.title!r}")
+
         video_duration_sec = media.media_metadata.get("video_duration_sec")
         duration_context = ""
         if video_duration_sec:
@@ -104,6 +107,7 @@ When you detect a circuit:
 - Set "rounds" to the number of rounds
 - Set "sets" on each exercise to null (rounds handle repetition)
 - Use "distance_m" for distance-based exercises (e.g. 500m ski = distance_m: 500)
+- Use "calories" for calorie-target exercises (e.g. "16 cal row" = calories: 16)
 - "supersets" MUST be [] (empty)
 
 CONFIDENCE SCORING — INCLUDE IN EVERY BLOCK:
@@ -152,29 +156,25 @@ STRUCTURE FOR CIRCUIT / ROUNDS BLOCKS (3+ exercises, repeated):
       "sets": null,
       "reps": null,
       "distance_m": 500,
+      "calories": null,
       "type": "cardio",
       "notes": "Steady pace"
     }},
     {{
-      "name": "Sled Pull",
+      "name": "Rowing",
       "sets": null,
       "reps": null,
-      "distance_m": 25,
-      "type": "strength",
-      "notes": "120kg + sled"
-    }},
-    {{
-      "name": "Bike Erg",
-      "sets": null,
-      "reps": null,
-      "distance_m": 2500,
+      "distance_m": null,
+      "calories": 16,
       "type": "cardio",
-      "notes": "Race pace"
+      "notes": "16 cal"
     }},
     {{
       "name": "Wall Balls",
       "sets": null,
       "reps": 20,
+      "distance_m": null,
+      "calories": null,
       "type": "strength",
       "notes": "9kg ball"
     }}
@@ -255,6 +255,8 @@ Rules:
 - NEVER put exercises in BOTH "exercises" and "supersets" — pick one or the other per block
 - Use multiple blocks only if the text describes truly distinct sections (e.g. "Warm-up" vs "Main work")
 - Use "distance_m" for distance-based exercises (500m, 25m, 2.5km = 2500, etc.)
+- Use "calories" for calorie-target exercises (rowing machine, ski erg, air bike measured in cals)
+- Never put a calorie target in "distance_m" — use "calories" field instead
 - For video_start_sec/video_end_sec: estimate when each exercise is discussed
 - Return ONLY JSON, no markdown, no code blocks"""
 

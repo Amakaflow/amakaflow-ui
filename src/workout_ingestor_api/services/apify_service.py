@@ -77,4 +77,9 @@ class ApifyService:
             f"duration={reel.get('videoDuration')}s, "
             f"has_transcript={bool(reel.get('transcript'))}"
         )
+        logger.info(f"[apify_debug] raw keys: {list(reel.keys())}")
+        logger.info(f"[apify_debug] caption={reel.get('caption')!r}")
+        logger.info(f"[apify_debug] text={reel.get('text')!r}")
+        logger.info(f"[apify_debug] description={reel.get('description')!r}")
+        logger.info(f"[apify_debug] transcript={reel.get('transcript')!r}")
         return reel
