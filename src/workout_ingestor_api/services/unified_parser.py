@@ -77,15 +77,29 @@ Text from Instagram Reel titled "{media.title}":
 {media.primary_text}
 ---
 
-CIRCUIT / ROUNDS DETECTION — CHECK THIS FIRST:
+KEYWORD STRUCTURE OVERRIDE — HIGHEST PRIORITY (check before everything else):
+If the block label or workout title contains any of these keywords (case-insensitive), you MUST use that exact structure — it overrides all other heuristics:
+- "EMOM" → structure: "emom", time_work_sec: 60 (1 min per station), set rounds to the round count if given
+- "AMRAP" → structure: "amrap", time_cap_sec: the stated time in seconds if given
+- "Tabata" → structure: "tabata", time_work_sec: 20, time_rest_sec: 10 unless stated otherwise
+- "For Time" → structure: "for-time"
+Keyword match = structure_confidence: 1.0, structure_options: []
+
+EMOM FIELDS:
+- "rounds": number of times through all exercises (e.g. 6 rounds)
+- "time_cap_sec": total workout time in seconds, if a total duration is stated (e.g. "30 min EMOM" → 1800)
+- "time_work_sec": 60 (one minute per station — the definition of EMOM)
+- Set time_work_sec and time_cap_sec to null when not determinable
+
+CIRCUIT / ROUNDS DETECTION — CHECK AFTER KEYWORD OVERRIDE:
 A circuit or rounds-based workout is 3+ exercises done in sequence, repeated for N rounds. Detect when:
 - Text mentions "N rounds", "N rounds of", "repeat N times", "x N rounds"
 - Text lists 3 or more exercises to be done in order, then repeated
-- Workout styles like HYROX, CrossFit WODs, AMRAP, EMOM, For Time are almost always circuits, NOT supersets
-- If there are 3+ exercises and a round count, it is a CIRCUIT — never a superset
+- Workout styles like HYROX, CrossFit WODs are often circuits — but check for EMOM/AMRAP/Tabata/For Time keywords FIRST
+- If there are 3+ exercises and a round count with no EMOM/AMRAP keyword, it is a CIRCUIT
 
 When you detect a circuit:
-- Set structure to "circuit" (or "amrap"/"emom"/"for-time" if applicable)
+- Set structure to "circuit"
 - Put ALL exercises in the "exercises" array (NOT in supersets)
 - Set "rounds" to the number of rounds
 - Set "sets" on each exercise to null (rounds handle repetition)
