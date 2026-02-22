@@ -82,7 +82,7 @@ Keyword match = structure_confidence: 1.0, structure_options: []
 
 EMOM FIELDS:
 - "rounds": number of times through all exercises (e.g. 6 rounds)
-- "time_cap_sec": total workout time in seconds, if a total duration is stated (e.g. "30 min EMOM" → 1800)
+- "time_cap_sec": total workout time in seconds, if a total duration is stated (e.g. "30 min EMOM" → 1800, "EMOM x 30 mins" → 1800, "EMOM x 20 minutes" → 1200). Convert any stated duration to seconds.
 - "time_work_sec": 60 (one minute per station — the definition of EMOM)
 - Set time_work_sec and time_cap_sec to null when not determinable
 
