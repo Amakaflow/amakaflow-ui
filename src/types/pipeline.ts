@@ -1,13 +1,10 @@
 /**
  * Pipeline type definitions for standalone streaming workflows.
- * Used by the CreateAIWorkout, ImportWorkout flows, and useStreamingPipeline hook.
+ * Used by the CreateAIWorkout and useStreamingPipeline hook.
  */
 
 // Pipeline stages for workout generation
 export type GenerationStage = 'analyzing' | 'creating' | 'complete';
-
-// Pipeline stages for URL import
-export type ImportStage = 'fetching' | 'extracting' | 'parsing' | 'mapping' | 'complete';
 
 // Pipeline stages for save & push
 export type SaveStage = 'validating' | 'saving' | 'pushing' | 'scheduling' | 'complete';
@@ -24,7 +21,6 @@ export type BulkImportStage = 'validating' | 'importing' | 'complete';
 // Union of all pipeline stages
 export type PipelineStage =
   | GenerationStage
-  | ImportStage
   | SaveStage
   | ProgramDesignStage
   | ProgramGenerateStage
