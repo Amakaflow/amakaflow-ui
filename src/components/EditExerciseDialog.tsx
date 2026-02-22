@@ -18,7 +18,7 @@ interface EditExerciseDialogProps {
   onClose: () => void;
 }
 
-type ExerciseType = 'sets-reps' | 'duration' | 'distance';
+type ExerciseType = 'sets-reps' | 'duration' | 'distance' | 'calories';
 
 // Format duration in seconds to human-readable format
 const formatDuration = (seconds: number): string => {
@@ -48,6 +48,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
   // Determine initial exercise type
   const getInitialType = (): ExerciseType => {
     if (!exercise) return 'sets-reps';
+    if (exercise.calories !== null && exercise.calories !== undefined) return 'calories';
     // Check for distance (including 0, but not null/undefined)
     if (exercise.distance_m !== null && exercise.distance_m !== undefined) return 'distance';
     if (exercise.distance_range) return 'distance';
@@ -65,6 +66,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
   const [durationSec, setDurationSec] = useState(60);
   const [distanceM, setDistanceM] = useState(1000);
   const [distanceRange, setDistanceRange] = useState('');
+  const [caloriesVal, setCaloriesVal] = useState(20);
   const [restSec, setRestSec] = useState(0);
   const [restType, setRestType] = useState<RestType>('timed');
   const [notes, setNotes] = useState('');
@@ -101,6 +103,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       // Preserve 0 values for distance_m (don't default to 1000 if it's 0)
       setDistanceM(exercise.distance_m !== null && exercise.distance_m !== undefined ? exercise.distance_m : 1000);
       setDistanceRange(exercise.distance_range || '');
+      setCaloriesVal(exercise.calories !== null && exercise.calories !== undefined ? exercise.calories : 20);
       // Default to 0 if rest_sec is not set (null or undefined)
       setRestSec(exercise.rest_sec !== null && exercise.rest_sec !== undefined ? exercise.rest_sec : 0);
       setRestType(exercise.rest_type || 'timed');
@@ -129,6 +132,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     restType?: RestType;
     notes?: string;
     exerciseType?: ExerciseType;
+    caloriesVal?: number;
     warmupEnabled?: boolean;
     warmupSets?: number;
     warmupReps?: number;
@@ -146,6 +150,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
     const currentRestType = overrides?.restType ?? restType;
     const currentNotes = overrides?.notes ?? notes;
     const currentExerciseType = overrides?.exerciseType ?? exerciseType;
+    const currentCaloriesVal = overrides?.caloriesVal ?? caloriesVal;
     const currentWarmupEnabled = overrides?.warmupEnabled ?? warmupEnabled;
     const currentWarmupSets = overrides?.warmupSets ?? warmupSets;
     const currentWarmupReps = overrides?.warmupReps ?? warmupReps;
@@ -168,6 +173,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.duration_sec = null;
       updates.distance_m = null;
       updates.distance_range = null;
+      updates.calories = null;
     } else if (currentExerciseType === 'duration') {
       updates.duration_sec = currentDurationSec;
       updates.sets = null;
@@ -175,6 +181,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.reps_range = null;
       updates.distance_m = null;
       updates.distance_range = null;
+      updates.calories = null;
       // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
       updates.warmup_sets = null;
       updates.warmup_reps = null;
@@ -186,7 +193,18 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       updates.reps = null;
       updates.reps_range = null;
       updates.duration_sec = null;
+      updates.calories = null;
       // Clear warmup for duration/distance exercises (warmup sets only make sense for sets/reps)
+      updates.warmup_sets = null;
+      updates.warmup_reps = null;
+    } else if (currentExerciseType === 'calories') {
+      updates.calories = currentCaloriesVal;
+      updates.distance_m = null;
+      updates.distance_range = null;
+      updates.duration_sec = null;
+      updates.sets = null;
+      updates.reps = null;
+      updates.reps_range = null;
       updates.warmup_sets = null;
       updates.warmup_reps = null;
     }
@@ -199,7 +217,7 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
       warmupEnabled: currentWarmupEnabled,
     });
     onSave(updates);
-  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, restSec, restType, notes, warmupEnabled, warmupSets, warmupReps, onSave]);
+  }, [exercise, exerciseType, name, sets, reps, repsRange, durationSec, distanceM, distanceRange, caloriesVal, restSec, restType, notes, warmupEnabled, warmupSets, warmupReps, onSave]);
 
   // Handle tab change - clear other fields immediately
   const handleTabChange = (newType: ExerciseType) => {
@@ -258,10 +276,11 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
           <div className="space-y-3">
             <Label>Exercise Type</Label>
             <Tabs value={exerciseType} onValueChange={(value) => handleTabChange(value as ExerciseType)}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="sets-reps">Sets/Reps</TabsTrigger>
                 <TabsTrigger value="duration">Duration</TabsTrigger>
                 <TabsTrigger value="distance">Distance</TabsTrigger>
+                <TabsTrigger value="calories">Calories</TabsTrigger>
               </TabsList>
 
               {/* Sets/Reps Tab */}
@@ -588,6 +607,49 @@ export function EditExerciseDialog({ open, exercise, onSave, onClose }: EditExer
                   />
                   <p className="text-xs text-muted-foreground">
                     Use this instead of Distance for ranges
+                  </p>
+                </div>
+              </TabsContent>
+
+              {/* Calories Tab */}
+              <TabsContent value="calories" className="space-y-4 mt-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Calorie Target</Label>
+                    <span className="text-sm font-medium">{caloriesVal} cal</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-muted-foreground w-8">0</span>
+                    <Slider
+                      value={[caloriesVal]}
+                      onValueChange={(values) => {
+                        const newValue = values[0];
+                        setCaloriesVal(newValue);
+                        updateExerciseImmediately({ caloriesVal: newValue });
+                      }}
+                      min={0}
+                      max={500}
+                      step={5}
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground w-12 text-right">500</span>
+                    <Input
+                      type="number"
+                      value={caloriesVal}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        const clampedVal = Math.max(0, Math.min(999, val));
+                        setCaloriesVal(clampedVal);
+                        updateExerciseImmediately({ caloriesVal: clampedVal });
+                      }}
+                      className="w-20 h-9 text-center"
+                      min={0}
+                      max={999}
+                      placeholder="cal"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    For machines measured in calories (rowing, ski erg, air bike)
                   </p>
                 </div>
               </TabsContent>

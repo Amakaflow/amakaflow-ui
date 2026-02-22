@@ -442,6 +442,11 @@ function formatExerciseForStrava(exercise: Exercise, index: number, inSuperset: 
   } else if (exercise.distance_range) {
     parts.push(exercise.distance_range);
   }
+
+  // Calories
+  if (exercise.calories) {
+    parts.push(`${exercise.calories} cal`);
+  }
   
   // Per-exercise rest_sec intentionally not shown in block editor view —
   // block-level rest config (rest_between_rounds_sec etc.) is used instead.
