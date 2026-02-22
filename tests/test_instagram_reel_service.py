@@ -79,3 +79,18 @@ def test_extract_shortcode():
     assert InstagramReelService._extract_shortcode("https://www.instagram.com/reel/DRHiuniDM1K/") == "DRHiuniDM1K"
     assert InstagramReelService._extract_shortcode("https://instagram.com/reel/DRHiuniDM1K") == "DRHiuniDM1K"
     assert InstagramReelService._extract_shortcode("https://www.instagram.com/p/DRHiuniDM1K/") == "DRHiuniDM1K"
+
+
+def test_parse_transcript_prompt_includes_mm_mm_timestamp_guidance():
+    """Prompt should include guidance about MM-MM: timestamp format for timed stations."""
+    import inspect
+    from workout_ingestor_api.ai import AIClientFactory, AIRequestContext
+
+    # Get the source code of the _parse_transcript method
+    source = inspect.getsource(InstagramReelService._parse_transcript)
+
+    # Verify the prompt contains guidance about MM-MM: timestamp format
+    assert "MM-MM:" in source, "Prompt should contain MM-MM: timestamp format guidance"
+    assert "minute-range timestamp" in source, "Prompt should describe MM-MM as minute-range timestamp"
+    assert "35-40: 100 wall balls" in source, "Prompt should contain example of wall balls with MM-MM format"
+    assert "distance_m: 1000" in source, "Prompt should contain example for distance extraction"

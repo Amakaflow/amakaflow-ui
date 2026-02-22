@@ -121,6 +121,11 @@ REPS PARSING RULES:
 - If reps are given as a specific number (e.g. "10 reps"), set "reps" to that number and "reps_range" to null
 - If reps are given as a range (e.g. "6-8 reps"), set "reps" to null and "reps_range" to the exact range string
 - Never guess a reps number — if unclear, set both "reps" and "reps_range" to null
+- When caption lines use timed-station format ("MM-MM: <exercise>"), the "MM-MM:" prefix is a minute-range timestamp — it is NEVER reps or sets. Extract metrics from the text after the colon only:
+  - "35-40: 100 wall balls" -> reps: 100 (the 100 IS the rep count)
+  - "0-5: 1000m Ski" -> distance_m: 1000
+  - "25-30: 200m farmers carry" -> distance_m: 200
+  The leading "MM-MM:" numbers must NEVER be used as reps, sets, or distance.
 
 Return ONLY a valid JSON object.
 
