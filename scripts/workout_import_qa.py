@@ -16,12 +16,61 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
+
+
+# ============== UTILITY FUNCTIONS ==============
+
+def validate_url(url: str) -> bool:
+    """
+    Validate that a URL is properly formatted.
+    
+    Args:
+        url: URL string to validate
+        
+    Returns:
+        True if URL is valid, False otherwise
+    """
+    try:
+        result = urllib.parse.urlparse(url)
+        return all([result.scheme, result.netloc]) and result.scheme in ('http', 'https')
+    except Exception:
+        return False
+
+
+def retry_with_backoff(max_retries: int = 3, initial_delay: float = 1.0):
+    """
+    Decorator for retrying functions with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds
+    """
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_exception = None
+            for attempt in range(max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_retries:
+                        print(f"  Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                        await asyncio.sleep(delay)
+                        delay *= 2  # Exponential backoff
+                    else:
+                        print(f"  All {max_retries + 1} attempts failed")
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 # ============== PURE FUNCTIONS ==============
@@ -152,6 +201,12 @@ async def import_workflow_url(page, url: str, timeout: int = 120) -> dict[str, A
     """
     result = {"url": url, "status": "unknown", "issues": [], "screenshot_path": ""}
     
+    # Validate URL format before attempting import
+    if not validate_url(url):
+        result["status"] = "error"
+        result["issues"].append(f"Invalid URL format: {url}")
+        return result
+    
     try:
         # Navigate to the app
         await page.goto("http://localhost:3000", wait_until="networkidle", timeout=30000)
@@ -199,6 +254,12 @@ async def import_workflow_url(page, url: str, timeout: int = 120) -> dict[str, A
         if result["status"] == "unknown":
             result["status"] = "ok"
             
+    except PlaywrightTimeoutError as e:
+        result["status"] = "error"
+        result["issues"].append(f"Playwright timeout: {str(e)}")
+    except PlaywrightError as e:
+        result["status"] = "error"
+        result["issues"].append(f"Playwright error: {str(e)}")
     except Exception as e:
         result["status"] = "error"
         result["issues"].append(str(e))
@@ -216,6 +277,15 @@ async def analyze_screenshot_with_kimi(screenshot_path: str) -> dict[str, Any]:
     Returns:
         Analysis result from Kimi
     """
+    # Check if screenshot file exists
+    if not os.path.exists(screenshot_path):
+        return {"status": "error", "issues": [f"Screenshot file not found: {screenshot_path}"]}
+    
+    # Check file size before processing (limit to 10MB)
+    file_size = os.path.getsize(screenshot_path)
+    if file_size > 10 * 1024 * 1024:
+        return {"status": "error", "issues": [f"Screenshot file too large: {file_size} bytes (max 10MB)"]}
+    
     api_key = os.environ.get("MOONSHOT_API_KEY")
     if not api_key:
         return {"status": "error", "issues": ["MOONSHOT_API_KEY not set"]}
@@ -229,33 +299,48 @@ async def analyze_screenshot_with_kimi(screenshot_path: str) -> dict[str, Any]:
         with open(screenshot_path, "rb") as image_file:
             image_data = image_file.read()
         
-        response = client.chat.completions.create(
-            model="moonshot-v1-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this screenshot of the AmakaFlow workout import UI. What, if anything, looks wrong? Look for: blank areas, broken layouts, missing data, error messages, or any visual issues. Respond with a brief description of any problems you find, or say 'OK' if everything looks correct."
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{image_data.hex()}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            max_tokens=300
-        )
-        
-        response_text = response.choices[0].message.content
-        return parse_kimi_response(response_text)
+        return await _call_kimi_api(client, image_data)
         
     except Exception as e:
         return {"status": "error", "issues": [str(e)]}
+
+
+@retry_with_backoff(max_retries=3, initial_delay=1.0)
+async def _call_kimi_api(client: OpenAI, image_data: bytes) -> dict[str, Any]:
+    """
+    Call Kimi vision API with retry logic.
+    
+    Args:
+        client: OpenAI client configured for Kimi
+        image_data: Raw image bytes
+        
+    Returns:
+        Analysis result from Kimi
+    """
+    response = client.chat.completions.create(
+        model="moonshot-v1-vision-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Analyze this screenshot of the AmakaFlow workout import UI. What, if anything, looks wrong? Look for: blank areas, broken layouts, missing data, error messages, or any visual issues. Respond with a brief description of any problems you find, or say 'OK' if everything looks correct."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_data.hex()}"
+                        }
+                    }
+                ]
+            }
+        ],
+        max_tokens=300
+    )
+    
+    response_text = response.choices[0].message.content
+    return parse_kimi_response(response_text)
 
 
 def send_telegram_message(bot_token: str, chat_id: str, message: str) -> dict:
