@@ -14,40 +14,77 @@ on:
       - 'fixtures/workout-qa-urls.json'
       - '.github/workflows/workout-qa.yml'
 
-env:
-  VITE_CLERK_PUBLISHABLE_KEY: placeholder
+# Required secrets (already set in repo):
+#   KIMI_API_KEY              - Moonshot AI key for Kimi vision
+#   TELEGRAM_BOT_TOKEN        - Telegram bot token for delivery
+#   TELEGRAM_CHAT_ID          - David's Telegram chat ID
+#   GH_PAT                    - GitHub PAT to checkout amakaflow-dev-workspace
+#   SUPABASE_URL              - Supabase project URL
+#   SUPABASE_ANON_KEY         - Supabase anon key
+#   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key
+#   OPENAI_API_KEY            - OpenAI key (for app services)
+#   ANTHROPIC_API_KEY         - Anthropic key (for app services)
+#   APIFY_API_TOKEN           - Apify token (for workout ingestion)
 
 jobs:
   qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+    timeout-minutes: 60
+
     steps:
-      - name: Checkout code
+      - name: Checkout amakaflow-automation
         uses: actions/checkout@v4
-      
+
+      - name: Checkout amakaflow-dev-workspace
+        uses: actions/checkout@v4
+        with:
+          repository: supergeri/amakaflow-dev-workspace
+          token: ${{ secrets.GH_PAT }}
+          path: amakaflow-dev-workspace
+
+      - name: Write .env for dev stack
+        run: |
+          cat > amakaflow-dev-workspace/.env <<'EOF'
+          VITE_CLERK_PUBLISHABLE_KEY=placeholder
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          APIFY_API_TOKEN=${{ secrets.APIFY_API_TOKEN }}
+          EOF
+
+      - name: Start dev stack
+        run: |
+          cd amakaflow-dev-workspace
+          docker compose up -d
+
+      - name: Wait for services
+        run: bash scripts/wait-for-services.sh http://localhost:3000 http://localhost:8004/health 120 5
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install Python dependencies
         run: |
           pip install -r requirements-qa.txt
           playwright install chromium --with-deps
-      
-      - name: Start services
+
+      - name: Run unit tests
+        run: python3 -m pytest scripts/test_workout_import_qa.py -v
+
+      - name: Run QA script
+        id: qa
+        continue-on-error: true
+        env:
+          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
         run: |
-          docker-compose up -d
-          # Wait for services to be ready
-          bash scripts/wait-for-services.sh http://localhost:3000 http://localhost:8004/health 120 5
-      
-      - name: Run QA tests
-        run: |
-          python scripts/workout_import_qa.py \
+          python3 scripts/workout_import_qa.py \
             --urls fixtures/workout-qa-urls.json \
             --timeout 120
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -57,16 +94,32 @@ jobs:
             artifacts/screenshots/
             artifacts/workout-qa-report.md
           retention-days: 7
-      
-      - name: Set has_issues output
+
+      - name: Send Telegram report
+        if: ${{ steps.qa.outputs.has_issues == 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f "$GITHUB_OUTPUT" ]; then
-            source $GITHUB_OUTPUT
-            echo "has_issues=$has_issues"
-          else
-            echo "has_issues=false"
+          # Send the markdown report
+          REPORT=$(cat artifacts/workout-qa-report.md 2>/dev/null || echo "QA run completed but no report found")
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="Markdown" \
+            --data-urlencode text="${REPORT}"
+
+          # Send each screenshot
+          if ls artifacts/screenshots/*.png 1>/dev/null 2>&1; then
+            for f in artifacts/screenshots/*.png; do
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" \
+                -F chat_id="${TELEGRAM_CHAT_ID}" \
+                -F photo=@"$f" \
+                -F caption="$(basename $f .png)"
+            done
           fi
-      
-      - name: Stop services
+
+      - name: Stop dev stack
         if: always()
-        run: docker-compose down
+        run: |
+          cd amakaflow-dev-workspace
+          docker compose down

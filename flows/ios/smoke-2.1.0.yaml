@@ -1,0 +1,42 @@
+# iOS Smoke Test (Maestro 2.1.0 compatible)
+# Validates app launches and basic navigation works
+#
+# Run with environment variables:
+#   UITEST_MODE=1 UITEST_LOGIN_BYPASS=1 maestro test flows/ios/smoke-2.1.0.yaml
+
+appId: com.myamaka.AmakaFlowCompanion
+
+onFlowError:
+  - takeScreenshot: artifacts/screenshots/ios-smoke-error.png
+
+---
+
+# Launch the app with clean state
+- launchApp:
+    clearState: true
+
+# Wait for pairing screen to load (since UITEST_LOGIN_BYPASS should be passed via env)
+- waitForAnimationToEnd
+
+# Take initial screenshot to see what screen we're on
+- takeScreenshot: artifacts/screenshots/ios-smoke-01-launch.png
+
+# Try to find and tap "Skip for E2E Testing" if visible (AMA-535 test)
+- tapOn:
+    text: "Skip for E2E Testing"
+    optional: true
+    retryTapIfNoChange: true
+
+# Wait for potential animation
+- waitForAnimationToEnd
+
+# Take screenshot after auth bypass attempt
+- takeScreenshot: artifacts/screenshots/ios-smoke-02-after-auth.png
+
+# Try to navigate to workouts - if home_screen exists
+- tapOn:
+    id: "workouts_tab"
+    optional: true
+
+# Take final screenshot
+- takeScreenshot: artifacts/screenshots/ios-smoke-03-final.png

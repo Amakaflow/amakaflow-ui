@@ -35,6 +35,14 @@
 
 set -euo pipefail
 
+# ============================================
+# Java PATH Configuration for Maestro
+# ============================================
+# Non-interactive shells don't source ~/.zshrc, so explicitly set Java paths
+# This is critical for CI/automation contexts
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk}"
+export PATH="$JAVA_HOME/bin:$PATH"
+
 # Require Bash 4.0+ for associative arrays
 if ((BASH_VERSINFO[0] < 4)); then
   echo "Error: This script requires Bash 4.0 or higher"

@@ -1,0 +1,12 @@
+[0;34m========================================[0m
+[0;34mAmakaFlow Test Runner[0m
+[0;34m========================================[0m
+Suite:     [0;32msmoke[0m
+Platform:  [0;36mall[0m
+Timestamp: [1;33m20260203-110506[0m
+Timeout:   300s per test
+Project:   /Users/davidmini/.openclaw/workspace/amakaflow-automation
+
+[1;33mChecking prerequisites...[0m
+[0;31mError: ANTHROPIC_API_KEY environment variable not set[0m
+Set it with: export ANTHROPIC_API_KEY=sk-...
