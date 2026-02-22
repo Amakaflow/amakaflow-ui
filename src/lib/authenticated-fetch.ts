@@ -50,9 +50,15 @@ export async function authenticatedFetch(
 
   const headers = new Headers(options.headers);
 
-  // Add Authorization header if we have a token
   if (token) {
+    // Authenticated via Clerk JWT
     headers.set('Authorization', `Bearer ${token}`);
+  } else {
+    // Dev mode fallback: send X-API-Key when no Clerk token is available
+    const devApiKey = import.meta.env.VITE_DEV_API_KEY;
+    if (devApiKey) {
+      headers.set('X-API-Key', devApiKey);
+    }
   }
 
   return fetch(url, {
