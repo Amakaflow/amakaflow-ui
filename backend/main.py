@@ -179,6 +179,7 @@ def _include_routers(app: FastAPI) -> None:
         voice_router, workouts_router, pipelines_router, programs_router,
         knowledge_router,
     )
+    from api.routers.detection import router as detection_router
 
     # Health router (no prefix - /health at root)
     app.include_router(health_router)
@@ -194,6 +195,9 @@ def _include_routers(app: FastAPI) -> None:
 
     # Workouts router (/api/workouts/*)
     app.include_router(workouts_router)
+
+    # Detection router (/workouts/detect) - AMA-688
+    app.include_router(detection_router)
 
     # Pipelines router (/api/pipelines/*)
     app.include_router(pipelines_router)
