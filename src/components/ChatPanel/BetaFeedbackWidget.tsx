@@ -8,7 +8,7 @@
 
 import { useState, useCallback } from 'react';
 import { ThumbsUp, ThumbsDown, MessageCircle, X, Send, Loader2 } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useClerkUser } from '../../lib/clerk-auth';
 import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase';
 import type { FeedbackSentiment } from '../../types/feature-flags';
@@ -21,7 +21,7 @@ interface BetaFeedbackWidgetProps {
 }
 
 export function BetaFeedbackWidget({ sessionId, messageId }: BetaFeedbackWidgetProps) {
-  const { user } = useUser();
+  const { user } = useClerkUser();
   const [isExpanded, setIsExpanded] = useState(false);
   const [sentiment, setSentiment] = useState<FeedbackSentiment | null>(null);
   const [feedbackText, setFeedbackText] = useState('');

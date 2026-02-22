@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { VideoIngestDialog } from './VideoIngestDialog';
-import { useUser } from '@clerk/clerk-react';
+import { useClerkUser } from '../lib/clerk-auth';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { toast } from 'sonner';
 
@@ -363,7 +363,7 @@ Always follow the exact format above. No exceptions.`;
 }
 
 export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, progress, onCancel }: AddSourcesProps) {
-  const { user } = useUser();
+  const { user } = useClerkUser();
   const [sources, setSources] = useState<Source[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [activeTab, setActiveTab] = useState<string>('video');

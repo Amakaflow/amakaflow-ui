@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useClerkUser } from '../lib/clerk-auth';
 import { supabase } from '../lib/supabase';
 import { CHAT_ENABLED, CHAT_BETA_PERIOD, CHAT_VOICE_ENABLED } from '../lib/env';
 import type {
@@ -38,7 +38,7 @@ function parseJsonbValue<T>(value: unknown, defaultValue: T): T {
  * Hook to get resolved chat feature flags for the current user.
  */
 export function useChatFeatureFlags(): UseChatFeatureFlagsResult {
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user, isLoaded: isUserLoaded } = useClerkUser();
   const [flags, setFlags] = useState<ChatFeatureFlags>(DEFAULT_CHAT_FLAGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
