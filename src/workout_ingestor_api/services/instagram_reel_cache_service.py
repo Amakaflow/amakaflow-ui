@@ -1,10 +1,75 @@
-"""Instagram Reel workout cache service (Supabase-backed)."""
+"""Instagram Reel workout cache service (Supabase-backed).
+
+Two independent caches:
+- InstagramApifyRawCacheService  — raw Apify response (transcript, caption, etc.)
+- InstagramReelCacheService      — processed workout JSON from LLM
+
+Clearing the workout cache forces LLM re-extraction without re-calling Apify.
+Clearing both caches forces a full fresh fetch.
+"""
 
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+class InstagramApifyRawCacheService:
+    """Cache for raw Apify reel data in Supabase.
+
+    Stores the unprocessed Apify response keyed by shortcode so subsequent
+    requests (e.g. after a prompt fix) can skip the Apify API call entirely.
+    """
+
+    TABLE_NAME = "instagram_reel_apify_cache"
+
+    @staticmethod
+    def get_cached_raw(shortcode: str) -> Optional[Dict[str, Any]]:
+        """Return cached raw Apify data for shortcode, or None on miss/error."""
+        supabase = _get_supabase_client()
+        if not supabase:
+            return None
+        try:
+            result = (
+                supabase.table(InstagramApifyRawCacheService.TABLE_NAME)
+                .select("raw_data")
+                .eq("shortcode", shortcode)
+                .single()
+                .execute()
+            )
+            if result.data:
+                logger.info(f"Apify raw cache HIT: {shortcode}")
+                return result.data["raw_data"]
+            return None
+        except Exception as e:
+            if "no rows" in str(e).lower() or "0 rows" in str(e).lower():
+                logger.info(f"Apify raw cache MISS: {shortcode}")
+                return None
+            logger.error(f"Apify raw cache lookup error for {shortcode}: {e}")
+            return None
+
+    @staticmethod
+    def save_raw(shortcode: str, source_url: str, raw_data: Dict[str, Any]) -> bool:
+        """Persist raw Apify response. Silently skips on error (non-critical path)."""
+        supabase = _get_supabase_client()
+        if not supabase:
+            return False
+        try:
+            supabase.table(InstagramApifyRawCacheService.TABLE_NAME).upsert(
+                {
+                    "shortcode": shortcode,
+                    "source_url": source_url,
+                    "raw_data": raw_data,
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="shortcode",
+            ).execute()
+            logger.info(f"Saved Apify raw cache: {shortcode}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save Apify raw cache for {shortcode}: {e}")
+            return False
 
 
 def _get_supabase_client():

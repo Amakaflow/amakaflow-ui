@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
 from workout_ingestor_api.services.apify_service import ApifyService, ApifyServiceError
+from workout_ingestor_api.services.instagram_reel_cache_service import InstagramApifyRawCacheService
 from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data
 
 logger = logging.getLogger(__name__)
@@ -297,19 +298,27 @@ Rules:
         Returns:
             Workout dict with _provenance metadata
         """
-        reel = InstagramReelService._fetch_reel_data(url)
+        shortcode = InstagramReelService._extract_shortcode(url) or "unknown"
+
+        # Check Apify raw cache first — avoids paid API call when only the prompt has changed
+        reel = InstagramApifyRawCacheService.get_cached_raw(shortcode)
+        apify_cache_hit = reel is not None
+
+        if not apify_cache_hit:
+            reel = InstagramReelService._fetch_reel_data(url)
+            # Persist raw response so future re-extractions skip the Apify call
+            InstagramApifyRawCacheService.save_raw(shortcode, url, reel)
 
         # Log raw Apify response at WARNING level for debugging
-        shortcode_for_log = InstagramReelService._extract_shortcode(url) or reel.get("shortCode", "unknown")
         reel_caption = reel.get("caption", "")
         reel_transcript = reel.get("transcript", "")
         reel_duration = reel.get("videoDuration")
         logger.warning(
-            f"[apify_raw] shortcode={shortcode_for_log} keys={list(reel.keys())} "
-            f"caption={reel_caption!r:.500} transcript={reel_transcript!r:.500} videoDuration={reel_duration}"
+            f"[apify_raw] shortcode={shortcode} apify_cache={'HIT' if apify_cache_hit else 'MISS'} "
+            f"keys={list(reel.keys())} caption={reel_caption!r:.500} "
+            f"transcript={reel_transcript!r:.500} videoDuration={reel_duration}"
         )
 
-        shortcode = shortcode_for_log
         caption = reel.get("caption", "") or ""
         transcript = reel.get("transcript", "") or ""
         duration = reel.get("videoDuration")
@@ -348,6 +357,7 @@ Rules:
             "video_duration_sec": duration,
             "had_transcript": bool(transcript.strip()),
             "extraction_method": "apify_transcript" if transcript.strip() else "apify_caption",
+            "apify_cache_hit": apify_cache_hit,
         })
 
         return workout_data
