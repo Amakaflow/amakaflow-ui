@@ -115,8 +115,11 @@ When the workout uses a timed-station format with "X minute window" or timestamp
 - Set "time_cap_sec" on the block to the window duration in seconds (e.g. "5 minute window" = 300 seconds, "10 minute window" = 600 seconds)
 - Each line starts with "MM-MM:" which is a MINUTE timestamp range (e.g. "0-5:" means minutes 0-5) — NEVER use this as reps, sets, or rounds
 - Extract the actual exercise metrics from the text AFTER the colon only
+- DISTANCE RULE: If the metric has an "m" suffix (e.g. "1000m Ski", "80m Burpee", "100m Walking Lunge"), use distance_m — NEVER reps or duration_sec
+- REPS RULE: If the metric has NO unit suffix (e.g. "100 Wall Balls"), use reps
+- NEVER set duration_sec on individual exercises in a timed-station format
 
-Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 500m Run"
+Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 50m Sled Push, 15-20: 80m Burpee Broad Jumps, 35-40: 100 Wall Balls"
 {{
   "label": "5 Minute Window",
   "structure": "circuit",
@@ -125,12 +128,13 @@ Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 500m Run"
   "structure_confidence": 1.0,
   "structure_options": [],
   "exercises": [
-    {{"name": "Ski", "distance_m": 1000, "type": "cardio"}},
-    {{"name": "Run", "distance_m": 500, "type": "cardio"}}
+    {{"name": "Ski Erg", "distance_m": 1000, "duration_sec": null, "reps": null, "type": "cardio"}},
+    {{"name": "Sled Push", "distance_m": 50, "duration_sec": null, "reps": null, "type": "strength"}},
+    {{"name": "Burpee Broad Jumps", "distance_m": 80, "duration_sec": null, "reps": null, "type": "strength"}},
+    {{"name": "Wall Balls", "distance_m": null, "duration_sec": null, "reps": 100, "type": "strength"}}
   ],
   "supersets": []
 }}
-=======
 
 CONFIDENCE SCORING — INCLUDE IN EVERY BLOCK:
 - "structure_confidence": float 0.0–1.0 — your confidence in the "structure" field
