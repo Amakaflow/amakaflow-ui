@@ -4,7 +4,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    repo: https://github.com/supergeri/workout-ingestor-api
+    repo: https://github.com/Amakaflow/workout-ingestor-api
     branch: develop
     autoDeploy: false
     healthCheckPath: /health
