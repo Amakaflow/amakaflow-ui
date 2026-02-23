@@ -119,6 +119,7 @@ When the workout uses a timed-station format with "X minute window" or timestamp
 - DISTANCE RULE: If the metric has an "m" suffix (e.g. "1000m Ski", "80m Burpee", "100m Walking Lunge"), use distance_m — NEVER reps or duration_sec
 - REPS RULE: If the metric has NO unit suffix (e.g. "100 Wall Balls"), use reps
 - NEVER set duration_sec on individual exercises in a timed-station format
+- NEVER put "X minute cap" or time information in the notes field — time_cap_sec captures this; notes is for form cues only
 
 Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 50m Sled Push, 15-20: 80m Burpee Broad Jumps, 35-40: 100 Wall Balls"
 {{
@@ -129,10 +130,10 @@ Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 50m Sled Push, 15
   "structure_confidence": 1.0,
   "structure_options": [],
   "exercises": [
-    {{"name": "Ski Erg", "distance_m": 1000, "duration_sec": null, "reps": null, "time_cap_sec": 300, "type": "cardio"}},
-    {{"name": "Sled Push", "distance_m": 50, "duration_sec": null, "reps": null, "time_cap_sec": 300, "type": "strength"}},
-    {{"name": "Burpee Broad Jumps", "distance_m": 80, "duration_sec": null, "reps": null, "time_cap_sec": 300, "type": "strength"}},
-    {{"name": "Wall Balls", "distance_m": null, "duration_sec": null, "reps": 100, "time_cap_sec": 300, "type": "strength"}}
+    {{"name": "Ski Erg", "distance_m": 1000, "duration_sec": null, "reps": null, "time_cap_sec": 300, "notes": null, "type": "cardio"}},
+    {{"name": "Sled Push", "distance_m": 50, "duration_sec": null, "reps": null, "time_cap_sec": 300, "notes": null, "type": "strength"}},
+    {{"name": "Burpee Broad Jumps", "distance_m": 80, "duration_sec": null, "reps": null, "time_cap_sec": 300, "notes": null, "type": "strength"}},
+    {{"name": "Wall Balls", "distance_m": null, "duration_sec": null, "reps": 100, "time_cap_sec": 300, "notes": null, "type": "strength"}}
   ],
   "supersets": []
 }}
