@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
-import { ScrollArea } from './ui/scroll-area';
 import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code, Download, Send, Info, Clock, Copy, Settings2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
@@ -464,10 +463,13 @@ function DraggableBlock({
                     {/* Block name */}
                     <span className="font-medium text-sm truncate flex-1">{block.label}</span>
 
-                    {/* Key metric */}
+                    {/* Key metric — exercise count when collapsed, config summary when expanded */}
                     {block.structure && (
                       <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
-                        {getBlockKeyMetric(block)}
+                        {isCollapsed
+                          ? `${totalExerciseCount} exercise${totalExerciseCount !== 1 ? 's' : ''}`
+                          : getBlockKeyMetric(block)
+                        }
                       </span>
                     )}
 
@@ -515,8 +517,8 @@ function DraggableBlock({
                   onConfirm={onDeleteBlock}
                 />
 
-                {/* Config row — inline, no dialog */}
-                {showConfig && (
+                {/* Config row — only visible when block is expanded */}
+                {showConfig && !isCollapsed && (
                   <BlockConfigRow
                     block={block}
                     onUpdate={(updates) => onUpdateBlock(updates)}
@@ -1296,8 +1298,8 @@ export function StructureWorkout({
           />
         )}
 
-        <ScrollArea className="h-[calc(100vh-400px)] min-h-[400px]">
-          <div className="space-y-4 pr-4 pb-8">
+        <div>
+          <div className="space-y-4 pb-4">
             {(!workoutWithIds.blocks || workoutWithIds.blocks.length === 0) ? (
               <div className="text-center text-muted-foreground py-8">
                 <p className="mb-2">No blocks yet. Click "Add Block" to get started.</p>
@@ -1333,7 +1335,7 @@ export function StructureWorkout({
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Cooldown strip at bottom */}
         {showCooldownStrip && (
