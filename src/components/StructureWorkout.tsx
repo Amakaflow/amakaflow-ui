@@ -463,15 +463,15 @@ function DraggableBlock({
                     {/* Block name */}
                     <span className="font-medium text-sm truncate flex-1">{block.label}</span>
 
-                    {/* Exercise count badge — always visible */}
-                    <span className="shrink-0 hidden sm:inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {totalExerciseCount} ex
-                    </span>
+                    {/* Exercise count badge */}
+                    <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+                      {totalExerciseCount} exercises
+                    </Badge>
                     {/* Config summary — only when expanded and configured */}
                     {!isCollapsed && block.structure && (() => {
                       const metric = getBlockKeyMetric(block);
                       return metric && metric !== 'Configure →'
-                        ? <span className="text-xs text-muted-foreground shrink-0 hidden md:block">{metric}</span>
+                        ? <span className="text-xs text-muted-foreground shrink-0">{metric}</span>
                         : null;
                     })()}
 
