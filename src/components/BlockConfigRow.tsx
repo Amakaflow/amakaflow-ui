@@ -116,7 +116,7 @@ export function BlockConfigRow({
             max={99}
           />
         </Field>
-        <Field label="Rest">
+        <Field label="Rest between rounds">
           <Stepper
             value={block.rest_between_rounds_sec ?? null}
             onChange={v => onUpdate({ rest_between_rounds_sec: v })}
@@ -181,7 +181,7 @@ export function BlockConfigRow({
             format={v => `${v}s`}
           />
         </Field>
-        <Field label="Rest">
+        <Field label="Rest per interval">
           <Stepper
             value={block.time_rest_sec ?? null}
             onChange={v => onUpdate({ time_rest_sec: v })}

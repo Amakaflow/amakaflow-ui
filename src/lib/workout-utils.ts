@@ -127,8 +127,8 @@ export function getBlockKeyMetric(block: Block): string {
     case 'circuit':
     case 'rounds': {
       const parts: string[] = [];
-      if (block.rounds) parts.push(`${block.rounds} rnds`);
-      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest`);
+      if (block.rounds) parts.push(`${block.rounds} rounds`);
+      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest/round`);
       return parts.length ? parts.join(' · ') : 'Configure →';
     }
     case 'emom': {
@@ -146,7 +146,7 @@ export function getBlockKeyMetric(block: Block): string {
       const parts: string[] = [];
       if (block.time_work_sec) parts.push(`${block.time_work_sec}s on`);
       if (block.time_rest_sec) parts.push(`${block.time_rest_sec}s off`);
-      if (block.rounds) parts.push(`${block.rounds} rnds`);
+      if (block.rounds) parts.push(`${block.rounds} rounds`);
       return parts.length ? parts.join(' · ') : 'Configure →';
     }
     case 'sets':
@@ -158,8 +158,8 @@ export function getBlockKeyMetric(block: Block): string {
     }
     case 'superset': {
       const parts: string[] = [];
-      if (block.rounds) parts.push(`${block.rounds} rnds`);
-      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest`);
+      if (block.rounds) parts.push(`${block.rounds} rounds`);
+      if (block.rest_between_rounds_sec) parts.push(`${formatRestSecs(block.rest_between_rounds_sec)} rest/pair`);
       return parts.length ? parts.join(' · ') : 'Configure →';
     }
     case 'warmup':
