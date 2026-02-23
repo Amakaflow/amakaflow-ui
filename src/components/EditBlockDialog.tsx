@@ -357,10 +357,15 @@ export function EditBlockDialog({ open, block, workoutSettings, onSave, onClose 
             )}
           </div>
 
-          {/* Save Button */}
-          <Button onClick={handleSave} className="w-full">
-            Save Changes
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button onClick={handleSave} className="flex-1">
+              Save Changes
+            </Button>
+            <Button variant="outline" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
