@@ -175,6 +175,11 @@ function DraggableExercise({
     if (exercise.calories) parts.push(`${exercise.calories} cal`);
     if (exercise.distance_m) parts.push(`${exercise.distance_m}m`);
     if (exercise.distance_range) parts.push(`${exercise.distance_range}`);
+    if (exercise.time_cap_sec && exercise.time_cap_sec > 0) {
+      const mins = Math.floor(exercise.time_cap_sec / 60);
+      const secs = exercise.time_cap_sec % 60;
+      parts.push(secs > 0 ? `⏱ ${mins}m ${secs}s cap` : `⏱ ${mins}m cap`);
+    }
 
     // Rest is configured at block level (BlockConfigRow) — not shown per-exercise in the editor.
     return parts.length > 0 ? parts.join(' • ') : null;
