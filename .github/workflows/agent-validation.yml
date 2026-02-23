@@ -157,7 +157,7 @@ jobs:
 
       - name: Validation Gate
         if: always()
-        uses: supergeri/amakaflow-automation/.github/actions/validation-gate@main
+        uses: Amakaflow/amakaflow-automation/.github/actions/validation-gate@main
         with:
           linear-api-key: ${{ secrets.LINEAR_API_KEY }}
           repo-name: chat-api
