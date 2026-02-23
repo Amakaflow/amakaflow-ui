@@ -448,7 +448,7 @@ function DraggableBlock({
                         onUpdateBlock({ structure: newStructure });
                       }}
                     >
-                      <SelectTrigger className={`shrink-0 h-7 text-xs gap-1 ${styles.badge} border-0`}>
+                      <SelectTrigger className={`shrink-0 w-auto h-7 text-xs gap-1 ${styles.badge} border-0`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -463,15 +463,16 @@ function DraggableBlock({
                     {/* Block name */}
                     <span className="font-medium text-sm truncate flex-1">{block.label}</span>
 
-                    {/* Key metric — exercise count when collapsed, config summary when expanded */}
-                    {block.structure && (
-                      <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
-                        {isCollapsed
-                          ? `${totalExerciseCount} exercise${totalExerciseCount !== 1 ? 's' : ''}`
-                          : getBlockKeyMetric(block)
-                        }
-                      </span>
-                    )}
+                    {/* Key metric — always show exercise count; append config summary when expanded */}
+                    <span className="text-xs text-muted-foreground shrink-0 hidden sm:flex items-center gap-1.5">
+                      <span>{totalExerciseCount} exercise{totalExerciseCount !== 1 ? 's' : ''}</span>
+                      {!isCollapsed && block.structure && (() => {
+                        const metric = getBlockKeyMetric(block);
+                        return metric && metric !== 'Configure →'
+                          ? <><span className="text-muted-foreground/40">·</span><span>{metric}</span></>
+                          : null;
+                      })()}
+                    </span>
 
                     {/* Configure button */}
                     {block.structure && (
