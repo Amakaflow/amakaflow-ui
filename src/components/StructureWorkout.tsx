@@ -1241,7 +1241,136 @@ export function StructureWorkout({
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+        </Card>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Move className="w-4 h-4" />
+            <span>Drag blocks and exercises to reorder</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setCollapseSignal({ action: 'collapse', timestamp: Date.now() })}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Minimize2 className="w-4 h-4" />
+              Collapse All
+            </Button>
+            <Button
+              onClick={() => setCollapseSignal({ action: 'expand', timestamp: Date.now() })}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Maximize2 className="w-4 h-4" />
+              Expand All
+            </Button>
+          </div>
+        </div>
+
+        {/* Suggestion strips */}
+        {showWarmupStrip && (
+          <WarmupSuggestionStrip
+            onAdd={() => {
+              const newWorkout = cloneWorkout(workoutWithIds);
+              const warmupBlock: Block = {
+                id: generateId(),
+                label: 'Warm-up',
+                structure: 'warmup',
+                exercises: [],
+                warmup_enabled: true,
+                ...getStructureDefaults('warmup'),
+              };
+              newWorkout.blocks.unshift(warmupBlock);
+              onWorkoutChange(newWorkout);
+            }}
+            onSkip={() => setSkippedWarmup(true)}
+          />
+        )}
+        {showRestStrip && (
+          <DefaultRestStrip
+            onSet={() => setShowWorkoutSettings(true)}
+            onSkip={() => setSkippedRest(true)}
+          />
+        )}
+
+        <ScrollArea className="h-[calc(100vh-400px)] min-h-[400px]">
+          <div className="space-y-4 pr-4 pb-8">
+            {(!workoutWithIds.blocks || workoutWithIds.blocks.length === 0) ? (
+              <div className="text-center text-muted-foreground py-8">
+                <p className="mb-2">No blocks yet. Click "Add Block" to get started.</p>
+              </div>
+            ) : (
+              workoutWithIds.blocks.map((block, blockIdx) => (
+                <DraggableBlock
+                  key={block.id || blockIdx}
+                  block={block}
+                  blockIdx={blockIdx}
+                  workoutSettings={workoutWithIds.settings}
+                  onBlockDrop={handleBlockDrop}
+                  onExerciseDrop={(item, targetIdx, targetSupersetIdx) => handleExerciseDrop(item, blockIdx, targetIdx, targetSupersetIdx)}
+                  onEditExercise={(exerciseIdx, supersetIdx) => setEditingExercise({ blockIdx, exerciseIdx, supersetIdx })}
+                  onDeleteExercise={(exerciseIdx, supersetIdx) => deleteExercise(blockIdx, exerciseIdx, supersetIdx)}
+                  onAddExercise={() => {
+                    setAddingToBlock(blockIdx);
+                    setAddingToSuperset(null);
+                    setShowExerciseSearch(true);
+                  }}
+                  onAddExerciseToSuperset={(supersetIdx) => {
+                    setAddingToBlock(blockIdx);
+                    setAddingToSuperset({ blockIdx, supersetIdx });
+                    setShowExerciseSearch(true);
+                  }}
+                  onAddSuperset={() => addSuperset(blockIdx)}
+                  onDeleteSuperset={(supersetIdx) => deleteSuperset(blockIdx, supersetIdx)}
+                  onUpdateBlock={(updates) => updateBlock(blockIdx, updates)}
+                  onEditBlock={() => setEditingBlockIdx(blockIdx)}
+                  onDeleteBlock={() => deleteBlock(blockIdx)}
+                  collapseSignal={collapseSignal}
+                />
+              ))
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Cooldown strip at bottom */}
+        {showCooldownStrip && (
+          <CooldownSuggestionStrip
+            onAdd={() => {
+              const newWorkout = cloneWorkout(workoutWithIds);
+              const cooldownBlock: Block = {
+                id: generateId(),
+                label: 'Cool-down',
+                structure: 'cooldown',
+                exercises: [],
+                warmup_enabled: true,
+                ...getStructureDefaults('cooldown'),
+              };
+              newWorkout.blocks.push(cooldownBlock);
+              onWorkoutChange(newWorkout);
+            }}
+            onSkip={() => setSkippedCooldown(true)}
+          />
+        )}
+
+        {/* Add Block — type picker */}
+        {showAddBlockPicker ? (
+          <AddBlockTypePicker
+            onSelect={(structure) => addBlock(structure)}
+            onCancel={() => setShowAddBlockPicker(false)}
+          />
+        ) : (
+          <Button onClick={() => setShowAddBlockPicker(true)} variant="outline" className="gap-2" aria-label="Add Block">
+            <Plus className="w-4 h-4" />
+            Add Block
+          </Button>
+        )}
+
+        {/* Export Destination — at bottom of workout builder */}
+        <Card>
+          <CardContent className="space-y-4 pt-6">
             {/* Export Destination Selector */}
             <div className="space-y-3">
               <Label>Export Destination</Label>
@@ -1251,8 +1380,8 @@ export function StructureWorkout({
                 </SelectTrigger>
                 <SelectContent>
                   {getPrimaryExportDestinations().map((device) => (
-                    <SelectItem 
-                      key={device.id} 
+                    <SelectItem
+                      key={device.id}
                       value={device.id}
                       disabled={device.exportMethod === 'coming_soon'}
                     >
@@ -1272,7 +1401,7 @@ export function StructureWorkout({
               {(() => {
                 const device = getDeviceById(selectedDevice);
                 if (!device) return null;
-                
+
                 return (
                   <Alert className="bg-muted/50">
                     <Info className="h-4 w-4" />
@@ -1413,131 +1542,6 @@ export function StructureWorkout({
             </div>
           </CardContent>
         </Card>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Move className="w-4 h-4" />
-            <span>Drag blocks and exercises to reorder</span>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setCollapseSignal({ action: 'collapse', timestamp: Date.now() })}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Minimize2 className="w-4 h-4" />
-              Collapse All
-            </Button>
-            <Button
-              onClick={() => setCollapseSignal({ action: 'expand', timestamp: Date.now() })}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Maximize2 className="w-4 h-4" />
-              Expand All
-            </Button>
-          </div>
-        </div>
-
-        {/* Suggestion strips */}
-        {showWarmupStrip && (
-          <WarmupSuggestionStrip
-            onAdd={() => {
-              const newWorkout = cloneWorkout(workoutWithIds);
-              const warmupBlock: Block = {
-                id: generateId(),
-                label: 'Warm-up',
-                structure: 'warmup',
-                exercises: [],
-                warmup_enabled: true,
-                ...getStructureDefaults('warmup'),
-              };
-              newWorkout.blocks.unshift(warmupBlock);
-              onWorkoutChange(newWorkout);
-            }}
-            onSkip={() => setSkippedWarmup(true)}
-          />
-        )}
-        {showRestStrip && (
-          <DefaultRestStrip
-            onSet={() => setShowWorkoutSettings(true)}
-            onSkip={() => setSkippedRest(true)}
-          />
-        )}
-
-        <ScrollArea className="h-[calc(100vh-400px)] min-h-[400px]">
-          <div className="space-y-4 pr-4 pb-8">
-            {(!workoutWithIds.blocks || workoutWithIds.blocks.length === 0) ? (
-              <div className="text-center text-muted-foreground py-8">
-                <p className="mb-2">No blocks yet. Click "Add Block" to get started.</p>
-              </div>
-            ) : (
-              workoutWithIds.blocks.map((block, blockIdx) => (
-                <DraggableBlock
-                  key={block.id || blockIdx}
-                  block={block}
-                  blockIdx={blockIdx}
-                  workoutSettings={workoutWithIds.settings}
-                  onBlockDrop={handleBlockDrop}
-                  onExerciseDrop={(item, targetIdx, targetSupersetIdx) => handleExerciseDrop(item, blockIdx, targetIdx, targetSupersetIdx)}
-                  onEditExercise={(exerciseIdx, supersetIdx) => setEditingExercise({ blockIdx, exerciseIdx, supersetIdx })}
-                  onDeleteExercise={(exerciseIdx, supersetIdx) => deleteExercise(blockIdx, exerciseIdx, supersetIdx)}
-                  onAddExercise={() => {
-                    setAddingToBlock(blockIdx);
-                    setAddingToSuperset(null);
-                    setShowExerciseSearch(true);
-                  }}
-                  onAddExerciseToSuperset={(supersetIdx) => {
-                    setAddingToBlock(blockIdx);
-                    setAddingToSuperset({ blockIdx, supersetIdx });
-                    setShowExerciseSearch(true);
-                  }}
-                  onAddSuperset={() => addSuperset(blockIdx)}
-                  onDeleteSuperset={(supersetIdx) => deleteSuperset(blockIdx, supersetIdx)}
-                  onUpdateBlock={(updates) => updateBlock(blockIdx, updates)}
-                  onEditBlock={() => setEditingBlockIdx(blockIdx)}
-                  onDeleteBlock={() => deleteBlock(blockIdx)}
-                  collapseSignal={collapseSignal}
-                />
-              ))
-            )}
-          </div>
-        </ScrollArea>
-
-        {/* Cooldown strip at bottom */}
-        {showCooldownStrip && (
-          <CooldownSuggestionStrip
-            onAdd={() => {
-              const newWorkout = cloneWorkout(workoutWithIds);
-              const cooldownBlock: Block = {
-                id: generateId(),
-                label: 'Cool-down',
-                structure: 'cooldown',
-                exercises: [],
-                warmup_enabled: true,
-                ...getStructureDefaults('cooldown'),
-              };
-              newWorkout.blocks.push(cooldownBlock);
-              onWorkoutChange(newWorkout);
-            }}
-            onSkip={() => setSkippedCooldown(true)}
-          />
-        )}
-
-        {/* Add Block — type picker */}
-        {showAddBlockPicker ? (
-          <AddBlockTypePicker
-            onSelect={(structure) => addBlock(structure)}
-            onCancel={() => setShowAddBlockPicker(false)}
-          />
-        ) : (
-          <Button onClick={() => setShowAddBlockPicker(true)} variant="outline" className="gap-2" aria-label="Add Block">
-            <Plus className="w-4 h-4" />
-            Add Block
-          </Button>
-        )}
 
         {/* Exercise Search Modal */}
         {showExerciseSearch && addingToBlock !== null && (
