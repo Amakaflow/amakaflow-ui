@@ -1,0 +1,45 @@
+settings:
+  deleteSameNameWorkout: true
+
+workouts:
+  fullhyroxweek5:
+    # Warm up
+    - warmup:
+        - cardio: lap
+    
+    # First Superset (3 Sets)
+    # 30-degree Lat Pull-down, Goblet Squat, Kettlebell Floor to Shelf
+    - repeat(3):
+        - "30-degree Lat Pull-down [category: PULL_UP]": "lap | Straight Arm Pull down x 10"
+        - "Goblet Squat [category: SQUAT]": "lap | KB RDL Into Goblet Squat x10"
+        - "Kettlebell Floor to Shelf [category: DEADLIFT]": "lap | KB Bottoms Up Press x8 each side"
+        - rest: lap
+    
+    # Second Superset (3 Sets)
+    # Incline Dumbbell Bench Press, Dumbbell Power Clean and Jerk, Dumbbell Bulgarian Split Squat
+    - repeat(3):
+        - "Incline Dumbbell Bench Press [category: BENCH_PRESS]": "lap | 8 reps"
+        - "Dumbbell Power Clean and Jerk [category: OLYMPIC_LIFT]": "lap | 6 reps"
+        - "Dumbbell Bulgarian Split Squat [category: LUNGE]": "10 reps"
+        - rest: lap
+    
+    # Third Superset (3 Sets)
+    # Bar Good Morning, TRX Inverted Row
+    - repeat(3):
+        - "Bar Good Morning [category: LEG_CURL]": "12 reps"
+        - "TRX Inverted Row [category: ROW]": "12 reps"
+        - rest: lap
+    
+    # Fourth Superset (3 Sets)
+    # Medicine Ball Slam, Ski Moguls, Pike Push-up
+    - repeat(3):
+        - "Medicine Ball Slam [category: PLYO]": "lap | Kneeling x 8"
+        - "Ski Moguls [category: CARDIO]": "200m"
+        - "Pike Push-up [category: PUSH_UP]": "8 reps"
+        - rest: lap
+
+schedulePlan:
+  start_from: 2025-10-30
+  workouts: 
+    - fullhyroxweek5
+

@@ -1,0 +1,18 @@
+settings:
+  deleteSameNameWorkout: true
+
+workouts:
+  hyrox_test:
+    - warmup:
+        - cardio: lap
+    - repeat(3):
+        - "30-degree Lat Pull-down [category: PULL_UP]": "lap | Straight Arm Pull down x 10"
+        - "Goblet Squat [category: SQUAT]": "lap | KB RDL Into Goblet Squat x10"
+        - "Kettlebell Floor to Shelf [category: DEADLIFT]": "lap | KB Bottoms Up Press x8 each side"
+        - rest: lap
+
+schedulePlan:
+  start_from: 2025-10-30
+  workouts: 
+    - hyrox_test
+

@@ -1,0 +1,1 @@
+# Garmin Sync API package

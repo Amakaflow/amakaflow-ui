@@ -1,0 +1,6 @@
+PyYAML==6.0.2
+garth==0.5.2
+pytest==8.3.4
+pytest-cov==6.0.0
+uvicorn[standard]
+fastapi

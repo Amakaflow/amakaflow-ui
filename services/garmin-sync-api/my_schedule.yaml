@@ -1,0 +1,25 @@
+email: soopergeri@gmail.com
+password: "Ruben@Amorim5"
+
+settings:
+  deleteSameNameWorkout: true
+
+definitions:
+  GA: 6:35-7:00
+  Threshold: 5:20-5:45
+  VO2MaxP: 3:30-4:00
+
+workouts:
+  interval_Vo2Max:
+    - warmup: 15min @H(z2)
+    - repeat(8):
+      - run: 30sec @P($VO2MaxP) # can use definition here or raw value 3:30-4:00
+      - recovery: 1200m
+    - cooldown: 15min @H(z2)
+
+schedulePlan:
+  start_from: 2025-10-26
+  workouts: 
+    - interval_Vo2Max   # will be schedule on 2024-10-08
+    - ga_5k             # will be schedule on 2024-10-09
+    - rest              # if no "rest" workout found on garmin connect, skip this day
