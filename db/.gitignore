@@ -1,0 +1,37 @@
+# Supabase
+.supabase/
+supabase/.temp/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test data
+garmin-exercise-data/
+
+# Service repositories (cloned separately)
+amakaflow-db/
+amakaflow-fitfiletool/
+amakaflow-ui/
+calendar-api/
+chat-api/
+garmin-sync-api/
+garmin-usb-fit-api/
+mapper-api/
+strava-sync-api/
+workout-ingestor-api/
+
