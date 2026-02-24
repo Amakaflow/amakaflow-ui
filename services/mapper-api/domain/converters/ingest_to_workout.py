@@ -175,9 +175,12 @@ def ingest_to_workout(parsed: ParsedWorkout) -> Workout:
 
         # Determine block type
         if group_id is not None and len(exercises) > 1:
-            # Multiple exercises with same superset_group = superset
-            block_type = BlockType.SUPERSET
-            label = f"Superset {group_id}"
+            if len(exercises) >= 3:
+                block_type = BlockType.CIRCUIT
+                label = f"Circuit {group_id}"
+            else:
+                block_type = BlockType.SUPERSET
+                label = f"Superset {group_id}"
         else:
             block_type = BlockType.STRAIGHT
             label = None

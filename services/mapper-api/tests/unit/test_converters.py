@@ -144,6 +144,39 @@ class TestIngestToWorkout:
         assert len(workout.blocks[0].exercises) == 2
         assert workout.blocks[1].type == BlockType.STRAIGHT
 
+    def test_circuit_grouping(self):
+        """3 exercises with same superset_group form a CIRCUIT block (AMA-756)."""
+        parsed = ParsedWorkout(
+            name="Circuit Workout",
+            exercises=[
+                ParsedExercise(raw_name="Burpees", sets=3, reps="10", superset_group="A"),
+                ParsedExercise(raw_name="Jump Squats", sets=3, reps="15", superset_group="A"),
+                ParsedExercise(raw_name="Push-ups", sets=3, reps="20", superset_group="A"),
+            ],
+        )
+
+        workout = ingest_to_workout(parsed)
+
+        assert workout.block_count == 1
+        assert workout.blocks[0].type == BlockType.CIRCUIT
+        assert len(workout.blocks[0].exercises) == 3
+
+    def test_superset_grouping_two_exercises_still_superset(self):
+        """2 exercises with same superset_group remain a SUPERSET block (regression AMA-756)."""
+        parsed = ParsedWorkout(
+            name="Superset Workout",
+            exercises=[
+                ParsedExercise(raw_name="Bicep Curl", sets=3, reps="12", superset_group="B"),
+                ParsedExercise(raw_name="Tricep Extension", sets=3, reps="12", superset_group="B"),
+            ],
+        )
+
+        workout = ingest_to_workout(parsed)
+
+        assert workout.block_count == 1
+        assert workout.blocks[0].type == BlockType.SUPERSET
+        assert len(workout.blocks[0].exercises) == 2
+
     def test_rest_seconds(self):
         """Rest seconds are preserved."""
         parsed = ParsedWorkout(
