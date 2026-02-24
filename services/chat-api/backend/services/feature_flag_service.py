@@ -14,12 +14,11 @@ from supabase import Client
 logger = logging.getLogger(__name__)
 
 
-# Default rate limits by tier (messages per month)
-RATE_LIMITS = {
-    "free": 50,
-    "paid": 500,
-    "unlimited": 999999,
-}
+# Default rate limits by tier (messages per month).
+# These are fallback values only — prefer injecting via Settings.
+_DEFAULT_FREE = 50
+_DEFAULT_PAID = 500
+_UNLIMITED = 999999
 
 # Default enabled functions
 DEFAULT_FUNCTIONS = [
@@ -32,13 +31,25 @@ DEFAULT_FUNCTIONS = [
 class FeatureFlagService:
     """Service for checking feature flags and rate limits."""
 
-    def __init__(self, supabase_client: Client) -> None:
-        """Initialize with Supabase client.
+    def __init__(
+        self,
+        supabase_client: Client,
+        rate_limit_free: int = _DEFAULT_FREE,
+        rate_limit_paid: int = _DEFAULT_PAID,
+    ) -> None:
+        """Initialize with Supabase client and configurable rate limits.
 
         Args:
             supabase_client: Supabase client for database access.
+            rate_limit_free: Monthly message limit for free-tier users.
+            rate_limit_paid: Monthly message limit for paid-tier users.
         """
         self._client = supabase_client
+        self._rate_limits: Dict[str, int] = {
+            "free": rate_limit_free,
+            "paid": rate_limit_paid,
+            "unlimited": _UNLIMITED,
+        }
         self._cache: Dict[str, Dict[str, Any]] = {}
 
     def get_user_flags(self, user_id: str) -> Dict[str, Any]:
@@ -112,10 +123,10 @@ class FeatureFlagService:
         flags = self.get_user_flags(user_id)
         tier = self._parse_flag(flags.get("chat_rate_limit_tier"), "free")
 
-        if isinstance(tier, str) and tier in RATE_LIMITS:
-            return RATE_LIMITS[tier]
+        if isinstance(tier, str) and tier in self._rate_limits:
+            return self._rate_limits[tier]
 
-        return RATE_LIMITS["free"]
+        return self._rate_limits["free"]
 
     def is_function_enabled(self, user_id: str, function_name: str) -> bool:
         """Check if a specific function/tool is enabled for a user.
