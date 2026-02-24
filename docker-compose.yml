@@ -1,0 +1,139 @@
+services:
+  # =============================================================================
+  # CORE APIs
+  # =============================================================================
+
+  # Chat API - AI conversation service
+  chat:
+    build:
+      context: ./services/chat-api
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HELICONE_API_KEY=${HELICONE_API_KEY}
+      - HELICONE_ENABLED=${HELICONE_ENABLED:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-claude-sonnet-4-20250514}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - TTS_ENABLED=${TTS_ENABLED:-false}
+      - TTS_DEFAULT_VOICE_ID=${TTS_DEFAULT_VOICE_ID}
+      - TTS_DAILY_CHAR_LIMIT=${TTS_DAILY_CHAR_LIMIT:-50000}
+      - RATE_LIMIT_FREE=${RATE_LIMIT_FREE:-50}
+      - RATE_LIMIT_PAID=${RATE_LIMIT_PAID:-500}
+      # Internal service URLs (Docker network)
+      - MAPPER_API_URL=http://mapper:8001
+      - CALENDAR_API_URL=http://calendar:8003
+      - WORKOUT_INGESTOR_API_URL=http://workout-ingestor:8004
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - amakaflow
+
+  # Mapper API - Exercise mapping service
+  mapper:
+    build:
+      context: ./services/mapper-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - INGESTOR_URL=http://workout-ingestor:8004
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - amakaflow
+
+  # Calendar API - Calendar integration service
+  calendar:
+    build:
+      context: ./services/calendar-api
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - amakaflow
+
+  # Workout Ingestor API - Video/OCR ingestion service
+  workout-ingestor:
+    build:
+      context: ./services/workout-ingestor-api
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HELICONE_API_KEY=${HELICONE_API_KEY}
+      - HELICONE_ENABLED=${HELICONE_ENABLED:-false}
+      - YT_TRANSCRIPT_API_TOKEN=${YT_TRANSCRIPT_API_TOKEN}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
+      - BYPASS_TIER_GATE=${BYPASS_TIER_GATE:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - amakaflow
+
+networks:
+  amakaflow:
+    driver: bridge
+
+# =============================================================================
+# USAGE
+# =============================================================================
+# Start all services:     docker compose up -d
+# Start with logs:        docker compose up
+# View logs:              docker compose logs -f [service]
+# Stop all:               docker compose down
+# Rebuild:                docker compose build --no-cache
+# =============================================================================
