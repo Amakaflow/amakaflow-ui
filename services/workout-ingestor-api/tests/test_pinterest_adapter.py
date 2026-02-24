@@ -172,3 +172,202 @@ class TestPinterestAdapterFetch:
         )
         result = self._run_fetch(pin=pin)
         assert result.media_metadata.get("is_carousel") is True
+
+
+# ---------------------------------------------------------------------------
+# Test 3 — Vision AI success path: image → vision text becomes primary_text
+# ---------------------------------------------------------------------------
+
+class TestPinterestAdapterVisionSuccess:
+    """When VisionService returns text, it should become primary_text and
+    the original description/title should be relegated to secondary_texts."""
+
+    def _run_fetch_with_vision(
+        self,
+        pin: PinterestPin | None = None,
+        vision_text: str = "10 push-ups, 20 squats, 30 lunges",
+        url: str = "https://www.pinterest.com/pin/123456789/",
+        source_id: str = "123456789",
+    ) -> MediaContent:
+        p = pin or _make_pin()
+        with patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.PinterestService"
+        ) as mock_svc_cls, patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.VisionService"
+        ) as mock_vis_cls:
+            mock_svc = MagicMock()
+            mock_svc_cls.return_value = mock_svc
+            mock_svc._resolve_short_url = AsyncMock(return_value=url)
+            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+
+            mock_vis_cls.extract_text_from_images = MagicMock(return_value=vision_text)
+
+            adapter = PinterestAdapter()
+            return adapter.fetch(url, source_id)
+
+    def test_vision_text_becomes_primary_text(self):
+        """When VisionService returns text, it is used as primary_text."""
+        vision_text = "10 push-ups, 20 squats, 30 lunges"
+        pin = _make_pin(
+            description="30-minute full body HIIT. Squats, lunges, burpees.",
+            title="HIIT Workout Infographic",
+        )
+        result = self._run_fetch_with_vision(pin=pin, vision_text=vision_text)
+
+        assert result.primary_text == vision_text
+
+    def test_original_description_in_secondary_texts_after_vision(self):
+        """When vision succeeds, original description/title move to secondary_texts."""
+        pin = _make_pin(
+            description="30-minute full body HIIT. Squats, lunges, burpees.",
+            title="HIIT Workout Infographic",
+        )
+        result = self._run_fetch_with_vision(pin=pin)
+
+        # description and/or title should appear somewhere in secondary_texts
+        combined_secondary = " ".join(result.secondary_texts)
+        assert "HIIT" in combined_secondary or "Squats" in combined_secondary
+
+    def test_vision_text_not_empty_means_no_fallback_to_description(self):
+        """Non-empty vision text prevents the description from becoming primary_text."""
+        vision_text = "Deadlifts 5x5 @ 80%"
+        pin = _make_pin(description="This is the pin description.", title="Pin Title")
+        result = self._run_fetch_with_vision(pin=pin, vision_text=vision_text)
+
+        assert result.primary_text == vision_text
+        assert result.primary_text != "This is the pin description."
+
+    def test_vision_result_returns_media_content_instance(self):
+        """Vision success path returns a valid MediaContent object."""
+        result = self._run_fetch_with_vision()
+        assert isinstance(result, MediaContent)
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — Vision AI fallback path: vision fails → description as primary_text
+# ---------------------------------------------------------------------------
+
+class TestPinterestAdapterVisionFallback:
+    """When VisionService raises an exception or returns empty text,
+    the adapter should fall back to using the original description as primary_text."""
+
+    def _run_fetch_vision_raises(
+        self,
+        pin: PinterestPin | None = None,
+        vision_side_effect: Exception | None = None,
+        url: str = "https://www.pinterest.com/pin/123456789/",
+        source_id: str = "123456789",
+    ) -> MediaContent:
+        p = pin or _make_pin()
+        exc = vision_side_effect or ValueError("OpenAI Vision API call failed")
+        with patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.PinterestService"
+        ) as mock_svc_cls, patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.VisionService"
+        ) as mock_vis_cls:
+            mock_svc = MagicMock()
+            mock_svc_cls.return_value = mock_svc
+            mock_svc._resolve_short_url = AsyncMock(return_value=url)
+            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+
+            mock_vis_cls.extract_text_from_images = MagicMock(side_effect=exc)
+
+            adapter = PinterestAdapter()
+            return adapter.fetch(url, source_id)
+
+    def _run_fetch_vision_empty(
+        self,
+        pin: PinterestPin | None = None,
+        url: str = "https://www.pinterest.com/pin/123456789/",
+        source_id: str = "123456789",
+    ) -> MediaContent:
+        p = pin or _make_pin()
+        with patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.PinterestService"
+        ) as mock_svc_cls, patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.VisionService"
+        ) as mock_vis_cls:
+            mock_svc = MagicMock()
+            mock_svc_cls.return_value = mock_svc
+            mock_svc._resolve_short_url = AsyncMock(return_value=url)
+            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+
+            mock_vis_cls.extract_text_from_images = MagicMock(return_value="   ")
+
+            adapter = PinterestAdapter()
+            return adapter.fetch(url, source_id)
+
+    def test_vision_exception_falls_back_to_description(self):
+        """When VisionService raises, description is used as primary_text."""
+        pin = _make_pin(description="5x5 Squat program. Progressive overload.")
+        result = self._run_fetch_vision_raises(pin=pin)
+        assert result.primary_text == "5x5 Squat program. Progressive overload."
+
+    def test_vision_empty_text_falls_back_to_description(self):
+        """When VisionService returns blank text, description is used as primary_text."""
+        pin = _make_pin(description="Push pull legs routine.")
+        result = self._run_fetch_vision_empty(pin=pin)
+        assert result.primary_text == "Push pull legs routine."
+
+    def test_vision_fallback_returns_media_content(self):
+        """Vision fallback path still returns a valid MediaContent."""
+        result = self._run_fetch_vision_raises()
+        assert isinstance(result, MediaContent)
+
+    def test_no_image_url_falls_back_to_description(self):
+        """When pin has no image_url, skip vision and use description as primary_text."""
+        pin = _make_pin(
+            description="No image available but has description.",
+            image_url="",
+        )
+        # No vision mock needed — pin has no image_url so vision is never called
+        with patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.PinterestService"
+        ) as mock_svc_cls:
+            mock_svc = MagicMock()
+            mock_svc_cls.return_value = mock_svc
+            mock_svc._resolve_short_url = AsyncMock(
+                return_value="https://www.pinterest.com/pin/123456789/"
+            )
+            mock_svc._get_pin_metadata = AsyncMock(return_value=pin)
+            adapter = PinterestAdapter()
+            result = adapter.fetch("https://www.pinterest.com/pin/123456789/", "123456789")
+
+        assert result.primary_text == "No image available but has description."
+
+
+# ---------------------------------------------------------------------------
+# Test 5 — asyncio.run() fix: no RuntimeError in async context
+# ---------------------------------------------------------------------------
+
+class TestPinterestAdapterAsyncioFix:
+    """Verify that fetch() does not raise RuntimeError when called from within
+    an already-running event loop (e.g. an async test or FastAPI handler)."""
+
+    @pytest.mark.asyncio
+    async def test_no_runtime_error_in_async_context(self):
+        """fetch() must not raise 'This event loop is already running'."""
+        pin = _make_pin()
+        url = "https://www.pinterest.com/pin/123456789/"
+        with patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.PinterestService"
+        ) as mock_svc_cls, patch(
+            "workout_ingestor_api.services.adapters.pinterest_adapter.VisionService"
+        ) as mock_vis_cls:
+            mock_svc = MagicMock()
+            mock_svc_cls.return_value = mock_svc
+            mock_svc._resolve_short_url = AsyncMock(return_value=url)
+            mock_svc._get_pin_metadata = AsyncMock(return_value=pin)
+            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+            mock_vis_cls.extract_text_from_images = MagicMock(
+                return_value="10 squats, 10 push-ups"
+            )
+
+            adapter = PinterestAdapter()
+            # This must NOT raise RuntimeError: This event loop is already running
+            result = adapter.fetch(url, "123456789")
+
+        assert isinstance(result, MediaContent)
