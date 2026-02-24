@@ -11,6 +11,8 @@ Tests for:
 - User mapping priority over fuzzy matching
 """
 
+import unittest.mock
+
 import pytest
 
 from application.use_cases import MapWorkoutResult, MapWorkoutUseCase
@@ -562,14 +564,8 @@ class TestSaveWorkoutInBlocksFormat:
         db_row_to_workout cannot read back. Blocks format flattens this to
         {"weight": 100, "weight_unit": "kg"} at the exercise level.
         """
-        # Build a parsed workout — we need load to reach the exercise level, so
-        # construct and pass a Workout domain model directly via _map_exercises
-        # then trigger a save by calling execute with a parsed workout that has weight.
-        # Easier: build the domain model and call the repo save path via the use case,
-        # using a workout that includes a load on the exercise.
-
-        # Construct a Workout with a load on an exercise directly and call _map_exercises
-        # then simulate what execute() does with save=True.
+        # Build a weighted domain Workout; patch _map_exercises to return it so that
+        # execute() saves it and we can inspect the stored workout_data format.
         block = Block(
             type=BlockType.STRAIGHT,
             exercises=[
@@ -583,45 +579,21 @@ class TestSaveWorkoutInBlocksFormat:
         )
         workout = Workout(title="Weighted Workout", blocks=[block])
 
-        # Call save directly via the workout_repo (simulating the use case save path)
-        # to prove what format the data should be in. But we want to test the use case
-        # itself, so let's use execute() with a parsed workout that results in a
-        # weighted exercise. Since the fake matcher doesn't carry load, we patch the
-        # mapped_workout directly by using _map_exercises and then manually invoking
-        # the save to check what format is passed.
-        #
-        # The cleanest approach: call execute() and inspect the saved workout_data.
-        # Use a parsed workout; load won't be present from the parser, so build the
-        # domain model and invoke the private save step via monkey-patching the
-        # mapped_workout — or simply test that the save is called with blocks format
-        # by manually wiring the call.
-        #
-        # Simplest correct approach: monkey-patch _map_exercises to return our
-        # pre-built weighted workout, then call execute() with save=True and check
-        # the stored workout_data.
-        from backend.parsers.models import ParsedExercise, ParsedWorkout
-
         parsed = ParsedWorkout(
             name="Weighted Workout",
             exercises=[ParsedExercise(raw_name="Squat", sets=3, reps="5")],
         )
 
-        # Patch _map_exercises to return our weighted workout
-        original_map = use_case._map_exercises
-
         def patched_map(w):
             return workout, 1, 0
 
-        use_case._map_exercises = patched_map
-        try:
+        with unittest.mock.patch.object(use_case, "_map_exercises", patched_map):
             result = use_case.execute(
                 parsed_workout=parsed,
                 user_id="test-user-123",
                 device="garmin",
                 save=True,
             )
-        finally:
-            use_case._map_exercises = original_map
 
         assert result.success is True
 
