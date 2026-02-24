@@ -57,3 +57,21 @@ def test_route_youtube_playlist_url():
     assert result is not None
     assert result.platform == "youtube"
     assert result.source_id == "dQw4w9WgXcQ"
+
+def test_route_tiktok_short_url():
+    result = route_url("https://www.tiktok.com/t/ZTRqPmKxj/")
+    assert result is not None
+    assert result.platform == "tiktok"
+    assert result.source_id == "ZTRqPmKxj"
+
+def test_route_youtube_live():
+    result = route_url("https://www.youtube.com/live/dQw4w9WgXcQ")
+    assert result is not None
+    assert result.platform == "youtube"
+    assert result.source_id == "dQw4w9WgXcQ"
+
+def test_route_pinterest_long_form():
+    result = route_url("https://www.pinterest.com/janedoe/fitness-board/best-ab-workout/123456789/")
+    assert result is not None
+    assert result.platform == "pinterest"
+    assert result.source_id == "123456789"
