@@ -201,3 +201,104 @@ class TestBlockPortabilityFields:
         assert block.structure_confidence == 0.4
         assert block.structure_options == ["circuit", "straight_sets"]
         assert converted.needs_clarification is True
+
+
+class TestAMA753NewFields:
+    """Tests for AMA-753: new Block and Exercise fields."""
+
+    # --- Block: new optional fields default to None ---
+
+    def test_block_rep_scheme_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.rep_scheme is None
+
+    def test_block_rep_scheme_roundtrips(self):
+        block = Block(label="Test", rep_scheme="15-12-9-6-3")
+        assert block.rep_scheme == "15-12-9-6-3"
+
+    def test_block_rep_scheme_type_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.rep_scheme_type is None
+
+    def test_block_rep_scheme_type_accepts_valid_literals(self):
+        valid_values = ["descending", "ascending", "pyramid", "wave", "custom"]
+        for value in valid_values:
+            block = Block(label="Test", rep_scheme_type=value)
+            assert block.rep_scheme_type == value
+
+    def test_block_rep_scheme_type_rejects_invalid_value(self):
+        with pytest.raises(Exception):
+            Block(label="Test", rep_scheme_type="invalid_scheme_type")
+
+    def test_block_session_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.session is None
+
+    def test_block_session_roundtrips(self):
+        for value in ["Session 1", "AM", "PM"]:
+            block = Block(label="Test", session=value)
+            assert block.session == value
+
+    def test_block_block_type_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.block_type is None
+
+    def test_block_block_type_accepts_valid_literals(self):
+        valid_values = ["warmup", "strength", "metcon", "cooldown", "cardio"]
+        for value in valid_values:
+            block = Block(label="Test", block_type=value)
+            assert block.block_type == value
+
+    def test_block_block_type_rejects_invalid_value(self):
+        with pytest.raises(Exception):
+            Block(label="Test", block_type="invalid_block_type")
+
+    def test_block_load_variants_defaults_to_none(self):
+        block = Block(label="Test")
+        assert block.load_variants is None
+
+    def test_block_load_variants_roundtrips(self):
+        variants = [
+            {"gender": "M", "rx": "100kg", "scaled": "75kg"},
+            {"gender": "F", "rx": "70kg", "scaled": "50kg"},
+        ]
+        block = Block(label="Test", load_variants=variants)
+        assert block.load_variants == variants
+
+    # --- Block: extended structure Literal values ---
+
+    def test_structure_accepts_ladder(self):
+        block = Block(label="Test", structure="ladder")
+        assert block.structure == "ladder"
+
+    def test_structure_accepts_pyramid(self):
+        block = Block(label="Test", structure="pyramid")
+        assert block.structure == "pyramid"
+
+    def test_structure_accepts_complex(self):
+        block = Block(label="Test", structure="complex")
+        assert block.structure == "complex"
+
+    def test_structure_accepts_drop_set(self):
+        block = Block(label="Test", structure="drop-set")
+        assert block.structure == "drop-set"
+
+    def test_structure_still_rejects_invalid_value(self):
+        with pytest.raises(Exception):
+            Block(label="Test", structure="not-a-real-structure")
+
+    # --- Exercise: new optional load_options field ---
+
+    def test_exercise_load_options_defaults_to_none(self):
+        exercise = Exercise(name="Kettlebell Swing")
+        assert exercise.load_options is None
+
+    def test_exercise_load_options_roundtrips(self):
+        options = [{"weight_kg": 8, "label": "8kg"}, {"weight_kg": 12, "label": "12kg"}]
+        exercise = Exercise(name="Kettlebell Swing", load_options=options)
+        assert exercise.load_options == options
+
+    def test_exercise_load_options_can_be_omitted(self):
+        """Verifying Exercise can be created without load_options (it is optional)."""
+        exercise = Exercise(name="Squat", sets=3, reps=10)
+        assert exercise.load_options is None
