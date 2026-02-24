@@ -138,12 +138,12 @@ def build_exercise_selection_prompt(
     # Format limitations section with sanitization to prevent prompt injection
     limitations_section = ""
     if limitations:
-        sanitized_limitations = [sanitize_limitation(l) for l in limitations if l]
+        sanitized_limitations = [sanitize_limitation(lim) for lim in limitations if lim]
         # Filter out empty strings after sanitization
-        sanitized_limitations = [l for l in sanitized_limitations if l]
+        sanitized_limitations = [lim for lim in sanitized_limitations if lim]
         if sanitized_limitations:
             limitations_section = (
-                f"**User Limitations (AVOID exercises that stress these areas):**\n- "
+                "**User Limitations (AVOID exercises that stress these areas):**\n- "
                 + "\n- ".join(sanitized_limitations)
             )
 

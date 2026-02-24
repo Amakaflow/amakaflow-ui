@@ -1,4 +1,5 @@
-import yaml, pathlib
+import yaml
+import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 

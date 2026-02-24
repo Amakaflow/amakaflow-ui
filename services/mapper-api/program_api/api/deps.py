@@ -35,14 +35,14 @@ from fastapi import Depends, Header, HTTPException
 from supabase import Client, create_client
 
 from application.ports import ExerciseRepository, ProgramRepository, TemplateRepository
+from backend.settings import Settings
+from backend.settings import get_settings as _get_settings
+from infrastructure.calendar_client import CalendarClient
 from infrastructure.db import (
     SupabaseExerciseRepository,
     SupabaseProgramRepository,
     SupabaseTemplateRepository,
 )
-from infrastructure.calendar_client import CalendarClient
-from backend.settings import Settings, get_settings as _get_settings
-
 
 # =============================================================================
 # Settings Provider

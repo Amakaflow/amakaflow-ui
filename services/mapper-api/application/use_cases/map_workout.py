@@ -18,6 +18,7 @@ from application.ports import (
     WorkoutRepository,
 )
 from backend.parsers.models import ParsedWorkout
+from domain.converters.db_converters import _workout_to_blocks_format
 from domain.converters.ingest_to_workout import ingest_to_workout
 from domain.models import Block, Exercise, Workout
 
@@ -121,7 +122,7 @@ class MapWorkoutUseCase:
                 logger.debug(f"Saving workout to repository for user: {user_id}")
                 saved = self._workout_repo.save(
                     profile_id=user_id,
-                    workout_data=mapped_workout.model_dump(),
+                    workout_data=_workout_to_blocks_format(mapped_workout),
                     sources=[s.value for s in mapped_workout.metadata.sources],
                     device=device,
                     title=mapped_workout.title,
@@ -204,6 +205,7 @@ class MapWorkoutUseCase:
                 type=block.type,
                 rounds=block.rounds,
                 exercises=mapped_exercises,
+                rest_between_seconds=block.rest_between_seconds,
             )
             mapped_blocks.append(mapped_block)
 

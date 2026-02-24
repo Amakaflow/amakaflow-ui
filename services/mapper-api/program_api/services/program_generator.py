@@ -23,7 +23,6 @@ from application.exceptions import ProgramCreationError
 from application.ports import ExerciseRepository, ProgramRepository, TemplateRepository
 from models.generation import GenerateProgramRequest, GenerateProgramResponse
 from models.program import (
-    ExperienceLevel,
     ProgramGoal,
     ProgramStatus,
     ProgramWeek,
@@ -31,9 +30,12 @@ from models.program import (
     TrainingProgram,
 )
 from services.exercise_selector import ExerciseSelector, SlotRequirements
-from services.llm import OpenAIExerciseSelector, ExerciseSelectionRequest
-from services.periodization import PeriodizationModel, PeriodizationService, WeekParameters
-from services.program_validator import ProgramValidator, ValidationSeverity
+from services.llm import ExerciseSelectionRequest, OpenAIExerciseSelector
+from services.periodization import (
+    PeriodizationService,
+    WeekParameters,
+)
+from services.program_validator import ProgramValidator
 from services.template_selector import TemplateSelector
 
 logger = logging.getLogger(__name__)

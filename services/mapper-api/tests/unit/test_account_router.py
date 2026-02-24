@@ -12,7 +12,7 @@ Tests cover:
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 from api.routers.account import router
 from api.deps import get_current_user

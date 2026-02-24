@@ -12,9 +12,7 @@ Covers:
 AMA-564: Tier-gated Instagram Apify extraction.
 """
 
-import os
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from main import app

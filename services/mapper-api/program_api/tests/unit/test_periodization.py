@@ -748,7 +748,7 @@ class TestEdgeCasesLongPrograms:
             goal=ProgramGoal.HYPERTROPHY,
             experience_level=ExperienceLevel.INTERMEDIATE,
         )
-        week52 = service.get_week_parameters(
+        _week52 = service.get_week_parameters(
             week=52,
             total_weeks=52,
             model=PeriodizationModel.LINEAR,

@@ -7,7 +7,7 @@ This fake implementation stores calendar events in memory and provides
 helper methods for test setup and verification.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 from infrastructure.calendar_client import (
     BulkCreateResult,
     CalendarAPIError,
-    CalendarAPIUnavailable,
+    CalendarAPIUnavailableError,
     ProgramEventData,
     ProgramEventsResult,
 )
@@ -135,7 +135,7 @@ class FakeCalendarClient:
         Configure the next call to fail.
 
         Args:
-            unavailable: If True, raise CalendarAPIUnavailable; otherwise CalendarAPIError
+            unavailable: If True, raise CalendarAPIUnavailableError; otherwise CalendarAPIError
         """
         self._fail_next_call = True
         self._fail_with_unavailable = unavailable
@@ -172,7 +172,7 @@ class FakeCalendarClient:
         if self._fail_next_call:
             self._fail_next_call = False
             if self._fail_with_unavailable:
-                raise CalendarAPIUnavailable("Simulated unavailable")
+                raise CalendarAPIUnavailableError("Simulated unavailable")
             raise CalendarAPIError("Simulated error", 500)
 
         created_ids = []
@@ -231,7 +231,7 @@ class FakeCalendarClient:
         if self._fail_next_call:
             self._fail_next_call = False
             if self._fail_with_unavailable:
-                raise CalendarAPIUnavailable("Simulated unavailable")
+                raise CalendarAPIUnavailableError("Simulated unavailable")
             raise CalendarAPIError("Simulated error", 500)
 
         program_events = [
@@ -270,7 +270,7 @@ class FakeCalendarClient:
         if self._fail_next_call:
             self._fail_next_call = False
             if self._fail_with_unavailable:
-                raise CalendarAPIUnavailable("Simulated unavailable")
+                raise CalendarAPIUnavailableError("Simulated unavailable")
             raise CalendarAPIError("Simulated error", 500)
 
         to_delete = [
@@ -296,7 +296,7 @@ class FailingCalendarClient(FakeCalendarClient):
         Initialize with failure mode.
 
         Args:
-            unavailable: If True, raise CalendarAPIUnavailable; otherwise CalendarAPIError
+            unavailable: If True, raise CalendarAPIUnavailableError; otherwise CalendarAPIError
         """
         super().__init__()
         self._always_fail = True
@@ -306,19 +306,19 @@ class FailingCalendarClient(FakeCalendarClient):
         """Always fails."""
         self._call_count += 1
         if self._fail_with_unavailable:
-            raise CalendarAPIUnavailable("Calendar service unavailable")
+            raise CalendarAPIUnavailableError("Calendar service unavailable")
         raise CalendarAPIError("Calendar service error", 500)
 
     async def get_program_events(self, *args, **kwargs) -> ProgramEventsResult:
         """Always fails."""
         self._call_count += 1
         if self._fail_with_unavailable:
-            raise CalendarAPIUnavailable("Calendar service unavailable")
+            raise CalendarAPIUnavailableError("Calendar service unavailable")
         raise CalendarAPIError("Calendar service error", 500)
 
     async def delete_program_events(self, *args, **kwargs) -> int:
         """Always fails."""
         self._call_count += 1
         if self._fail_with_unavailable:
-            raise CalendarAPIUnavailable("Calendar service unavailable")
+            raise CalendarAPIUnavailableError("Calendar service unavailable")
         raise CalendarAPIError("Calendar service error", 500)

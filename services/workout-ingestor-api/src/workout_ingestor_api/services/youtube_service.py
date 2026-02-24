@@ -1,9 +1,5 @@
 """Enhanced YouTube video processing service with metadata, captions, and chapters."""
-import json
-import os
-import subprocess
-import tempfile
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from fastapi import HTTPException
 import requests
 
@@ -68,7 +64,7 @@ class YouTubeService:
                 status_code=408,
                 detail="Video metadata extraction timed out. YouTube may be rate-limiting or the video is unavailable."
             )
-        except Exception as e:
+        except Exception:
             # If extraction fails, try mweb client (also avoids SABR, no PO token needed)
             ydl_opts_minimal = {
                 "quiet": True,

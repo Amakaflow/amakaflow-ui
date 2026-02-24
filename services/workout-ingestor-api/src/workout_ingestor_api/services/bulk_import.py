@@ -21,21 +21,17 @@ import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Literal
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 import httpx
 import os
 
 from workout_ingestor_api.parsers import (
     FileParserFactory,
-    FileInfo,
-    ParseResult,
-    ParsedWorkout,
     URLParser,
     fetch_url_metadata_batch,
     ImageParser,
     parse_images_batch,
-    is_supported_image,
 )
 from workout_ingestor_api.services.pinterest_service import (
     ingest_pinterest_url,
@@ -1676,7 +1672,7 @@ class BulkImportService:
         detected = self._get_detected_items(job_id, profile_id)
         results = []
 
-        total = len(workout_ids)
+        _total = len(workout_ids)
 
         for idx, workout_id in enumerate(workout_ids):
             # Check for cancellation

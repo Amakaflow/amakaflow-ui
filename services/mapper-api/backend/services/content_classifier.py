@@ -11,10 +11,8 @@ Cache classification by video ID to avoid re-classifying same URLs.
 
 import asyncio
 import re
-import hashlib
 import logging
 import time
-from functools import lru_cache
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 from enum import Enum

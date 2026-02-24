@@ -19,7 +19,6 @@ Workflow:
 import copy
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from application.ports import WorkoutRepository

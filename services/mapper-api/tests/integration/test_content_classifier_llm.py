@@ -7,7 +7,6 @@ Tests LLM classification when keyword filter returns ambiguous results.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from backend.services.content_classifier import (
     ContentClassifier,

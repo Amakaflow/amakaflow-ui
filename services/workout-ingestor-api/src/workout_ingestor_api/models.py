@@ -1,7 +1,7 @@
 """Data models for workout ingestion."""
 import uuid
 from pydantic import BaseModel, Field, computed_field
-from typing import Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
 # AMA-213: Workout type detection
 WorkoutType = Literal['strength', 'circuit', 'hiit', 'cardio', 'follow_along', 'mixed']
@@ -28,6 +28,8 @@ class Exercise(BaseModel):
     # Warm-up sets (AMA-94)
     warmup_sets: Optional[int] = None  # Number of warm-up sets before working sets
     warmup_reps: Optional[int] = None  # Reps per warm-up set
+    # AMA-753: alternative weight options (e.g. 8kg / 12kg)
+    load_options: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         extra = "ignore"  # Ignore extra fields like 'id' from UI
@@ -68,14 +70,18 @@ class Block(BaseModel):
     structure_options: List[str] = Field(default_factory=list)  # LLM candidate structures
     structure: Optional[Literal[
         'superset',
-        'circuit', 
+        'circuit',
         'tabata',
         'emom',
         'amrap',
         'for-time',
         'rounds',
         'sets',
-        'regular'
+        'regular',
+        'ladder',
+        'pyramid',
+        'complex',
+        'drop-set',
     ]] = None
     
     # Exercises in order (no duplication - exercises appear only once)
@@ -92,6 +98,25 @@ class Block(BaseModel):
     rest_between_rounds_sec: Optional[int] = None  # Rest between rounds (for 'rounds', 'circuit', 'superset')
     rest_between_sets_sec: Optional[int] = None  # Rest between sets (for 'sets' structure)
     
+    # AMA-753: rep scheme and session metadata
+    rep_scheme: Optional[str] = None  # e.g. "15-12-9-6-3", "10-9-8-7-6-5-4-3-2-1"
+    rep_scheme_type: Optional[Literal[
+        'descending',
+        'ascending',
+        'pyramid',
+        'wave',
+        'custom',
+    ]] = None
+    session: Optional[str] = None  # e.g. "Session 1", "AM", "PM"
+    block_type: Optional[Literal[
+        'warmup',
+        'strength',
+        'metcon',
+        'cooldown',
+        'cardio',
+    ]] = None
+    load_variants: Optional[List[Dict[str, Any]]] = None  # M/F, RX/Scaled weight options
+
     # Legacy fields for backward compatibility (deprecated)
     rest_between_sec: Optional[int] = None  # Alias for rest_between_rounds_sec
     default_reps_range: Optional[str] = None  # Deprecated

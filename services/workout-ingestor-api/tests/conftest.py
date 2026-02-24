@@ -24,8 +24,8 @@ for p in {ROOT, SRC}:
         sys.path.insert(0, p_str)
 
 # Import FastAPI app (main.py at repo root)
-from main import app
-from workout_ingestor_api.auth import get_current_user, get_user_with_metadata
+from main import app  # noqa: E402
+from workout_ingestor_api.auth import get_current_user, get_user_with_metadata  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

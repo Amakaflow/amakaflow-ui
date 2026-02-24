@@ -12,13 +12,11 @@ These tests verify:
 """
 
 import pytest
-from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from backend.app import app
 from api.deps import get_patch_workout_use_case, get_current_user
-from application.use_cases.patch_workout import PatchWorkoutUseCase, PatchWorkoutResult
-from domain.models.patch_operation import PatchOperation
+from application.use_cases.patch_workout import PatchWorkoutResult
 
 
 # =============================================================================

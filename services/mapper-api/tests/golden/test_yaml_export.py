@@ -12,8 +12,6 @@ Covers:
 """
 
 import re
-from datetime import datetime, timedelta
-from unittest.mock import patch
 
 import pytest
 
@@ -356,7 +354,7 @@ class TestYamlExportIntegration:
 
         # Export using appropriate adapter
         hiit_output = to_hiit_garmin_yaml(hiit_blocks)
-        strength_output = to_hyrox_yaml(strength_blocks)
+        _strength_output = to_hyrox_yaml(strength_blocks)
 
         # HIIT output should have "sport: hiit"
         assert "sport: hiit" in hiit_output

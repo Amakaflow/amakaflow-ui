@@ -4,7 +4,7 @@ Remembers user selections for future automatic mapping.
 """
 import yaml
 import pathlib
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MAPPINGS_FILE = ROOT / "shared/dictionaries/user_mappings.yaml"

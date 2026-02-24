@@ -20,9 +20,7 @@ Coverage: All 10 endpoints with 60+ test cases including success, error, and edg
 
 import pytest
 from io import BytesIO
-from datetime import datetime
-from unittest.mock import patch, MagicMock
-from typing import List
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from fastapi import status, HTTPException

@@ -15,7 +15,7 @@ import pytest
 import json
 import os
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 # Import module under test
 from backend.mobile_pairing import (
@@ -134,7 +134,7 @@ class TestGenerateQrData:
         """API URL should come from environment variable."""
         with patch.dict(os.environ, {"MAPPER_API_PUBLIC_URL": "https://custom.api.com"}):
             qr_data = generate_qr_data("test-token", api_url=None)
-            parsed = json.loads(qr_data)
+            _parsed = json.loads(qr_data)
             # Note: function reads env at call time, so we pass explicit value
 
     def test_api_url_override(self):
@@ -593,7 +593,7 @@ class TestGetClerkClient:
 
         # Mock the import inside the function
         with patch.dict("sys.modules", {"clerk_backend_api": MagicMock(Clerk=mock_clerk_class)}):
-            result = get_clerk_client()
+            _result = get_clerk_client()
 
         # Verify Clerk was called with the secret key
         mock_clerk_class.assert_called_once_with(bearer_auth="sk_test_12345")

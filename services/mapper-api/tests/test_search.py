@@ -19,15 +19,15 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.integration
 
-from backend.app import app
-from api.deps import (
+from backend.app import app  # noqa: E402
+from api.deps import (  # noqa: E402
     get_current_user,
     get_search_repo,
     get_embedding_service,
 )
-from api.routers.workouts import _matches_workout_type, _matches_duration
-from application.ports.search_repository import SearchRepository
-from infrastructure.db.search_repository import SupabaseSearchRepository
+from api.routers.workouts import _matches_workout_type, _matches_duration  # noqa: E402
+from application.ports.search_repository import SearchRepository  # noqa: E402
+from infrastructure.db.search_repository import SupabaseSearchRepository  # noqa: E402
 
 TEST_USER_ID = "test-user-123"
 

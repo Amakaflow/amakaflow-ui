@@ -12,7 +12,6 @@ from backend.adapters.workoutkit_schemas import (
     WarmupInterval,
     CooldownInterval,
     RepeatInterval,
-    Schedule,
 )
 from backend.adapters.blocks_to_hyrox_yaml import (
     map_exercise_to_garmin,

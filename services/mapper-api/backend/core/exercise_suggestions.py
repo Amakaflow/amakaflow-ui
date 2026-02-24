@@ -6,7 +6,6 @@ from backend.core.garmin_matcher import load_garmin_exercises, find_garmin_exerc
 from backend.core.normalize import normalize
 from backend.core.global_mappings import get_popular_mappings
 from rapidfuzz import fuzz, process
-import re
 
 
 def find_similar_exercises(exercise_name: str, limit: int = 10, min_score: int = 50) -> List[Dict]:

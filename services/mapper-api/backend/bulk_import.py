@@ -21,19 +21,15 @@ import uuid
 import base64
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Literal
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
 from backend.parsers import (
     FileParserFactory,
-    FileInfo,
-    ParseResult,
-    ParsedWorkout,
     URLParser,
     fetch_url_metadata_batch,
     ImageParser,
     parse_images_batch,
-    is_supported_image,
 )
 from backend.services.content_classifier import classify_content, ContentCategory, ClassificationConfidence
 from backend.core.garmin_matcher import find_garmin_exercise, get_garmin_suggestions
@@ -472,7 +468,7 @@ class BulkImportService:
 
                 # AMA-171: Classify content BEFORE expensive processing
                 classification_result = None
-                classification_error = None
+                _classification_error = None
 
                 if metadata.video_id and metadata.platform != 'unknown':
                     try:
@@ -484,7 +480,7 @@ class BulkImportService:
                         )
                     except (asyncio.TimeoutError, ValueError, ConnectionError) as e:
                         logger.warning(f"Classification failed for {metadata.url}: {e}")
-                        classification_error = str(e)
+                        _classification_error = str(e)
 
                 # Check if non-workout content detected (high confidence)
                 is_non_workout = (
@@ -1216,7 +1212,7 @@ class BulkImportService:
         In sync mode, processes all workouts before returning.
         """
         # Create import job entry
-        import_job_id = str(uuid.uuid4())
+        _import_job_id = str(uuid.uuid4())
 
         self._update_job_status(
             job_id, profile_id, "running",
@@ -1286,7 +1282,7 @@ class BulkImportService:
         detected = self._get_detected_items(job_id, profile_id)
         results = []
 
-        total = len(workout_ids)
+        _total = len(workout_ids)
 
         for idx, workout_id in enumerate(workout_ids):
             # Check for cancellation

@@ -1,6 +1,5 @@
 """Tests for /ingest/instagram_reel endpoint."""
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from main import app
 from workout_ingestor_api.auth import get_user_with_metadata

@@ -16,7 +16,6 @@ from fastapi import HTTPException
 from workout_ingestor_api.auth import (
     get_user_with_metadata,
     _validate_jwt_with_metadata,
-    validate_api_key,
 )
 
 

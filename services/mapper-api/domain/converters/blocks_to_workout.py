@@ -76,7 +76,7 @@ def _parse_reps(reps_raw: Any) -> tuple[Optional[int], Optional[str], Optional[i
 
 
 def _parse_load(
-    weight: Any, weight_unit: Optional[str] = None
+    weight: Any, weight_unit: Optional[str] = None, load_type: Optional[str] = None
 ) -> Optional[Load]:
     """
     Parse weight value into Load object.
@@ -84,6 +84,7 @@ def _parse_load(
     Args:
         weight: Weight value (number or string)
         weight_unit: Unit string (kg, lbs, lb)
+        load_type: Load type string (absolute, percentage, bodyweight, rpe)
 
     Returns:
         Load object or None
@@ -103,7 +104,11 @@ def _parse_load(
             if unit_lower in ("kg", "kgs"):
                 unit = "kg"
 
-        return Load(value=value, unit=unit)
+        # Validate load_type
+        valid_load_types = ("absolute", "percentage", "bodyweight", "rpe")
+        validated_load_type = load_type if load_type in valid_load_types else None
+
+        return Load(value=value, unit=unit, load_type=validated_load_type)
     except (ValueError, TypeError):
         return None
 
@@ -119,11 +124,27 @@ def _convert_exercise(ex_data: Dict[str, Any]) -> Exercise:
     if duration_secs is None and ex_data.get("duration_sec"):
         duration_secs = int(ex_data["duration_sec"])
 
-    # Parse load from weight/weight_unit
-    load = _parse_load(ex_data.get("weight"), ex_data.get("weight_unit"))
+    # Parse load from weight/weight_unit and optional load_type
+    load = _parse_load(ex_data.get("weight"), ex_data.get("weight_unit"), ex_data.get("load_type"))
 
     # Map rest_sec to rest_seconds
     rest_seconds = ex_data.get("rest_sec") or ex_data.get("rest_seconds")
+
+    # Parse load_options list
+    load_options_raw = ex_data.get("load_options")
+    load_options = None
+    if load_options_raw:
+        parsed_opts = []
+        for opt in load_options_raw:
+            if isinstance(opt, dict):
+                parsed = _parse_load(
+                    opt.get("weight") or opt.get("value"),
+                    opt.get("weight_unit") or opt.get("unit"),
+                    opt.get("load_type"),
+                )
+                if parsed is not None:
+                    parsed_opts.append(parsed)
+        load_options = parsed_opts if parsed_opts else None
 
     return Exercise(
         name=name,
@@ -133,6 +154,7 @@ def _convert_exercise(ex_data: Dict[str, Any]) -> Exercise:
         reps=int_reps if int_reps is not None else str_reps,
         duration_seconds=duration_secs,
         load=load,
+        load_options=load_options,
         rest_seconds=rest_seconds,
         notes=ex_data.get("notes"),
     )
@@ -188,6 +210,13 @@ def _convert_block(block_data: Dict[str, Any]) -> List[Block]:
     rounds = _resolve_rounds(block_data)
     rest_between = block_data.get("rest_between_sec") or block_data.get("rest_between_rounds_sec")
 
+    # New AMA-754 fields
+    rep_scheme = block_data.get("rep_scheme")
+    rep_scheme_type = block_data.get("rep_scheme_type")
+    session = block_data.get("session")
+    block_category = block_data.get("block_type")
+    load_variants = block_data.get("load_variants")
+
     # Legacy format: supersets[] array
     supersets = block_data.get("supersets", [])
     for i, superset in enumerate(supersets):
@@ -210,6 +239,11 @@ def _convert_block(block_data: Dict[str, Any]) -> List[Block]:
                     rounds=rounds,
                     exercises=exercises,
                     rest_between_seconds=superset.get("rest_between_sec") or rest_between,
+                    rep_scheme=rep_scheme,
+                    rep_scheme_type=rep_scheme_type,
+                    session=session,
+                    block_type=block_category,
+                    load_variants=load_variants,
                 )
             )
 
@@ -224,6 +258,11 @@ def _convert_block(block_data: Dict[str, Any]) -> List[Block]:
                 rounds=rounds,
                 exercises=exercises,
                 rest_between_seconds=rest_between,
+                rep_scheme=rep_scheme,
+                rep_scheme_type=rep_scheme_type,
+                session=session,
+                block_type=block_category,
+                load_variants=load_variants,
             )
         )
 

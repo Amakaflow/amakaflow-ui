@@ -182,7 +182,6 @@ def _convert_block(block_data: Dict[str, Any]) -> List[Block]:
 
 def _convert_exercise(ex_data: Dict[str, Any]) -> Exercise:
     """Convert a single exercise from blocks_json to domain Exercise."""
-    import re
 
     name = ex_data.get("name", "Exercise")
 

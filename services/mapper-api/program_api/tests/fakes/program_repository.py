@@ -305,7 +305,7 @@ class FakeProgramRepository:
 
         # All data collected successfully, now insert (simulating commit)
         # Create program
-        created_program = self.create({**program_data, "id": program_id})
+        _created_program = self.create({**program_data, "id": program_id})
 
         # Create weeks and workouts
         workout_idx = 0

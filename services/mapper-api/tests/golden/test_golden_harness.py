@@ -12,7 +12,6 @@ Tests the golden test infrastructure itself to ensure:
 """
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,6 @@ from tests.golden.conftest import (
     assert_golden,
     update_golden,
     GoldenTestError,
-    FIXTURES_DIR,
     _normalize_content,
     _generate_diff,
 )

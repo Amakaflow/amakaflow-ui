@@ -12,7 +12,6 @@ These tests verify:
 
 import json
 import pytest
-from datetime import datetime
 
 
 @pytest.mark.unit
@@ -690,6 +689,211 @@ class TestWorkoutModel:
         assert restored.tags == original.tags
         assert restored.is_favorite == original.is_favorite
         assert restored.times_completed == original.times_completed
+
+
+@pytest.mark.unit
+class TestAMA754NewEnumValues:
+    """Tests for new BlockType enum values added in AMA-754."""
+
+    def test_block_type_ladder_exists(self):
+        """BlockType.LADDER enum value exists."""
+        from domain.models import BlockType
+
+        assert BlockType.LADDER == "ladder"
+
+    def test_block_type_pyramid_exists(self):
+        """BlockType.PYRAMID enum value exists."""
+        from domain.models import BlockType
+
+        assert BlockType.PYRAMID == "pyramid"
+
+    def test_block_type_complex_exists(self):
+        """BlockType.COMPLEX enum value exists."""
+        from domain.models import BlockType
+
+        assert BlockType.COMPLEX == "complex"
+
+    def test_block_type_drop_set_exists(self):
+        """BlockType.DROP_SET enum value exists."""
+        from domain.models import BlockType
+
+        assert BlockType.DROP_SET == "drop_set"
+
+
+@pytest.mark.unit
+class TestAMA754BlockNewFields:
+    """Tests for new optional fields added to Block in AMA-754."""
+
+    def test_block_rep_scheme_defaults_none(self):
+        """Block.rep_scheme defaults to None."""
+        from domain.models import Block, Exercise
+
+        block = Block(exercises=[Exercise(name="Squat", sets=5, reps=5)])
+        assert block.rep_scheme is None
+
+    def test_block_rep_scheme_type_defaults_none(self):
+        """Block.rep_scheme_type defaults to None."""
+        from domain.models import Block, Exercise
+
+        block = Block(exercises=[Exercise(name="Squat", sets=5, reps=5)])
+        assert block.rep_scheme_type is None
+
+    def test_block_session_defaults_none(self):
+        """Block.session defaults to None."""
+        from domain.models import Block, Exercise
+
+        block = Block(exercises=[Exercise(name="Squat", sets=5, reps=5)])
+        assert block.session is None
+
+    def test_block_block_type_defaults_none(self):
+        """Block.block_type defaults to None."""
+        from domain.models import Block, Exercise
+
+        block = Block(exercises=[Exercise(name="Squat", sets=5, reps=5)])
+        assert block.block_type is None
+
+    def test_block_load_variants_defaults_none(self):
+        """Block.load_variants defaults to None."""
+        from domain.models import Block, Exercise
+
+        block = Block(exercises=[Exercise(name="Squat", sets=5, reps=5)])
+        assert block.load_variants is None
+
+    def test_block_rep_scheme_set(self):
+        """Block.rep_scheme can be set to a string."""
+        from domain.models import Block, Exercise
+
+        block = Block(
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+            rep_scheme="5-4-3-2-1",
+        )
+        assert block.rep_scheme == "5-4-3-2-1"
+
+    def test_block_rep_scheme_type_valid_values(self):
+        """Block.rep_scheme_type accepts valid literal values."""
+        from domain.models import Block, Exercise
+
+        for scheme_type in ("descending", "ascending", "pyramid", "wave", "custom"):
+            block = Block(
+                exercises=[Exercise(name="Squat", sets=5, reps=5)],
+                rep_scheme_type=scheme_type,
+            )
+            assert block.rep_scheme_type == scheme_type
+
+    def test_block_session_set(self):
+        """Block.session can be set."""
+        from domain.models import Block, Exercise
+
+        block = Block(
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+            session="Session A",
+        )
+        assert block.session == "Session A"
+
+    def test_block_block_type_valid_values(self):
+        """Block.block_type accepts valid literal values."""
+        from domain.models import Block, Exercise
+
+        for bt in ("warmup", "strength", "metcon", "cooldown", "cardio"):
+            block = Block(
+                exercises=[Exercise(name="Squat", sets=5, reps=5)],
+                block_type=bt,
+            )
+            assert block.block_type == bt
+
+    def test_block_load_variants_set(self):
+        """Block.load_variants can be set to a list of dicts."""
+        from domain.models import Block, Exercise
+
+        variants = [{"weight": 135, "unit": "lb"}, {"weight": 145, "unit": "lb"}]
+        block = Block(
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+            load_variants=variants,
+        )
+        assert block.load_variants == variants
+
+    def test_block_with_ladder_type(self):
+        """Block can be created with LADDER BlockType."""
+        from domain.models import Block, BlockType, Exercise
+
+        block = Block(
+            type=BlockType.LADDER,
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+        )
+        assert block.type == BlockType.LADDER
+
+    def test_block_with_pyramid_type(self):
+        """Block can be created with PYRAMID BlockType."""
+        from domain.models import Block, BlockType, Exercise
+
+        block = Block(
+            type=BlockType.PYRAMID,
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+        )
+        assert block.type == BlockType.PYRAMID
+
+    def test_block_with_complex_type(self):
+        """Block can be created with COMPLEX BlockType."""
+        from domain.models import Block, BlockType, Exercise
+
+        block = Block(
+            type=BlockType.COMPLEX,
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+        )
+        assert block.type == BlockType.COMPLEX
+
+    def test_block_with_drop_set_type(self):
+        """Block can be created with DROP_SET BlockType."""
+        from domain.models import Block, BlockType, Exercise
+
+        block = Block(
+            type=BlockType.DROP_SET,
+            exercises=[Exercise(name="Squat", sets=5, reps=5)],
+        )
+        assert block.type == BlockType.DROP_SET
+
+
+@pytest.mark.unit
+class TestAMA754ExerciseNewFields:
+    """Tests for new optional fields added to Exercise in AMA-754."""
+
+    def test_exercise_load_options_defaults_none(self):
+        """Exercise.load_options defaults to None."""
+        from domain.models import Exercise
+
+        exercise = Exercise(name="Squat", sets=5, reps=5)
+        assert exercise.load_options is None
+
+    def test_exercise_load_options_set(self):
+        """Exercise.load_options can be set to a list of Load objects."""
+        from domain.models import Exercise, Load
+
+        opts = [Load(value=135, unit="lb"), Load(value=145, unit="lb")]
+        exercise = Exercise(name="Squat", sets=5, reps=5, load_options=opts)
+        assert exercise.load_options is not None
+        assert len(exercise.load_options) == 2
+        assert exercise.load_options[0].value == 135
+        assert exercise.load_options[1].value == 145
+
+
+@pytest.mark.unit
+class TestAMA754LoadNewFields:
+    """Tests for new optional fields added to Load in AMA-754."""
+
+    def test_load_load_type_defaults_none(self):
+        """Load.load_type defaults to None."""
+        from domain.models import Load
+
+        load = Load(value=135, unit="lb")
+        assert load.load_type is None
+
+    def test_load_load_type_valid_values(self):
+        """Load.load_type accepts valid literal values."""
+        from domain.models import Load
+
+        for lt in ("absolute", "percentage", "bodyweight", "rpe"):
+            load = Load(value=135, unit="lb", load_type=lt)
+            assert load.load_type == lt
 
 
 @pytest.mark.unit

@@ -189,14 +189,15 @@ def run_viewer(host: str = 'localhost', port: int = 8080, open_browser: bool = T
     # Change to static directory to serve files from there
     os.chdir(static_dir)
 
-    handler = lambda *args, **kwargs: ViewerHandler(*args, directory=str(static_dir), **kwargs)
+    def handler(*args, **kwargs):
+        return ViewerHandler(*args, directory=str(static_dir), **kwargs)
 
     server = http.server.HTTPServer((host, port), handler)
 
     url = f"http://{host}:{port}"
     print(f"🎯 Trace Viewer starting at {url}")
     print(f"   Serving sessions from: {DEFAULT_SESSIONS_DIR}")
-    print(f"   Press Ctrl+C to stop")
+    print("   Press Ctrl+C to stop")
 
     if open_browser:
         webbrowser.open(url)

@@ -93,9 +93,9 @@ def _configure_cors(app: FastAPI) -> None:
 def _include_routers(app: FastAPI) -> None:
     """Include all API routers in the application."""
     from api.routers import (
+        generation_router,
         health_router,
         programs_router,
-        generation_router,
         progression_router,
     )
 

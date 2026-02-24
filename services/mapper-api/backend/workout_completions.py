@@ -2,7 +2,7 @@
 Workout Completions module for storing health metrics from Apple Watch (AMA-189).
 Handles saving and retrieving workout completion data with heart rate, calories, etc.
 """
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import logging

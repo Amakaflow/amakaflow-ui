@@ -2,6 +2,27 @@
 # ADD THIS TO YOUR routes.py FILE
 # =============================================================================
 
+import re
+import shutil
+import tempfile
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from workout_ingestor_api.services.ocr_service import OCRService
+from workout_ingestor_api.services.parser_service import ParserService
+from workout_ingestor_api.services.video_service import VideoService
+
+# BUILD_TIMESTAMP and GIT_INFO are expected to be imported from routes.py when
+# this file's snippets are integrated into that module.
+try:
+    from workout_ingestor_api.api.routes import BUILD_TIMESTAMP, GIT_INFO, router
+except ImportError:
+    BUILD_TIMESTAMP = None  # type: ignore[assignment]
+    GIT_INFO = None  # type: ignore[assignment]
+    router = APIRouter()  # type: ignore[assignment]
+
 # -----------------------------------------------------------------------------
 # STEP 1: Add this import near the top (around line 35, after instagram import)
 # -----------------------------------------------------------------------------
@@ -68,14 +89,14 @@ async def ingest_tiktok(payload: TikTokIngestRequest):
         # Step 3: Extract frames for OCR
         try:
             VideoService.sample_frames(video_path, tmpdir, fps=0.5, max_secs=60)
-        except Exception as e:
+        except Exception:
             pass  # Continue even if frame extraction fails
         
         # Step 4: OCR the frames
         ocr_text = ""
         try:
             ocr_text = OCRService.ocr_many_images_to_text(tmpdir, fast_mode=True)
-        except Exception as e:
+        except Exception:
             pass  # Continue even if OCR fails
         
         # Step 5: Combine description + OCR text

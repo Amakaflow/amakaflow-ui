@@ -96,7 +96,7 @@ class TestEmptyRouters:
 
     def test_mapping_router_prefix(self, test_app):
         """Mapping router should have /map prefix."""
-        routes = [route.path for route in test_app.routes]
+        _routes = [route.path for route in test_app.routes]
         # Currently empty, but prefix should be /map
         # When endpoints are added, they'll be at /map/...
         # For now, just verify the app creates without error

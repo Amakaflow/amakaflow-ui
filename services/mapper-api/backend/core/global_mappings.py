@@ -6,7 +6,6 @@ Popular mappings are prioritized in auto-mapping.
 import yaml
 import pathlib
 from typing import Optional, Dict, List, Tuple
-from collections import defaultdict
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 POPULARITY_FILE = ROOT / "shared/dictionaries/global_mappings.yaml"

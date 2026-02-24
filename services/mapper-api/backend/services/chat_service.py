@@ -11,11 +11,10 @@ Handles:
 - Tool execution
 """
 
-import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, AsyncGenerator, Callable
+from typing import Optional, Dict, Any, AsyncGenerator
+from backend.ai import AIClientFactory, AIRequestContext
 from backend.services.tool_executor import ToolExecutor
 from backend.services.tool_schemas import get_all_tool_schemas
 

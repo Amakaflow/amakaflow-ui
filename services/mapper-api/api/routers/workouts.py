@@ -22,9 +22,10 @@ api/routers/completions.py and must be registered BEFORE this router.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
-from typing import Any, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -44,8 +45,10 @@ from application.use_cases.patch_workout import PatchWorkoutUseCase
 from domain.models.patch_operation import PatchOperation
 from backend.adapters.blocks_to_workoutkit import to_workoutkit
 from domain.converters.blocks_to_workout import blocks_to_workout
-from domain.models import WorkoutMetadata, WorkoutSource
+from domain.models import WorkoutSource
+from backend.services.embedding_notifier import notify_embedding_update
 from backend.services.export_queue import ExportQueue
+from backend.settings import get_settings
 from backend.utils.intervals import calculate_intervals_duration, convert_exercise_to_interval
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     tags=["Workouts"],
 )
+
+# Module-level set to retain background task references and prevent GC before completion.
+_background_tasks: set[asyncio.Task] = set()
 
 
 # =============================================================================
@@ -229,7 +235,7 @@ class WorkoutOperationResponse(BaseModel):
 
 
 @router.post("/workouts/save")
-def save_workout_endpoint(
+async def save_workout_endpoint(
     request: SaveWorkoutRequest,
     user_id: str = Depends(get_current_user),
     save_workout_use_case: SaveWorkoutUseCase = Depends(get_save_workout_use_case),
@@ -278,7 +284,7 @@ def save_workout_endpoint(
             device=request.device,
         )
 
-        # Step 3: Queue workout for export if save was successful
+        # Step 3: Queue workout for export and notify embedding webhook if save was successful
         if result.success and result.workout_id:
             export_queue.enqueue(
                 workout_id=result.workout_id,
@@ -286,8 +292,17 @@ def save_workout_endpoint(
                 device=request.device,
                 export_formats=request.exports or {},
             )
+            # Notify chat-api to generate embedding (fire-and-forget)
+            _task = asyncio.create_task(
+                notify_embedding_update(
+                    workout_id=result.workout_id,
+                    chat_api_url=get_settings().chat_api_url,
+                )
+            )
+            _background_tasks.add(_task)
+            _task.add_done_callback(_background_tasks.discard)
 
-        # Step 4: Convert use case result to HTTP response
+        # Step 5: Convert use case result to HTTP response
         if result.success:
             return {
                 "success": True,
@@ -296,31 +311,32 @@ def save_workout_endpoint(
                 "is_update": result.is_update,
             }
         else:
-            return {
-                "success": False,
-                "message": result.error or "Failed to save workout",
-                "validation_errors": result.validation_errors,
-            }
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": result.error or "Failed to save workout",
+                    "validation_errors": result.validation_errors,
+                },
+            )
 
     except ValueError as e:
-        # Conversion error (e.g., invalid workout_data)
         logger.warning(f"Failed to convert workout data: {e}")
-        return {
-            "success": False,
-            "message": f"Invalid workout data: {str(e)}"
-        }
+        raise HTTPException(
+            status_code=422,
+            detail={"message": f"Invalid workout data: {str(e)}"},
+        )
     except TimeoutError as e:
         logger.error(f"Timeout saving workout: {e}")
-        return {
-            "success": False,
-            "message": "Service temporarily unavailable. Please try again."
-        }
+        raise HTTPException(
+            status_code=503,
+            detail={"message": "Service temporarily unavailable. Please try again."},
+        )
     except Exception as e:
         logger.exception(f"Unexpected error saving workout: {e}")
-        return {
-            "success": False,
-            "message": "Failed to save workout. Check server logs."
-        }
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Failed to save workout. Check server logs."},
+        )
 
 
 @router.get("/workouts", response_model=WorkoutListResponse)
@@ -712,7 +728,7 @@ def update_workout_tags_endpoint(
         422: {"model": PatchWorkoutErrorResponse, "description": "Validation error"},
     },
 )
-def patch_workout_endpoint(
+async def patch_workout_endpoint(
     workout_id: str,
     request: PatchWorkoutRequest,
     user_id: str = Depends(get_current_user),
@@ -772,6 +788,16 @@ def patch_workout_endpoint(
                 "validation_errors": result.validation_errors,
             },
         )
+
+    # Notify chat-api to regenerate embedding (fire-and-forget)
+    _task = asyncio.create_task(
+        notify_embedding_update(
+            workout_id=workout_id,
+            chat_api_url=get_settings().chat_api_url,
+        )
+    )
+    _background_tasks.add(_task)
+    _task.add_done_callback(_background_tasks.discard)
 
     return PatchWorkoutResponse(
         success=True,

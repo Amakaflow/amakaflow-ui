@@ -10,7 +10,6 @@ These tests verify that fake repositories:
 - Return expected values for all operations
 """
 import pytest
-from datetime import datetime, timezone
 
 from application.ports import HealthMetricsDTO
 
@@ -597,7 +596,6 @@ class TestProtocolCompliance:
     def test_workout_repo_has_all_methods(self):
         """FakeWorkoutRepository should have all Protocol methods."""
         from tests.fakes import FakeWorkoutRepository
-        from application.ports import WorkoutRepository
 
         required = [
             "save", "get", "get_list", "delete", "update_export_status",

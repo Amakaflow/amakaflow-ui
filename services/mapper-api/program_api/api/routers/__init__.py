@@ -10,9 +10,9 @@ This package contains all API routers organized by domain:
 - progression: Exercise progression tracking
 """
 
+from api.routers.generation import router as generation_router
 from api.routers.health import router as health_router
 from api.routers.programs import router as programs_router
-from api.routers.generation import router as generation_router
 from api.routers.progression import router as progression_router
 
 __all__ = [

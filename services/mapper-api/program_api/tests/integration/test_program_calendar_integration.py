@@ -8,13 +8,9 @@ verifying that calendar events are created correctly when a program
 is activated.
 """
 
-from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
-
-from tests.fakes import FakeCalendarClient
-
 
 # ---------------------------------------------------------------------------
 # Test Helpers

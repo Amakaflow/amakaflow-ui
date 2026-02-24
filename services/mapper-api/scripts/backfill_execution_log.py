@@ -23,8 +23,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from supabase import create_client
-from backend.workout_completions import merge_set_logs_to_execution_log
+from supabase import create_client  # noqa: E402
+from backend.workout_completions import merge_set_logs_to_execution_log  # noqa: E402
 
 
 def get_supabase_client():
@@ -108,7 +108,7 @@ def backfill_execution_log(dry_run: bool = False, limit: int = None):
 
     print()
     print("=" * 50)
-    print(f"Backfill complete:")
+    print("Backfill complete:")
     print(f"  Total processed: {len(result.data)}")
     if dry_run:
         print(f"  Would update: {len(result.data) - error_count}")

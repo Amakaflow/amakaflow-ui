@@ -14,19 +14,16 @@ Usage:
 
 import json
 import sys
-import os
 from pathlib import Path
-from typing import Any
 
 # Add project root to path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.adapters.ingest_to_cir import to_cir
-from backend.adapters.cir_to_garmin_yaml import to_garmin_yaml
-from backend.adapters.blocks_to_workoutkit import to_workoutkit
-from backend.replay.core import Session, DiffEngine, IgnoreConfig
-import yaml
+from backend.adapters.ingest_to_cir import to_cir  # noqa: E402
+from backend.adapters.cir_to_garmin_yaml import to_garmin_yaml  # noqa: E402
+from backend.adapters.blocks_to_workoutkit import to_workoutkit  # noqa: E402
+import yaml  # noqa: E402
 
 
 # --- Built-in test scenarios ---

@@ -11,16 +11,17 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import requests
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
-from workout_ingestor_api.models import Block, Exercise, Workout
+from workout_ingestor_api.config import settings
+from workout_ingestor_api.models import Workout
+from workout_ingestor_api.services.prompts import build_prompt
 from workout_ingestor_api.services.url_normalizer import (
-    extract_youtube_video_id,
     normalize_youtube_url,
     parse_youtube_url,
 )
@@ -29,137 +30,6 @@ from workout_ingestor_api.services.youtube_cache_service import YouTubeCacheServ
 
 
 logger = logging.getLogger(__name__)
-
-# Static system prompt for Anthropic transcript parsing — cached via prompt caching.
-# Keep dynamic content (title, transcript, duration) in the user message only.
-_ANTHROPIC_SYSTEM_PROMPT = """You are a fitness expert who extracts structured workout information from video transcripts.
-
-Extract workout routines focusing on:
-1. Exercise names (standardize to common names like "Incline Barbell Bench Press", "Pull-Up", "Lateral Raise")
-2. Sets and reps (extract specific numbers when mentioned)
-3. Important form cues and technique notes
-4. Rest periods if mentioned
-5. Distinguishing STRENGTH from CIRCUIT via rest periods — see rules below (check FIRST)
-6. Detecting SUPERSETS — see rules below (check SECOND, only if not a circuit)
-7. Approximate timestamp in the video where each exercise is discussed
-
-STRENGTH vs CIRCUIT — THE KEY SIGNAL IS REST BETWEEN EXERCISES:
-The word "rounds" or "sets" does NOT automatically mean circuit. Use rest periods to decide:
-
-STRENGTH indicators (classify block as straight-sets or superset, workout_type = "strength"):
-- Exercises have explicit rest periods (60+ seconds between sets, e.g. "rest 2 min", "rest 90 seconds")
-- Heavy compound lifts: squat, bench press, deadlift, barbell/dumbbell rows, overhead press
-- "3 rounds of this superset" with rest = STRENGTH SUPERSET (not a circuit)
-- Each exercise is done for its full sets before moving on (or paired with one other exercise)
-
-CIRCUIT indicators (classify block as circuit, workout_type may be "circuit"):
-- Exercises performed BACK-TO-BACK with minimal rest (<30 seconds) between exercises
-- Rest only comes AFTER completing the full round of all exercises
-- Explicit circuit keywords: "circuit", "AMRAP", "EMOM", "For Time", "WOD"
-- Workout styles like HYROX, CrossFit WODs are almost always circuits
-
-CIRCUIT / ROUNDS DETECTION:
-Detect a CIRCUIT block when:
-- Text uses "circuit", "AMRAP", "EMOM", "For Time", or CrossFit/HYROX workout style
-- Exercises are performed consecutively with minimal rest between them
-- 3+ exercises done back-to-back per round WITH minimal inter-exercise rest
-
-NOT a circuit (even when "rounds" is mentioned):
-- "3 rounds of this superset" with 90s rest = STRENGTH SUPERSET
-- "4 sets of squats, rest 2 min, then bench press" = STRENGTH straight sets
-- Multiple strength exercises with explicit rest periods between each = STRENGTH
-
-When you detect a circuit:
-- Set structure to "circuit" (or "amrap"/"emom"/"for-time" if applicable)
-- Put ALL exercises in the "exercises" array (NOT in supersets)
-- Set "rounds" to the number of rounds
-- Set "sets" on each exercise to null (rounds handle repetition)
-- Use "distance_m" for distance-based exercises (e.g. 500m ski = distance_m: 500)
-- "supersets" MUST be [] (empty)
-
-SUPERSET DETECTION — CHECK ONLY IF NOT A CIRCUIT:
-Supersets are EXACTLY 2 exercises paired back-to-back. Detect when:
-- Two exercises appear on the SAME LINE separated by "and", "&", "/", or "+"
-- Exercises are labeled A1/A2, B1/B2, etc.
-- Exercises are explicitly called "superset" or "paired with"
-- ONLY use superset when exercises come in pairs of 2 — never for 3+ exercises in a round
-
-CRITICAL RULE — DO NOT VIOLATE:
-When structure is "superset", the "exercises" array MUST be empty []. ALL exercises go inside "supersets" only.
-NEVER put the same exercise in both "exercises" and "supersets".
-
-Return ONLY a valid JSON object with this structure:
-
-STRUCTURE FOR CIRCUIT / ROUNDS BLOCKS (3+ exercises, repeated):
-{
-  "label": "HYROX Conditioning",
-  "structure": "circuit",
-  "rounds": 5,
-  "exercises": [
-    {"name": "Ski Erg", "sets": null, "reps": null, "distance_m": 500, "type": "cardio", "notes": "Steady pace"},
-    {"name": "Wall Balls", "sets": null, "reps": 20, "type": "strength", "notes": "9kg ball"}
-  ],
-  "supersets": []
-}
-
-STRUCTURE FOR NON-SUPERSET, NON-CIRCUIT BLOCKS (straight sets):
-{
-  "label": "Main Workout",
-  "structure": null,
-  "exercises": [
-    {
-      "name": "Exercise Name",
-      "sets": 3, "reps": 10, "reps_range": null, "duration_sec": null,
-      "rest_sec": null, "distance_m": null, "type": "strength",
-      "notes": "Form cues and tips here",
-      "video_start_sec": 60, "video_end_sec": 120
-    }
-  ],
-  "supersets": []
-}
-
-STRUCTURE FOR SUPERSET BLOCKS (exactly 2 exercises paired):
-{
-  "label": "Strength Supersets",
-  "structure": "superset",
-  "exercises": [],
-  "supersets": [
-    {"exercises": [
-      {"name": "Exercise A", "sets": 5, "reps": 5, "type": "strength"},
-      {"name": "Exercise B", "sets": 5, "reps": 5, "type": "strength"}
-    ]}
-  ]
-}
-NOTE: "exercises" is [] (empty) above. This is mandatory when structure is "superset".
-
-Workout Type Detection (applies to the entire workout session, not individual blocks):
-- "strength": Weight training, bodybuilding, powerlifting. Barbell/dumbbell exercises with rest periods between sets (60+ seconds). May use supersets or "rounds" language but has structured rest. Default for standard gym lifting workouts.
-- "circuit": Exercises performed back-to-back with minimal rest (<30s) between exercises, then rest after the full round. CrossFit WODs, HYROX, bodyweight circuits.
-- "hiit": High-intensity intervals with explicit timed work/rest periods (e.g. 40s on / 20s off, Tabata). Cardio or plyometric focus.
-- "cardio": Running, cycling, rowing, swimming focused. Steady-state or interval cardio.
-- "follow_along": Real-time video workouts to follow along with the trainer.
-- "mixed": Workout clearly combines both strength (with rest) AND circuit/cardio sections in the same session.
-
-IMPORTANT: If the workout has barbell or dumbbell exercises with rest periods between sets, classify as "strength" even if the trainer uses "rounds" language.
-
-Rules:
-- Only include actual exercises mentioned, not random sentences
-- If sets/reps aren't explicitly stated, use reasonable defaults (3-4 sets, 8-12 reps for strength)
-- Use "strength" for weight exercises, "cardio" for running/cycling, "interval" for timed work
-- Include helpful notes from the transcript about form, tempo, or technique
-- Standardize exercise names
-- FIRST check rest periods — long rest = strength, no rest between exercises = circuit
-- THEN check for circuits/rounds (back-to-back exercises, minimal inter-exercise rest)
-- THEN check for supersets (exactly 2 exercises paired on same line)
-- For circuits: put ALL exercises in "exercises", set "rounds", leave "supersets" empty
-- For supersets: put ALL exercises in "supersets", leave "exercises" empty
-- NEVER put exercises in BOTH "exercises" and "supersets" — pick one or the other per block
-- Use "distance_m" for distance-based exercises (500m, 25m, 2.5km = 2500, etc.)
-- For video_start_sec: estimate when each exercise is first discussed/demonstrated in the video
-- For video_end_sec: estimate when the discussion of that exercise ends
-
-Return ONLY the JSON, no markdown formatting, no code blocks, just pure JSON."""
-
 
 def _extract_youtube_id(url: Optional[str]) -> Optional[str]:
     """Extract YouTube video ID from various URL formats."""
@@ -202,7 +72,7 @@ def _parse_with_openai(
 ) -> Dict:
     """Parse transcript using OpenAI GPT-4."""
     try:
-        import openai
+        import openai  # noqa: F401
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -213,7 +83,7 @@ def _parse_with_openai(
     context = AIRequestContext(
         user_id=user_id,
         feature_name="youtube_parse_transcript",
-        custom_properties={"model": "gpt-4o-mini"},
+        custom_properties={"model": settings.PARSE_MODEL},
     )
 
     try:
@@ -221,185 +91,20 @@ def _parse_with_openai(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    # Build duration context for timestamp estimation
-    duration_context = ""
-    if video_duration_sec:
-        duration_context = f"\nThe video is {video_duration_sec} seconds long ({video_duration_sec // 60} minutes {video_duration_sec % 60} seconds)."
-    
-    # Add chapter info if available
-    if chapter_info:
-        duration_context += chapter_info + "\nUse these chapter timestamps for video_start_sec values."
-    elif video_duration_sec:
-        duration_context += " Estimate the approximate start time in seconds for each exercise based on when it's discussed in the transcript."
-    
-    prompt = f"""You are a fitness expert who extracts structured workout information from video transcripts.
+    # Build secondary_texts from chapter info when available
+    secondary_texts = [chapter_info] if chapter_info else None
 
-Analyze this transcript and extract the workout routine being described. Focus on:
-1. Exercise names (standardize to common names like "Incline Barbell Bench Press", "Pull-Up", "Lateral Raise")
-2. Sets and reps (extract specific numbers when mentioned)
-3. Important form cues and technique notes
-4. Rest periods if mentioned
-5. Distinguishing STRENGTH from CIRCUIT via rest periods — see rules below (check FIRST)
-6. Detecting SUPERSETS — see rules below (check SECOND, only if not a circuit)
-7. Approximate timestamp in the video where each exercise is discussed{duration_context}
-
-Transcript from video titled "{title}":
----
-{transcript}
----
-
-STRENGTH vs CIRCUIT — THE KEY SIGNAL IS REST BETWEEN EXERCISES:
-The word "rounds" or "sets" does NOT automatically mean circuit. Use rest periods to decide:
-
-STRENGTH indicators (classify block as straight-sets or superset, workout_type = "strength"):
-- Exercises have explicit rest periods (60+ seconds between sets, e.g. "rest 2 min", "rest 90 seconds")
-- Heavy compound lifts: squat, bench press, deadlift, barbell/dumbbell rows, overhead press
-- "3 rounds of this superset" with rest = STRENGTH SUPERSET (not a circuit)
-- Each exercise is done for its full sets before moving on (or paired with one other exercise)
-
-CIRCUIT indicators (classify block as circuit, workout_type may be "circuit"):
-- Exercises performed BACK-TO-BACK with minimal rest (<30 seconds) between exercises
-- Rest only comes AFTER completing the full round of all exercises
-- Explicit circuit keywords: "circuit", "AMRAP", "EMOM", "For Time", "WOD"
-- Workout styles like HYROX, CrossFit WODs are almost always circuits
-
-CIRCUIT / ROUNDS DETECTION:
-Detect a CIRCUIT block when:
-- Text uses "circuit", "AMRAP", "EMOM", "For Time", or CrossFit/HYROX workout style
-- Exercises are performed consecutively with minimal rest between them (not long rest between each)
-- 3+ exercises done back-to-back per round WITH minimal inter-exercise rest
-
-NOT a circuit (even when "rounds" is mentioned):
-- "3 rounds of this superset" with 90s rest = STRENGTH SUPERSET
-- "4 sets of squats, rest 2 min, then bench press" = STRENGTH straight sets
-- Multiple strength exercises with explicit rest periods between each = STRENGTH
-
-When you detect a circuit:
-- Set structure to "circuit" (or "amrap"/"emom"/"for-time" if applicable)
-- Put ALL exercises in the "exercises" array (NOT in supersets)
-- Set "rounds" to the number of rounds
-- Set "sets" on each exercise to null (rounds handle repetition)
-- Use "distance_m" for distance-based exercises (e.g. 500m ski = distance_m: 500)
-- "supersets" MUST be [] (empty)
-
-SUPERSET DETECTION — CHECK ONLY IF NOT A CIRCUIT:
-Supersets are EXACTLY 2 exercises paired back-to-back. Detect when:
-- Two exercises appear on the SAME LINE separated by "and", "&", "/", or "+"
-- Exercises are labeled A1/A2, B1/B2, etc.
-- Exercises are explicitly called "superset" or "paired with"
-- ONLY use superset when exercises come in pairs of 2 — never for 3+ exercises in a round
-
-CRITICAL RULE — DO NOT VIOLATE:
-When structure is "superset", the "exercises" array MUST be empty []. ALL exercises go inside "supersets" only.
-NEVER put the same exercise in both "exercises" and "supersets".
-
-Return ONLY a valid JSON object.
-
-STRUCTURE FOR CIRCUIT / ROUNDS BLOCKS (3+ exercises, repeated):
-{{
-  "label": "HYROX Conditioning",
-  "structure": "circuit",
-  "rounds": 5,
-  "exercises": [
-    {{
-      "name": "Ski Erg",
-      "sets": null,
-      "reps": null,
-      "distance_m": 500,
-      "type": "cardio",
-      "notes": "Steady pace"
-    }},
-    {{
-      "name": "Wall Balls",
-      "sets": null,
-      "reps": 20,
-      "type": "strength",
-      "notes": "9kg ball"
-    }}
-  ],
-  "supersets": []
-}}
-
-STRUCTURE FOR NON-SUPERSET, NON-CIRCUIT BLOCKS (straight sets):
-{{
-  "label": "Main Workout",
-  "structure": null,
-  "exercises": [
-    {{
-      "name": "Exercise Name",
-      "sets": 3,
-      "reps": 10,
-      "reps_range": null,
-      "duration_sec": null,
-      "rest_sec": null,
-      "distance_m": null,
-      "type": "strength",
-      "notes": "Form cues and tips here",
-      "video_start_sec": 60,
-      "video_end_sec": 120
-    }}
-  ],
-  "supersets": []
-}}
-
-STRUCTURE FOR SUPERSET BLOCKS (exactly 2 exercises paired):
-{{
-  "label": "Strength Supersets",
-  "structure": "superset",
-  "exercises": [],
-  "supersets": [
-    {{
-      "exercises": [
-        {{"name": "Exercise A", "sets": 5, "reps": 5, "type": "strength"}},
-        {{"name": "Exercise B", "sets": 5, "reps": 5, "type": "strength"}}
-      ]
-    }}
-  ]
-}}
-NOTE: "exercises" is [] (empty) above. This is mandatory when structure is "superset".
-
-Full response format:
-{{
-  "title": "{title}",
-  "workout_type": "strength | circuit | hiit | cardio | follow_along | mixed",
-  "workout_type_confidence": 0.0-1.0,
-  "video_duration_sec": {video_duration_sec if video_duration_sec else 'null'},
-  "blocks": [ ... ]
-}}
-
-Workout Type Detection (applies to the entire workout session, not individual blocks):
-- "strength": Weight training, bodybuilding, powerlifting. Barbell/dumbbell exercises with rest periods between sets (60+ seconds). May use supersets or "rounds" language but has structured rest. Default for standard gym lifting workouts.
-- "circuit": Exercises performed back-to-back with minimal rest (<30s) between exercises, then rest after the full round. CrossFit WODs, HYROX, bodyweight circuits, Tabata-style strength circuits.
-- "hiit": High-intensity intervals with explicit timed work/rest periods (e.g. 40s on / 20s off, Tabata). Cardio or plyometric focus.
-- "cardio": Running, cycling, rowing, swimming focused. Steady-state or interval cardio.
-- "follow_along": Real-time video workouts to follow along with the trainer.
-- "mixed": Workout clearly combines both strength (with rest) AND circuit/cardio sections in the same session.
-
-IMPORTANT: If the workout has barbell or dumbbell exercises with rest periods between sets, classify as "strength" even if the trainer uses "rounds" language.
-
-Set workout_type_confidence (0.0-1.0) based on clarity.
-
-Rules:
-- Only include actual exercises mentioned, not random sentences
-- If sets/reps aren't explicitly stated, use reasonable defaults (3-4 sets, 8-12 reps for strength)
-- Use "strength" for weight exercises, "cardio" for running/cycling, "interval" for timed work
-- Include helpful notes from the transcript about form, tempo, or technique
-- Standardize exercise names (e.g., "Beijing curl" should be normalized to a proper exercise name if it's a variation)
-- FIRST check rest periods — long rest = strength, no rest between exercises = circuit
-- THEN check for circuits/rounds (back-to-back exercises, minimal inter-exercise rest) — these are NOT supersets
-- THEN check for supersets (exactly 2 exercises paired on same line)
-- For circuits: put ALL exercises in "exercises", set "rounds", leave "supersets" empty
-- For supersets: put ALL exercises in "supersets", leave "exercises" empty
-- NEVER put exercises in BOTH "exercises" and "supersets" — pick one or the other per block
-- Use "distance_m" for distance-based exercises (500m, 25m, 2.5km = 2500, etc.)
-- For video_start_sec: estimate when each exercise is first discussed/demonstrated in the video
-- For video_end_sec: estimate when the discussion of that exercise ends (before the next exercise starts)
-
-Return ONLY the JSON, no other text."""
+    prompt = build_prompt(
+        platform="youtube",
+        video_duration_sec=video_duration_sec,
+        raw_text=transcript,
+        secondary_texts=secondary_texts,
+        title=title,
+    )
 
     def _make_api_call() -> Dict:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.PARSE_MODEL,
             messages=[
                 {"role": "system", "content": "You are a fitness expert that extracts workout data from transcripts. Return only valid JSON."},
                 {"role": "user", "content": prompt}
@@ -435,7 +140,7 @@ def _parse_with_anthropic(
 ) -> Dict:
     """Parse transcript using Anthropic Claude."""
     try:
-        from anthropic import Anthropic
+        from anthropic import Anthropic  # noqa: F401
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -446,7 +151,7 @@ def _parse_with_anthropic(
     context = AIRequestContext(
         user_id=user_id,
         feature_name="youtube_parse_transcript_anthropic",
-        custom_properties={"model": "claude-3-5-sonnet-20241022"},
+        custom_properties={"model": settings.ANTHROPIC_PARSE_MODEL},
     )
 
     try:
@@ -454,30 +159,27 @@ def _parse_with_anthropic(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    # Build duration context for timestamp estimation
-    duration_context = ""
-    if video_duration_sec:
-        duration_context = f"\nThe video is {video_duration_sec} seconds long ({video_duration_sec // 60} minutes {video_duration_sec % 60} seconds)."
-    
-    # Add chapter info if available
-    if chapter_info:
-        duration_context += chapter_info + "\nUse these chapter timestamps for video_start_sec values."
-    elif video_duration_sec:
-        duration_context += " Estimate the approximate start time in seconds for each exercise based on when it's discussed in the transcript."
-    
-    user_message = (
-        f'Analyze this transcript from video titled "{title}":{duration_context}\n'
-        f"---\n{transcript}\n---\n\n"
-        f'Return JSON with "title": "{title}", '
-        f'"video_duration_sec": {video_duration_sec if video_duration_sec else "null"}, '
-        f'and "blocks" array.'
+    # Build secondary_texts from chapter info when available
+    secondary_texts = [chapter_info] if chapter_info else None
+
+    # Full prompt sourced from shared builder — used as the cached system message so the
+    # static structural instructions benefit from Anthropic prompt caching, while the
+    # dynamic content (title, transcript, duration) is embedded via build_prompt().
+    system_prompt = build_prompt(
+        platform="youtube",
+        video_duration_sec=video_duration_sec,
+        raw_text=transcript,
+        secondary_texts=secondary_texts,
+        title=title,
     )
+
+    user_message = "Extract the workout from the text above and return valid JSON."
 
     def _make_api_call() -> Dict:
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=settings.ANTHROPIC_PARSE_MODEL,
             max_tokens=4096,
-            system=[{"type": "text", "text": _ANTHROPIC_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_message}],
             temperature=0.1,
         )
@@ -616,7 +318,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
 
     logger.info(f"Fetching transcript for video_id: {video_id}")
 
-    last_error = None
+    _last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             logger.debug(f"Transcript API attempt {attempt + 1}/{MAX_RETRIES} for video_id: {video_id}")
@@ -632,7 +334,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
             # Success - break out of retry loop
             break
         except requests.Timeout as exc:
-            last_error = exc
+            _last_error = exc
             logger.warning(
                 f"Transcript API timeout (attempt {attempt + 1}/{MAX_RETRIES}) "
                 f"for video_id: {video_id}, timeout: {TRANSCRIPT_API_TIMEOUT}s"
@@ -648,7 +350,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
                        f"The youtube-transcript.io service may be slow or unavailable.",
             ) from exc
         except requests.RequestException as exc:
-            last_error = exc
+            _last_error = exc
             logger.error(f"Transcript API request failed for video_id: {video_id}: {exc}")
             raise HTTPException(
                 status_code=502,

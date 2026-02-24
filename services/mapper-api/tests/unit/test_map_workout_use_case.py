@@ -11,11 +11,13 @@ Tests for:
 - User mapping priority over fuzzy matching
 """
 
+import unittest.mock
+
 import pytest
 
 from application.use_cases import MapWorkoutResult, MapWorkoutUseCase
 from backend.parsers.models import ParsedExercise, ParsedWorkout
-from domain.models import BlockType, WorkoutSource
+from domain.models import Block, BlockType, Exercise, Load, Workout, WorkoutSource
 from tests.fakes.mapping_repository import (
     FakeExerciseMatchRepository,
     FakeUserMappingRepository,
@@ -225,7 +227,7 @@ class TestMapWorkoutUseCaseSuccess:
         workout_repo: FakeWorkoutRepository,
     ):
         """Workout is saved to repository with correct data."""
-        result = use_case.execute(
+        _result = use_case.execute(
             parsed_workout=basic_parsed_workout,
             user_id="test-user-123",
             device="garmin",
@@ -495,7 +497,7 @@ class TestDeviceTypes:
         device: str,
     ):
         """Workout is saved with correct device type."""
-        result = use_case.execute(
+        _result = use_case.execute(
             parsed_workout=basic_parsed_workout,
             user_id="test-user-123",
             device=device,
@@ -503,3 +505,126 @@ class TestDeviceTypes:
 
         saved = workout_repo.get_all()[0]
         assert saved["device"] == device
+
+
+# =============================================================================
+# Block Field Preservation Tests
+# =============================================================================
+
+
+class TestBlockFieldPreservation:
+    """Tests that Block fields are preserved through exercise mapping."""
+
+    @pytest.mark.unit
+    def test_rest_between_seconds_survives_exercise_mapping(
+        self,
+        use_case: MapWorkoutUseCase,
+    ):
+        """rest_between_seconds on a Block is not lost during _map_exercises."""
+        # Build a Workout directly with rest_between_seconds set on the block
+        block = Block(
+            label="Main Block",
+            type=BlockType.STRAIGHT,
+            rounds=3,
+            rest_between_seconds=90,
+            exercises=[
+                Exercise(name="Squat", sets=3, reps=10),
+            ],
+        )
+        workout = Workout(title="Rest Timer Test", blocks=[block])
+
+        mapped_workout, _mapped, _unmapped = use_case._map_exercises(workout)
+
+        assert len(mapped_workout.blocks) == 1
+        assert mapped_workout.blocks[0].rest_between_seconds == 90
+
+
+# =============================================================================
+# AMA-745: Blocks Format Save Tests
+# =============================================================================
+
+
+class TestSaveWorkoutInBlocksFormat:
+    """Tests that workout_data saved to the repository uses blocks format (AMA-745).
+
+    When MapWorkoutUseCase saves a workout, it must use _workout_to_blocks_format()
+    rather than model_dump(). Blocks format stores weight/weight_unit at the exercise
+    level as flat fields; model_dump() produces a nested 'load' dict instead.
+    """
+
+    @pytest.mark.unit
+    def test_saved_workout_data_uses_blocks_format_not_model_dump(
+        self,
+        use_case: MapWorkoutUseCase,
+        workout_repo: FakeWorkoutRepository,
+    ):
+        """workout_data stored in the repo must have weight/weight_unit at exercise level.
+
+        model_dump() would produce {"load": {"value": 100, "unit": "kg"}} which
+        db_row_to_workout cannot read back. Blocks format flattens this to
+        {"weight": 100, "weight_unit": "kg"} at the exercise level.
+        """
+        # Build a weighted domain Workout; patch _map_exercises to return it so that
+        # execute() saves it and we can inspect the stored workout_data format.
+        block = Block(
+            type=BlockType.STRAIGHT,
+            exercises=[
+                Exercise(
+                    name="Squat",
+                    sets=3,
+                    reps=5,
+                    load=Load(value=100, unit="kg"),
+                ),
+            ],
+        )
+        workout = Workout(title="Weighted Workout", blocks=[block])
+
+        parsed = ParsedWorkout(
+            name="Weighted Workout",
+            exercises=[ParsedExercise(raw_name="Squat", sets=3, reps="5")],
+        )
+
+        def patched_map(w):
+            return workout, 1, 0
+
+        with unittest.mock.patch.object(use_case, "_map_exercises", patched_map):
+            result = use_case.execute(
+                parsed_workout=parsed,
+                user_id="test-user-123",
+                device="garmin",
+                save=True,
+            )
+
+        assert result.success is True
+
+        saved_workouts = workout_repo.get_all()
+        assert len(saved_workouts) == 1
+
+        workout_data = saved_workouts[0]["workout_data"]
+
+        # Blocks format: must have a "blocks" key at the top level
+        assert "blocks" in workout_data, (
+            "workout_data must be in blocks format (has 'blocks' key), "
+            f"got keys: {list(workout_data.keys())}"
+        )
+
+        # Drill into the first exercise of the first block
+        first_exercise = workout_data["blocks"][0]["exercises"][0]
+
+        # Blocks format: weight and weight_unit are flat fields on the exercise
+        assert "weight" in first_exercise, (
+            "Blocks format must have 'weight' at exercise level, "
+            f"got exercise keys: {list(first_exercise.keys())}"
+        )
+        assert "weight_unit" in first_exercise, (
+            "Blocks format must have 'weight_unit' at exercise level, "
+            f"got exercise keys: {list(first_exercise.keys())}"
+        )
+        assert first_exercise["weight"] == 100
+        assert first_exercise["weight_unit"] == "kg"
+
+        # model_dump() format (wrong): must NOT have a nested 'load' dict
+        assert "load" not in first_exercise, (
+            "Blocks format must NOT have a nested 'load' dict at exercise level "
+            "(that is model_dump() format, not blocks format)"
+        )

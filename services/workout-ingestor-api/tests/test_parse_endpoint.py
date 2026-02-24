@@ -444,7 +444,7 @@ class TestLLMFallback:
             exercises=[mock_exercise],
             supersets=[],
         )
-        mock_workout = SimpleNamespace(blocks=[mock_block])
+        _mock_workout = SimpleNamespace(blocks=[mock_block])
 
         # Mock ParserService to return empty workout (no exercises)
         # so the LLM fallback is triggered.

@@ -13,13 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import quote
 
 import httpx
 
@@ -219,13 +216,13 @@ class PinterestService:
 
         try:
             # 1. Resolve short URL if needed
-            resolved_url = await self._resolve_short_url(url)
+            resolved_url = await self.resolve_short_url(url)
             logger.info(f"Pinterest: Resolved URL: {resolved_url}")
 
             # 2. Get pin metadata and image URL(s)
-            pin = await self._get_pin_metadata(resolved_url)
+            pin = await self.get_pin_metadata(resolved_url)
             if not pin or not pin.image_url:
-                logger.warning(f"Pinterest: Failed to get pin metadata or image URL")
+                logger.warning("Pinterest: Failed to get pin metadata or image URL")
                 result.errors.append("Could not extract image URL from Pinterest pin")
                 return result
             logger.info(f"Pinterest: Got pin - id={pin.pin_id}, image={pin.image_url}, is_carousel={pin.is_carousel}")
@@ -242,7 +239,7 @@ class PinterestService:
             for idx, image_url in enumerate(images_to_process):
                 try:
                     # Download the image
-                    image_data = await self._download_image(image_url)
+                    image_data = await self.download_image(image_url)
                     if not image_data:
                         result.errors.append(f"Failed to download image {idx + 1}")
                         continue
@@ -364,7 +361,7 @@ class PinterestService:
                         continue
 
                     # Download image
-                    image_data = await self._download_image(pin.image_url)
+                    image_data = await self.download_image(pin.image_url)
                     if not image_data:
                         result.errors.append(f"Failed to download pin {pin.pin_id}")
                         continue
@@ -426,7 +423,7 @@ class PinterestService:
     # HTTP Helpers
     # =========================================================================
 
-    async def _resolve_short_url(self, url: str) -> str:
+    async def resolve_short_url(self, url: str) -> str:
         """Resolve pin.it short URLs to full Pinterest URLs."""
         if "pin.it" not in url:
             return url
@@ -470,7 +467,7 @@ class PinterestService:
 
         return url
 
-    async def _get_pin_metadata(self, url: str) -> Optional[PinterestPin]:
+    async def get_pin_metadata(self, url: str) -> Optional[PinterestPin]:
         """
         Get pin metadata from Pinterest page.
 
@@ -574,7 +571,7 @@ class PinterestService:
                     logger.info(f"Pinterest: Detected carousel pin with {len(pin.image_urls)} images (736x)")
                 else:
                     # Single image pin - use existing logic
-                    logger.debug(f"Pinterest: Processing as single image pin")
+                    logger.debug("Pinterest: Processing as single image pin")
 
                     # Method 1: Look for og:image meta tag (usually high quality)
                     # Try multiple patterns as Pinterest format varies
@@ -596,7 +593,7 @@ class PinterestService:
                         if json_ld:
                             try:
                                 data = json.loads(json_ld.group(1))
-                                logger.debug(f"Pinterest: Found JSON-LD data")
+                                logger.debug("Pinterest: Found JSON-LD data")
                                 if isinstance(data, dict) and "image" in data:
                                     img = data["image"]
                                     if isinstance(img, str):
@@ -779,7 +776,7 @@ class PinterestService:
 
         return pins[:limit]
 
-    async def _download_image(self, url: str) -> Optional[bytes]:
+    async def download_image(self, url: str) -> Optional[bytes]:
         """Download image from URL."""
         try:
             headers = {

@@ -10,15 +10,14 @@ Tests Pydantic model validation rules and constraints.
 import pytest
 from pydantic import ValidationError
 
+from models.generation import GenerateProgramRequest
 from models.program import (
-    ProgramGoal,
     ExperienceLevel,
+    ProgramGoal,
     ProgramStatus,
     TrainingProgramCreate,
     TrainingProgramUpdate,
 )
-from models.generation import GenerateProgramRequest
-
 
 # ---------------------------------------------------------------------------
 # ProgramGoal Enum Tests

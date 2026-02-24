@@ -32,7 +32,6 @@ Or use the standalone functions:
 """
 
 from typing import Any, Callable, Dict, Optional, Type
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -46,8 +45,6 @@ from application.ports import (
     ExerciseMatchRepository,
     ExercisesRepository,
     ProgressionRepository,
-    SearchRepository,
-    EmbeddingService,
 )
 
 # Import the dependency getter functions from api/deps

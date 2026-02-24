@@ -1,7 +1,6 @@
 """Service for fusing transcript, OCR, chapters, and description into unified text."""
 import re
-from typing import Dict, List, Optional, Tuple
-from datetime import timedelta
+from typing import Dict, List
 
 
 class FusionService:

@@ -13,7 +13,6 @@ from supabase import Client
 import logging
 
 from application.ports.completion_repository import (
-    CompletionRepository,
     HealthMetricsDTO,
     CompletionSummary,
 )

@@ -4,7 +4,6 @@ AMA-649: Verifies that YouTube ingest path calls _sanitize_workout_data
 to fix common LLM structural mistakes (same as Instagram path).
 """
 
-import pytest
 from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data
 
 

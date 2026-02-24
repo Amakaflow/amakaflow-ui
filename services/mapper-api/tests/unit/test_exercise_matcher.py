@@ -5,11 +5,10 @@ Part of AMA-299: Exercise Database for Progression Tracking
 Phase 2 - Matching Service
 """
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from backend.core.exercise_matcher import (
     ExerciseMatchingService,
-    ExerciseMatch,
     MatchMethod,
 )
 from tests.fakes import FakeExercisesRepository

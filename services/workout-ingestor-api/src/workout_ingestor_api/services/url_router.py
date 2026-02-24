@@ -24,6 +24,9 @@ _PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"vm\.tiktok\.com/([A-Za-z0-9]+)"), "tiktok"),
     (re.compile(r"pinterest\.com/pin/(\d+)"), "pinterest"),
     (re.compile(r"pin\.it/([A-Za-z0-9]+)"), "pinterest"),
+    (re.compile(r"tiktok\.com/t/([A-Za-z0-9]+)"), "tiktok"),
+    (re.compile(r"youtube\.com/live/([A-Za-z0-9_-]{11})"), "youtube"),
+    (re.compile(r"pinterest\.com/[^/]+/[^/]+/[^/]+/(\d+)"), "pinterest"),
 ]
 
 

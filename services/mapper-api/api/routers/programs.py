@@ -14,7 +14,7 @@ This router contains endpoints for:
 """
 
 import logging
-from typing import Optional, Any
+from typing import Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from pydantic import BaseModel

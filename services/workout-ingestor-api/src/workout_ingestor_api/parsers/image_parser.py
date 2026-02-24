@@ -10,10 +10,8 @@ Parses workout images using OCR and Vision AI:
 Routes to workout-ingestor-api for processing.
 """
 
-import base64
 import asyncio
 import logging
-import tempfile
 import os
 from typing import List, Dict, Any, Optional, Literal
 from dataclasses import dataclass, field

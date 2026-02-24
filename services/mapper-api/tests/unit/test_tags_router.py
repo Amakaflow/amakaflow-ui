@@ -10,7 +10,7 @@ Tests the tags router endpoints:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from backend.main import create_app

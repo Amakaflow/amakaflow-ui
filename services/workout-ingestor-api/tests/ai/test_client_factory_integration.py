@@ -16,7 +16,6 @@ class TestOpenAIClientCreation:
             # Mock the openai import inside the method
             mock_openai = MagicMock()
             with patch.dict("sys.modules", {"openai": mock_openai}):
-                from workout_ingestor_api.ai.client_factory import AIClientFactory
 
                 # Clear any cached imports
                 import importlib
@@ -46,7 +45,7 @@ class TestOpenAIClientCreation:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client()
+                _client = AIClientFactory.create_openai_client()
 
                 call_kwargs = mock_openai_class.call_args[1]
                 assert call_kwargs["base_url"] == _HELICONE_OPENAI_BASE_URL
@@ -76,7 +75,7 @@ class TestOpenAIClientCreation:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client(context=context)
+                _client = AIClientFactory.create_openai_client(context=context)
 
                 headers = mock_openai_class.call_args[1]["default_headers"]
                 assert headers["Helicone-User-Id"] == "user_123"
@@ -93,7 +92,7 @@ class TestOpenAIClientCreation:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client(timeout=120.0)
+                _client = AIClientFactory.create_openai_client(timeout=120.0)
 
                 call_kwargs = mock_openai_class.call_args[1]
                 assert call_kwargs["timeout"] == 120.0
@@ -111,7 +110,7 @@ class TestOpenAIClientCreation:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client()
+                _client = AIClientFactory.create_openai_client()
 
                 call_kwargs = mock_openai_class.call_args[1]
                 assert call_kwargs["timeout"] == DEFAULT_TIMEOUT
@@ -152,7 +151,7 @@ class TestOpenAIClientCreation:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client(context=context)
+                _client = AIClientFactory.create_openai_client(context=context)
 
                 call_kwargs = mock_openai_class.call_args[1]
                 assert "default_headers" not in call_kwargs
@@ -177,7 +176,7 @@ class TestAnthropicClientCreation:
 
             mock_anthropic_class = MagicMock()
             with patch("anthropic.Anthropic", mock_anthropic_class):
-                client = AIClientFactory.create_anthropic_client()
+                _client = AIClientFactory.create_anthropic_client()
 
                 call_kwargs = mock_anthropic_class.call_args[1]
                 assert call_kwargs["base_url"] == _HELICONE_ANTHROPIC_BASE_URL
@@ -204,7 +203,7 @@ class TestAnthropicClientCreation:
 
             mock_anthropic_class = MagicMock()
             with patch("anthropic.Anthropic", mock_anthropic_class):
-                client = AIClientFactory.create_anthropic_client()
+                _client = AIClientFactory.create_anthropic_client()
 
                 call_kwargs = mock_anthropic_class.call_args[1]
                 assert "base_url" not in call_kwargs
@@ -272,7 +271,7 @@ class TestHeliconeRequiresApiKey:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client()
+                _client = AIClientFactory.create_openai_client()
 
                 call_kwargs = mock_openai_class.call_args[1]
                 # Should fall back to direct (no base_url or headers)
@@ -291,7 +290,7 @@ class TestHeliconeRequiresApiKey:
 
             mock_openai_class = MagicMock()
             with patch("openai.OpenAI", mock_openai_class):
-                client = AIClientFactory.create_openai_client()
+                _client = AIClientFactory.create_openai_client()
 
                 call_kwargs = mock_openai_class.call_args[1]
                 # Empty string is falsy, should fall back to direct

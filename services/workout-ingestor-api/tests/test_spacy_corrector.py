@@ -35,7 +35,11 @@ def test_rest_extracted_single_value(corrector):
     assert result["blocks"][0].get("rest_between_rounds_sec") == 60
 
 def test_per_side_note_added_to_exercise(corrector):
-    data = _single_block("6-8 reps each leg", {"exercises": [{"name": "Lunge", "sets": 3, "reps": 10}]})
+    # Block label carries the per-side language so the per-block check fires.
+    data = _single_block(
+        "6-8 reps each leg",
+        {"label": "6-8 reps each leg", "exercises": [{"name": "Lunge", "sets": 3, "reps": 10}]},
+    )
     result = corrector.correct(data, raw_text="6-8 reps each leg")
     exercise = result["blocks"][0]["exercises"][0]
     assert "(per side)" in (exercise.get("notes") or "")
@@ -170,3 +174,39 @@ class TestSpacyCorrectorConfidenceUpgrade:
         block = result["blocks"][0]
         assert block["structure_confidence"] == 1.0
         assert block["structure_options"] == []
+
+
+def test_per_side_applied_only_to_block_with_per_side_language(corrector):
+    """Per-side correction must only apply to blocks whose own text mentions per-side language.
+
+    Block 1 label mentions "each leg" → its exercises get "(per side)".
+    Block 2 has no per-side language → its exercises must NOT get "(per side)".
+    """
+    workout_data = {
+        "title": "Leg Day",
+        "blocks": [
+            {
+                "label": "Lunges — 6-8 reps each leg",
+                "exercises": [{"name": "Lunge", "sets": 3, "reps": 8, "notes": None}],
+                "supersets": [],
+            },
+            {
+                "label": "Upper Body",
+                "exercises": [{"name": "Bench Press", "sets": 3, "reps": 10, "notes": None}],
+                "supersets": [],
+            },
+        ],
+    }
+    # raw_text also contains "each leg" (as it would in reality), but block 2 text does not
+    raw_text = "Lunges — 6-8 reps each leg\nBench Press 3x10"
+    result = corrector.correct(workout_data, raw_text=raw_text)
+
+    block1_exercise = result["blocks"][0]["exercises"][0]
+    block2_exercise = result["blocks"][1]["exercises"][0]
+
+    assert "(per side)" in (block1_exercise.get("notes") or ""), (
+        "Block 1 exercise should have '(per side)' because its block label mentions 'each leg'"
+    )
+    assert "(per side)" not in (block2_exercise.get("notes") or ""), (
+        "Block 2 exercise must NOT have '(per side)' — its block text has no per-side language"
+    )

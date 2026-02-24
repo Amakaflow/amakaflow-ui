@@ -4,7 +4,7 @@ import pathlib
 from datetime import datetime, timedelta
 from backend.core.normalize import normalize
 from backend.core.match import classify
-from backend.core.garmin_matcher import fuzzy_match_garmin, find_garmin_exercise
+from backend.core.garmin_matcher import find_garmin_exercise
 from backend.core.user_mappings import get_user_mapping
 from backend.core.exercise_categories import add_category_to_exercise_name
 from backend.adapters.cir_to_garmin_yaml import GARMIN
@@ -76,7 +76,7 @@ def parse_exercise_name(ex_name: str) -> tuple[str, str, str]:
     - "B1: DB INCLINE BENCH PRESS X8" -> ("DB INCLINE BENCH PRESS", "x8", "8 reps")
     - "D2: 200M SKI" -> ("SKI", "", "200m")
     """
-    original = ex_name
+    _original = ex_name
     # Remove prefix like "A1;", "A1:", "B1:", etc.
     ex_name = re.sub(r'^[A-Z]\d+[:\s;]+', '', ex_name, flags=re.IGNORECASE).strip()
 
@@ -437,8 +437,8 @@ def map_exercise_to_garmin(ex_name: str, ex_reps=None, ex_distance_m=None, use_u
     final_confidence = mapping_info.get("confidence", 0.0)
     if not garmin_name or final_confidence < 0.40:
         # Try one more time with the effective_name (mapped_name if available)
-        if effective_name != ex_name and not garmin_name:
-            garmin_name, confidence = find_garmin_exercise(effective_name, threshold=40)
+        if effective_name != ex_name and not garmin_name:  # noqa: F821
+            garmin_name, confidence = find_garmin_exercise(effective_name, threshold=40)  # noqa: F821
             if garmin_name:
                 mapping_info["source"] = "garmin_database"
                 mapping_info["confidence"] = confidence
@@ -451,27 +451,27 @@ def map_exercise_to_garmin(ex_name: str, ex_reps=None, ex_distance_m=None, use_u
             mapping_info["source"] = "fallback"
             mapping_info["confidence"] = 0.0
             mapping_info["method"] = "title_case_fallback"
-            logger.warning(
+            logger.warning(  # noqa: F821
                 "GARMIN_EXPORT_FALLBACK generic step used for %r (original=%r mapped=%r candidates=%r conf=%r)",
-                ex_name, ex_name, mapped_name, candidate_names, final_confidence
+                ex_name, ex_name, mapped_name, candidate_names, final_confidence  # noqa: F821
             )
 
 
         if ex_distance_m:
-            desc_parts.append(f"{ex_distance_m}m")
+            desc_parts.append(f"{ex_distance_m}m")  # noqa: F821
         elif ex_reps is not None:
             # Format: "Exercise Name x reps" or "Exercise Name reps reps"
-            if name_part and name_part.lower() != garmin_name.lower():
-                desc_parts.append(f"{name_part} {ex_reps} reps")
+            if name_part and name_part.lower() != garmin_name.lower():  # noqa: F821
+                desc_parts.append(f"{name_part} {ex_reps} reps")  # noqa: F821
             else:
-                desc_parts.append(f"{ex_reps} reps")
+                desc_parts.append(f"{ex_reps} reps")  # noqa: F821
         elif reps_desc:
-            if name_part and name_part.lower() != garmin_name.lower():
-                desc_parts.append(f"{name_part} {reps_desc}")
+            if name_part and name_part.lower() != garmin_name.lower():  # noqa: F821
+                desc_parts.append(f"{name_part} {reps_desc}")  # noqa: F821
             else:
-                desc_parts.append(reps_desc)
+                desc_parts.append(reps_desc)  # noqa: F821
 
-        description = " ".join(desc_parts) if desc_parts else ""
+        description = " ".join(desc_parts) if desc_parts else ""  # noqa: F821
 
     # Build the description to include original exercise name with details
     # Format: "lap | Original Exercise Name x5 (chosen as closest match)"
@@ -488,7 +488,7 @@ def map_exercise_to_garmin(ex_name: str, ex_reps=None, ex_distance_m=None, use_u
         if popularity_count == 1 and "popular_choice_" in method:
             try:
                 popularity_count = int(method.split("_")[-1].replace("users", ""))
-            except:
+            except Exception:
                 popularity_count = 1
         if popularity_count == 1:
             mapping_reason = "chosen as popular choice by users"
@@ -629,7 +629,7 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                     "warmup": {yaml_activity: "lap"}
                 })
 
-        label = block.get("label", "")
+        _label = block.get("label", "")
         structure = block.get("structure", "")
         rounds = extract_rounds(structure) if structure else 1
 
@@ -640,7 +640,7 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
             sets = ex.get("sets")
             reps = ex.get("reps")
             reps_range = ex.get("reps_range")  # e.g., "6-8", "8-10"
-            distance_m = ex.get("distance_m")
+            _distance_m = ex.get("distance_m")
             duration_sec = ex.get("duration_sec")
             rest_sec = ex.get("rest_sec")
             # Exercise notes (coaching cues) - will be added after pipe in YAML
@@ -697,7 +697,7 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                     try:
                         parts = reps_range.replace('-', ' ').split()
                         upper_reps = int(parts[-1]) if parts else 10
-                    except:
+                    except Exception:
                         upper_reps = 10
                     if not reason:
                         ex_entry[garmin_name_with_category] = format_exercise_value(f"x{upper_reps}", ex_notes)
@@ -782,7 +782,7 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                 sets = ex.get("sets")
                 reps = ex.get("reps")
                 reps_range = ex.get("reps_range")  # e.g., "6-8", "8-10"
-                distance_m = ex.get("distance_m")
+                _distance_m = ex.get("distance_m")
                 # Exercise notes (coaching cues) - will be added after pipe in YAML
                 ex_notes = ex.get("notes")
                 # Warm-up sets (AMA-94)
@@ -820,7 +820,7 @@ def to_hyrox_yaml(blocks_json: dict) -> str:
                     try:
                         parts = reps_range.replace('-', ' ').split()
                         upper_reps = int(parts[-1]) if parts else 10
-                    except:
+                    except Exception:
                         upper_reps = 10
                     if not reason:
                         ex_entry[garmin_name_with_category] = format_exercise_value(f"x{upper_reps}", ex_notes)

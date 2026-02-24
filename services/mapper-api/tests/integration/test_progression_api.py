@@ -11,7 +11,6 @@ Tests cover:
 - Volume analytics endpoint
 """
 import pytest
-from datetime import date, timedelta
 from fastapi.testclient import TestClient
 
 from backend.main import create_app

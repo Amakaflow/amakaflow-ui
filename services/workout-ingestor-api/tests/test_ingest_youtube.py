@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 from copy import deepcopy
-from typing import Any, Dict, List
+from typing import Any, Dict
 from unittest.mock import patch, MagicMock, AsyncMock
 
 
@@ -720,7 +720,7 @@ class TestYouTubeErrorHandling:
                             with patch(
                                 "workout_ingestor_api.api.youtube_ingest.YouTubeCacheService.save_cached_workout",
                             ):
-                                response = api_client.post(
+                                _response = api_client.post(
                                     "/ingest/youtube",
                                     json={"url": f"https://www.youtube.com/watch?v={VIDEO_ID_RICKROLL}"},
                                 )

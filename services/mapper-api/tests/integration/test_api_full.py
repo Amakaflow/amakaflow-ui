@@ -69,7 +69,7 @@ def run_full_conversion(input_file):
             if best_match:
                 print(f"  ✓ Best match: {best_match['name']} (score: {best_match['score']:.2f})")
             else:
-                print(f"  ✗ No match found")
+                print("  ✗ No match found")
 
             if suggestions.get("category"):
                 print(f"  Category: {suggestions['category']}")
@@ -86,7 +86,7 @@ def run_full_conversion(input_file):
                 print(f"    Top 3: {[e['name'] for e in suggestions['exercises_by_type'][:3]]}")
 
             if suggestions.get("needs_user_search"):
-                print(f"  ⚠ Needs manual search")
+                print("  ⚠ Needs manual search")
                 problem_exercises.append((ex_name, suggestions))
 
             print()
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         response = requests.get(f"{BASE_URL}/docs", timeout=2)
         print(f"✓ Server is running at {BASE_URL}")
         print()
-    except Exception as e:
+    except Exception:
         print(f"✗ Server not running at {BASE_URL}")
         print("Start server with: uvicorn backend.app:app --reload")
         sys.exit(1)

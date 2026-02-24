@@ -44,7 +44,6 @@ class SpacyCorrector:
 
         rounds = self._extract_rounds(raw_text)
         rest_sec = self._extract_rest_sec(raw_text)
-        has_per_side = bool(_PER_SIDE_PATTERN.search(raw_text))
 
         for block in blocks:
             if rounds is not None and block.get("rounds") is None:
@@ -53,7 +52,7 @@ class SpacyCorrector:
             if rest_sec is not None and block.get("rest_between_rounds_sec") is None:
                 block["rest_between_rounds_sec"] = rest_sec
 
-            if has_per_side:
+            if self._block_has_per_side_language(block):
                 self._apply_per_side(block)
 
             # Upgrade confidence if explicit round signal found in raw text
@@ -87,6 +86,31 @@ class SpacyCorrector:
         if unit.startswith("min"):
             return int(avg * 60)
         return int(avg)
+
+    @staticmethod
+    def _block_has_per_side_language(block: Dict) -> bool:
+        """Return True if this block's own text contains per-side language.
+
+        Block text is the concatenation of the block label (if any), all
+        exercise names, and all exercise notes — both top-level exercises and
+        those nested inside supersets.
+        """
+        parts: List[str] = []
+        if block.get("label"):
+            parts.append(block["label"])
+        for exercise in block.get("exercises", []):
+            if exercise.get("name"):
+                parts.append(exercise["name"])
+            if exercise.get("notes"):
+                parts.append(exercise["notes"])
+        for superset in block.get("supersets", []):
+            for exercise in superset.get("exercises", []):
+                if exercise.get("name"):
+                    parts.append(exercise["name"])
+                if exercise.get("notes"):
+                    parts.append(exercise["notes"])
+        block_text = " ".join(parts)
+        return bool(_PER_SIDE_PATTERN.search(block_text))
 
     @staticmethod
     def _apply_per_side(block: Dict) -> None:

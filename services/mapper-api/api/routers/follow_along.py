@@ -20,7 +20,6 @@ Part of AMA-587: Extract follow-along router from monolithic app.py
 from __future__ import annotations
 
 import logging
-import re
 import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Literal, Optional
@@ -41,7 +40,6 @@ from api.deps import (
 from backend.services.content_classifier import (
     classify_content,
     ContentCategory,
-    ClassificationConfidence,
 )
 
 logger = logging.getLogger(__name__)

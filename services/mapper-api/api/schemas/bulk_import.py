@@ -12,7 +12,7 @@ Part of AMA-591: Extract bulk import router from app.py
 """
 
 from typing import List, Dict, Any, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class DetectedItem(BaseModel):

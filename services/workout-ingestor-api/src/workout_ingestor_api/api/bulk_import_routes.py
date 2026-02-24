@@ -11,17 +11,16 @@ Handles the 5-step bulk import workflow:
 
 import base64
 import os
-from typing import Optional, List
+from typing import List
 
 import httpx
 from fastapi import APIRouter, UploadFile, File as FastAPIFile, Form, Query
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # Mapper API URL for exercise search
 MAPPER_API_URL = os.getenv("MAPPER_API_URL", "http://localhost:8001")
 
-from workout_ingestor_api.services.bulk_import import (
+from workout_ingestor_api.services.bulk_import import (  # noqa: E402
     BulkImportService,
     BulkDetectRequest,
     BulkDetectResponse,

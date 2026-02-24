@@ -26,9 +26,7 @@ from backend.adapters.blocks_to_hyrox_yaml import to_hyrox_yaml
 from backend.adapters.blocks_to_hiit_garmin_yaml import to_hiit_garmin_yaml, is_hiit_workout
 from backend.adapters.blocks_to_zwo import to_zwo
 from backend.adapters.blocks_to_workoutkit import to_workoutkit
-from backend.adapters.blocks_to_fit import get_fit_metadata, blocks_to_steps
-from backend.adapters.cir_to_garmin_yaml import to_garmin_yaml
-from shared.schemas.cir import CIR, Workout, Block, Exercise
+from backend.adapters.blocks_to_fit import get_fit_metadata
 
 
 # =============================================================================

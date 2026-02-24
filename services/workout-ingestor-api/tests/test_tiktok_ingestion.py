@@ -3,7 +3,6 @@
 import pytest
 from workout_ingestor_api.services.tiktok_service import (
     TikTokService,
-    TikTokServiceError,
     TikTokVideoMetadata,
 )
 
@@ -116,8 +115,7 @@ class TestTikTokIntegration:
 # API Endpoint Tests with Mocking
 # ---------------------------------------------------------------------------
 
-from unittest.mock import patch, MagicMock
-import json
+from unittest.mock import patch, MagicMock  # noqa: E402
 
 
 class TestTikTokIngestionEndpoint:

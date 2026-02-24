@@ -9,16 +9,13 @@ Tests cover:
 - Progression service business logic
 """
 import pytest
-from datetime import date, timedelta
+from datetime import date
 
 from backend.core.progression_service import (
     calculate_1rm,
     calculate_1rm_brzycki,
     calculate_1rm_epley,
     ProgressionService,
-    ExerciseHistoryResponse,
-    PersonalRecordResponse,
-    LastWeightResponse,
 )
 from tests.fakes import FakeProgressionRepository, FakeExercisesRepository
 

@@ -13,8 +13,8 @@ import re
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from urllib.parse import urlparse, parse_qs
+from dataclasses import dataclass
+from urllib.parse import urlparse
 import httpx
 
 logger = logging.getLogger(__name__)

@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # External Services - Chat API (AMA-746: embedding webhook)
+    # -------------------------------------------------------------------------
+    chat_api_url: str = Field(
+        default="http://chat-api:8005",
+        description="Base URL for chat-api service (used for embedding webhook)",
+    )
+
+    # -------------------------------------------------------------------------
     # External Services - Ingestor
     # -------------------------------------------------------------------------
     ingestor_url: str = Field(
@@ -265,7 +273,7 @@ def _get_settings_singleton() -> Settings:
 
 # For backwards compatibility and convenience: from backend.settings import settings
 # This uses a property-like behavior via __getattr__ at module level
-import sys
+import sys  # noqa: E402
 _settings_module = sys.modules[__name__]
 
 

@@ -22,7 +22,6 @@ from supabase import Client, create_client
 
 from backend.core.exercise_matcher import (
     ExerciseMatchingService,
-    ExerciseMatch,
     MatchMethod,
 )
 from infrastructure.db.exercises_repository import SupabaseExercisesRepository

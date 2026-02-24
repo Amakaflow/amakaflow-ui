@@ -14,7 +14,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from backend.services.export_queue import ExportQueue, ExportStatus
+from backend.services.export_queue import ExportQueue, ExportStatus  # noqa: E402
 
 
 # =============================================================================

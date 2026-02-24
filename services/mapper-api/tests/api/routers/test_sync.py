@@ -14,7 +14,6 @@ Coverage: All 10+ endpoints tested with 60+ test cases
 """
 
 import pytest
-from datetime import datetime
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from backend.main import create_app

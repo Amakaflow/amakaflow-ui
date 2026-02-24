@@ -4,8 +4,6 @@ These tests specify the expected behavior of the trace viewer component.
 """
 
 import pytest
-import json
-from pathlib import Path
 
 
 class TestViewerServer:

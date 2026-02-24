@@ -9,8 +9,7 @@ Tests programs CRUD endpoints with fake repository.
 
 import pytest
 
-from tests.conftest import TEST_USER_ID, OTHER_USER_ID
-
+from tests.conftest import OTHER_USER_ID, TEST_USER_ID
 
 # ---------------------------------------------------------------------------
 # List Programs Tests
@@ -44,6 +43,7 @@ class TestListPrograms:
     def test_list_programs_excludes_other_users(self, app, fake_program_repo):
         """Does not return programs belonging to other users."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -85,6 +85,7 @@ class TestListPrograms:
     def test_list_programs_filter_by_status(self, app, fake_program_repo):
         """Filters programs by status."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -127,6 +128,7 @@ class TestListPrograms:
     def test_list_programs_pagination(self, app, fake_program_repo):
         """Supports limit and offset pagination."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -206,6 +208,7 @@ class TestGetProgram:
     def test_get_program_access_denied(self, app, fake_program_repo):
         """Returns 404 when accessing another user's program (prevents enumeration)."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -405,6 +408,7 @@ class TestActivateProgram:
     def test_activate_already_active(self, app, fake_program_repo):
         """Returns 422 when program is already active."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -438,6 +442,7 @@ class TestActivateProgram:
     def test_activate_archived_program(self, app, fake_program_repo):
         """Returns 422 when trying to activate archived program."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -481,6 +486,7 @@ class TestDeleteProgram:
     def test_delete_program_success(self, app, fake_program_repo):
         """Soft deletes (archives) a program."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -523,6 +529,7 @@ class TestDeleteProgram:
     def test_delete_program_idempotent(self, app, fake_program_repo):
         """Deleting already archived program is idempotent."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 
@@ -552,6 +559,7 @@ class TestDeleteProgram:
     def test_delete_program_access_denied(self, app, fake_program_repo):
         """Returns 404 when trying to delete another user's program (prevents enumeration)."""
         from fastapi.testclient import TestClient
+
         from api.deps import get_current_user, get_program_repo
         from tests.conftest import mock_get_current_user
 

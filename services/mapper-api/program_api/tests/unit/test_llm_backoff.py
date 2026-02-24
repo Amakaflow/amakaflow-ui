@@ -12,7 +12,7 @@ Tests verify that:
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from openai import RateLimitError, APIConnectionError, APIStatusError
+from openai import APIConnectionError, APIStatusError, RateLimitError
 
 from services.llm.client import OpenAIExerciseSelector
 from services.llm.schemas import ExerciseSelectionRequest

@@ -1,6 +1,5 @@
 """Test HTTP error handling with simulated responses."""
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 import httpx
 
 

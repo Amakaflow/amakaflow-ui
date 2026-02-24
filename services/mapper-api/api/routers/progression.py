@@ -11,8 +11,7 @@ This router provides endpoints for:
 - Volume analytics by muscle group
 """
 import re
-from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
@@ -21,10 +20,6 @@ from pydantic import BaseModel, Field
 from api.deps import get_current_user, get_progression_service
 from backend.core.progression_service import (
     ProgressionService,
-    ExerciseHistoryResponse,
-    PersonalRecordResponse,
-    LastWeightResponse,
-    VolumeAnalyticsResponse,
 )
 
 router = APIRouter(

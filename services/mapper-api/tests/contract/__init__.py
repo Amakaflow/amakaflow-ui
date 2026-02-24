@@ -12,8 +12,7 @@ catching breaking changes to API contracts. Tests validate:
 - Error response shapes
 """
 
-from typing import Any, Dict, List, Optional, Type, get_origin, get_args
-import re
+from typing import Any, Dict, Optional, get_origin
 
 
 def assert_response_shape(

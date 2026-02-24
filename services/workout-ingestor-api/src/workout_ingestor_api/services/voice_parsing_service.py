@@ -214,11 +214,11 @@ Return ONLY the JSON object, no additional text or markdown formatting."""
         if sport_hint:
             # Limit length to prevent DoS
             if len(sport_hint) > 100:
-                logger.warning(f"sport_hint exceeds max length (100), truncating")
+                logger.warning("sport_hint exceeds max length (100), truncating")
                 sport_hint = sport_hint[:100]
             # Whitelist allowed characters (alphanumeric, spaces, hyphens)
             if not re.match(r'^[\w\s-]+$', sport_hint):
-                logger.warning(f"sport_hint contains invalid characters, sanitizing")
+                logger.warning("sport_hint contains invalid characters, sanitizing")
                 sport_hint = re.sub(r'[^\w\s-]', '', sport_hint)
             # Use structured parameter formatting to prevent prompt injection
             safe_sport_hint = sport_hint.strip()

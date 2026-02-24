@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from api.deps import get_exercises_repo, get_exercise_matcher
 from application.ports import ExercisesRepository
-from backend.core.exercise_matcher import ExerciseMatchingService, ExerciseMatch, MatchMethod
+from backend.core.exercise_matcher import ExerciseMatchingService, ExerciseMatch
 
 router = APIRouter(
     prefix="/exercises",

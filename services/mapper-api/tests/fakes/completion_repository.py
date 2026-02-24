@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import uuid
 import copy
 
-from application.ports import HealthMetricsDTO, CompletionSummary
+from application.ports import HealthMetricsDTO
 
 
 def _format_duration(seconds: int) -> str:

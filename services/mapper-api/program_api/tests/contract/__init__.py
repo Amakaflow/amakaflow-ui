@@ -6,7 +6,7 @@ Part of AMA-461: Create program-api service scaffold
 Contract tests validate API response shapes and OpenAPI schema compliance.
 """
 
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, Optional, Type, Union
 
 
 def assert_response_shape(

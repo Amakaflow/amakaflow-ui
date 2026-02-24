@@ -1,16 +1,10 @@
 """Tests for replay CLI commands."""
 
 import pytest
-import json
-import sys
-import tempfile
-from pathlib import Path
-from io import StringIO
 
 from replay.core import Session, ReplayEngine
 from replay.cli import (
-    cmd_run, cmd_diff, cmd_list, cmd_validate, cmd_tags,
-    validate_session_name, get_sessions_dir
+    cmd_run, cmd_diff, cmd_list, cmd_validate, validate_session_name
 )
 import argparse
 

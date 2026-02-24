@@ -9,7 +9,6 @@ Tests program generation endpoint with mocked AI.
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Generation Endpoint Tests
 # ---------------------------------------------------------------------------

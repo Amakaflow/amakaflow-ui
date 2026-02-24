@@ -1,4 +1,5 @@
-import yaml, pathlib
+import yaml
+import pathlib
 
 from shared.schemas.cir import CIR
 

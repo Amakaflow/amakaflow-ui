@@ -112,7 +112,7 @@ class TestSaveWorkoutCreate:
         workout_repo: FakeWorkoutRepository,
     ):
         """Created workout is saved to repository."""
-        result = use_case.execute(
+        _result = use_case.execute(
             workout=valid_workout,
             user_id="user-123",
             device="garmin",

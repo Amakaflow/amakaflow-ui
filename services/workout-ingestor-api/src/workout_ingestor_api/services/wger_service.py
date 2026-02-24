@@ -21,7 +21,6 @@ This pattern is "industry standard":
 - WGER is only hit occasionally, not on every user request
 """
 
-import os
 import json
 import requests
 from typing import List, Optional, Dict, Any

@@ -83,7 +83,7 @@ class CalendarClientError(Exception):
     pass
 
 
-class CalendarAPIUnavailable(CalendarClientError):
+class CalendarAPIUnavailableError(CalendarClientError):
     """Raised when Calendar-API is unavailable."""
 
     pass
@@ -138,7 +138,7 @@ class CalendarClient:
             BulkCreateResult with count and IDs of created events
 
         Raises:
-            CalendarAPIUnavailable: If Calendar-API is not reachable
+            CalendarAPIUnavailableError: If Calendar-API is not reachable
             CalendarAPIError: If Calendar-API returns an error response
         """
         url = f"{self._base_url}/program-events/bulk-create"
@@ -176,12 +176,12 @@ class CalendarClient:
 
         except httpx.ConnectError as e:
             logger.error(f"Calendar-API unavailable: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 f"Calendar-API is not available at {self._base_url}"
             ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Calendar-API timeout: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 "Calendar-API request timed out"
             ) from e
 
@@ -201,7 +201,7 @@ class CalendarClient:
             ProgramEventsResult with list of events
 
         Raises:
-            CalendarAPIUnavailable: If Calendar-API is not reachable
+            CalendarAPIUnavailableError: If Calendar-API is not reachable
             CalendarAPIError: If Calendar-API returns an error response
         """
         url = f"{self._base_url}/program-events/{program_id}"
@@ -232,12 +232,12 @@ class CalendarClient:
 
         except httpx.ConnectError as e:
             logger.error(f"Calendar-API unavailable: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 f"Calendar-API is not available at {self._base_url}"
             ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Calendar-API timeout: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 "Calendar-API request timed out"
             ) from e
 
@@ -257,7 +257,7 @@ class CalendarClient:
             Number of events deleted
 
         Raises:
-            CalendarAPIUnavailable: If Calendar-API is not reachable
+            CalendarAPIUnavailableError: If Calendar-API is not reachable
             CalendarAPIError: If Calendar-API returns an error response
         """
         url = f"{self._base_url}/program-events/{program_id}"
@@ -284,11 +284,11 @@ class CalendarClient:
 
         except httpx.ConnectError as e:
             logger.error(f"Calendar-API unavailable: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 f"Calendar-API is not available at {self._base_url}"
             ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Calendar-API timeout: {e}")
-            raise CalendarAPIUnavailable(
+            raise CalendarAPIUnavailableError(
                 "Calendar-API request timed out"
             ) from e
