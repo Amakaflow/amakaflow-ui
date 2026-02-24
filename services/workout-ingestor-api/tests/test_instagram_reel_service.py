@@ -83,41 +83,40 @@ def test_extract_shortcode():
 
 def test_parse_transcript_prompt_includes_mm_mm_timestamp_guidance():
     """Prompt should include guidance about MM-MM: timestamp format for timed stations."""
-    import inspect
-    from workout_ingestor_api.ai import AIClientFactory, AIRequestContext
+    from workout_ingestor_api.services.prompts import build_prompt
 
-    # Get the source code of the _parse_transcript method
-    source = inspect.getsource(InstagramReelService._parse_transcript)
+    # Build the prompt as _parse_transcript would — verify its content
+    prompt = build_prompt(platform="instagram", video_duration_sec=90, raw_text="test", title="Test")
 
     # Verify the prompt contains guidance about MM-MM: timestamp format
-    assert "MM-MM:" in source, "Prompt should contain MM-MM: timestamp format guidance"
-    assert "minute-range timestamp" in source, "Prompt should describe MM-MM as minute-range timestamp"
-    assert "35-40: 100 wall balls" in source, "Prompt should contain example of wall balls with MM-MM format"
-    assert "distance_m: 1000" in source, "Prompt should contain example for distance extraction"
+    assert "MM-MM:" in prompt, "Prompt should contain MM-MM: timestamp format guidance"
+    assert "minute-range timestamp" in prompt, "Prompt should describe MM-MM as minute-range timestamp"
+    assert "35-40: 100 wall balls" in prompt, "Prompt should contain example of wall balls with MM-MM format"
+    assert "distance_m: 1000" in prompt, "Prompt should contain example for distance extraction"
 
 
 def test_parse_transcript_prompt_includes_timed_station_format():
     """Prompt should include TIMED STATION FORMAT section for 'X minute window' captions."""
-    import inspect
+    from workout_ingestor_api.services.prompts import build_prompt
 
-    # Get the source code of the _parse_transcript method
-    source = inspect.getsource(InstagramReelService._parse_transcript)
+    # Build the prompt as _parse_transcript would — verify its content
+    prompt = build_prompt(platform="instagram", video_duration_sec=90, raw_text="test", title="Test")
 
     # Verify the prompt contains TIMED STATION FORMAT section
-    assert "TIMED STATION FORMAT" in source, "Prompt should contain TIMED STATION FORMAT section"
-    assert "time_cap_sec" in source, "Prompt should contain time_cap_sec guidance for timed stations"
-    assert "rounds" in source and "1" in source, "Prompt should contain rounds=1 guidance for timed stations"
-    assert "minute window" in source.lower(), "Prompt should mention 'minute window' in timed station format"
+    assert "TIMED STATION FORMAT" in prompt, "Prompt should contain TIMED STATION FORMAT section"
+    assert "time_cap_sec" in prompt, "Prompt should contain time_cap_sec guidance for timed stations"
+    assert "rounds" in prompt and "1" in prompt, "Prompt should contain rounds=1 guidance for timed stations"
+    assert "minute window" in prompt.lower(), "Prompt should mention 'minute window' in timed station format"
 
 
 def test_parse_transcript_prompt_includes_notes_for_timed_station_format():
     """Prompt should include NOTES FOR TIMED STATION FORMAT section to set exercise notes to 'X minute cap'."""
-    import inspect
+    from workout_ingestor_api.services.prompts import build_prompt
 
-    # Get the source code of the _parse_transcript method
-    source = inspect.getsource(InstagramReelService._parse_transcript)
+    # Build the prompt as _parse_transcript would — verify its content
+    prompt = build_prompt(platform="instagram", video_duration_sec=90, raw_text="test", title="Test")
 
     # Verify the prompt contains NOTES FOR TIMED STATION FORMAT section
-    assert "NOTES FOR TIMED STATION FORMAT" in source, "Prompt should contain NOTES FOR TIMED STATION FORMAT section"
-    assert "minute cap" in source, "Prompt should mention 'minute cap' for timed station notes"
-    assert "Do NOT use" in source and "Complete as fast as possible" in source, "Prompt should instruct not to use 'Complete as fast as possible' for timed stations"
+    assert "NOTES FOR TIMED STATION FORMAT" in prompt, "Prompt should contain NOTES FOR TIMED STATION FORMAT section"
+    assert "minute cap" in prompt, "Prompt should mention 'minute cap' for timed station notes"
+    assert "Do NOT use" in prompt and "Complete as fast as possible" in prompt, "Prompt should instruct not to use 'Complete as fast as possible' for timed stations"
