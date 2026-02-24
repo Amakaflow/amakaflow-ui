@@ -10,7 +10,6 @@ These tests verify that:
 3. Mock implementations satisfy the Protocol contracts
 """
 import pytest
-from typing import runtime_checkable, Protocol, get_type_hints
 
 # All tests in this module are pure logic tests (no TestClient) - mark as unit
 pytestmark = pytest.mark.unit
@@ -212,8 +211,6 @@ class TestMockImplementations:
 
     def test_workout_repository_mock_satisfies_protocol(self):
         """A mock class should satisfy WorkoutRepository protocol."""
-        from application.ports import WorkoutRepository
-        from typing import Optional, List, Dict, Any
 
         class MockWorkoutRepository:
             def save(self, profile_id, workout_data, sources, device, **kwargs):
@@ -258,7 +255,7 @@ class TestMockImplementations:
 
     def test_completion_repository_mock_satisfies_protocol(self):
         """A mock class should satisfy CompletionRepository protocol."""
-        from application.ports import CompletionRepository, HealthMetricsDTO
+        from application.ports import HealthMetricsDTO
 
         class MockCompletionRepository:
             def save(self, user_id, **kwargs):

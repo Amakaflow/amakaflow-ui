@@ -14,9 +14,8 @@ Tests template selection logic:
 import pytest
 
 from models.program import ExperienceLevel, ProgramGoal
-from services.template_selector import TemplateSelector, TemplateMatch
+from services.template_selector import TemplateMatch, TemplateSelector
 from tests.fakes import FakeTemplateRepository
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

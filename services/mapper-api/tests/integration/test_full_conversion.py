@@ -99,7 +99,7 @@ def run_conversion(input_file):
                     print(f"    - {ex['name']} (score: {ex['score']:.2f})")
 
             if suggestions['needs_user_search']:
-                print(f"  ⚠ Needs manual search in Garmin database")
+                print("  ⚠ Needs manual search in Garmin database")
 
             print()
 

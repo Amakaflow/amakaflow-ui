@@ -16,9 +16,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from openai import AsyncOpenAI, RateLimitError
-
 from backend.ai import AIClientFactory, AIRequestContext
+from openai import RateLimitError
+
 from services.llm.prompts import (
     EXERCISE_SELECTION_SYSTEM_PROMPT,
     build_exercise_selection_prompt,
@@ -159,7 +159,7 @@ class OpenAIExerciseSelector:
         )
 
         # Call LLM with retries and exponential backoff
-        last_error: Optional[Exception] = None
+        _last_error: Optional[Exception] = None
         for attempt in range(self.MAX_RETRIES + 1):
             try:
                 response = await self._call_llm(user_prompt)
@@ -172,10 +172,10 @@ class OpenAIExerciseSelector:
                 return parsed
 
             except json.JSONDecodeError as e:
-                last_error = e
+                _last_error = e
                 logger.warning(f"JSON parse error on attempt {attempt + 1}: {e}")
             except RateLimitError as e:
-                last_error = e
+                _last_error = e
                 logger.warning(f"Rate limit error on attempt {attempt + 1}: {e}")
                 if attempt < self.MAX_RETRIES:
                     # Longer backoff for rate limits
@@ -186,7 +186,7 @@ class OpenAIExerciseSelector:
                     await asyncio.sleep(delay)
                 continue
             except Exception as e:
-                last_error = e
+                _last_error = e
                 logger.warning(f"LLM call error on attempt {attempt + 1}: {e}")
 
             # Apply exponential backoff with jitter for non-rate-limit errors
@@ -196,7 +196,7 @@ class OpenAIExerciseSelector:
                 await asyncio.sleep(delay)
 
         # All retries failed - use fallback
-        logger.error(f"All LLM attempts failed, using fallback selection")
+        logger.error("All LLM attempts failed, using fallback selection")
         return self._fallback_selection(request)
 
     async def _call_llm(self, user_prompt: str) -> str:

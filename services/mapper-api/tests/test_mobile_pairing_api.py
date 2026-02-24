@@ -6,8 +6,7 @@ Updated in AMA-388 to use dependency overrides instead of patches.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, Mock
-from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from backend.app import app

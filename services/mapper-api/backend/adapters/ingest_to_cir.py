@@ -1,5 +1,4 @@
 import re
-from collections import OrderedDict
 from typing import List, Optional, Tuple
 
 from shared.schemas.cir import CIR, Workout, Block, Exercise
@@ -227,7 +226,7 @@ def _clean_circuit_label_from_name(name: str) -> str:
 
 def _count_exercises_with_label(tagged: List[Tuple[Optional[str], dict]], label: str) -> int:
     """Count how many exercises have a specific label."""
-    return sum(1 for l, _ in tagged if l == label)
+    return sum(1 for lbl, _ in tagged if lbl == label)
 
 
 def detect_superset_groups(exercises: List[dict]) -> List[Block]:
@@ -255,7 +254,7 @@ def detect_superset_groups(exercises: List[dict]) -> List[Block]:
     # Labels with 2 exercises become supersets
     circuit_labels: set = set()
     superset_candidate_labels: set = set()
-    for label in {l for l, _ in all_labels if l}:
+    for label in {lbl for lbl, _ in all_labels if lbl}:
         count = _count_exercises_with_label(all_labels, label)
         if count >= 3:
             circuit_labels.add(label)

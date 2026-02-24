@@ -12,7 +12,6 @@ Updated in AMA-388 to use dependency overrides instead of patches.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock, Mock
 import uuid
 
@@ -697,7 +696,7 @@ def test_ios_companion_pending_excludes_completed_by_default(client):
     with patch('backend.app.get_ios_companion_pending_workouts') as mock_get:
         mock_get.return_value = []
 
-        resp = client.get("/ios-companion/pending")
+        _resp = client.get("/ios-companion/pending")
 
         # Verify exclude_completed=True was passed by default
         mock_get.assert_called_once()
@@ -710,7 +709,7 @@ def test_ios_companion_pending_can_include_completed(client):
     with patch('backend.app.get_ios_companion_pending_workouts') as mock_get:
         mock_get.return_value = []
 
-        resp = client.get("/ios-companion/pending", params={"exclude_completed": "false"})
+        _resp = client.get("/ios-companion/pending", params={"exclude_completed": "false"})
 
         # Verify exclude_completed=False was passed
         mock_get.assert_called_once()

@@ -12,10 +12,9 @@ Parses .xlsx files with support for:
 import io
 import re
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.cell.cell import Cell
 
 from .base import BaseParser
 from .models import (
@@ -217,7 +216,7 @@ class ExcelParser(BaseParser):
         """Parse workouts from a single sheet"""
         workouts = []
         current_workout = None
-        current_day = None
+        _current_day = None
         exercise_order = 1
 
         # Find column indices

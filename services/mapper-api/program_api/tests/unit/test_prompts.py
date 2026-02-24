@@ -11,8 +11,8 @@ import pytest
 from core.constants import MAX_LIMITATION_LENGTH
 from core.sanitization import sanitize_user_input
 from services.llm.prompts import (
-    sanitize_limitation,
     build_exercise_selection_prompt,
+    sanitize_limitation,
 )
 
 # Verify the re-export works correctly

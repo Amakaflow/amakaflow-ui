@@ -14,13 +14,12 @@ Run with:
     pytest tests/e2e/test_exercise_selection.py --live -v  # With live API
 """
 
-from typing import Dict, List
+from typing import Dict
 
 import pytest
 from supabase import Client
 
 from infrastructure.db.exercise_repository import SupabaseExerciseRepository
-
 
 # =============================================================================
 # EXERCISE DATABASE SMOKE TESTS
@@ -213,7 +212,7 @@ class TestEquipmentMappingConsistency:
 
     def test_database_equipment_is_recognized(self, supabase_client: Client):
         """Equipment in database should be recognized by the selector."""
-        from services.exercise_selector import EQUIPMENT_MAPPING, EQUIPMENT_ALIASES
+        from services.exercise_selector import EQUIPMENT_ALIASES, EQUIPMENT_MAPPING
 
         # Get all unique equipment from database
         result = supabase_client.table("exercises").select("equipment").execute()

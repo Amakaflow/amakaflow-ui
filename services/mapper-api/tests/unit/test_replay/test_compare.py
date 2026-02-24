@@ -1,6 +1,5 @@
 """Tests for diff engine edge cases."""
 
-import pytest
 from replay.core import Session, DiffEngine
 
 

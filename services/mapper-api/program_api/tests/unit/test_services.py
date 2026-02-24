@@ -10,13 +10,12 @@ Tests service layer logic.
 
 import pytest
 
-from services.program_generator import ProgramGenerator
-from services.exercise_selector import ExerciseSelector
-from services.periodization import PeriodizationService, PeriodizationModel
-from services.progression_engine import ProgressionEngine
-from models.program import ProgramGoal, ExperienceLevel
 from models.generation import GenerateProgramRequest
-
+from models.program import ExperienceLevel, ProgramGoal
+from services.exercise_selector import ExerciseSelector
+from services.periodization import PeriodizationModel, PeriodizationService
+from services.program_generator import ProgramGenerator
+from services.progression_engine import ProgressionEngine
 
 # ---------------------------------------------------------------------------
 # ProgramGenerator Tests

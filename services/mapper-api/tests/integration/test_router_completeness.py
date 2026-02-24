@@ -25,9 +25,9 @@ root_str = str(ROOT)
 if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
-from backend.app import app
-from backend.auth import get_current_user as backend_get_current_user
-from api.deps import get_current_user as deps_get_current_user
+from backend.app import app  # noqa: E402
+from backend.auth import get_current_user as backend_get_current_user  # noqa: E402
+from api.deps import get_current_user as deps_get_current_user  # noqa: E402
 
 
 # Test user ID for mocked authentication

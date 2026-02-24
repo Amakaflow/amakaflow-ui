@@ -7,11 +7,11 @@ Phase 4 - Testing Overhaul
 Tests verify that API response shapes match expected structure.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any
 
 import pytest
 
-from tests.contract import assert_response_shape, assert_list_response
+from tests.contract import assert_response_shape
 
 
 # =============================================================================

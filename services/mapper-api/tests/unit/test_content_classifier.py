@@ -5,7 +5,6 @@ Tests the keyword-based pre-filter and LLM classification fallback.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
 
 from backend.services.content_classifier import (
     ContentClassifier,
@@ -168,7 +167,7 @@ class TestClassificationFlow:
         )
 
         assert result1.category == ContentCategory.WORKOUT
-        assert result1.cached == False
+        assert not result1.cached
 
         # Second classification should use cache
         result2 = await classifier.classify(
@@ -177,7 +176,7 @@ class TestClassificationFlow:
             title="Different Title"  # Different title, but should still use cache
         )
 
-        assert result2.cached == True
+        assert result2.cached
         assert result2.category == result1.category
 
     @pytest.mark.asyncio
@@ -197,8 +196,8 @@ class TestClassificationFlow:
             title="HIIT Workout"
         )
 
-        assert result1.cached == False
-        assert result2.cached == False
+        assert not result1.cached
+        assert not result2.cached
 
 
 class TestContentClassifierEdgeCases:

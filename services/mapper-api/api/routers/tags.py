@@ -9,7 +9,7 @@ This router contains endpoints for:
 - DELETE /tags/{tag_id} - Delete a user tag
 """
 
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel

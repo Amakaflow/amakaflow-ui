@@ -13,7 +13,7 @@ from typing import Literal, Optional
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from backend.auth import get_current_user
 from backend.adapters.blocks_to_hyrox_yaml import load_user_defaults

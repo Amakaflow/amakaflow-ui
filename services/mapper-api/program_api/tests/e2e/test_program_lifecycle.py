@@ -17,12 +17,11 @@ Note: CRUD endpoints implemented in AMA-464. DELETE performs soft delete (archiv
 """
 
 import uuid
-from typing import Any, Dict
+from typing import Dict
 
 import httpx
 import pytest
 from supabase import Client
-
 
 # =============================================================================
 # SMOKE SUITE - Critical Database Operations (run on every PR)
@@ -1147,7 +1146,7 @@ class TestLargeProgramGeneration:
 
         # Verify each week has 7 workouts
         for week in program["weeks"]:
-            assert len(week["workouts"]) == 7, f"Week should have 7 workouts"
+            assert len(week["workouts"]) == 7, "Week should have 7 workouts"
 
 
 # =============================================================================

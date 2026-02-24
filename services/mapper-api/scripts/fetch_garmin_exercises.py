@@ -2,7 +2,6 @@
 Fetch Garmin exercise data from their public API endpoints.
 Based on: https://github.com/maximecharriere/GarminExercisesCollector
 """
-import json
 import requests
 import yaml
 from pathlib import Path

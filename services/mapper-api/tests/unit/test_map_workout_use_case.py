@@ -227,7 +227,7 @@ class TestMapWorkoutUseCaseSuccess:
         workout_repo: FakeWorkoutRepository,
     ):
         """Workout is saved to repository with correct data."""
-        result = use_case.execute(
+        _result = use_case.execute(
             parsed_workout=basic_parsed_workout,
             user_id="test-user-123",
             device="garmin",
@@ -497,7 +497,7 @@ class TestDeviceTypes:
         device: str,
     ):
         """Workout is saved with correct device type."""
-        result = use_case.execute(
+        _result = use_case.execute(
             parsed_workout=basic_parsed_workout,
             user_id="test-user-123",
             device=device,

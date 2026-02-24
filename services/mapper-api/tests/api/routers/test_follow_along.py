@@ -18,8 +18,7 @@ Coverage: All 9 endpoints with 60+ test cases including success, error, and edge
 """
 
 import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from fastapi import status, HTTPException
@@ -623,7 +622,7 @@ class TestCreateFromWorkout:
             },
         }
 
-        response = client.post("/follow-along/from-workout", json=request_data)
+        _response = client.post("/follow-along/from-workout", json=request_data)
 
         call_kwargs = mock_save.call_args.kwargs
         assert call_kwargs["title"] == "Follow-along Workout"
@@ -1019,7 +1018,6 @@ class TestEdgeCases:
     @patch("api.routers.follow_along.save_follow_along_workout")
     def test_get_with_various_id_formats(self, mock_save, client, sample_workout):
         """Test retrieval with various ID formats."""
-        from api.routers.follow_along import get_follow_along_workout as mock_get
 
         # Test with UUID-like ID
         test_ids = [

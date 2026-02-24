@@ -12,9 +12,7 @@ import pytest
 from application.exceptions import ProgramCreationError
 from models.generation import GenerateProgramRequest
 from models.program import ExperienceLevel, ProgramGoal
-from services.program_generator import ProgramGenerator, ProgramGenerationError
-from tests.fakes import FakeProgramRepository
-
+from services.program_generator import ProgramGenerationError, ProgramGenerator
 
 # ---------------------------------------------------------------------------
 # FakeProgramRepository Atomic Creation Tests

@@ -16,10 +16,6 @@ from supabase import Client
 import logging
 import jwt
 
-from application.ports.device_repository import (
-    DeviceRepository,
-    UserProfileRepository,
-)
 
 logger = logging.getLogger(__name__)
 

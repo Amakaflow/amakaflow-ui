@@ -18,7 +18,6 @@ Run with:
 import pytest
 from supabase import Client
 
-
 # =============================================================================
 # SMOKE SUITE - ELITE Experience Level (run on every PR)
 # =============================================================================
@@ -252,7 +251,7 @@ class TestPeriodizationDataIntegrity:
                 {"program_id": program_id, "week_number": 3, "is_deload": False, "focus": "Training"},
                 {"program_id": program_id, "week_number": 4, "is_deload": True, "focus": "Deload"},
             ]
-            weeks_result = supabase_client.table("program_weeks").insert(weeks_data).execute()
+            _weeks_result = supabase_client.table("program_weeks").insert(weeks_data).execute()
 
             # Retrieve and verify
             stored_weeks = (

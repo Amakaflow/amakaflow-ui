@@ -1,7 +1,7 @@
 """
 Workflow functions for processing blocks JSON with exercise validation.
 """
-from typing import List, Dict, Optional
+from typing import List, Dict
 from backend.adapters.blocks_to_hyrox_yaml import map_exercise_to_garmin, to_hyrox_yaml
 from backend.core.exercise_suggestions import suggest_alternatives
 from backend.core.garmin_matcher import find_garmin_exercise, get_garmin_suggestions
@@ -79,7 +79,7 @@ def validate_workout_mapping(blocks_json: dict, confidence_threshold: float = 0.
         suggestions = [{"name": name, "confidence": conf} for name, conf in suggestions_list]
 
         # Also get legacy suggestions for additional context
-        legacy_suggestions = suggest_alternatives(ex_name, include_similar_types=True)
+        _legacy_suggestions = suggest_alternatives(ex_name, include_similar_types=True)
 
         # Determine status based on thresholds
         if mapped_name is None or confidence < 0.40:

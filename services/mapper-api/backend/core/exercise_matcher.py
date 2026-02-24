@@ -13,10 +13,10 @@ This service provides a multi-stage matching approach:
 import json
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Tuple, TYPE_CHECKING
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from enum import Enum
 
-from rapidfuzz import fuzz, process
+from rapidfuzz import fuzz
 
 from backend.core.normalize import normalize
 

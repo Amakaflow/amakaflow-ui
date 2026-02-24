@@ -11,9 +11,8 @@ Endpoints:
 Part of AMA-596: Extract account router from monolithic app.py
 """
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps import get_current_user
 from api.deps import (

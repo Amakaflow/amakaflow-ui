@@ -23,7 +23,6 @@ Part of AMA-591: Extract bulk import router from monolithic app.py
 
 import base64
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi import File as FastAPIFile

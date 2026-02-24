@@ -2,7 +2,10 @@
 # FILE: mapper-api/scripts/refresh_garmin_from_collector.py
 # (NEW FILE — automatically rebuilds all Garmin exercise datasets from the GitHub repo)
 # =====================================================================================
-import json, yaml, pathlib, requests, re
+import yaml
+import pathlib
+import requests
+import re
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]

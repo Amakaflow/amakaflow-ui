@@ -11,7 +11,7 @@ These fixtures provide:
 """
 import os
 import pytest
-from typing import Generator, Optional
+from typing import Generator
 
 import httpx
 from dotenv import load_dotenv

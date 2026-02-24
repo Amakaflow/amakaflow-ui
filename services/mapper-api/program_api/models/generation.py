@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from core.constants import MAX_LIMITATIONS_COUNT
 from core.sanitization import sanitize_user_input
-from models.program import ProgramGoal, ExperienceLevel, TrainingProgram
+from models.program import ExperienceLevel, ProgramGoal, TrainingProgram
 
 
 class GenerateProgramRequest(BaseModel):

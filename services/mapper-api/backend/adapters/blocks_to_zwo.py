@@ -3,7 +3,7 @@
 This exporter only supports running and cycling workouts.
 """
 import re
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
 from backend.adapters.zwo_schemas import Workout, Step, Target
 from backend.adapters.blocks_to_hyrox_yaml import extract_rounds
@@ -320,7 +320,7 @@ def block_to_steps(block: dict, sport: str) -> List[Step]:
         else:
             # Block has time but no exercises with durations - treat as warmup/cooldown
             # Check if any exercises have descriptions but no durations (like "60% FTP easy spin")
-            has_description_only = False
+            _has_description_only = False
             recovery_target = Target()
             if exercises:
                 # Check if we can extract a target from the exercise name
@@ -328,7 +328,7 @@ def block_to_steps(block: dict, sport: str) -> List[Step]:
                     ex_name = ex.get("name", "")
                     if ex_name and not ex.get("duration_sec"):
                         recovery_target = extract_power_target(ex_name) or Target()
-                        has_description_only = True
+                        _has_description_only = True
                         break
 
             step = Step(
@@ -355,7 +355,7 @@ def block_to_steps(block: dict, sport: str) -> List[Step]:
         target = extract_power_target(ex_name) or Target()
 
         # Check if this is a running/cycling exercise
-        is_cardio = any(keyword in ex_name_lower for keyword in [
+        _is_cardio = any(keyword in ex_name_lower for keyword in [
             "run", "jog", "sprint", "pace", "tempo", "easy", "recovery",
             "bike", "ride", "cycle", "spin", "watt", "ftp", "threshold"
         ])
@@ -426,7 +426,7 @@ def block_to_steps(block: dict, sport: str) -> List[Step]:
             rest_sec = ex.get("rest_sec")
 
             # Check if this is a running/cycling exercise
-            is_cardio = any(keyword in ex_name for keyword in [
+            _is_cardio = any(keyword in ex_name for keyword in [
                 "run", "jog", "sprint", "pace", "tempo", "easy", "recovery",
                 "bike", "ride", "cycle", "spin", "watt", "ftp", "threshold"
             ])
@@ -510,7 +510,7 @@ def export_zwo(workout: Workout) -> str:
     zwo = Element("workout_file")
     _add_text(zwo, "name", workout.name)
     _add_text(zwo, "sportType", "run" if workout.sport == "run" else "bike")
-    _add_text(zwo, "description", f"Auto-generated from canonical JSON → ZWO")
+    _add_text(zwo, "description", "Auto-generated from canonical JSON → ZWO")
 
     w_el = SubElement(zwo, "workout")
 

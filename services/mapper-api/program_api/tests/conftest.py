@@ -17,16 +17,15 @@ root_str = str(ROOT)
 if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
-from backend.main import create_app
-from backend.settings import Settings
-from api.deps import (
+from api.deps import (  # noqa: E402
     get_calendar_client,
     get_current_user,
     get_exercise_repo,
     get_program_repo,
     get_template_repo,
 )
-
+from backend.main import create_app  # noqa: E402
+from backend.settings import Settings  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Auth Mock
@@ -361,7 +360,6 @@ def client_with_failing_calendar(
 @pytest.fixture
 def sample_program_with_weeks(sample_program_data) -> Dict[str, Any]:
     """Program data with weeks and workouts for calendar integration tests."""
-    from datetime import datetime
     program_id = sample_program_data["id"]
     # Use valid UUIDs for weeks and workouts
     week1_id = "550e8400-e29b-41d4-a716-446655440010"

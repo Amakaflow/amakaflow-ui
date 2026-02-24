@@ -1,7 +1,7 @@
 from typing import Iterable, Tuple, Optional, Dict, List
 import re
 
-from rapidfuzz import fuzz, process
+from rapidfuzz import fuzz
 
 
 def normalize_name(name: str) -> str:

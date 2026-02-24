@@ -106,8 +106,6 @@ def create_completion_repo(
     Returns:
         Pre-populated FakeCompletionRepository
     """
-    from application.ports import HealthMetricsDTO
-
     repo = FakeCompletionRepository()
 
     if num_completions > 0:

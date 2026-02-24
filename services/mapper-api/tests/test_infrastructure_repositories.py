@@ -10,8 +10,7 @@ implement the protocol interfaces and can be used with dependency injection.
 Run integration tests with: pytest -m integration
 """
 import pytest
-from typing import Dict, Any
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 # All tests in this module are pure logic tests with mocks - mark as unit
 pytestmark = pytest.mark.unit
@@ -140,7 +139,6 @@ class TestProtocolCompliance:
     def test_workout_repository_has_required_methods(self):
         """SupabaseWorkoutRepository should have all Protocol methods."""
         from infrastructure.db.workout_repository import SupabaseWorkoutRepository
-        from application.ports.workout_repository import WorkoutRepository
 
         required_methods = [
             "save", "get", "get_list", "delete", "update_export_status",

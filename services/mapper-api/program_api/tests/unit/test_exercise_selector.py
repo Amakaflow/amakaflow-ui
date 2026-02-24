@@ -16,12 +16,10 @@ import pytest
 
 from services.exercise_selector import (
     EQUIPMENT_MAPPING,
-    ExerciseCandidate,
     ExerciseSelector,
     SlotRequirements,
 )
 from tests.fakes import FakeExerciseRepository
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -546,7 +544,7 @@ class TestScoreCandidates:
         scored = selector._score_candidates(candidates, requirements)
 
         # 0.4 (muscle) + 0.3 (category) + 0.2 (pattern) + 0.1 (equipment) + 0.05 (1rm) + 0.05 (compound bonus)
-        expected_max = 1.1
+        _expected_max = 1.1
         assert scored[0].score >= 1.0  # Should be near max
 
     def test_empty_candidates_returns_empty(self, selector):

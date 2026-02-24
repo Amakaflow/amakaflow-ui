@@ -285,7 +285,7 @@ def cmd_save(args):
         try:
             with open(args.file) as f:
                 data = json.load(f)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             print(f"Error: File not found: {args.file}", file=sys.stderr)
             sys.exit(2)
         except (IOError, OSError) as e:

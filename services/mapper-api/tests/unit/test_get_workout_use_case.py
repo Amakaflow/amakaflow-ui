@@ -4,12 +4,9 @@ Tests for GetWorkoutUseCase.
 Part of AMA-370: Refactor routers to call use-cases
 """
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 from application.use_cases.get_workout import (
     GetWorkoutUseCase,
-    GetWorkoutResult,
-    ListWorkoutsResult,
-    GetIncomingWorkoutsResult,
 )
 
 

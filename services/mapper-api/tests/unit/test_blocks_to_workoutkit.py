@@ -6,7 +6,7 @@ from backend.adapters.blocks_to_workoutkit import (
     to_workoutkit,
     parse_exercise_name,
 )
-from backend.adapters.workoutkit_schemas import RestStep, TimeStep, RepsStep
+from backend.adapters.workoutkit_schemas import RestStep
 
 
 @pytest.mark.unit

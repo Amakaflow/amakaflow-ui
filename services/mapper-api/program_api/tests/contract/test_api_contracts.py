@@ -9,8 +9,11 @@ even for stub endpoints that return errors.
 
 import pytest
 
-from tests.contract import assert_response_shape, assert_error_response, assert_list_response
-
+from tests.contract import (
+    assert_error_response,
+    assert_list_response,
+    assert_response_shape,
+)
 
 # ---------------------------------------------------------------------------
 # Health Endpoint Contracts

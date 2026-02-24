@@ -20,7 +20,6 @@ Run with:
 import os
 import time
 import uuid
-from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
 
@@ -35,7 +34,6 @@ try:
         retry,
         stop_after_attempt,
         wait_exponential,
-        retry_if_exception_type,
     )
     TENACITY_AVAILABLE = True
 except ImportError:

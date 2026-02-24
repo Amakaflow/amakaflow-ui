@@ -16,9 +16,7 @@ from .models import (
     ParseResult,
     ParsedWorkout,
     ParsedExercise,
-    ColumnInfo,
     FileInfo,
-    ExerciseFlag,
 )
 
 logger = logging.getLogger(__name__)

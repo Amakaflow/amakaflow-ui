@@ -9,12 +9,11 @@ It integrates with the exercise database for fallback mechanisms when
 LLM-powered selection is unavailable.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 from uuid import uuid4
 
 from application.ports import ExerciseRepository
-
 
 # Equipment mapping for different gym setups
 EQUIPMENT_MAPPING: Dict[str, List[str]] = {

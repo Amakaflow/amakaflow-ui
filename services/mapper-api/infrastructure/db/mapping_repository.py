@@ -13,9 +13,7 @@ from supabase import Client
 import logging
 
 from application.ports.mapping_repository import (
-    UserMappingRepository,
     GlobalMappingRepository,
-    ExerciseMatchRepository,
 )
 
 logger = logging.getLogger(__name__)

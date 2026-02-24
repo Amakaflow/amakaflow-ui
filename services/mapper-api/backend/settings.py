@@ -273,7 +273,7 @@ def _get_settings_singleton() -> Settings:
 
 # For backwards compatibility and convenience: from backend.settings import settings
 # This uses a property-like behavior via __getattr__ at module level
-import sys
+import sys  # noqa: E402
 _settings_module = sys.modules[__name__]
 
 

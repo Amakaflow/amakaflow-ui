@@ -8,7 +8,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     before_sleep_log,
-    RetryError,
 )
 
 

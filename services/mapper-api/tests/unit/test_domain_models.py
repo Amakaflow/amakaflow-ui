@@ -12,7 +12,6 @@ These tests verify:
 
 import json
 import pytest
-from datetime import datetime
 
 
 @pytest.mark.unit

@@ -7,13 +7,10 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent.parent.parent / 'backend'
 sys.path.insert(0, str(backend_path))
 
-import pytest
-import json
-import tempfile
-from pathlib import Path
-from typing import Any
+import pytest  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-from replay.core import Session
+from replay.core import Session  # noqa: E402
 
 
 @pytest.fixture

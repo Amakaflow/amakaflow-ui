@@ -7,7 +7,7 @@ Part of AMA-377: Introduce main.py with create_app() factory
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from backend.main import create_app, _init_sentry, _configure_cors, _log_feature_flags
 from backend.settings import Settings

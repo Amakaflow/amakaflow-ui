@@ -9,7 +9,7 @@ creating, retrieving, and deleting program workout events.
 
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -17,12 +17,11 @@ import pytest
 from infrastructure.calendar_client import (
     BulkCreateResult,
     CalendarAPIError,
-    CalendarAPIUnavailable,
+    CalendarAPIUnavailableError,
     CalendarClient,
     ProgramEventData,
     ProgramEventsResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -210,7 +209,7 @@ class TestCalendarClientBulkCreate:
     async def test_bulk_create_connection_error(
         self, calendar_client, sample_event_data, auth_token, program_id
     ):
-        """Connection error raises CalendarAPIUnavailable."""
+        """Connection error raises CalendarAPIUnavailableError."""
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
@@ -218,7 +217,7 @@ class TestCalendarClientBulkCreate:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
 
-            with pytest.raises(CalendarAPIUnavailable):
+            with pytest.raises(CalendarAPIUnavailableError):
                 await calendar_client.bulk_create_program_events(
                     program_id=program_id,
                     events=[sample_event_data],
@@ -229,7 +228,7 @@ class TestCalendarClientBulkCreate:
     async def test_bulk_create_timeout(
         self, calendar_client, sample_event_data, auth_token, program_id
     ):
-        """Timeout raises CalendarAPIUnavailable."""
+        """Timeout raises CalendarAPIUnavailableError."""
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
@@ -237,7 +236,7 @@ class TestCalendarClientBulkCreate:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
 
-            with pytest.raises(CalendarAPIUnavailable):
+            with pytest.raises(CalendarAPIUnavailableError):
                 await calendar_client.bulk_create_program_events(
                     program_id=program_id,
                     events=[sample_event_data],
@@ -315,7 +314,7 @@ class TestCalendarClientGetEvents:
     async def test_get_events_connection_error(
         self, calendar_client, auth_token, program_id
     ):
-        """Connection error raises CalendarAPIUnavailable."""
+        """Connection error raises CalendarAPIUnavailableError."""
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
@@ -323,7 +322,7 @@ class TestCalendarClientGetEvents:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
 
-            with pytest.raises(CalendarAPIUnavailable):
+            with pytest.raises(CalendarAPIUnavailableError):
                 await calendar_client.get_program_events(
                     program_id=program_id,
                     auth_token=auth_token,

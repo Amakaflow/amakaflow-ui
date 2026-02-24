@@ -1,16 +1,13 @@
 """Unit tests for the Replay Engine."""
 
-import pytest
 import json
-import tempfile
 from pathlib import Path
 
 from backend.replay.core import (
     Session,
     ReplayEngine,
     DiffEngine,
-    IgnoreConfig,
-    DiffItem
+    IgnoreConfig
 )
 
 

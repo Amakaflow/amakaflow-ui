@@ -2,8 +2,6 @@
 Garmin exercise name matcher using official Garmin exercise database.
 """
 import pathlib
-from rapidfuzz import fuzz, process
-from .normalize import normalize
 from backend.mapping.exercise_name_matcher import best_match, top_matches
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

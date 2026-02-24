@@ -20,11 +20,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 
-from api.deps import get_calendar_client, get_current_user, get_program_repo, verify_service_token
+from api.deps import (
+    get_calendar_client,
+    get_current_user,
+    get_program_repo,
+    verify_service_token,
+)
 from application.ports import ProgramRepository
 from infrastructure.calendar_client import (
     CalendarAPIError,
-    CalendarAPIUnavailable,
+    CalendarAPIUnavailableError,
     CalendarClient,
     ProgramEventData,
 )
@@ -586,7 +591,7 @@ async def activate_program(
             logger.info(
                 f"Created {scheduled_count} calendar events for program {program_id}"
             )
-        except CalendarAPIUnavailable as e:
+        except CalendarAPIUnavailableError as e:
             logger.warning(f"Calendar-API unavailable during activation: {e}")
             # Don't fail activation if calendar is unavailable
             # Program will be active but without calendar events

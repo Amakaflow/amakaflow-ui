@@ -11,7 +11,6 @@ with support for function calling and tool execution.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse

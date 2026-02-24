@@ -11,22 +11,17 @@ Tests for:
 - Error handling and validation
 """
 
-import copy
 import pytest
-from unittest.mock import MagicMock, patch
 
 from domain.models.patch_operation import (
     PatchOperation,
     PatchOperationList,
     parse_path,
     validate_path_structure,
-    VALID_ROOT_PATHS,
-    VALID_EXERCISE_FIELDS,
 )
 from application.use_cases.patch_workout import (
     PatchWorkoutUseCase,
     PatchWorkoutResult,
-    PatchValidationError,
 )
 
 

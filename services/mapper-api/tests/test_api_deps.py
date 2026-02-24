@@ -9,7 +9,7 @@ return the correct types. Uses mocks for external dependencies.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 # All tests in this module are pure logic tests with mocks - mark as unit
 pytestmark = pytest.mark.unit
@@ -309,7 +309,6 @@ class TestProtocolCompliance:
     def test_workout_repo_satisfies_protocol(self):
         """WorkoutRepository from provider should satisfy Protocol."""
         from api.deps import get_workout_repo
-        from application.ports import WorkoutRepository
 
         mock_client = Mock()
         repo = get_workout_repo(mock_client)
@@ -326,7 +325,6 @@ class TestProtocolCompliance:
     def test_completion_repo_satisfies_protocol(self):
         """CompletionRepository from provider should satisfy Protocol."""
         from api.deps import get_completion_repo
-        from application.ports import CompletionRepository
 
         mock_client = Mock()
         repo = get_completion_repo(mock_client)
@@ -341,7 +339,6 @@ class TestProtocolCompliance:
     def test_device_repo_satisfies_protocol(self):
         """DeviceRepository from provider should satisfy Protocol."""
         from api.deps import get_device_repo
-        from application.ports import DeviceRepository
 
         mock_client = Mock()
         repo = get_device_repo(mock_client)
@@ -356,7 +353,6 @@ class TestProtocolCompliance:
     def test_user_profile_repo_satisfies_protocol(self):
         """UserProfileRepository from provider should satisfy Protocol."""
         from api.deps import get_user_profile_repo
-        from application.ports import UserProfileRepository
 
         mock_client = Mock()
         repo = get_user_profile_repo(mock_client)
@@ -370,7 +366,6 @@ class TestProtocolCompliance:
     def test_user_mapping_repo_satisfies_protocol(self):
         """UserMappingRepository from provider should satisfy Protocol."""
         from api.deps import get_user_mapping_repo
-        from application.ports import UserMappingRepository
 
         mock_client = Mock()
         repo = get_user_mapping_repo(mock_client, "test_user")
@@ -382,7 +377,6 @@ class TestProtocolCompliance:
     def test_global_mapping_repo_satisfies_protocol(self):
         """GlobalMappingRepository from provider should satisfy Protocol."""
         from api.deps import get_global_mapping_repo
-        from application.ports import GlobalMappingRepository
 
         mock_client = Mock()
         repo = get_global_mapping_repo(mock_client)
@@ -394,7 +388,6 @@ class TestProtocolCompliance:
     def test_exercise_match_repo_satisfies_protocol(self):
         """ExerciseMatchRepository from provider should satisfy Protocol."""
         from api.deps import get_exercise_match_repo
-        from application.ports import ExerciseMatchRepository
 
         repo = get_exercise_match_repo()
 

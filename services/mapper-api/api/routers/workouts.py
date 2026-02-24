@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -45,7 +45,7 @@ from application.use_cases.patch_workout import PatchWorkoutUseCase
 from domain.models.patch_operation import PatchOperation
 from backend.adapters.blocks_to_workoutkit import to_workoutkit
 from domain.converters.blocks_to_workout import blocks_to_workout
-from domain.models import WorkoutMetadata, WorkoutSource
+from domain.models import WorkoutSource
 from backend.services.embedding_notifier import notify_embedding_update
 from backend.services.export_queue import ExportQueue
 from backend.settings import get_settings

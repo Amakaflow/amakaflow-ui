@@ -18,7 +18,6 @@ from services.llm.schemas import (
     ExerciseSelectionResponse,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -992,8 +991,9 @@ class TestCacheStatsTracking:
     def test_clear_cache_resets_stats(self, selector):
         """Clearing cache should reset entry counts."""
         # Manually add a cache entry
-        from services.llm.client import CacheEntry
         import time
+
+        from services.llm.client import CacheEntry
 
         selector._cache["test-key"] = CacheEntry(
             response=ExerciseSelectionResponse(

@@ -16,8 +16,7 @@ Features:
 import io
 import csv
 import logging
-from typing import List, Dict, Any, Optional, Tuple
-from collections import defaultdict
+from typing import List, Dict, Tuple
 
 from .base import BaseParser
 from .models import (
@@ -26,7 +25,6 @@ from .models import (
     ParsedExercise,
     ColumnInfo,
     FileInfo,
-    ExerciseFlag,
 )
 
 logger = logging.getLogger(__name__)
@@ -374,7 +372,7 @@ class CSVParser(BaseParser):
             weight_unit_val = row.get(mapping.get('weight_unit', ''), '').strip()
             rpe_val = row.get(mapping.get('rpe', ''), '').strip()
             notes_val = row.get(mapping.get('notes', ''), '').strip()
-            set_order = row.get(mapping.get('set_order', ''), '').strip()
+            _set_order = row.get(mapping.get('set_order', ''), '').strip()
 
             # Parse reps and flags
             reps_str, reps_flags = self.parse_reps(reps_val or "1")

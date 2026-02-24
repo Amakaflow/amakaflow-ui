@@ -10,7 +10,6 @@ This module provides functionality to:
 from __future__ import annotations
 
 import json
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -164,7 +163,7 @@ class DiffEngine:
             return
 
         # Type mismatch
-        if type(a) != type(b):
+        if type(a) is not type(b):
             differences.append(DiffItem(
                 path=path,
                 value_a=a,

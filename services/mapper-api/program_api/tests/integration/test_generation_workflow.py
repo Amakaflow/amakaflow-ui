@@ -17,14 +17,13 @@ from api.deps import (
     get_template_repo,
 )
 from models.program import ExperienceLevel, ProgramGoal
-from services.program_generator import ProgramGenerationError, ProgramGenerator
+from services.program_generator import ProgramGenerator
 from tests.fakes import (
     FakeExerciseRepository,
     FakeExerciseSelector,
     FakeProgramRepository,
     FakeTemplateRepository,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -407,8 +406,8 @@ class TestFallbackBehavior:
         self, program_repo, template_repo, exercise_repo
     ):
         """Should use deterministic fallback when LLM fails."""
-        from tests.fakes import FailingExerciseSelector
         from models.generation import GenerateProgramRequest
+        from tests.fakes import FailingExerciseSelector
 
         generator = ProgramGenerator(
             program_repo=program_repo,

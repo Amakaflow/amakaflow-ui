@@ -7,7 +7,6 @@ Converts ParsedWorkout/ParsedExercise from AI parsing output to the
 canonical Workout domain model.
 """
 
-from collections import defaultdict
 from typing import List, Optional
 
 from backend.parsers.models import ParsedExercise, ParsedWorkout

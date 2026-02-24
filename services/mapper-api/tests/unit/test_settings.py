@@ -190,7 +190,7 @@ class TestGetSettings:
     def test_get_settings_cache_can_be_cleared(self):
         """get_settings() cache can be cleared for testing."""
         get_settings.cache_clear()
-        settings1 = get_settings()
+        _settings1 = get_settings()
         get_settings.cache_clear()
         settings2 = get_settings()
         # After clearing cache, we get a new instance

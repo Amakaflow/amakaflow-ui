@@ -9,7 +9,6 @@ the canonical exercises table.
 """
 import logging
 from typing import Optional, List, Dict, Any
-from functools import lru_cache
 
 from supabase import Client
 
@@ -89,7 +88,7 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception("Error fetching all exercises")
             return []
 
@@ -114,7 +113,7 @@ class SupabaseExercisesRepository:
                 self._cache_result(result.data[0])
                 return result.data[0]
             return None
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching exercise by id {exercise_id}")
             return None
 
@@ -133,7 +132,7 @@ class SupabaseExercisesRepository:
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error finding exercise by name {name}")
             return None
 
@@ -160,7 +159,7 @@ class SupabaseExercisesRepository:
                 self._cache_result(result.data[0])
                 return result.data[0]
             return None
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error finding exercise by alias {alias}")
             return None
 
@@ -178,7 +177,7 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").ilike("name", pattern).limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error searching exercises by pattern {pattern}")
             return []
 
@@ -196,7 +195,7 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").contains("primary_muscles", [muscle]).limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error finding exercises by muscle {muscle}")
             return []
 
@@ -214,7 +213,7 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").contains("equipment", [equipment]).limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error finding exercises by equipment {equipment}")
             return []
 
@@ -231,7 +230,7 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").eq("category", "compound").limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception("Error finding compound exercises")
             return []
 
@@ -248,6 +247,6 @@ class SupabaseExercisesRepository:
         try:
             result = self._client.table("exercises").select("*").eq("supports_1rm", True).limit(limit).execute()
             return result.data or []
-        except Exception as e:
+        except Exception:
             logger.exception("Error finding 1RM exercises")
             return []
