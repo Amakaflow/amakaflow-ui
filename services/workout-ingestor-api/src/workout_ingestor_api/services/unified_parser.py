@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+from workout_ingestor_api.config import settings
 from workout_ingestor_api.services.adapters.base import MediaContent
 from workout_ingestor_api.services.prompts import build_prompt
 from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data
@@ -45,7 +46,7 @@ class UnifiedParser:
         context = AIRequestContext(
             user_id=user_id,
             feature_name=f"{platform}_parse_workout",
-            custom_properties={"model": "gpt-4o-mini"},
+            custom_properties={"model": settings.PARSE_MODEL},
         )
         client = AIClientFactory.create_openai_client(context=context)
 
@@ -64,7 +65,7 @@ class UnifiedParser:
 
         def _call() -> dict:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.PARSE_MODEL,
                 messages=[
                     # Note: "from content" (not "from transcripts") is intentional — this parser
                     # handles multi-platform content including captions, descriptions, and audio transcripts.

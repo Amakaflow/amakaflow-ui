@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict, Optional
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+from workout_ingestor_api.config import settings
 from workout_ingestor_api.services.apify_service import ApifyService, ApifyServiceError
 from workout_ingestor_api.services.instagram_reel_cache_service import InstagramApifyRawCacheService
 from workout_ingestor_api.services.prompts import build_prompt
@@ -45,7 +46,7 @@ class InstagramReelService:
         context = AIRequestContext(
             user_id=user_id,
             feature_name="instagram_reel_parse_transcript",
-            custom_properties={"model": "gpt-4o-mini"},
+            custom_properties={"model": settings.PARSE_MODEL},
         )
         client = AIClientFactory.create_openai_client(context=context)
 
@@ -58,7 +59,7 @@ class InstagramReelService:
 
         def _make_api_call() -> Dict:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.PARSE_MODEL,
                 messages=[
                     {"role": "system", "content": "You are a fitness expert that extracts workout data from transcripts. Return only valid JSON."},
                     {"role": "user", "content": prompt},

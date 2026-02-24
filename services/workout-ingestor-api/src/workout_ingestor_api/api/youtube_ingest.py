@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
+from workout_ingestor_api.config import settings
 from workout_ingestor_api.models import Block, Exercise, Workout
 from workout_ingestor_api.services.prompts import build_prompt
 from workout_ingestor_api.services.url_normalizer import (
@@ -83,7 +84,7 @@ def _parse_with_openai(
     context = AIRequestContext(
         user_id=user_id,
         feature_name="youtube_parse_transcript",
-        custom_properties={"model": "gpt-4o-mini"},
+        custom_properties={"model": settings.PARSE_MODEL},
     )
 
     try:
@@ -104,7 +105,7 @@ def _parse_with_openai(
 
     def _make_api_call() -> Dict:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.PARSE_MODEL,
             messages=[
                 {"role": "system", "content": "You are a fitness expert that extracts workout data from transcripts. Return only valid JSON."},
                 {"role": "user", "content": prompt}

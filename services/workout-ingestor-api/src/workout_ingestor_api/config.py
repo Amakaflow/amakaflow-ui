@@ -22,6 +22,9 @@ class Settings:
     HELICONE_API_KEY: str | None = None
     APIFY_API_TOKEN: str | None = None
 
+    # Model configuration
+    PARSE_MODEL: str = "gpt-4o-mini"
+
     def __init__(self):
         # Environment
         env = os.getenv("ENVIRONMENT", "development").lower()
@@ -39,6 +42,9 @@ class Settings:
         self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
         self.HELICONE_API_KEY = os.getenv("HELICONE_API_KEY")
         self.APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
+
+        # Model configuration
+        self.PARSE_MODEL: str = os.getenv("PARSE_MODEL", "gpt-4o-mini")
 
 
 settings = Settings()
