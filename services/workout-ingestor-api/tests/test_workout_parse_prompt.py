@@ -443,6 +443,9 @@ class TestLadderPyramidComplexExamples:
     def test_ascending_or_pyramid_rep_scheme_type_present(self, base_prompt: str):
         assert 'ascending' in base_prompt or 'pyramid' in base_prompt
 
+    def test_drop_set_rep_scheme_type_present(self, base_prompt: str):
+        assert '"drop-set"' in base_prompt or 'drop-set' in base_prompt
+
 
 class TestSessionGroupingRules:
     """AMA-757 item 3: session field rules and AM/PM multi-session JSON example."""
@@ -464,8 +467,8 @@ class TestSessionGroupingRules:
 
     def test_multi_session_json_example_present(self, base_prompt: str):
         # Should have both AM and PM session values as strings in JSON
-        assert ('"AM"' in base_prompt or '"am"' in base_prompt or
-                '"AM strength"' in base_prompt or 'session' in base_prompt)
+        assert '"session": "AM"' in base_prompt
+        assert '"session": "PM"' in base_prompt
 
 
 class TestLoadVariants:
@@ -550,7 +553,7 @@ class TestBilingualHandling:
         )
 
     def test_bilingual_rule_present(self, base_prompt: str):
-        assert 'language' in base_prompt.lower() or 'bilingual' in base_prompt.lower()
+        assert 'BILINGUAL' in base_prompt
 
     def test_original_language_instruction_present(self, base_prompt: str):
         # Exercise names in original language, structure values stay English
