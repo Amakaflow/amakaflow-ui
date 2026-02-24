@@ -20,7 +20,8 @@ class TestPlatformPreambles:
             video_duration_sec=None,
             raw_text="Squat 3x10",
         )
-        assert "instagram" in prompt.lower()
+        # Phrase unique to the instagram preamble — not in general rules
+        assert "Instagram Reel captions" in prompt
 
     def test_youtube_preamble_present(self):
         prompt = build_prompt(
@@ -28,7 +29,8 @@ class TestPlatformPreambles:
             video_duration_sec=None,
             raw_text="Squat 3x10",
         )
-        assert "youtube" in prompt.lower()
+        # Phrase unique to the youtube preamble — chapter titles signal
+        assert "Chapter titles are particularly" in prompt
 
     def test_tiktok_preamble_present(self):
         prompt = build_prompt(
@@ -36,7 +38,8 @@ class TestPlatformPreambles:
             video_duration_sec=None,
             raw_text="Squat 3x10",
         )
-        assert "tiktok" in prompt.lower()
+        # Phrase unique to the tiktok preamble — on-screen text priority
+        assert "Prioritise on-screen text over audio transcripts" in prompt
 
     def test_pinterest_preamble_present(self):
         prompt = build_prompt(
@@ -44,7 +47,8 @@ class TestPlatformPreambles:
             video_duration_sec=None,
             raw_text="Squat 3x10",
         )
-        assert "pinterest" in prompt.lower()
+        # Phrase unique to the pinterest preamble — no video transcript
+        assert "There is no video transcript" in prompt
 
     def test_unknown_platform_still_returns_prompt(self):
         """Unknown platforms should still produce a usable prompt."""
@@ -274,16 +278,69 @@ class TestVideoDurationContext:
         assert "Squat 3x10" in prompt
 
     def test_duration_zero_handled_gracefully(self):
+        """video_duration_sec=0 is a valid duration and MUST include duration context."""
         prompt = build_prompt(
             platform="tiktok",
             video_duration_sec=0,
             raw_text="Squat 3x10",
         )
         assert "Squat 3x10" in prompt
+        # 0 is a valid duration value (not missing), so the duration context must be present
+        assert "The video is 0 seconds long" in prompt
+        # vd_placeholder in the JSON footer must be 0 (int), not "null"
+        assert '"video_duration_sec": 0' in prompt
 
 
 # ---------------------------------------------------------------------------
-# 6. Return type and basic sanity
+# 6. Optional title parameter
+# ---------------------------------------------------------------------------
+
+
+class TestTitleParameter:
+    """build_prompt() should include the title in the header when provided."""
+
+    def test_title_appears_when_provided(self):
+        prompt = build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Squat 3x10",
+            title="Full Body HIIT Blast",
+        )
+        assert "Title: Full Body HIIT Blast" in prompt
+
+    def test_title_line_absent_when_not_provided(self):
+        prompt = build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Squat 3x10",
+        )
+        assert "Title:" not in prompt
+
+    def test_title_line_absent_when_none(self):
+        prompt = build_prompt(
+            platform="youtube",
+            video_duration_sec=300,
+            raw_text="Squat 3x10",
+            title=None,
+        )
+        assert "Title:" not in prompt
+
+    def test_title_appears_between_platform_and_text_to_parse(self):
+        """Title line must sit between 'Platform:' and 'Text to parse:' in the header."""
+        prompt = build_prompt(
+            platform="youtube",
+            video_duration_sec=None,
+            raw_text="Deadlift 5x3",
+            title="Leg Day Strength",
+        )
+        platform_pos = prompt.index("Platform: youtube")
+        title_pos = prompt.index("Title: Leg Day Strength")
+        text_pos = prompt.index("Text to parse:")
+        assert platform_pos < title_pos < text_pos
+
+
+# ---------------------------------------------------------------------------
+# 7. Return type and basic sanity
 # ---------------------------------------------------------------------------
 
 

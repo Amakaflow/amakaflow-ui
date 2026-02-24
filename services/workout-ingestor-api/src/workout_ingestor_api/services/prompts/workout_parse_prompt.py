@@ -78,6 +78,7 @@ def build_prompt(
     video_duration_sec: Optional[float],
     raw_text: str,
     secondary_texts: Optional[List[str]] = None,
+    title: Optional[str] = None,
 ) -> str:
     """Build the unified workout-parse LLM prompt.
 
@@ -90,6 +91,9 @@ def build_prompt(
         secondary_texts: Optional additional text snippets (e.g. YouTube chapter
             list, description, on-screen overlay text).  Each entry is appended
             in its own labelled section so the LLM can distinguish sources.
+        title: Optional workout title sourced from the platform (e.g. video
+            title, pin title).  When provided it is included in the prompt
+            header so the LLM can use it as a structural signal.
 
     Returns:
         A fully-formed prompt string ready to pass to any OpenAI-compatible
@@ -98,7 +102,7 @@ def build_prompt(
     preamble = _get_preamble(platform)
 
     # Duration context inserted into the focus list item
-    if video_duration_sec:
+    if video_duration_sec is not None:
         duration_context = (
             f"\nThe video is {int(video_duration_sec)} seconds long "
             f"({int(video_duration_sec) // 60} minutes {int(video_duration_sec) % 60} seconds). "
@@ -117,7 +121,10 @@ def build_prompt(
         secondary_section = "\n\n" + "\n\n".join(parts)
 
     # video_duration_sec placeholder for the JSON response format footer
-    vd_placeholder = int(video_duration_sec) if video_duration_sec else "null"
+    vd_placeholder = int(video_duration_sec) if video_duration_sec is not None else "null"
+
+    # Build optional title line for the prompt header
+    title_line = f"Title: {title}\n" if title is not None else ""
 
     prompt = f"""{preamble}
 
@@ -131,7 +138,7 @@ Analyze this text and extract the workout routine being described. Focus on:
 7. Approximate timestamp in the video where each exercise is discussed{duration_context}
 
 Platform: {platform}
-Text to parse:
+{title_line}Text to parse:
 ---
 {raw_text}
 ---{secondary_section}
