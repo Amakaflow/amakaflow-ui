@@ -311,31 +311,32 @@ async def save_workout_endpoint(
                 "is_update": result.is_update,
             }
         else:
-            return {
-                "success": False,
-                "message": result.error or "Failed to save workout",
-                "validation_errors": result.validation_errors,
-            }
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": result.error or "Failed to save workout",
+                    "validation_errors": result.validation_errors,
+                },
+            )
 
     except ValueError as e:
-        # Conversion error (e.g., invalid workout_data)
         logger.warning(f"Failed to convert workout data: {e}")
-        return {
-            "success": False,
-            "message": f"Invalid workout data: {str(e)}"
-        }
+        raise HTTPException(
+            status_code=422,
+            detail={"message": f"Invalid workout data: {str(e)}"},
+        )
     except TimeoutError as e:
         logger.error(f"Timeout saving workout: {e}")
-        return {
-            "success": False,
-            "message": "Service temporarily unavailable. Please try again."
-        }
+        raise HTTPException(
+            status_code=503,
+            detail={"message": "Service temporarily unavailable. Please try again."},
+        )
     except Exception as e:
         logger.exception(f"Unexpected error saving workout: {e}")
-        return {
-            "success": False,
-            "message": "Failed to save workout. Check server logs."
-        }
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Failed to save workout. Check server logs."},
+        )
 
 
 @router.get("/workouts", response_model=WorkoutListResponse)

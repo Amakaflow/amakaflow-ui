@@ -67,7 +67,7 @@ class TikTokAdapter(PlatformAdapter):
 
         base_meta = {
             "platform": "tiktok",
-            "video_id": source_id,
+            "video_id": metadata.video_id,
             "creator": metadata.author_name,
             "hashtags": metadata.hashtags,
             "duration_seconds": metadata.duration_seconds,

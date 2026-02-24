@@ -130,8 +130,8 @@ class PinterestAdapter(PlatformAdapter):
     @staticmethod
     async def _fetch_pin(service: PinterestService, url: str):
         """Resolve URL and fetch pin metadata via PinterestService helpers."""
-        resolved_url = await service._resolve_short_url(url)
-        pin = await service._get_pin_metadata(resolved_url)
+        resolved_url = await service.resolve_short_url(url)
+        pin = await service.get_pin_metadata(resolved_url)
         if pin is None:
             raise PlatformFetchError(
                 f"PinterestService could not retrieve metadata for URL: {url}"
@@ -151,7 +151,7 @@ class PinterestAdapter(PlatformAdapter):
         produces no usable text.
         """
         try:
-            image_data: bytes | None = _run_async(service._download_image(image_url))
+            image_data: bytes | None = _run_async(service.download_image(image_url))
             if not image_data:
                 logger.warning(
                     "Pinterest pin %s: image download returned no data from %s",
