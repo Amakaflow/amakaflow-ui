@@ -31,14 +31,6 @@ from workout_ingestor_api.services.youtube_cache_service import YouTubeCacheServ
 
 logger = logging.getLogger(__name__)
 
-# Static system prompt for Anthropic transcript parsing — cached via prompt caching.
-# Keep dynamic content (title, transcript, duration) in the user message only.
-# NOTE: The full structural instructions are now sourced from build_prompt() at call time
-# and passed as the cached system message. This constant is kept as a minimal fallback
-# role declaration; the real prompt body is injected in _parse_with_anthropic.
-_ANTHROPIC_SYSTEM_PROMPT_ROLE = "You are a fitness expert that extracts workout data from video transcripts. Return only valid JSON."
-
-
 def _extract_youtube_id(url: Optional[str]) -> Optional[str]:
     """Extract YouTube video ID from various URL formats."""
     from urllib.parse import urlparse, parse_qs
