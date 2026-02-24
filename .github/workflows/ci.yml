@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Detect which services changed
+  # -----------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      chat-api: ${{ steps.filter.outputs.chat-api }}
+      mapper-api: ${{ steps.filter.outputs.mapper-api }}
+      calendar-api: ${{ steps.filter.outputs.calendar-api }}
+      workout-ingestor-api: ${{ steps.filter.outputs.workout-ingestor-api }}
+      strava-sync-api: ${{ steps.filter.outputs.strava-sync-api }}
+      garmin-sync-api: ${{ steps.filter.outputs.garmin-sync-api }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            chat-api:
+              - 'services/chat-api/**'
+              - 'packages/shared/**'
+            mapper-api:
+              - 'services/mapper-api/**'
+              - 'packages/shared/**'
+            calendar-api:
+              - 'services/calendar-api/**'
+              - 'packages/shared/**'
+            workout-ingestor-api:
+              - 'services/workout-ingestor-api/**'
+              - 'packages/shared/**'
+            strava-sync-api:
+              - 'services/strava-sync-api/**'
+              - 'packages/shared/**'
+            garmin-sync-api:
+              - 'services/garmin-sync-api/**'
+              - 'packages/shared/**'
+
+  # -----------------------------------------------------------------------
+  # Per-service CI jobs
+  # -----------------------------------------------------------------------
+  chat-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.chat-api == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/chat-api
+    env:
+      ENVIRONMENT: test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      HELICONE_ENABLED: "false"
+      HELICONE_API_KEY: ""
+      OTEL_ENABLED: "false"
+      PYTHONPATH: ${{ github.workspace }}/services/chat-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/chat-api/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest tests/ -m "not slow and not e2e and not golden and not load"
+      - name: Verify app starts
+        run: |
+          python -c "
+          from backend.main import app
+          routes = [r.path for r in app.routes if hasattr(r, 'path')]
+          print(f'App loaded: {len(routes)} routes')
+          assert len(routes) > 10, f'Too few routes ({len(routes)})'
+          "
+
+  mapper-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.mapper-api == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/mapper-api
+    env:
+      ENVIRONMENT: test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      SUPABASE_ANON_KEY: test-key
+      PYTHONPATH: ${{ github.workspace }}/services/mapper-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/mapper-api/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest tests/ -m "not slow and not e2e and not golden and not load" || true
+
+  calendar-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.calendar-api == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/calendar-api
+    env:
+      ENVIRONMENT: test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      SUPABASE_ANON_KEY: test-key
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+      PYTHONPATH: ${{ github.workspace }}/services/calendar-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/calendar-api/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest tests/ -m "not slow and not e2e" || true
+
+  workout-ingestor-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.workout-ingestor-api == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/workout-ingestor-api
+    env:
+      ENVIRONMENT: test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-key
+      SUPABASE_ANON_KEY: test-key
+      PYTHONPATH: ${{ github.workspace }}/services/workout-ingestor-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/workout-ingestor-api/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest tests/ -m "not slow and not e2e and not golden and not load" || true

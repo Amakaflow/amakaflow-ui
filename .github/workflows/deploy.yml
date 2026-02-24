@@ -1,0 +1,125 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Detect which services changed on main
+  # -----------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      chat-api: ${{ steps.filter.outputs.chat-api }}
+      mapper-api: ${{ steps.filter.outputs.mapper-api }}
+      calendar-api: ${{ steps.filter.outputs.calendar-api }}
+      workout-ingestor-api: ${{ steps.filter.outputs.workout-ingestor-api }}
+      strava-sync-api: ${{ steps.filter.outputs.strava-sync-api }}
+      garmin-sync-api: ${{ steps.filter.outputs.garmin-sync-api }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            chat-api:
+              - 'services/chat-api/**'
+            mapper-api:
+              - 'services/mapper-api/**'
+            calendar-api:
+              - 'services/calendar-api/**'
+            workout-ingestor-api:
+              - 'services/workout-ingestor-api/**'
+            strava-sync-api:
+              - 'services/strava-sync-api/**'
+            garmin-sync-api:
+              - 'services/garmin-sync-api/**'
+
+  # -----------------------------------------------------------------------
+  # Deploy each changed service to Render
+  # Render uses Root Directory = services/{name} so it only builds that service
+  # -----------------------------------------------------------------------
+  deploy-chat-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.chat-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_CHAT_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  deploy-mapper-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.mapper-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_MAPPER_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  deploy-calendar-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.calendar-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_CALENDAR_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  deploy-workout-ingestor-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.workout-ingestor-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_WORKOUT_INGESTOR_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  deploy-strava-sync-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.strava-sync-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_STRAVA_SYNC_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  deploy-garmin-sync-api:
+    needs: changes
+    if: ${{ needs.changes.outputs.garmin-sync-api == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_GARMIN_SYNC_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'

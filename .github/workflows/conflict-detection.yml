@@ -1,0 +1,12 @@
+name: Conflict Detection
+
+on:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 8 * * *'
+
+jobs:
+  call-shared:
+    uses: Amakaflow/.github/.github/workflows/conflict-detection.yml@main
+    secrets: inherit
