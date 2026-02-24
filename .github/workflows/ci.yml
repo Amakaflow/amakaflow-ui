@@ -16,6 +16,9 @@ jobs:
   # -----------------------------------------------------------------------
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       chat-api: ${{ steps.filter.outputs.chat-api }}
       mapper-api: ${{ steps.filter.outputs.mapper-api }}
