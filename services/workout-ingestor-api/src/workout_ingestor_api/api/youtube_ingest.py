@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import requests
 from fastapi import HTTPException
@@ -19,10 +19,9 @@ from fastapi.responses import JSONResponse
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
 from workout_ingestor_api.config import settings
-from workout_ingestor_api.models import Block, Exercise, Workout
+from workout_ingestor_api.models import Workout
 from workout_ingestor_api.services.prompts import build_prompt
 from workout_ingestor_api.services.url_normalizer import (
-    extract_youtube_video_id,
     normalize_youtube_url,
     parse_youtube_url,
 )
@@ -73,7 +72,7 @@ def _parse_with_openai(
 ) -> Dict:
     """Parse transcript using OpenAI GPT-4."""
     try:
-        import openai
+        import openai  # noqa: F401
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -141,7 +140,7 @@ def _parse_with_anthropic(
 ) -> Dict:
     """Parse transcript using Anthropic Claude."""
     try:
-        from anthropic import Anthropic
+        from anthropic import Anthropic  # noqa: F401
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -319,7 +318,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
 
     logger.info(f"Fetching transcript for video_id: {video_id}")
 
-    last_error = None
+    _last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             logger.debug(f"Transcript API attempt {attempt + 1}/{MAX_RETRIES} for video_id: {video_id}")
@@ -335,7 +334,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
             # Success - break out of retry loop
             break
         except requests.Timeout as exc:
-            last_error = exc
+            _last_error = exc
             logger.warning(
                 f"Transcript API timeout (attempt {attempt + 1}/{MAX_RETRIES}) "
                 f"for video_id: {video_id}, timeout: {TRANSCRIPT_API_TIMEOUT}s"
@@ -351,7 +350,7 @@ async def ingest_youtube_impl(video_url: str, user_id: Optional[str] = None, ski
                        f"The youtube-transcript.io service may be slow or unavailable.",
             ) from exc
         except requests.RequestException as exc:
-            last_error = exc
+            _last_error = exc
             logger.error(f"Transcript API request failed for video_id: {video_id}: {exc}")
             raise HTTPException(
                 status_code=502,

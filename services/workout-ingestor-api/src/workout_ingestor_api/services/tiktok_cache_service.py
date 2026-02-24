@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def get_supabase_client():
     """Get Supabase client instance."""
     try:
-        from supabase import create_client, Client
+        from supabase import create_client
     except ImportError:
         logger.warning("Supabase library not installed. Caching will be disabled.")
         return None

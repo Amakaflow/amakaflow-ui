@@ -13,57 +13,53 @@ from typing import Optional, Dict, List
 import re
 
 logger = logging.getLogger(__name__)
-import requests
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs  # noqa: E402
 
-from fastapi import (
+from fastapi import (  # noqa: E402
     APIRouter,
     UploadFile,
     File,
     Form,
     Body,
     HTTPException,
-    Query,
     Depends,
 )
-from fastapi.responses import JSONResponse, Response
-from workout_ingestor_api.auth import get_current_user, get_optional_user, get_user_with_metadata
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+from workout_ingestor_api.auth import get_current_user, get_optional_user, get_user_with_metadata  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
-from workout_ingestor_api.models import Workout, Block, Exercise, STRUCTURE_CONFIDENCE_THRESHOLD
-from workout_ingestor_api.services.ocr_service import OCRService
-from workout_ingestor_api.services.parser_service import ParserService
-from workout_ingestor_api.services.video_service import VideoService
-from workout_ingestor_api.services.export_service import ExportService
-from workout_ingestor_api.services.instagram_service import (
+from workout_ingestor_api.models import Workout, Block, STRUCTURE_CONFIDENCE_THRESHOLD  # noqa: E402
+from workout_ingestor_api.services.ocr_service import OCRService  # noqa: E402
+from workout_ingestor_api.services.parser_service import ParserService  # noqa: E402
+from workout_ingestor_api.services.video_service import VideoService  # noqa: E402
+from workout_ingestor_api.services.export_service import ExportService  # noqa: E402
+from workout_ingestor_api.services.instagram_service import (  # noqa: E402
     InstagramService,
     InstagramServiceError,
 )
-from workout_ingestor_api.services.tiktok_service import (
+from workout_ingestor_api.services.tiktok_service import (  # noqa: E402
     TikTokService,
     TikTokServiceError,
 )
-from workout_ingestor_api.services.tiktok_cache_service import TikTokCacheService
-from workout_ingestor_api.services.pinterest_service import (
+from workout_ingestor_api.services.tiktok_cache_service import TikTokCacheService  # noqa: E402
+from workout_ingestor_api.services.pinterest_service import (  # noqa: E402
     PinterestService,
     PinterestServiceError,
 )
-from workout_ingestor_api.services.vision_service import VisionService
-from workout_ingestor_api.services.llm_service import LLMService
-from workout_ingestor_api.services.feedback_service import FeedbackService
-from workout_ingestor_api.services.voice_parsing_service import VoiceParsingService
-from workout_ingestor_api.services.cloud_transcription_service import CloudTranscriptionService
-from workout_ingestor_api.services.voice_dictionary_service import (
+from workout_ingestor_api.services.vision_service import VisionService  # noqa: E402
+from workout_ingestor_api.services.voice_parsing_service import VoiceParsingService  # noqa: E402
+from workout_ingestor_api.services.cloud_transcription_service import CloudTranscriptionService  # noqa: E402
+from workout_ingestor_api.services.voice_dictionary_service import (  # noqa: E402
     VoiceDictionaryService,
     DictionaryEntry,
     VoiceSettings,
 )
-from workout_ingestor_api.api.youtube_ingest import ingest_youtube_impl
-import workout_ingestor_api.services.url_router as _url_router_module
-import workout_ingestor_api.services.adapters as _adapters_module
-from workout_ingestor_api.services.adapters.base import PlatformFetchError, MediaContent
-import workout_ingestor_api.services.unified_cache_service as _unified_cache_module
-import workout_ingestor_api.services.unified_parser as _unified_parser_module
+from workout_ingestor_api.api.youtube_ingest import ingest_youtube_impl  # noqa: E402
+import workout_ingestor_api.services.url_router as _url_router_module  # noqa: E402
+import workout_ingestor_api.services.adapters as _adapters_module  # noqa: E402
+from workout_ingestor_api.services.adapters.base import PlatformFetchError, MediaContent  # noqa: E402
+import workout_ingestor_api.services.unified_cache_service as _unified_cache_module  # noqa: E402
+import workout_ingestor_api.services.unified_parser as _unified_parser_module  # noqa: E402
 # ---------------------------------------------------------------------------
 # Build / git metadata
 # ---------------------------------------------------------------------------

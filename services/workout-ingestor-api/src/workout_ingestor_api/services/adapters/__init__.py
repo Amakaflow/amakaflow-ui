@@ -1,5 +1,5 @@
 """Platform adapter registry for unified workout ingestion."""
-from typing import Dict, Optional, Type
+from typing import Dict, Type
 from .base import PlatformAdapter, MediaContent, PlatformFetchError
 
 _ADAPTER_REGISTRY: Dict[str, Type[PlatformAdapter]] = {}
@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 # Auto-load adapters (triggers self-registration)
-from . import instagram_adapter  # noqa: F401
-from . import youtube_adapter  # noqa: F401
-from . import tiktok_adapter  # noqa: F401
-from . import pinterest_adapter  # noqa: F401
+from . import instagram_adapter  # noqa: E402, F401
+from . import youtube_adapter  # noqa: E402, F401
+from . import tiktok_adapter  # noqa: E402, F401
+from . import pinterest_adapter  # noqa: E402, F401

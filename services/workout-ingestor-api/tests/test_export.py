@@ -1,5 +1,4 @@
 """Unit tests for export service."""
-import pytest
 from workout_ingestor_api.models import Workout, Block, Exercise, Superset
 from workout_ingestor_api.services.export_service import ExportService
 
@@ -107,9 +106,9 @@ class TestExportService:
 # API Endpoint Tests
 # ---------------------------------------------------------------------------
 
-import json
-import zipfile
-from io import BytesIO
+import json  # noqa: E402
+import zipfile  # noqa: E402
+from io import BytesIO  # noqa: E402
 
 
 class TestCsvExportEndpoint:

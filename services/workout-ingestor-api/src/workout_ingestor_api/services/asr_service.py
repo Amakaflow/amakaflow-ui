@@ -2,7 +2,7 @@
 import logging
 import subprocess
 import tempfile
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from fastapi import HTTPException
 
@@ -171,7 +171,7 @@ class ASRService:
             Dict with transcript text
         """
         try:
-            import openai
+            import openai  # noqa: F401
         except ImportError:
             raise HTTPException(
                 status_code=500,

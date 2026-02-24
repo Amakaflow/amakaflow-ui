@@ -21,7 +21,6 @@ from .models import (
     ParsedWorkout,
     ParsedExercise,
     FileInfo,
-    ExerciseFlag,
 )
 
 logger = logging.getLogger(__name__)
@@ -190,7 +189,7 @@ class TextParser(BaseParser):
 
         # Calculate confidence
         total_exercises = sum(len(w.exercises) for w in workouts)
-        total_lines = len([l for l in lines if l.strip()])
+        total_lines = len([line for line in lines if line.strip()])
 
         if total_exercises == 0:
             confidence = 0

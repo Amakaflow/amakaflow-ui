@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
+import httpx
 import pytest
 from workout_ingestor_api.services.adapters.instagram_adapter import InstagramAdapter
 from workout_ingestor_api.services.adapters.base import MediaContent, PlatformFetchError

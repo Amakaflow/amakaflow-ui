@@ -1575,7 +1575,7 @@ class ParserService:
                 # Check if next lines are part of this exercise (descriptions, not new exercises)
                 full_exercise_text = exercise_line
                 j = i + 1
-                blank_lines_seen = 0
+                _blank_lines_seen = 0
                 while j < len(lines):
                     next_line = lines[j].strip()
                     # Stop if we hit a blank line (block boundary), new exercise bullet, section, superset marker, or separator
@@ -1593,7 +1593,7 @@ class ParserService:
                         break
                     # Continue collecting description lines
                     if next_line:
-                        blank_lines_seen = 0
+                        _blank_lines_seen = 0
                         # Check if it's likely a description vs new exercise
                         is_description = (
                             re.match(r'^\d+\s+(heavy|working|set)', next_line, re.I) or  # "1 heavy working set"
@@ -1872,7 +1872,7 @@ class ParserService:
         # Pattern: "/side" or "/side" - indicates unilateral exercise
         if '/side' in full_text.lower() or 'per side' in full_text.lower():
             # Keep reps as is, but note it's per side in the name
-            if not '/side' in exercise_name.lower():
+            if '/side' not in exercise_name.lower():
                 exercise_name += " (per side)"
         
         # Pattern: "20–30s hold" - time-based exercise
@@ -2396,7 +2396,7 @@ class ParserService:
         line = line.strip()
         
         # Remove bullet points and dashes at start (but preserve the line)
-        original_line = line
+        _original_line = line
         line = re.sub(r'^[•\-\s]+', '', line)
         line = line.strip()
         
