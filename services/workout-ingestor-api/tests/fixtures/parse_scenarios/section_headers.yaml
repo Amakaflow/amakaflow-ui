@@ -1,0 +1,27 @@
+name: "Section headers creating separate blocks"
+source: instagram_caption
+input: |
+  STRENGTH / POWER
+  A1: Bench Press 4x5
+  A2: Barbell Row 4x5
+
+  MUSCULAR ENDURANCE
+  A1: Push-ups x20
+  A2: Pull-ups x10
+
+expected:
+  success: true
+  exercise_count: 4
+  exercises:
+    - name_contains: Bench Press
+      reps: 5
+    - name_contains: Barbell Row
+      reps: 5
+    - name_contains: Push-ups
+      reps: 20
+    - name_contains: Pull-ups
+      reps: 10
+  blocks:
+    - exercise_count: 2
+    - label_contains: "Muscular Endurance"
+      exercise_count: 2

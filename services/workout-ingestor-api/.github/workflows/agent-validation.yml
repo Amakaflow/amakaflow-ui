@@ -1,0 +1,195 @@
+name: Agent Validation Gate
+
+on:
+  push:
+    branches: ['agent/**']
+
+concurrency:
+  group: agent-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        id: install
+        timeout-minutes: 10
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        id: tests
+        timeout-minutes: 10
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          pytest tests/ -v \
+            --ignore=tests/ai/test_helicone_e2e.py \
+            -m "not slow and not e2e" \
+            --tb=short \
+            --junitxml=test-results.xml
+        env:
+          OPENAI_API_KEY: test-key
+          ANTHROPIC_API_KEY: test-key
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+          HELICONE_ENABLED: "false"
+          HELICONE_API_KEY: ""
+          ENVIRONMENT: development
+
+      - name: Run AI module tests with coverage
+        id: coverage
+        timeout-minutes: 10
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          pytest tests/ai/ -v \
+            --ignore=tests/ai/test_helicone_e2e.py \
+            --cov=src/workout_ingestor_api/ai \
+            --cov-report=term-missing \
+            --cov-fail-under=80 \
+            --junitxml=ai-test-results.xml \
+            2>&1 | tee coverage-output.txt
+        env:
+          OPENAI_API_KEY: test-key
+          ANTHROPIC_API_KEY: test-key
+          HELICONE_ENABLED: "false"
+          ENVIRONMENT: test
+
+      - name: Determine outcome
+        if: always()
+        id: outcome
+        run: |
+          if [ "${{ steps.install.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=install" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.tests.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=test" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.coverage.outcome }}" == "failure" ]; then
+            echo "ci_outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_step=coverage" >> "$GITHUB_OUTPUT"
+          else
+            echo "ci_outcome=success" >> "$GITHUB_OUTPUT"
+            echo "failed_step=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate test summary
+        if: always()
+        id: summary
+        run: |
+          SUMMARY=""
+
+          # Parse unit test results
+          if [ -f "test-results.xml" ]; then
+            T=$(grep -oP 'tests="\K[0-9]+' test-results.xml | head -1)
+            F=$(grep -oP 'failures="\K[0-9]+' test-results.xml | head -1)
+            E=$(grep -oP 'errors="\K[0-9]+' test-results.xml | head -1)
+            S=$(grep -oP 'skipped="\K[0-9]+' test-results.xml | head -1)
+            TOTAL=${T:-0}
+            FAILS=${F:-0}
+            ERRS=${E:-0}
+            SKIP=${S:-0}
+            PASSED=$((TOTAL - FAILS - ERRS - SKIP))
+            SUMMARY="**Unit tests:** ${PASSED} passed, ${FAILS} failed, ${ERRS} errors, ${SKIP} skipped (${TOTAL} total)"
+          else
+            SUMMARY="**Unit tests:** No results found."
+          fi
+
+          # Parse AI module test results
+          if [ -f "ai-test-results.xml" ]; then
+            T=$(grep -oP 'tests="\K[0-9]+' ai-test-results.xml | head -1)
+            F=$(grep -oP 'failures="\K[0-9]+' ai-test-results.xml | head -1)
+            E=$(grep -oP 'errors="\K[0-9]+' ai-test-results.xml | head -1)
+            TOTAL=${T:-0}
+            FAILS=${F:-0}
+            ERRS=${E:-0}
+            PASSED=$((TOTAL - FAILS - ERRS))
+            SUMMARY="${SUMMARY}\n**AI module tests:** ${PASSED} passed, ${FAILS} failed, ${ERRS} errors (${TOTAL} total)"
+          fi
+
+          # Extract coverage percentage
+          if [ -f "coverage-output.txt" ]; then
+            COV=$(grep -oP 'TOTAL\s+\d+\s+\d+\s+\K\d+%' coverage-output.txt | tail -1)
+            if [ -n "$COV" ]; then
+              SUMMARY="${SUMMARY}\n**AI module coverage:** ${COV}"
+            else
+              SUMMARY="${SUMMARY}\n**AI module coverage:** Unable to parse (see artifacts)"
+            fi
+          fi
+
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="No test results found."
+          fi
+
+          {
+            echo "markdown<<EOF"
+            echo -e "$SUMMARY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Capture failure logs
+        if: always() && steps.outcome.outputs.ci_outcome == 'failure'
+        id: failure-logs
+        run: |
+          LOGS=""
+          FAILED="${{ steps.outcome.outputs.failed_step }}"
+
+          if [ "$FAILED" == "install" ]; then
+            LOGS="Dependency installation failed. Check workflow run for full output."
+          elif [ "$FAILED" == "test" ]; then
+            if [ -f "test-results.xml" ]; then
+              LOGS=$(grep -h '<failure' test-results.xml 2>/dev/null | head -20 | sed 's/<[^>]*>//g' | head -c 2000)
+            fi
+            if [ -z "$LOGS" ]; then
+              LOGS="Unit tests failed. Check workflow run for full output."
+            fi
+          elif [ "$FAILED" == "coverage" ]; then
+            if [ -f "coverage-output.txt" ]; then
+              LOGS=$(tail -30 coverage-output.txt | head -c 2000)
+            fi
+            if [ -z "$LOGS" ]; then
+              LOGS="AI module coverage below 80%. Check workflow run for full output."
+            fi
+          fi
+
+          {
+            echo "logs<<EOF"
+            echo "$LOGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-test-results
+          path: |
+            test-results.xml
+            ai-test-results.xml
+            coverage-output.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Validation Gate
+        if: always()
+        uses: supergeri/amakaflow-automation/.github/actions/validation-gate@main
+        with:
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          repo-name: workout-ingestor-api
+          ci-outcome: ${{ steps.outcome.outputs.ci_outcome }}
+          failed-step: ${{ steps.outcome.outputs.failed_step }}
+          failure-logs: ${{ steps.failure-logs.outputs.logs }}
+          test-results-summary: ${{ steps.summary.outputs.markdown }}

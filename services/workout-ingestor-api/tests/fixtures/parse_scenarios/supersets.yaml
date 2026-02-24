@@ -1,0 +1,20 @@
+name: "Superset splitting with labeled exercises"
+source: instagram_caption
+input: |
+  A1: Pull-ups 4x8
+  A2: Z Press 4x8
+  B1: SA cable row 4x12
+  B2: SA DB press 4x8
+
+expected:
+  success: true
+  exercise_count: 4
+  exercises:
+    - name_contains: Pull-ups
+      reps: 8
+    - name_contains: Z Press
+      reps: 8
+    - name_contains: SA cable row
+      reps: 12
+    - name_contains: SA DB press
+      reps: 8

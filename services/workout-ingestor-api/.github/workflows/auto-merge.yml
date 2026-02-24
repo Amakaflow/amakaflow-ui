@@ -1,0 +1,10 @@
+name: Auto Merge
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+jobs:
+  call-shared:
+    uses: Amakaflow/.github/.github/workflows/auto-merge.yml@main
+    secrets: inherit

@@ -1,0 +1,17 @@
+name: "Bullet list format with dashes"
+source: instagram_caption
+input: |
+  - Squats 4x8
+  - Bench Press 3x10
+  - Rows 4x12
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Squats
+      reps: 8
+    - name_contains: Rows
+      reps: 12
+    - name_contains: Bench Press
+      reps: 10

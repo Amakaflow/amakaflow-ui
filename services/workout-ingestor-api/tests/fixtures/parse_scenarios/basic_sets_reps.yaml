@@ -1,0 +1,17 @@
+name: "Basic sets x reps notation"
+source: instagram_caption
+input: |
+  Bench Press 4x8
+  Squats 5x5
+  Deadlift 3x10
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Squats
+      reps: 5
+    - name_contains: Bench Press
+      reps: 8
+    - name_contains: Deadlift
+      reps: 10

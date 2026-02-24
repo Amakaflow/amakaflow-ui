@@ -1,0 +1,28 @@
+name: "Instagram workout with rounds and distance — the bug that prompted this"
+source: instagram_caption
+input: |
+  Barbell Back Squats 5x5
+  Barbell Reverse Lunges 4x20
+
+  5 Rounds
+  Rowing 500m
+  Run 500m
+  Walking Lunges 25m
+
+expected:
+  success: true
+  exercise_count: 5
+  exercises:
+    - name_contains: Rowing
+      distance: 500
+    - name_contains: Run
+      distance: 500
+    - name_contains: Walking Lunges
+      distance: 25
+    - name_contains: Barbell Back Squats
+      reps: 5
+    - name_contains: Barbell Reverse Lunges
+      reps: 20
+  blocks:
+    - structure_contains: "5 round"
+      exercise_count: 5

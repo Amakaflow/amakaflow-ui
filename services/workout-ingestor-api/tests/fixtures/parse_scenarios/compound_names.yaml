@@ -1,0 +1,14 @@
+name: "Compound exercise names with + — no false superset split"
+source: instagram_caption
+input: |
+  Chin-up + Negative Hold 3x5
+  RDL + Shrug 4x8
+
+expected:
+  success: true
+  exercise_count: 2
+  exercises:
+    - name_contains: RDL
+      reps: 8
+    - name_contains: Chin-up
+      reps: 5

@@ -1,0 +1,18 @@
+name: "AMRAP format workout"
+source: instagram_caption
+input: |
+  AMRAP
+  Burpees x5
+  Push-ups x10
+  Squats x15
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Push-ups
+      reps: 10
+    - name_contains: Squats
+      reps: 15
+    - name_contains: Burpees
+      reps: 5

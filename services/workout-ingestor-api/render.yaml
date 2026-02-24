@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: workout-ingestor-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    repo: https://github.com/Amakaflow/workout-ingestor-api
+    branch: develop
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8004"
+      - fromGroup: amakaflow-shared
+      - fromGroup: workout-ingestor-api-secrets
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+      targetCPUPercent: 70
+    buildFilter:
+      paths:
+        - src/**
+        - requirements.txt
+        - requirements-dev.txt
+        - Dockerfile

@@ -1,0 +1,17 @@
+name: "Standalone distance without NxN format"
+source: instagram_caption
+input: |
+  Rowing 500m
+  Run 1000m
+  Farmers Carry 50m
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Rowing
+      distance: 500
+    - name_contains: Run
+      distance: 1000
+    - name_contains: Farmers Carry
+      distance: 50

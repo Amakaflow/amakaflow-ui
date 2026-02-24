@@ -1,0 +1,17 @@
+name: "Numbered list format"
+source: instagram_caption
+input: |
+  1. Squats 4x8
+  2. Bench Press 3x10
+  3. Deadlifts 5x5
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Squats
+      reps: 8
+    - name_contains: Bench Press
+      reps: 10
+    - name_contains: Deadlifts
+      reps: 5

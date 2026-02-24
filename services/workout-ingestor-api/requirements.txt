@@ -1,0 +1,50 @@
+fastapi>=0.115
+uvicorn>=0.30
+requests>=2.31.0
+httpx>=0.27.0
+pillow>=10
+pytesseract>=0.3.10
+yt-dlp>=2024.10.7
+fit-tool==0.9.14
+python-multipart>=0.0.9
+numpy>=1.24.0
+pytest>=7.4.0
+instaloader>=4.14.2
+# Note: openpyxl comes from fit-tool dependency (pinned to 2.5.12)
+
+# Optional: YouTube pipeline dependencies
+# For ASR (Automatic Speech Recognition):
+# openai-whisper>=20231117  # Local Whisper
+# whisperx>=3.1.1  # WhisperX with better alignment
+
+# For scene detection:
+# scenedetect[opencv]>=0.6.2  # PySceneDetect for keyframe extraction
+# opencv-python>=4.8.0  # OpenCV for text region detection
+
+# For LLM structuring:
+# openai>=1.0.0  # OpenAI API
+# anthropic>=0.7.0  # Anthropic Claude API
+
+# For enhanced OCR (optional):
+# paddlepaddle>=2.5.0  # PaddleOCR backend
+# paddleocr>=2.7.0  # PaddleOCR
+easyocr>=1.7.0  # EasyOCR - better for social media content (recommended for Instagram)
+# instagrapi>=2.0.0  # Experimental: Optional Instagram API wrapper for higher quality images (uncomment to try)
+openai>=1.0.0  # OpenAI API for vision models (GPT-4o-mini/GPT-4o Vision) and voice workout parsing (AMA-5)
+supabase>=2.0.0  # Supabase client for YouTube workout caching
+reportlab>=4.0.0  # PDF generation for workout export
+PyJWT>=2.8.0  # JWT validation for Clerk authentication
+
+# Error tracking (AMA-225)
+sentry-sdk[fastapi]>=2.0.0
+
+# AI Gateway integration (AMA-405)
+tenacity>=8.2.0  # Retry with exponential backoff for AI calls
+anthropic>=0.40.0  # Anthropic Claude API (official dependency)
+
+# Cloud transcription providers (AMA-229)
+deepgram-sdk>=3.0.0  # Deepgram Nova-3 for cloud transcription
+assemblyai>=0.23.0   # AssemblyAI Universal for cloud transcription
+
+# Instagram Reel ingestion via Apify (AMA-564)
+apify-client>=1.6.0

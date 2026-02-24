@@ -1,0 +1,24 @@
+name: "Mixed exercises followed by round block"
+source: instagram_caption
+input: |
+  Bench Press 4x8
+  Overhead Press 3x10
+
+  3 Rounds
+  Push-ups x20
+  Plank Hold 60s
+
+expected:
+  success: true
+  exercise_count: 4
+  exercises:
+    - name_contains: Overhead Press
+      reps: 10
+    - name_contains: Push-ups
+      reps: 20
+    - name_contains: Plank Hold
+    - name_contains: Bench Press
+      reps: 8
+  blocks:
+    - structure_contains: "3 round"
+      exercise_count: 4

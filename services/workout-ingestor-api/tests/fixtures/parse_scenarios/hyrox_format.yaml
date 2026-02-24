@@ -1,0 +1,21 @@
+name: "Hyrox-style workout with running and stations"
+source: instagram_caption
+input: |
+  Time Cap: 10 min
+  A1: 1000m Run
+  A2: Sled Push 50m
+  A3: Burpee Broad Jump x80
+  A4: Farmers Carry 200m
+
+expected:
+  success: true
+  exercise_count: 4
+  exercises:
+    - name_contains: Run
+      distance: 1000
+    - name_contains: Sled Push
+      distance: 50
+    - name_contains: Burpee Broad Jump
+      reps: 80
+    - name_contains: Farmers Carry
+      distance: 200

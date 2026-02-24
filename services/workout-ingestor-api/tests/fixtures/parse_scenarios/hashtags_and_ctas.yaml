@@ -1,0 +1,20 @@
+name: "Text with hashtags and CTAs — verify junk filtering"
+source: instagram_caption
+input: |
+  Squats 4x8
+  Bench Press 3x10
+  #fitness #legday #workout
+  Follow me for more workouts!
+  Save this for later!
+  Deadlifts 5x5
+
+expected:
+  success: true
+  exercise_count: 3
+  exercises:
+    - name_contains: Squats
+      reps: 8
+    - name_contains: Bench Press
+      reps: 10
+    - name_contains: Deadlifts
+      reps: 5
