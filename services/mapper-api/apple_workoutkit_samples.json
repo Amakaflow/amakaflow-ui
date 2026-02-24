@@ -1,0 +1,740 @@
+{
+  "description": "Sample Apple WorkoutKit DTOs ready to push to iPhone app",
+  "samples": [
+    {
+      "id": "sample_1",
+      "title": "Full Body Strength Workout",
+      "dto": {
+        "title": "Full Body Strength Workout",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 300,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Squat",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Bench Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Romanian Deadlift",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Dumbbell Row",
+                "load": null,
+                "restSec": 60
+              },
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 12,
+                "name": "Push Up",
+                "load": null,
+                "restSec": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 300,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_2",
+      "title": "Upper Body Push Day",
+      "dto": {
+        "title": "Upper Body Push Day",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "repeat",
+            "reps": 4,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 6,
+                "name": "Bench Press",
+                "load": null,
+                "restSec": 120
+              },
+              {
+                "kind": "time",
+                "seconds": 120,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 8,
+                "name": "Overhead Press",
+                "load": null,
+                "restSec": 90
+              }
+            ]
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Incline Dumbbell Press",
+                "load": null,
+                "restSec": 60
+              },
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 12,
+                "name": "Tricep Dips",
+                "load": null,
+                "restSec": null
+              }
+            ]
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_3",
+      "title": "Hyrox Training Session",
+      "dto": {
+        "title": "Hyrox Training Session",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 180,
+            "target": null
+          },
+          {
+            "kind": "distance",
+            "meters": 1000,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 100,
+            "name": "Wall Ball",
+            "load": null,
+            "restSec": null
+          },
+          {
+            "kind": "distance",
+            "meters": 100,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 80,
+            "name": "Walking Lunge",
+            "load": null,
+            "restSec": null
+          },
+          {
+            "kind": "distance",
+            "meters": 100,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 100,
+            "name": "Burpee Broad Jump",
+            "load": null,
+            "restSec": null
+          },
+          {
+            "kind": "distance",
+            "meters": 1000,
+            "target": null
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 300,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_4",
+      "title": "Interval Training - HIIT",
+      "dto": {
+        "title": "Interval Training - HIIT",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 120,
+            "target": null
+          },
+          {
+            "kind": "repeat",
+            "reps": 5,
+            "intervals": [
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              },
+              {
+                "kind": "time",
+                "seconds": 90,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 20,
+                "name": "Burpee",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 15,
+                "name": "Mountain Climber",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 180,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_5",
+      "title": "Lower Body Strength",
+      "dto": {
+        "title": "Lower Body Strength",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 240,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Back Squat",
+            "load": null,
+            "restSec": 180
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Back Squat",
+            "load": null,
+            "restSec": 180
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Back Squat",
+            "load": null,
+            "restSec": 180
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Romanian Deadlift",
+            "load": null,
+            "restSec": 120
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Romanian Deadlift",
+            "load": null,
+            "restSec": 120
+          },
+          {
+            "kind": "reps",
+            "reps": 5,
+            "name": "Romanian Deadlift",
+            "load": null,
+            "restSec": 120
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Bulgarian Split Squat",
+                "load": null,
+                "restSec": 60
+              },
+              {
+                "kind": "time",
+                "seconds": 60,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 12,
+                "name": "Leg Curl",
+                "load": null,
+                "restSec": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 300,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_6",
+      "title": "Circuit Training",
+      "dto": {
+        "title": "Circuit Training",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 180,
+            "target": null
+          },
+          {
+            "kind": "repeat",
+            "reps": 4,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 15,
+                "name": "Push Up",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 20,
+                "name": "Bodyweight Squat",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Pull Up",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 20,
+                "name": "Lunge",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 30,
+                "name": "Plank",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "time",
+                "seconds": 120,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 180,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_7",
+      "title": "Running Intervals",
+      "dto": {
+        "title": "Running Intervals",
+        "sportType": "running",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 600,
+            "target": null
+          },
+          {
+            "kind": "repeat",
+            "reps": 6,
+            "intervals": [
+              {
+                "kind": "distance",
+                "meters": 400,
+                "target": null
+              },
+              {
+                "kind": "time",
+                "seconds": 120,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 600,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_8",
+      "title": "Cycling Workout",
+      "dto": {
+        "title": "Cycling Workout",
+        "sportType": "cycling",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 600,
+            "target": null
+          },
+          {
+            "kind": "repeat",
+            "reps": 5,
+            "intervals": [
+              {
+                "kind": "time",
+                "seconds": 300,
+                "target": null
+              },
+              {
+                "kind": "time",
+                "seconds": 120,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 600,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_9",
+      "title": "Complex Multi-Block Workout",
+      "dto": {
+        "title": "Complex Multi-Block Workout",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 300,
+            "target": null
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Good Morning",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 12,
+                "name": "Plank",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "distance",
+                "meters": 20,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "repeat",
+            "reps": 4,
+            "intervals": [
+              {
+                "kind": "reps",
+                "reps": 5,
+                "name": "Front Squat",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 4,
+                "name": "Burpee",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "reps",
+                "reps": 10,
+                "name": "Kettlebell Swing",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "time",
+                "seconds": 15,
+                "target": null
+              }
+            ]
+          },
+          {
+            "kind": "repeat",
+            "reps": 3,
+            "intervals": [
+              {
+                "kind": "distance",
+                "meters": 60,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 25,
+                "name": "Push Press",
+                "load": null,
+                "restSec": null
+              },
+              {
+                "kind": "time",
+                "seconds": 45,
+                "target": null
+              },
+              {
+                "kind": "distance",
+                "meters": 27,
+                "target": null
+              },
+              {
+                "kind": "reps",
+                "reps": 8,
+                "name": "Push Up",
+                "load": null,
+                "restSec": null
+              }
+            ]
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 300,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_10",
+      "title": "Scheduled Workout with Date",
+      "dto": {
+        "title": "Scheduled Workout with Date",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 180,
+            "target": null
+          },
+          {
+            "kind": "reps",
+            "reps": 10,
+            "name": "Bench Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 10,
+            "name": "Bench Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 10,
+            "name": "Bench Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 180,
+            "target": null
+          }
+        ],
+        "schedule": {
+          "startLocal": "2025-11-20T10:00:00Z"
+        }
+      }
+    },
+    {
+      "id": "sample_11",
+      "title": "Simple Strength Workout",
+      "dto": {
+        "title": "Simple Strength Workout",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Squat",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Bench Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Bent Over Row",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Overhead Press",
+            "load": null,
+            "restSec": 90
+          },
+          {
+            "kind": "reps",
+            "reps": 8,
+            "name": "Deadlift",
+            "load": null,
+            "restSec": null
+          }
+        ],
+        "schedule": null
+      }
+    },
+    {
+      "id": "sample_12",
+      "title": "Time-Based Workout",
+      "dto": {
+        "title": "Time-Based Workout",
+        "sportType": "strengthTraining",
+        "intervals": [
+          {
+            "kind": "warmup",
+            "seconds": 120,
+            "target": null
+          },
+          {
+            "kind": "time",
+            "seconds": 300,
+            "target": null
+          },
+          {
+            "kind": "time",
+            "seconds": 60,
+            "target": null
+          },
+          {
+            "kind": "time",
+            "seconds": 300,
+            "target": null
+          },
+          {
+            "kind": "time",
+            "seconds": 60,
+            "target": null
+          },
+          {
+            "kind": "time",
+            "seconds": 300,
+            "target": null
+          },
+          {
+            "kind": "cooldown",
+            "seconds": 120,
+            "target": null
+          }
+        ],
+        "schedule": null
+      }
+    }
+  ]
+}

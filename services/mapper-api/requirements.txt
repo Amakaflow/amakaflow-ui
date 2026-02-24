@@ -1,0 +1,25 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pyyaml>=6.0
+rapidfuzz==3.9.1
+supabase>=2.0.0
+httpx>=0.25.0
+fit-tool @ git+https://bitbucket.org/stagescycling/python_fit_tool.git@version/0.9.13
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+PyJWT>=2.8.0
+clerk-backend-api>=1.0.0
+
+requests
+
+# OpenAI embeddings (AMA-432: Semantic Search)
+openai>=1.0.0
+
+# Error tracking (AMA-225)
+sentry-sdk[fastapi]>=2.0.0
+
+# Local packages (installed via pip install -e)
+# amakaflow-fitfiletool - installed from ../amakaflow-fitfiletool
+amakaflow-fitfiletool>=0.2.3
