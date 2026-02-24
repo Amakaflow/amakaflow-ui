@@ -1,0 +1,405 @@
+# Golden Test Cases for Workout Quality Evaluation
+# AMA-567: 25 human-scored test cases for WorkoutQualityEvaluator
+#
+# Categories:
+# - strength: Well-structured strength training workouts (good scores)
+# - edge_case: Bad or medium quality workouts (low/medium scores)
+# - ai_generated: Realistic AI-generated workouts
+# - imported: Workouts imported from external sources
+# - program: Multi-week program workouts
+# - equipment: Equipment-constrained workouts
+#
+# Score dimensions (weights):
+#   exercise_count (20%), variety (20%), volume_sanity (25%),
+#   equipment_match (15%), hallucination (20%)
+
+cases:
+
+  # ===========================================================================
+  # GOOD WORKOUTS - Strength (score >= 0.7)
+  # ===========================================================================
+
+  - id: good_push_day
+    category: strength
+    description: "Well-structured push day with 4 exercises"
+    input:
+      name: "Push Day"
+      exercises:
+        - {name: "Bench Press", sets: 4, reps: 10, muscle_group: "chest"}
+        - {name: "Overhead Press", sets: 3, reps: 8, muscle_group: "shoulders"}
+        - {name: "Incline Dumbbell Press", sets: 3, reps: 12, muscle_group: "chest"}
+        - {name: "Tricep Pushdown", sets: 3, reps: 15, muscle_group: "triceps"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: good_pull_day
+    category: strength
+    description: "Well-structured pull day with 5 exercises"
+    input:
+      name: "Pull Day"
+      exercises:
+        - {name: "Barbell Row", sets: 4, reps: 8, muscle_group: "back"}
+        - {name: "Lat Pulldown", sets: 3, reps: 12, muscle_group: "back"}
+        - {name: "Face Pull", sets: 3, reps: 15, muscle_group: "rear delts"}
+        - {name: "Bicep Curl", sets: 3, reps: 12, muscle_group: "biceps"}
+        - {name: "Hammer Curl", sets: 3, reps: 12, muscle_group: "biceps"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: good_leg_day
+    category: strength
+    description: "Balanced leg day with compound and isolation movements"
+    input:
+      name: "Leg Day"
+      exercises:
+        - {name: "Barbell Squat", sets: 4, reps: 8, muscle_group: "quads"}
+        - {name: "Leg Press", sets: 3, reps: 12, muscle_group: "quads"}
+        - {name: "Leg Curl", sets: 3, reps: 12, muscle_group: "hamstrings"}
+        - {name: "Calf Raise", sets: 4, reps: 15, muscle_group: "calves"}
+        - {name: "Leg Extension", sets: 3, reps: 15, muscle_group: "quads"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: good_full_body
+    category: strength
+    description: "Full body workout covering major muscle groups"
+    input:
+      name: "Full Body Strength"
+      exercises:
+        - {name: "Deadlift", sets: 4, reps: 6, muscle_group: "back"}
+        - {name: "Bench Press", sets: 4, reps: 8, muscle_group: "chest"}
+        - {name: "Squat", sets: 4, reps: 8, muscle_group: "legs"}
+        - {name: "Overhead Press", sets: 3, reps: 10, muscle_group: "shoulders"}
+        - {name: "Barbell Row", sets: 3, reps: 10, muscle_group: "back"}
+        - {name: "Lateral Raise", sets: 3, reps: 15, muscle_group: "shoulders"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: good_upper_body
+    category: strength
+    description: "Upper body focused day with 6 exercises"
+    input:
+      name: "Upper Body"
+      exercises:
+        - {name: "Incline Bench Press", sets: 4, reps: 8, muscle_group: "chest"}
+        - {name: "Cable Row", sets: 4, reps: 10, muscle_group: "back"}
+        - {name: "Dumbbell Press", sets: 3, reps: 12, muscle_group: "shoulders"}
+        - {name: "Lat Pulldown", sets: 3, reps: 12, muscle_group: "back"}
+        - {name: "Tricep Extension", sets: 3, reps: 15, muscle_group: "triceps"}
+        - {name: "Bicep Curl", sets: 3, reps: 15, muscle_group: "biceps"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  # ===========================================================================
+  # EDGE CASES - Bad / Medium Quality
+  # ===========================================================================
+
+  - id: edge_empty_workout
+    category: edge_case
+    description: "Empty workout with no exercises"
+    input:
+      name: "Empty"
+      exercises: []
+    expected_max_score: 0.15
+    expected_issues:
+      - "No exercises"
+
+  - id: edge_single_exercise
+    category: edge_case
+    description: "Only one exercise - below minimum count but other dimensions perfect"
+    input:
+      name: "Quick Workout"
+      exercises:
+        - {name: "Bench Press", sets: 3, reps: 10, muscle_group: "chest"}
+    expected_min_score: 0.85
+    expected_max_score: 0.90
+    expected_issues:
+      - "Only 1 exercises"
+
+  - id: edge_all_duplicates
+    category: edge_case
+    description: "All exercises are the same - low variety but other dimensions fine"
+    input:
+      name: "Bench Only"
+      exercises:
+        - {name: "Bench Press", sets: 3, reps: 10}
+        - {name: "Bench Press", sets: 3, reps: 10}
+        - {name: "Bench Press", sets: 3, reps: 10}
+    expected_min_score: 0.85
+    expected_max_score: 0.90
+    expected_issues:
+      - "duplicate"
+
+  - id: edge_insane_reps
+    category: edge_case
+    description: "Exercises with absurd rep ranges (500 reps) - volume_sanity=0 but rest perfect"
+    input:
+      name: "Insane Volume"
+      exercises:
+        - {name: "Bench Press", sets: 3, reps: 500}
+        - {name: "Squat", sets: 3, reps: 500}
+        - {name: "Deadlift", sets: 3, reps: 500}
+    expected_min_score: 0.74
+    expected_max_score: 0.76
+    expected_issues:
+      - "reps"
+
+  - id: edge_insane_sets
+    category: edge_case
+    description: "Exercises with absurd set counts (50 sets) - volume_sanity=0 but rest perfect"
+    input:
+      name: "Too Many Sets"
+      exercises:
+        - {name: "Bench Press", sets: 50, reps: 10}
+        - {name: "Squat", sets: 50, reps: 10}
+        - {name: "Deadlift", sets: 50, reps: 10}
+    expected_min_score: 0.74
+    expected_max_score: 0.76
+    expected_issues:
+      - "sets"
+
+  - id: edge_too_many_exercises
+    category: edge_case
+    description: "25 exercises - exceeds maximum of 20"
+    input:
+      name: "Marathon Workout"
+      exercises:
+        - {name: "Bench Press", sets: 3, reps: 10}
+        - {name: "Squat", sets: 3, reps: 10}
+        - {name: "Deadlift", sets: 3, reps: 10}
+        - {name: "Overhead Press", sets: 3, reps: 10}
+        - {name: "Barbell Row", sets: 3, reps: 10}
+        - {name: "Lat Pulldown", sets: 3, reps: 10}
+        - {name: "Bicep Curl", sets: 3, reps: 10}
+        - {name: "Tricep Extension", sets: 3, reps: 10}
+        - {name: "Lateral Raise", sets: 3, reps: 10}
+        - {name: "Face Pull", sets: 3, reps: 10}
+        - {name: "Leg Press", sets: 3, reps: 10}
+        - {name: "Leg Curl", sets: 3, reps: 10}
+        - {name: "Leg Extension", sets: 3, reps: 10}
+        - {name: "Calf Raise", sets: 3, reps: 10}
+        - {name: "Hip Thrust", sets: 3, reps: 10}
+        - {name: "Cable Fly", sets: 3, reps: 10}
+        - {name: "Dumbbell Press", sets: 3, reps: 10}
+        - {name: "Hammer Curl", sets: 3, reps: 10}
+        - {name: "Skull Crusher", sets: 3, reps: 10}
+        - {name: "Incline Press", sets: 3, reps: 10}
+        - {name: "Decline Press", sets: 3, reps: 10}
+        - {name: "Shrug", sets: 3, reps: 10}
+        - {name: "Dip", sets: 3, reps: 10}
+        - {name: "Pull-up", sets: 3, reps: 10}
+        - {name: "Lunge", sets: 3, reps: 10}
+    expected_min_score: 0.7
+    expected_issues:
+      - "exceeds maximum"
+
+  # ===========================================================================
+  # AI GENERATED - Realistic but potentially flawed outputs
+  # ===========================================================================
+
+  - id: ai_good_generation
+    category: ai_generated
+    description: "Realistic well-formed AI-generated workout"
+    input:
+      name: "AI Push Pull Legs - Day 1"
+      exercises:
+        - {name: "Flat Bench Press", sets: 4, reps: 8, muscle_group: "chest"}
+        - {name: "Incline Dumbbell Press", sets: 3, reps: 10, muscle_group: "chest"}
+        - {name: "Cable Fly", sets: 3, reps: 12, muscle_group: "chest"}
+        - {name: "Seated Overhead Press", sets: 3, reps: 10, muscle_group: "shoulders"}
+        - {name: "Tricep Pushdown", sets: 3, reps: 12, muscle_group: "triceps"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: ai_hallucinated_exercises
+    category: ai_generated
+    description: "AI-generated workout with all hallucinated exercise names - hallucination=0 but rest perfect"
+    input:
+      name: "AI Custom Workout"
+      exercises:
+        - {name: "Quantum Bicep Flux", sets: 3, reps: 10, muscle_group: "biceps"}
+        - {name: "Neuromuscular Synapse Crunch", sets: 3, reps: 15, muscle_group: "abs"}
+        - {name: "Hypertrophic Oscillation Press", sets: 4, reps: 8, muscle_group: "chest"}
+    expected_min_score: 0.79
+    expected_max_score: 0.81
+    expected_issues:
+      - "hallucinated"
+
+  - id: ai_mixed_quality
+    category: ai_generated
+    description: "AI workout with some good and some bad exercises"
+    input:
+      name: "AI Mixed Workout"
+      exercises:
+        - {name: "Bench Press", sets: 4, reps: 10, muscle_group: "chest"}
+        - {name: "Squat", sets: 4, reps: 8, muscle_group: "legs"}
+        - {name: "Biomechanical Transduction Curl", sets: 3, reps: 12, muscle_group: "biceps"}
+    expected_min_score: 0.5
+    expected_max_score: 0.95
+    expected_issues:
+      - "hallucinated"
+
+  # ===========================================================================
+  # IMPORTED - Workouts from external sources
+  # ===========================================================================
+
+  - id: imported_youtube_good
+    category: imported
+    description: "Well-structured workout imported from YouTube video"
+    input:
+      name: "Jeff Nippard Push Day"
+      exercises:
+        - {name: "Incline Bench Press", sets: 3, reps: 10, muscle_group: "chest"}
+        - {name: "Flat Dumbbell Press", sets: 3, reps: 12, muscle_group: "chest"}
+        - {name: "Cable Lateral Raise", sets: 3, reps: 15, muscle_group: "shoulders"}
+        - {name: "Overhead Tricep Extension", sets: 3, reps: 12, muscle_group: "triceps"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: imported_minimal_data
+    category: imported
+    description: "Imported workout with missing sets/reps data"
+    input:
+      name: "Instagram Workout"
+      exercises:
+        - {name: "Push-ups"}
+        - {name: "Squat"}
+        - {name: "Plank"}
+        - {name: "Lunge"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  # ===========================================================================
+  # PROGRAM - Multi-week program workouts
+  # ===========================================================================
+
+  - id: program_week1_day1
+    category: program
+    description: "Week 1 Day 1 of a structured program"
+    input:
+      name: "Hypertrophy Program - W1D1"
+      exercises:
+        - {name: "Barbell Squat", sets: 4, reps: 10, muscle_group: "quads"}
+        - {name: "Leg Press", sets: 3, reps: 12, muscle_group: "quads"}
+        - {name: "Walking Lunge", sets: 3, reps: 12, muscle_group: "quads"}
+        - {name: "Leg Curl", sets: 3, reps: 15, muscle_group: "hamstrings"}
+        - {name: "Calf Raise", sets: 4, reps: 15, muscle_group: "calves"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: program_deload_week
+    category: program
+    description: "Deload week with reduced volume (fewer exercises, lower sets)"
+    input:
+      name: "Deload - Upper Body"
+      exercises:
+        - {name: "Bench Press", sets: 2, reps: 8, muscle_group: "chest"}
+        - {name: "Cable Row", sets: 2, reps: 10, muscle_group: "back"}
+        - {name: "Lateral Raise", sets: 2, reps: 12, muscle_group: "shoulders"}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  # ===========================================================================
+  # EQUIPMENT - Constrained by available equipment
+  # ===========================================================================
+
+  - id: equipment_mismatch
+    category: equipment
+    description: "All exercises use wrong equipment - equipment_match=0 but rest perfect"
+    input:
+      name: "Home Workout"
+      exercises:
+        - {name: "Barbell Squat", sets: 4, reps: 8, equipment: "barbell"}
+        - {name: "Cable Fly", sets: 3, reps: 12, equipment: "cable"}
+        - {name: "Smith Machine Press", sets: 3, reps: 10, equipment: "smith machine"}
+    equipment:
+      - "dumbbell"
+      - "bodyweight"
+    expected_min_score: 0.84
+    expected_max_score: 0.86
+    expected_issues:
+      - "not in requested equipment"
+
+  - id: equipment_match_good
+    category: equipment
+    description: "Workout correctly uses only requested equipment"
+    input:
+      name: "Dumbbell Only Workout"
+      exercises:
+        - {name: "Dumbbell Press", sets: 4, reps: 10, equipment: "dumbbell"}
+        - {name: "Dumbbell Row", sets: 4, reps: 10, equipment: "dumbbell"}
+        - {name: "Dumbbell Curl", sets: 3, reps: 12, equipment: "dumbbell"}
+        - {name: "Dumbbell Lunge", sets: 3, reps: 12, equipment: "dumbbell"}
+    equipment:
+      - "dumbbell"
+    expected_min_score: 0.7
+    expected_issues: []
+
+  # ===========================================================================
+  # MORE EDGE CASES
+  # ===========================================================================
+
+  - id: edge_two_exercises
+    category: edge_case
+    description: "Two exercises - still below minimum of 3"
+    input:
+      name: "Quick Session"
+      exercises:
+        - {name: "Bench Press", sets: 4, reps: 10, muscle_group: "chest"}
+        - {name: "Squat", sets: 4, reps: 8, muscle_group: "legs"}
+    expected_max_score: 0.95
+    expected_issues:
+      - "Only 2 exercises"
+
+  - id: edge_unusual_characters
+    category: edge_case
+    description: "Exercise names with unusual characters"
+    input:
+      name: "Weird Names"
+      exercises:
+        - {name: "Bench Press!!!", sets: 3, reps: 10}
+        - {name: "Squat @home", sets: 3, reps: 10}
+        - {name: "Curl #gains", sets: 3, reps: 10}
+    expected_max_score: 0.85
+    expected_issues:
+      - "unusual characters"
+
+  - id: edge_missing_name
+    category: edge_case
+    description: "Exercises with empty names"
+    input:
+      name: "Bad Data"
+      exercises:
+        - {name: "", sets: 3, reps: 10}
+        - {name: "", sets: 3, reps: 10}
+        - {name: "", sets: 3, reps: 10}
+    expected_min_score: 0.4
+    expected_issues: []
+
+  - id: edge_bodyweight_no_equipment
+    category: edge_case
+    description: "Bodyweight workout with no equipment field - should score well on equipment"
+    input:
+      name: "Bodyweight Circuit"
+      exercises:
+        - {name: "Push-up", sets: 3, reps: 15}
+        - {name: "Squat", sets: 3, reps: 20}
+        - {name: "Plank", sets: 3, reps: 30}
+        - {name: "Lunge", sets: 3, reps: 12}
+    expected_min_score: 0.7
+    expected_issues: []
+
+  - id: edge_combined_problems
+    category: edge_case
+    description: "Workout with duplicates, insane reps, and hallucinated names combined"
+    input:
+      name: "Everything Wrong"
+      exercises:
+        - {name: "Bench Press", sets: 3, reps: 200}
+        - {name: "Bench Press", sets: 3, reps: 10}
+        - {name: "Quantum Neuro Flex", sets: 3, reps: 10}
+    expected_max_score: 0.80
+    expected_issues:
+      - "duplicate"
+      - "reps"
+      - "hallucinated"

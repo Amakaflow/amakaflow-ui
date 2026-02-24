@@ -1,0 +1,690 @@
+# Golden Test Cases for Function Calling Validation
+# AMA-436: Comprehensive test suite for AI function selection
+#
+# Categories:
+# - search: search_workout_library tests
+# - calendar: add_workout_to_calendar tests
+# - generation: generate_ai_workout tests
+# - navigation: navigate_to_page tests
+# - negative: Out of scope requests (no function call expected)
+# - edge_case: Ambiguous or multi-intent inputs
+
+cases:
+  # =============================================================================
+  # SEARCH_WORKOUT_LIBRARY (15 cases)
+  # =============================================================================
+
+  # Basic search queries
+  - id: search_001
+    input: "Find me a 20 minute HIIT workout"
+    expected_function: search_workout_library
+    expected_params:
+      query: "20 minute HIIT workout"
+    category: search
+    description: "Basic duration + type search"
+
+  - id: search_002
+    input: "Show me some leg workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "leg workouts"
+    category: search
+    description: "Body part search"
+
+  - id: search_003
+    input: "I want to find upper body exercises"
+    expected_function: search_workout_library
+    expected_params:
+      query: "upper body exercises"
+    category: search
+    description: "Body region search"
+
+  - id: search_004
+    input: "Search for strength training workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "strength training workouts"
+    category: search
+    description: "Training type search"
+
+  - id: search_005
+    input: "Do I have any cardio workouts saved?"
+    expected_function: search_workout_library
+    expected_params:
+      query: "cardio workouts"
+    category: search
+    description: "Question format search"
+
+  # Duration-specific searches
+  - id: search_006
+    input: "Find a 30 minute workout"
+    expected_function: search_workout_library
+    expected_params:
+      query: "30 minute workout"
+    category: search
+    description: "Duration-only search"
+
+  - id: search_007
+    input: "Show me quick 10 minute workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "quick 10 minute workouts"
+    category: search
+    description: "Short duration search"
+
+  - id: search_008
+    input: "I need a 45 minute full body routine"
+    expected_function: search_workout_library
+    expected_params:
+      query: "45 minute full body routine"
+    category: search
+    description: "Duration + full body search"
+
+  # Equipment-based searches
+  - id: search_009
+    input: "Find workouts with dumbbells"
+    expected_function: search_workout_library
+    expected_params:
+      query: "workouts with dumbbells"
+    category: search
+    description: "Equipment search"
+
+  - id: search_010
+    input: "Show me bodyweight only exercises"
+    expected_function: search_workout_library
+    expected_params:
+      query: "bodyweight only exercises"
+    category: search
+    description: "No equipment search"
+
+  - id: search_011
+    input: "I want kettlebell workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "kettlebell workouts"
+    category: search
+    description: "Specific equipment search"
+
+  # Goal-based searches
+  - id: search_012
+    input: "Find workouts for weight loss"
+    expected_function: search_workout_library
+    expected_params:
+      query: "workouts for weight loss"
+    category: search
+    description: "Goal-based search"
+
+  - id: search_013
+    input: "Show me muscle building workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "muscle building workouts"
+    category: search
+    description: "Muscle building search"
+
+  # Specific body part searches
+  - id: search_014
+    input: "Find ab workouts"
+    expected_function: search_workout_library
+    expected_params:
+      query: "ab workouts"
+    category: search
+    description: "Core/abs search"
+
+  - id: search_015
+    input: "Search for back and bicep exercises"
+    expected_function: search_workout_library
+    expected_params:
+      query: "back and bicep exercises"
+    category: search
+    description: "Multiple body parts search"
+
+  # =============================================================================
+  # ADD_WORKOUT_TO_CALENDAR (12 cases)
+  # =============================================================================
+
+  # Basic scheduling
+  - id: calendar_001
+    input: "Schedule my leg day for tomorrow at 6am"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      time: "06:00"
+    category: calendar
+    description: "Basic schedule with time"
+
+  - id: calendar_002
+    input: "Add this workout to Monday"
+    expected_function: add_workout_to_calendar
+    category: calendar
+    description: "Day of week scheduling"
+
+  - id: calendar_003
+    input: "Put this on my calendar for January 15th"
+    expected_function: add_workout_to_calendar
+    category: calendar
+    description: "Specific date scheduling"
+
+  - id: calendar_004
+    input: "Schedule workout w-abc123 for tomorrow"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      workout_id: "w-abc123"
+    category: calendar
+    description: "Explicit workout ID"
+
+  # Time-specific scheduling
+  - id: calendar_005
+    input: "Add to calendar for 7:30 PM tonight"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      time: "19:30"
+    category: calendar
+    description: "Evening time with PM"
+
+  - id: calendar_006
+    input: "Schedule for noon on Friday"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      time: "12:00"
+    category: calendar
+    description: "Noon scheduling"
+
+  - id: calendar_007
+    input: "Put this on my calendar for 5am"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      time: "05:00"
+    category: calendar
+    description: "Early morning scheduling"
+
+  # Recurring schedules
+  - id: calendar_008
+    input: "Schedule this workout every Monday"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      recurrence: "weekly"
+    category: calendar
+    description: "Weekly recurrence"
+
+  - id: calendar_009
+    input: "Add this as a daily workout"
+    expected_function: add_workout_to_calendar
+    expected_params:
+      recurrence: "daily"
+    category: calendar
+    description: "Daily recurrence"
+
+  # Relative date scheduling
+  - id: calendar_010
+    input: "Schedule for next week"
+    expected_function: add_workout_to_calendar
+    category: calendar
+    description: "Relative date - next week"
+
+  - id: calendar_011
+    input: "Add to my calendar for the day after tomorrow"
+    expected_function: add_workout_to_calendar
+    category: calendar
+    description: "Relative date - day after tomorrow"
+
+  - id: calendar_012
+    input: "Book this workout for this weekend"
+    expected_function: add_workout_to_calendar
+    category: calendar
+    description: "Weekend scheduling"
+
+  # =============================================================================
+  # GENERATE_AI_WORKOUT (10 cases)
+  # =============================================================================
+
+  # Basic generation
+  - id: generate_001
+    input: "Create a beginner-friendly 30 minute workout"
+    expected_function: generate_ai_workout
+    expected_params:
+      difficulty: "beginner"
+      duration_minutes: 30
+    category: generation
+    description: "Basic generation with difficulty and duration"
+
+  - id: generate_002
+    input: "Generate a HIIT workout for me"
+    expected_function: generate_ai_workout
+    expected_params:
+      description: "HIIT workout"
+    category: generation
+    description: "Simple workout type generation"
+
+  - id: generate_003
+    input: "Make me a 45 minute strength training session"
+    expected_function: generate_ai_workout
+    expected_params:
+      duration_minutes: 45
+      description: "strength training session"
+    category: generation
+    description: "Duration + type generation"
+
+  # Equipment-specific generation
+  - id: generate_004
+    input: "Create a workout using only dumbbells and a bench"
+    expected_function: generate_ai_workout
+    expected_params:
+      equipment: ["dumbbells", "bench"]
+    category: generation
+    description: "Equipment-constrained generation"
+
+  - id: generate_005
+    input: "Generate a bodyweight workout I can do at home"
+    expected_function: generate_ai_workout
+    expected_params:
+      equipment: []
+    category: generation
+    description: "No equipment generation"
+
+  - id: generate_006
+    input: "Make me a kettlebell workout"
+    expected_function: generate_ai_workout
+    expected_params:
+      equipment: ["kettlebell"]
+    category: generation
+    description: "Single equipment generation"
+
+  # Difficulty-specific generation
+  - id: generate_007
+    input: "Create an advanced workout for experienced lifters"
+    expected_function: generate_ai_workout
+    expected_params:
+      difficulty: "advanced"
+    category: generation
+    description: "Advanced difficulty generation"
+
+  - id: generate_008
+    input: "Generate an intermediate level circuit"
+    expected_function: generate_ai_workout
+    expected_params:
+      difficulty: "intermediate"
+    category: generation
+    description: "Intermediate difficulty generation"
+
+  # Goal-oriented generation
+  - id: generate_009
+    input: "Create a fat-burning cardio workout"
+    expected_function: generate_ai_workout
+    expected_params:
+      description: "fat-burning cardio workout"
+    category: generation
+    description: "Goal-based generation"
+
+  - id: generate_010
+    input: "Design a 20 minute core workout for beginners"
+    expected_function: generate_ai_workout
+    expected_params:
+      difficulty: "beginner"
+      duration_minutes: 20
+      description: "core workout"
+    category: generation
+    description: "Multi-param generation"
+
+  # =============================================================================
+  # NAVIGATE_TO_PAGE (8 cases)
+  # =============================================================================
+
+  - id: nav_001
+    input: "Take me to my calendar"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "calendar"
+    category: navigation
+    description: "Calendar navigation"
+
+  - id: nav_002
+    input: "Go to my workout library"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "library"
+    category: navigation
+    description: "Library navigation"
+
+  - id: nav_003
+    input: "Open settings"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "settings"
+    category: navigation
+    description: "Settings navigation"
+
+  - id: nav_004
+    input: "Go home"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "home"
+    category: navigation
+    description: "Home navigation"
+
+  - id: nav_005
+    input: "Show me workout w-xyz789"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "workout"
+      workout_id: "w-xyz789"
+    category: navigation
+    description: "Workout detail navigation with ID"
+
+  - id: nav_006
+    input: "Navigate to the home page"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "home"
+    category: navigation
+    description: "Explicit home navigation"
+
+  - id: nav_007
+    input: "Open my saved workouts"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "library"
+    category: navigation
+    description: "Library alternate phrasing"
+
+  - id: nav_008
+    input: "Take me to account settings"
+    expected_function: navigate_to_page
+    expected_params:
+      page: "settings"
+    category: navigation
+    description: "Settings alternate phrasing"
+
+  # =============================================================================
+  # NEGATIVE CASES - No function call expected (8 cases)
+  # =============================================================================
+
+  - id: negative_001
+    input: "What's the weather like?"
+    expected_function: null
+    category: negative
+    description: "Weather query - out of scope"
+
+  - id: negative_002
+    input: "Tell me a joke"
+    expected_function: null
+    category: negative
+    description: "Entertainment request - out of scope"
+
+  - id: negative_003
+    input: "Hello!"
+    expected_function: null
+    category: negative
+    description: "Simple greeting"
+
+  - id: negative_004
+    input: "How are you?"
+    expected_function: null
+    category: negative
+    description: "Social question"
+
+  - id: negative_005
+    input: "What can you do?"
+    expected_function: null
+    category: negative
+    description: "Capability question"
+
+  - id: negative_006
+    input: "Thanks for your help"
+    expected_function: null
+    category: negative
+    description: "Thank you message"
+
+  - id: negative_007
+    input: "What is the capital of France?"
+    expected_function: null
+    category: negative
+    description: "General knowledge - out of scope"
+
+  - id: negative_008
+    input: "Can you order me pizza?"
+    expected_function: null
+    category: negative
+    description: "Unrelated action request"
+
+  # =============================================================================
+  # EDGE CASES (7 cases)
+  # =============================================================================
+
+  - id: edge_001
+    input: "Find a workout and schedule it for Monday"
+    expected_function: search_workout_library
+    category: edge_case
+    description: "Multi-intent - should prioritize search first"
+
+  - id: edge_002
+    input: "workout"
+    expected_function: null
+    category: edge_case
+    description: "Incomplete/vague input"
+
+  - id: edge_003
+    input: "I want to exercise"
+    expected_function: search_workout_library
+    category: edge_case
+    description: "Vague exercise intent - default to search"
+
+  - id: edge_004
+    input: "Create something for tomorrow at 8am"
+    expected_function: generate_ai_workout
+    category: edge_case
+    description: "Ambiguous create vs schedule"
+
+  - id: edge_005
+    input: "Help me with my fitness goals"
+    expected_function: null
+    category: edge_case
+    description: "General help request - conversational"
+
+  - id: edge_006
+    input: "Show workouts and go to calendar"
+    expected_function: search_workout_library
+    category: edge_case
+    description: "Multi-intent with navigation"
+
+  - id: edge_007
+    input: "Make a quick workout and add it to today"
+    expected_function: generate_ai_workout
+    category: edge_case
+    description: "Generate then schedule - prioritize generation"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_YOUTUBE (5 cases)
+  # =============================================================================
+
+  - id: import_youtube_001
+    input: "Import this YouTube workout video https://youtube.com/watch?v=abc123"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtube.com/watch?v=abc123"
+    category: import_youtube
+    description: "Direct YouTube URL import"
+
+  - id: import_youtube_002
+    input: "Can you grab the workout from this video? https://youtu.be/xyz789"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtu.be/xyz789"
+    category: import_youtube
+    description: "Short YouTube URL with conversational text"
+
+  - id: import_youtube_003
+    input: "Save this YouTube fitness routine to my library https://www.youtube.com/watch?v=test"
+    expected_function: import_from_youtube
+    category: import_youtube
+    description: "YouTube import with www prefix"
+
+  - id: import_youtube_004
+    input: "Extract the exercises from https://youtube.com/watch?v=workout123 and bypass the cache"
+    expected_function: import_from_youtube
+    expected_params:
+      url: "https://youtube.com/watch?v=workout123"
+      skip_cache: true
+    category: import_youtube
+    description: "YouTube import with skip_cache"
+
+  - id: import_youtube_005
+    input: "I found a great HIIT video on YouTube, here's the link: https://youtube.com/watch?v=hiit"
+    expected_function: import_from_youtube
+    category: import_youtube
+    description: "Conversational YouTube import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_TIKTOK (5 cases)
+  # =============================================================================
+
+  - id: import_tiktok_001
+    input: "Import this TikTok workout https://tiktok.com/@user/video/123456"
+    expected_function: import_from_tiktok
+    expected_params:
+      url: "https://tiktok.com/@user/video/123456"
+    category: import_tiktok
+    description: "Direct TikTok URL import"
+
+  - id: import_tiktok_002
+    input: "Save this TikTok fitness video https://vm.tiktok.com/abc123"
+    expected_function: import_from_tiktok
+    category: import_tiktok
+    description: "TikTok short URL import"
+
+  - id: import_tiktok_003
+    input: "Import this TikTok and use vision mode: https://tiktok.com/@fitness/video/789"
+    expected_function: import_from_tiktok
+    expected_params:
+      mode: "hybrid"
+    category: import_tiktok
+    description: "TikTok with mode preference"
+
+  - id: import_tiktok_004
+    input: "Get the workout from this TikTok using audio transcription https://tiktok.com/@coach/video/456"
+    expected_function: import_from_tiktok
+    expected_params:
+      mode: "auto"
+    category: import_tiktok
+    description: "TikTok with audio mode preference"
+
+  - id: import_tiktok_005
+    input: "This TikTok has a great ab routine, import it https://tiktok.com/@abs/video/111"
+    expected_function: import_from_tiktok
+    category: import_tiktok
+    description: "Conversational TikTok import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_INSTAGRAM (4 cases)
+  # =============================================================================
+
+  - id: import_instagram_001
+    input: "Import the workout from this Instagram post https://instagram.com/p/ABC123"
+    expected_function: import_from_instagram
+    expected_params:
+      url: "https://instagram.com/p/ABC123"
+    category: import_instagram
+    description: "Instagram post import"
+
+  - id: import_instagram_002
+    input: "Save this IG workout https://www.instagram.com/reel/XYZ789"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Instagram reel import"
+
+  - id: import_instagram_003
+    input: "Extract exercises from this Instagram: https://instagram.com/p/workout123"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Instagram with extract intent"
+
+  - id: import_instagram_004
+    input: "I saw this workout on IG, can you import it? https://instagram.com/p/fit"
+    expected_function: import_from_instagram
+    category: import_instagram
+    description: "Conversational Instagram import"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_PINTEREST (4 cases)
+  # =============================================================================
+
+  - id: import_pinterest_001
+    input: "Import workouts from this Pinterest board https://pinterest.com/user/fitness-board"
+    expected_function: import_from_pinterest
+    expected_params:
+      url: "https://pinterest.com/user/fitness-board"
+    category: import_pinterest
+    description: "Pinterest board import"
+
+  - id: import_pinterest_002
+    input: "Save this workout pin https://pinterest.com/pin/123456789"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest single pin import"
+
+  - id: import_pinterest_003
+    input: "Get all the workouts from my Pinterest board: https://pinterest.com/me/workout-ideas"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest board with all intent"
+
+  - id: import_pinterest_004
+    input: "Import from https://www.pinterest.com/pin/workout"
+    expected_function: import_from_pinterest
+    category: import_pinterest
+    description: "Pinterest with www prefix"
+
+  # =============================================================================
+  # PHASE 2: CONTENT INGESTION - IMPORT_FROM_IMAGE (4 cases)
+  # =============================================================================
+
+  - id: import_image_001
+    input: "I uploaded an image of my workout plan, can you import it?"
+    expected_function: import_from_image
+    category: import_image
+    description: "Image upload context"
+
+  - id: import_image_002
+    input: "Here's a screenshot of the exercises I want to save"
+    expected_function: import_from_image
+    category: import_image
+    description: "Screenshot import context"
+
+  - id: import_image_003
+    input: "Import the workout from this photo"
+    expected_function: import_from_image
+    category: import_image
+    description: "Photo import context"
+
+  - id: import_image_004
+    input: "Can you read this workout image and save the exercises?"
+    expected_function: import_from_image
+    category: import_image
+    description: "Image with read intent"
+
+  # =============================================================================
+  # PHASE 2: NEGATIVE CASES - NO IMPORT FUNCTION EXPECTED (4 cases)
+  # =============================================================================
+
+  - id: import_negative_001
+    input: "Import a workout"
+    expected_function: null
+    category: import_negative
+    description: "Generic import without source - needs clarification"
+
+  - id: import_negative_002
+    input: "https://facebook.com/video/123"
+    expected_function: null
+    category: import_negative
+    description: "Unsupported platform URL"
+
+  - id: import_negative_003
+    input: "Get the workout from the video I watched yesterday"
+    expected_function: null
+    category: import_negative
+    description: "No URL provided - needs clarification"
+
+  - id: import_negative_004
+    input: "Import from Vimeo https://vimeo.com/123"
+    expected_function: null
+    category: import_negative
+    description: "Unsupported video platform"

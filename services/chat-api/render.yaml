@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: chat-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    repo: https://github.com/AmakaFlow/chat-api
+    branch: develop
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8005"
+      - fromGroup: amakaflow-shared
+      - fromGroup: chat-api-secrets
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+      targetCPUPercent: 70
+    buildFilter:
+      paths:
+        - chat-api/**

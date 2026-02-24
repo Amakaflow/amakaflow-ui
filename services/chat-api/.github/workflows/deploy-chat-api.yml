@@ -1,0 +1,88 @@
+name: Deploy chat-api
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run linter
+        run: |
+          pip install ruff
+          ruff check .
+
+      - name: Run tests
+        env:
+          ENVIRONMENT: test
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+        run: pytest -x -q
+
+      - name: Verify app starts
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+        run: |
+          python -c "
+          from backend.main import app
+          routes = [r.path for r in app.routes if hasattr(r, 'path')]
+          print(f'App loaded: {len(routes)} routes')
+          assert len(routes) > 10, f'Too few routes ({len(routes)}), something is broken'
+          "
+
+  deploy:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_CHAT_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deployment to stabilize
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -sf -o /dev/null -w "%{http_code}" https://chat-api.onrender.com/health || true)
+            if [ "$status" = "200" ]; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i: status=$status, retrying in 15s..."
+            sleep 15
+          done
+          echo "Smoke test failed after 5 attempts"
+          exit 1
+
+      - name: Readiness check
+        run: |
+          status=$(curl -sf -o /dev/null -w "%{http_code}" https://chat-api.onrender.com/health/ready || true)
+          if [ "$status" != "200" ]; then
+            echo "Warning: readiness check returned $status (non-blocking)"
+          else
+            echo "Readiness check passed"
+          fi
