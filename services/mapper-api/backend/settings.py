@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # External Services - Chat API (AMA-746: embedding webhook)
+    # -------------------------------------------------------------------------
+    chat_api_url: str = Field(
+        default="http://localhost:8005",
+        description="Base URL for chat-api service (used for embedding webhook)",
+    )
+
+    # -------------------------------------------------------------------------
     # External Services - Ingestor
     # -------------------------------------------------------------------------
     ingestor_url: str = Field(

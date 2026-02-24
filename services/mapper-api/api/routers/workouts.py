@@ -22,6 +22,7 @@ api/routers/completions.py and must be registered BEFORE this router.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any, List, Literal, Optional
@@ -45,7 +46,9 @@ from domain.models.patch_operation import PatchOperation
 from backend.adapters.blocks_to_workoutkit import to_workoutkit
 from domain.converters.blocks_to_workout import blocks_to_workout
 from domain.models import WorkoutMetadata, WorkoutSource
+from backend.services.embedding_notifier import notify_embedding_update
 from backend.services.export_queue import ExportQueue
+from backend.settings import get_settings
 from backend.utils.intervals import calculate_intervals_duration, convert_exercise_to_interval
 
 logger = logging.getLogger(__name__)
@@ -287,7 +290,16 @@ def save_workout_endpoint(
                 export_formats=request.exports or {},
             )
 
-        # Step 4: Convert use case result to HTTP response
+        # Step 4: Notify chat-api to generate embedding (fire-and-forget)
+        if result.success and result.workout_id:
+            asyncio.create_task(
+                notify_embedding_update(
+                    workout_id=result.workout_id,
+                    chat_api_url=get_settings().chat_api_url,
+                )
+            )
+
+        # Step 5: Convert use case result to HTTP response
         if result.success:
             return {
                 "success": True,
@@ -772,6 +784,14 @@ def patch_workout_endpoint(
                 "validation_errors": result.validation_errors,
             },
         )
+
+    # Notify chat-api to regenerate embedding (fire-and-forget)
+    asyncio.create_task(
+        notify_embedding_update(
+            workout_id=workout_id,
+            chat_api_url=get_settings().chat_api_url,
+        )
+    )
 
     return PatchWorkoutResponse(
         success=True,
