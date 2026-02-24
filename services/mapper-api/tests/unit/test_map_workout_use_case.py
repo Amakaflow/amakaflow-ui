@@ -15,7 +15,7 @@ import pytest
 
 from application.use_cases import MapWorkoutResult, MapWorkoutUseCase
 from backend.parsers.models import ParsedExercise, ParsedWorkout
-from domain.models import Block, BlockType, Exercise, Workout, WorkoutSource
+from domain.models import Block, BlockType, Exercise, Load, Workout, WorkoutSource
 from tests.fakes.mapping_repository import (
     FakeExerciseMatchRepository,
     FakeUserMappingRepository,
@@ -535,3 +535,124 @@ class TestBlockFieldPreservation:
 
         assert len(mapped_workout.blocks) == 1
         assert mapped_workout.blocks[0].rest_between_seconds == 90
+
+
+# =============================================================================
+# AMA-745: Blocks Format Save Tests
+# =============================================================================
+
+
+class TestSaveWorkoutInBlocksFormat:
+    """Tests that workout_data saved to the repository uses blocks format (AMA-745).
+
+    When MapWorkoutUseCase saves a workout, it must use _workout_to_blocks_format()
+    rather than model_dump(). Blocks format stores weight/weight_unit at the exercise
+    level as flat fields; model_dump() produces a nested 'load' dict instead.
+    """
+
+    @pytest.mark.unit
+    def test_saved_workout_data_uses_blocks_format_not_model_dump(
+        self,
+        use_case: MapWorkoutUseCase,
+        workout_repo: FakeWorkoutRepository,
+    ):
+        """workout_data stored in the repo must have weight/weight_unit at exercise level.
+
+        model_dump() would produce {"load": {"value": 100, "unit": "kg"}} which
+        db_row_to_workout cannot read back. Blocks format flattens this to
+        {"weight": 100, "weight_unit": "kg"} at the exercise level.
+        """
+        # Build a parsed workout — we need load to reach the exercise level, so
+        # construct and pass a Workout domain model directly via _map_exercises
+        # then trigger a save by calling execute with a parsed workout that has weight.
+        # Easier: build the domain model and call the repo save path via the use case,
+        # using a workout that includes a load on the exercise.
+
+        # Construct a Workout with a load on an exercise directly and call _map_exercises
+        # then simulate what execute() does with save=True.
+        block = Block(
+            type=BlockType.STRAIGHT,
+            exercises=[
+                Exercise(
+                    name="Squat",
+                    sets=3,
+                    reps=5,
+                    load=Load(value=100, unit="kg"),
+                ),
+            ],
+        )
+        workout = Workout(title="Weighted Workout", blocks=[block])
+
+        # Call save directly via the workout_repo (simulating the use case save path)
+        # to prove what format the data should be in. But we want to test the use case
+        # itself, so let's use execute() with a parsed workout that results in a
+        # weighted exercise. Since the fake matcher doesn't carry load, we patch the
+        # mapped_workout directly by using _map_exercises and then manually invoking
+        # the save to check what format is passed.
+        #
+        # The cleanest approach: call execute() and inspect the saved workout_data.
+        # Use a parsed workout; load won't be present from the parser, so build the
+        # domain model and invoke the private save step via monkey-patching the
+        # mapped_workout — or simply test that the save is called with blocks format
+        # by manually wiring the call.
+        #
+        # Simplest correct approach: monkey-patch _map_exercises to return our
+        # pre-built weighted workout, then call execute() with save=True and check
+        # the stored workout_data.
+        from backend.parsers.models import ParsedExercise, ParsedWorkout
+
+        parsed = ParsedWorkout(
+            name="Weighted Workout",
+            exercises=[ParsedExercise(raw_name="Squat", sets=3, reps="5")],
+        )
+
+        # Patch _map_exercises to return our weighted workout
+        original_map = use_case._map_exercises
+
+        def patched_map(w):
+            return workout, 1, 0
+
+        use_case._map_exercises = patched_map
+        try:
+            result = use_case.execute(
+                parsed_workout=parsed,
+                user_id="test-user-123",
+                device="garmin",
+                save=True,
+            )
+        finally:
+            use_case._map_exercises = original_map
+
+        assert result.success is True
+
+        saved_workouts = workout_repo.get_all()
+        assert len(saved_workouts) == 1
+
+        workout_data = saved_workouts[0]["workout_data"]
+
+        # Blocks format: must have a "blocks" key at the top level
+        assert "blocks" in workout_data, (
+            "workout_data must be in blocks format (has 'blocks' key), "
+            f"got keys: {list(workout_data.keys())}"
+        )
+
+        # Drill into the first exercise of the first block
+        first_exercise = workout_data["blocks"][0]["exercises"][0]
+
+        # Blocks format: weight and weight_unit are flat fields on the exercise
+        assert "weight" in first_exercise, (
+            "Blocks format must have 'weight' at exercise level, "
+            f"got exercise keys: {list(first_exercise.keys())}"
+        )
+        assert "weight_unit" in first_exercise, (
+            "Blocks format must have 'weight_unit' at exercise level, "
+            f"got exercise keys: {list(first_exercise.keys())}"
+        )
+        assert first_exercise["weight"] == 100
+        assert first_exercise["weight_unit"] == "kg"
+
+        # model_dump() format (wrong): must NOT have a nested 'load' dict
+        assert "load" not in first_exercise, (
+            "Blocks format must NOT have a nested 'load' dict at exercise level "
+            "(that is model_dump() format, not blocks format)"
+        )
