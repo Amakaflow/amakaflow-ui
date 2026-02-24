@@ -1,0 +1,10 @@
+name: Linear Status Sync
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened, closed]
+
+jobs:
+  call-shared:
+    uses: Amakaflow/.github/.github/workflows/linear-sync.yml@main
+    secrets: inherit
