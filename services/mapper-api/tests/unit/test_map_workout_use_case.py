@@ -15,7 +15,7 @@ import pytest
 
 from application.use_cases import MapWorkoutResult, MapWorkoutUseCase
 from backend.parsers.models import ParsedExercise, ParsedWorkout
-from domain.models import BlockType, WorkoutSource
+from domain.models import Block, BlockType, Exercise, Workout, WorkoutSource
 from tests.fakes.mapping_repository import (
     FakeExerciseMatchRepository,
     FakeUserMappingRepository,
@@ -503,3 +503,35 @@ class TestDeviceTypes:
 
         saved = workout_repo.get_all()[0]
         assert saved["device"] == device
+
+
+# =============================================================================
+# Block Field Preservation Tests
+# =============================================================================
+
+
+class TestBlockFieldPreservation:
+    """Tests that Block fields are preserved through exercise mapping."""
+
+    @pytest.mark.unit
+    def test_rest_between_seconds_survives_exercise_mapping(
+        self,
+        use_case: MapWorkoutUseCase,
+    ):
+        """rest_between_seconds on a Block is not lost during _map_exercises."""
+        # Build a Workout directly with rest_between_seconds set on the block
+        block = Block(
+            label="Main Block",
+            type=BlockType.STRAIGHT,
+            rounds=3,
+            rest_between_seconds=90,
+            exercises=[
+                Exercise(name="Squat", sets=3, reps=10),
+            ],
+        )
+        workout = Workout(title="Rest Timer Test", blocks=[block])
+
+        mapped_workout, _mapped, _unmapped = use_case._map_exercises(workout)
+
+        assert len(mapped_workout.blocks) == 1
+        assert mapped_workout.blocks[0].rest_between_seconds == 90

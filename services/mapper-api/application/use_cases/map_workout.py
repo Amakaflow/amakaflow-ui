@@ -204,6 +204,7 @@ class MapWorkoutUseCase:
                 type=block.type,
                 rounds=block.rounds,
                 exercises=mapped_exercises,
+                rest_between_seconds=block.rest_between_seconds,
             )
             mapped_blocks.append(mapped_block)
 
