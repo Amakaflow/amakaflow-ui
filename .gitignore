@@ -37,3 +37,6 @@ htmlcov/
 
 # Node (for any tooling)
 node_modules/
+
+# Git worktrees
+.worktrees/
