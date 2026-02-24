@@ -5,7 +5,7 @@ import json
 import re
 import zipfile
 from datetime import datetime
-from typing import Optional, List, Literal, Dict, Any
+from typing import Optional, List, Literal
 from workout_ingestor_api.models import Workout
 from workout_ingestor_api.utils import upper_from_range
 

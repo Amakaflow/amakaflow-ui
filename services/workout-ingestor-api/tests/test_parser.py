@@ -1,4 +1,3 @@
-import pytest
 
 from workout_ingestor_api.services.parser_service import ParserService
 

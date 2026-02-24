@@ -1,9 +1,7 @@
 """Tests for InstagramReelService."""
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from workout_ingestor_api.services.instagram_reel_service import (
     InstagramReelService,
-    InstagramReelServiceError,
 )
 
 

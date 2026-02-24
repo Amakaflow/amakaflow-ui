@@ -1,7 +1,5 @@
 """Tests for TikTokAdapter — three-tier fallback: transcript → vision → oEmbed."""
-import os
-import tempfile
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 

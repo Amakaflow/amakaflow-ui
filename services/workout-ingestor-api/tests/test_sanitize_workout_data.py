@@ -7,7 +7,6 @@ AMA-564: superset detection from paired exercises on same line.
 """
 
 import copy
-import pytest
 from workout_ingestor_api.services.instagram_reel_service import InstagramReelService
 from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data
 

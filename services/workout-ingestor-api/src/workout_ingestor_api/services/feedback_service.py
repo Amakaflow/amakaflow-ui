@@ -1,6 +1,5 @@
 """Service for collecting user feedback to improve OCR and parsing."""
 import json
-import os
 from datetime import datetime
 from typing import List, Dict
 from pathlib import Path

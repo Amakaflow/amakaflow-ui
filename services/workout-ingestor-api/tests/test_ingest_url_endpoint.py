@@ -1,7 +1,5 @@
 import uuid as _uuid
 from unittest.mock import patch, MagicMock
-import pytest
-from fastapi.testclient import TestClient
 from workout_ingestor_api.services.unified_parser import UnifiedParserError
 
 

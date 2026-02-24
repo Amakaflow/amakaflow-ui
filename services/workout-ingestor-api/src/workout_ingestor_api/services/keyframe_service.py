@@ -1,9 +1,7 @@
 """Service for extracting keyframes from videos for OCR."""
 import os
 import subprocess
-import tempfile
 from typing import List, Tuple
-from fastapi import HTTPException
 
 # Optional dependencies
 try:
@@ -55,7 +53,7 @@ class KeyframeService:
             timestamps = [scene[0].get_seconds() for scene in scene_list]
             
             return timestamps
-        except Exception as e:
+        except Exception:
             # Fallback to periodic sampling
             return KeyframeService.extract_periodic_frames(video_path, fps=0.5)
     

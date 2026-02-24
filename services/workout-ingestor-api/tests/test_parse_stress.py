@@ -10,7 +10,6 @@ documented with comments and, where behavior is clearly wrong, marked with
 pytest.xfail so we capture regressions while documenting gaps.
 """
 
-import re
 import pytest
 from workout_ingestor_api.services.parser_service import ParserService
 
@@ -249,7 +248,7 @@ class TestScenario3PushDayWithCardio:
     @pytest.mark.xfail(reason="Parser treats 'Push Day' as an exercise instead of a section header")
     def test_push_day_not_exercise(self):
         for name in self.names:
-            assert "push day" not in name, f"'Push Day' header incorrectly parsed as exercise"
+            assert "push day" not in name, "'Push Day' header incorrectly parsed as exercise"
 
     def test_reps_range_parsed(self):
         # Find bench press or incline that has range
@@ -276,7 +275,7 @@ class TestScenario3PushDayWithCardio:
 
     def test_cardio_not_exercise(self):
         for name in self.names:
-            assert name.strip() != "cardio", f"'Cardio' header incorrectly parsed as exercise"
+            assert name.strip() != "cardio", "'Cardio' header incorrectly parsed as exercise"
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +332,7 @@ class TestScenario4SupersetsAndRounds:
     def test_rounds_header_not_exercise(self):
         for name in self.names:
             assert "4 rounds" not in name and name.strip() != "rounds", (
-                f"'4 Rounds' header incorrectly parsed as exercise"
+                "'4 Rounds' header incorrectly parsed as exercise"
             )
 
     def test_row_has_distance(self):
@@ -769,5 +768,5 @@ class TestScenario10MixedUnits:
     def test_no_brick_workout_as_exercise(self):
         for name in self.names:
             assert "brick workout" not in name, (
-                f"'Brick Workout' header incorrectly parsed as exercise"
+                "'Brick Workout' header incorrectly parsed as exercise"
             )

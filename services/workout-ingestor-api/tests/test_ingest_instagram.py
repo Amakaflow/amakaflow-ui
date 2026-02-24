@@ -1,7 +1,7 @@
 """Tests for Instagram ingestion endpoint."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestInstagramIngestion:

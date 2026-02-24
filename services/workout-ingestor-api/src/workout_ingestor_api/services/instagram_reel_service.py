@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from workout_ingestor_api.ai import AIClientFactory, AIRequestContext, retry_sync_call
 from workout_ingestor_api.config import settings
-from workout_ingestor_api.services.apify_service import ApifyService, ApifyServiceError
+from workout_ingestor_api.services.apify_service import ApifyService
 from workout_ingestor_api.services.instagram_reel_cache_service import InstagramApifyRawCacheService
 from workout_ingestor_api.services.prompts import build_prompt
 from workout_ingestor_api.services.workout_sanitizer import sanitize_workout_data

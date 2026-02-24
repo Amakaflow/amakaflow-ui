@@ -13,13 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import quote
 
 import httpx
 
@@ -225,7 +222,7 @@ class PinterestService:
             # 2. Get pin metadata and image URL(s)
             pin = await self._get_pin_metadata(resolved_url)
             if not pin or not pin.image_url:
-                logger.warning(f"Pinterest: Failed to get pin metadata or image URL")
+                logger.warning("Pinterest: Failed to get pin metadata or image URL")
                 result.errors.append("Could not extract image URL from Pinterest pin")
                 return result
             logger.info(f"Pinterest: Got pin - id={pin.pin_id}, image={pin.image_url}, is_carousel={pin.is_carousel}")
@@ -574,7 +571,7 @@ class PinterestService:
                     logger.info(f"Pinterest: Detected carousel pin with {len(pin.image_urls)} images (736x)")
                 else:
                     # Single image pin - use existing logic
-                    logger.debug(f"Pinterest: Processing as single image pin")
+                    logger.debug("Pinterest: Processing as single image pin")
 
                     # Method 1: Look for og:image meta tag (usually high quality)
                     # Try multiple patterns as Pinterest format varies
@@ -596,7 +593,7 @@ class PinterestService:
                         if json_ld:
                             try:
                                 data = json.loads(json_ld.group(1))
-                                logger.debug(f"Pinterest: Found JSON-LD data")
+                                logger.debug("Pinterest: Found JSON-LD data")
                                 if isinstance(data, dict) and "image" in data:
                                     img = data["image"]
                                     if isinstance(img, str):

@@ -1,7 +1,7 @@
 """Unit tests for canonical AI format parser."""
 import pytest
 from workout_ingestor_api.services.parser_service import ParserService
-from workout_ingestor_api.models import Workout, Block, Exercise
+from workout_ingestor_api.models import Workout
 
 
 class TestCanonicalFormatDetection:

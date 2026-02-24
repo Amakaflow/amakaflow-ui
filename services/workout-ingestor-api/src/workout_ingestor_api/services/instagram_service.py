@@ -92,7 +92,7 @@ class InstagramService:
             if username and password and username.strip() and password.strip().lower() != "string":
                 try:
                     cl.login(username, password)
-                except Exception as e:
+                except Exception:
                     # If login fails, try without login (public access)
                     pass
             
@@ -129,7 +129,7 @@ class InstagramService:
                                     full_path = os.path.join(target_dir, file)
                                     if os.path.exists(full_path) and os.path.getsize(full_path) > 0 and full_path not in image_paths:
                                         image_paths.append(full_path)
-                        except Exception as e:
+                        except Exception:
                             # Log error but continue with other images
                             continue
             
@@ -610,8 +610,8 @@ class InstagramService:
             
             if any(private_indicators):
                 raise InstagramServiceError(
-                    f"Instagram post appears to be private or requires login. "
-                    f"Please provide username and password to access this post, or the post may not be publicly accessible."
+                    "Instagram post appears to be private or requires login. "
+                    "Please provide username and password to access this post, or the post may not be publicly accessible."
                 )
             
             # Log some debug info before failing
@@ -684,7 +684,7 @@ class InstagramService:
                             os.remove(filepath)
                         continue
                         
-                except requests.RequestException as e:
+                except requests.RequestException:
                     # If it's a 403/404 on last attempt, skip this image
                     if attempt == max_retries - 1:
                         continue
@@ -707,12 +707,12 @@ class InstagramService:
         if not image_paths:
             # Provide helpful error message
             error_msg = (
-                f"Failed to download images from Instagram post. "
-                f"Possible reasons: "
-                f"1) Images URLs expired or blocked by Instagram CDN, "
-                f"2) Post is private (requires login), "
-                f"3) Rate limiting or geo-restrictions. "
-                f"Suggestion: Try providing username/password, or manually upload screenshots."
+                "Failed to download images from Instagram post. "
+                "Possible reasons: "
+                "1) Images URLs expired or blocked by Instagram CDN, "
+                "2) Post is private (requires login), "
+                "3) Rate limiting or geo-restrictions. "
+                "Suggestion: Try providing username/password, or manually upload screenshots."
             )
             raise InstagramServiceError(error_msg)
         

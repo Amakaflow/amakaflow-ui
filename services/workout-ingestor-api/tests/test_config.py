@@ -1,6 +1,4 @@
 """Tests for Settings / config.py — AMA-749."""
-import importlib
-import os
 
 
 def test_parse_model_default():
@@ -132,7 +130,6 @@ def test_parse_model_used_in_youtube_parse_with_openai():
 def test_anthropic_parse_model_used_in_youtube_parse_with_anthropic():
     """youtube_ingest._parse_with_anthropic passes settings.ANTHROPIC_PARSE_MODEL to the Anthropic client."""
     import json
-    import re
     from unittest.mock import MagicMock, patch
 
     from workout_ingestor_api.api.youtube_ingest import _parse_with_anthropic

@@ -4,9 +4,8 @@ Provides multi-provider transcription with fitness vocabulary boosting.
 API keys are stored server-side for security - never exposed to clients.
 """
 import os
-import base64
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

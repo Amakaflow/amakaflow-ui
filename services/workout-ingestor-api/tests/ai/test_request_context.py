@@ -1,5 +1,4 @@
 """Unit tests for AIRequestContext header generation."""
-import pytest
 from unittest.mock import patch
 
 from workout_ingestor_api.ai.client_factory import AIRequestContext

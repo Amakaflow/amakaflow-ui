@@ -1,5 +1,4 @@
 from unittest.mock import patch, MagicMock
-import pytest
 from workout_ingestor_api.services.unified_cache_service import UnifiedCacheService
 
 SAMPLE_WORKOUT = {"title": "Test", "blocks": []}

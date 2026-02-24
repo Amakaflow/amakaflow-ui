@@ -1,6 +1,5 @@
 """Tests for input validation on ingestion endpoints."""
 
-import pytest
 
 
 class TestInputValidation:

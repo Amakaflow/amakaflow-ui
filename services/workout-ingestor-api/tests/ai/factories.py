@@ -1,6 +1,5 @@
 """Factory functions for creating test doubles."""
 from unittest.mock import MagicMock
-from typing import Optional
 
 
 def create_openai_response(content: str, model: str = "gpt-4o"):

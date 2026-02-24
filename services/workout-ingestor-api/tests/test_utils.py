@@ -1,5 +1,4 @@
 """Unit tests for utility functions."""
-import pytest
 from workout_ingestor_api.utils import to_int, upper_from_range
 
 
