@@ -264,7 +264,7 @@ Use this mapping when assigning the structure field to any block:
 
 LADDER / PYRAMID / COMPLEX / DROP-SET EXAMPLES:
 When a workout uses a non-uniform rep scheme, populate rep_scheme and rep_scheme_type:
-- rep_scheme: the rep sequence as a list or string (e.g. [10, 8, 6, 4, 2])
+- rep_scheme: the rep sequence as a hyphen-separated string (e.g. "10-8-6-4-2")
 - rep_scheme_type: one of "descending", "ascending", "pyramid", "drop-set", "wave"
 
 Descending ladder example (10-8-6-4-2 Deadlifts):
@@ -273,14 +273,14 @@ Descending ladder example (10-8-6-4-2 Deadlifts):
   "structure": "ladder",
   "structure_confidence": 0.95,
   "structure_options": [],
-  "rep_scheme": [10, 8, 6, 4, 2],
+  "rep_scheme": "10-8-6-4-2",
   "rep_scheme_type": "descending",
   "exercises": [
     {{
       "name": "Deadlift",
       "sets": 5,
       "reps": null,
-      "rep_scheme": [10, 8, 6, 4, 2],
+      "rep_scheme": "10-8-6-4-2",
       "rep_scheme_type": "descending",
       "type": "strength",
       "notes": "Reset between each set"
@@ -295,14 +295,14 @@ Pyramid example (3-6-9-6-3 reps):
   "structure": "pyramid",
   "structure_confidence": 0.9,
   "structure_options": [],
-  "rep_scheme": [3, 6, 9, 6, 3],
+  "rep_scheme": "3-6-9-6-3",
   "rep_scheme_type": "pyramid",
   "exercises": [
     {{
       "name": "Pull-ups",
       "sets": 5,
       "reps": null,
-      "rep_scheme": [3, 6, 9, 6, 3],
+      "rep_scheme": "3-6-9-6-3",
       "rep_scheme_type": "pyramid",
       "type": "strength",
       "notes": null
