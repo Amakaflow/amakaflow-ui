@@ -5,7 +5,7 @@ Part of AMA-389: Define canonical Workout domain model
 """
 
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -26,6 +26,10 @@ class BlockType(str, Enum):
     SUPERSET = "superset"
     CIRCUIT = "circuit"
     TIMED_ROUND = "timed_round"
+    LADDER = "ladder"
+    PYRAMID = "pyramid"
+    COMPLEX = "complex"
+    DROP_SET = "drop_set"
 
 
 class Block(BaseModel):
@@ -91,6 +95,28 @@ class Block(BaseModel):
         default=None,
         ge=0,
         description="Rest period between rounds/supersets in seconds",
+    )
+
+    # Extended fields (AMA-754)
+    rep_scheme: Optional[str] = Field(
+        default=None,
+        description="Rep scheme description (e.g., '5-4-3-2-1', '10-8-6')",
+    )
+    rep_scheme_type: Optional[Literal["descending", "ascending", "pyramid", "wave", "custom"]] = Field(
+        default=None,
+        description="Type of rep scheme pattern",
+    )
+    session: Optional[str] = Field(
+        default=None,
+        description="Training session label (e.g., 'Session A', 'Week 1 Day 1')",
+    )
+    block_type: Optional[Literal["warmup", "strength", "metcon", "cooldown", "cardio"]] = Field(
+        default=None,
+        description="Functional category of this block within the workout",
+    )
+    load_variants: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="List of load variant options for this block (e.g., different weights per set)",
     )
 
     @field_validator("exercises")

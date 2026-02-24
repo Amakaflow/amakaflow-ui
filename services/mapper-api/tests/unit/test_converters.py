@@ -1069,6 +1069,127 @@ class TestRoundTrip:
         exercise_steps = [s for s in repeat.intervals if s.kind == "reps"]
         assert len(exercise_steps) == 2
 
+    def test_ama754_new_block_fields_roundtrip(self):
+        """New Block fields (AMA-754) survive _workout_to_blocks_format -> blocks_to_workout."""
+        from domain.converters.db_converters import _workout_to_blocks_format
+
+        workout = Workout(
+            title="AMA-754 Round Trip",
+            blocks=[
+                Block(
+                    type=BlockType.LADDER,
+                    rep_scheme="5-4-3-2-1",
+                    rep_scheme_type="descending",
+                    session="Session A",
+                    block_type="strength",
+                    load_variants=[{"weight": 135, "unit": "lb"}, {"weight": 145, "unit": "lb"}],
+                    exercises=[
+                        Exercise(
+                            name="Squat",
+                            sets=5,
+                            reps=5,
+                            load=Load(value=135, unit="lb", load_type="absolute"),
+                            load_options=[
+                                Load(value=135, unit="lb", load_type="absolute"),
+                                Load(value=145, unit="lb", load_type="absolute"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        # Serialize to blocks format
+        blocks_format = _workout_to_blocks_format(workout)
+        block_data = blocks_format["blocks"][0]
+
+        # Verify new block fields are in the serialized format
+        assert block_data.get("rep_scheme") == "5-4-3-2-1"
+        assert block_data.get("rep_scheme_type") == "descending"
+        assert block_data.get("session") == "Session A"
+        assert block_data.get("block_type") == "strength"
+        assert block_data.get("load_variants") == [
+            {"weight": 135, "unit": "lb"},
+            {"weight": 145, "unit": "lb"},
+        ]
+
+        # Verify new exercise fields are serialized
+        ex_data = block_data["exercises"][0]
+        assert ex_data.get("load_type") == "absolute"
+        assert ex_data.get("load_options") is not None
+        assert len(ex_data["load_options"]) == 2
+
+        # Deserialize back to workout
+        reconstructed = blocks_to_workout(blocks_format)
+        r_block = reconstructed.blocks[0]
+
+        assert r_block.type == BlockType.LADDER
+        assert r_block.rep_scheme == "5-4-3-2-1"
+        assert r_block.rep_scheme_type == "descending"
+        assert r_block.session == "Session A"
+        assert r_block.block_type == "strength"
+        assert r_block.load_variants == [
+            {"weight": 135, "unit": "lb"},
+            {"weight": 145, "unit": "lb"},
+        ]
+
+        r_ex = r_block.exercises[0]
+        assert r_ex.load is not None
+        assert r_ex.load.load_type == "absolute"
+        assert r_ex.load_options is not None
+        assert len(r_ex.load_options) == 2
+        assert r_ex.load_options[0].value == 135
+        assert r_ex.load_options[1].value == 145
+
+    def test_ama754_new_block_types_roundtrip(self):
+        """New BlockType values (LADDER, PYRAMID, COMPLEX, DROP_SET) survive round-trip."""
+        from domain.converters.db_converters import _workout_to_blocks_format
+
+        for block_type in (BlockType.LADDER, BlockType.PYRAMID, BlockType.COMPLEX, BlockType.DROP_SET):
+            workout = Workout(
+                title=f"{block_type.value} Round Trip",
+                blocks=[
+                    Block(
+                        type=block_type,
+                        exercises=[Exercise(name="Squat", sets=5, reps=5)],
+                    )
+                ],
+            )
+
+            blocks_format = _workout_to_blocks_format(workout)
+            reconstructed = blocks_to_workout(blocks_format)
+
+            assert reconstructed.blocks[0].type == block_type, (
+                f"Expected {block_type} to survive round-trip"
+            )
+
+    def test_ama754_load_type_roundtrip(self):
+        """load_type field on Load survives _workout_to_blocks_format -> blocks_to_workout."""
+        from domain.converters.db_converters import _workout_to_blocks_format
+
+        workout = Workout(
+            title="Load Type Round Trip",
+            blocks=[
+                Block(
+                    exercises=[
+                        Exercise(
+                            name="Squat",
+                            sets=3,
+                            reps=10,
+                            load=Load(value=135, unit="lb", load_type="absolute"),
+                        )
+                    ]
+                )
+            ],
+        )
+
+        blocks_format = _workout_to_blocks_format(workout)
+        ex_data = blocks_format["blocks"][0]["exercises"][0]
+        assert ex_data.get("load_type") == "absolute"
+
+        reconstructed = blocks_to_workout(blocks_format)
+        assert reconstructed.blocks[0].exercises[0].load.load_type == "absolute"
+
     def test_legacy_superset_to_workoutkit_pipeline(self):
         """Old DB format with supersets[] array still produces correct WorkoutKit output."""
         legacy_blocks_json = {

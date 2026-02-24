@@ -4,7 +4,7 @@ Load value object for exercise weight/resistance.
 Part of AMA-389: Define canonical Workout domain model
 """
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -37,6 +37,10 @@ class Load(BaseModel):
     per_side: bool = Field(
         default=False,
         description="True if load is per arm/leg (e.g., dumbbells), False for total load",
+    )
+    load_type: Optional[Literal["absolute", "percentage", "bodyweight", "rpe"]] = Field(
+        default=None,
+        description="How the load is expressed (absolute weight, % of max, bodyweight, or RPE)",
     )
 
     @field_validator("value")

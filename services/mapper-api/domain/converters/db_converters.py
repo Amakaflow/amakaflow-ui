@@ -251,6 +251,19 @@ def _workout_to_blocks_format(workout: Workout) -> Dict[str, Any]:
             if ex.load:
                 ex_data["weight"] = ex.load.value
                 ex_data["weight_unit"] = ex.load.unit
+                if ex.load.load_type is not None:
+                    ex_data["load_type"] = ex.load.load_type
+
+            # Serialize load_options (AMA-754)
+            if ex.load_options:
+                ex_data["load_options"] = [
+                    {
+                        "weight": opt.value,
+                        "unit": opt.unit,
+                        **({"load_type": opt.load_type} if opt.load_type is not None else {}),
+                    }
+                    for opt in ex.load_options
+                ]
 
             exercises_data.append(ex_data)
 
@@ -272,6 +285,18 @@ def _workout_to_blocks_format(workout: Workout) -> Dict[str, Any]:
 
         if block.rest_between_seconds:
             block_data["rest_between_sec"] = block.rest_between_seconds
+
+        # Serialize new AMA-754 block fields
+        if block.rep_scheme is not None:
+            block_data["rep_scheme"] = block.rep_scheme
+        if block.rep_scheme_type is not None:
+            block_data["rep_scheme_type"] = block.rep_scheme_type
+        if block.session is not None:
+            block_data["session"] = block.session
+        if block.block_type is not None:
+            block_data["block_type"] = block.block_type
+        if block.load_variants is not None:
+            block_data["load_variants"] = block.load_variants
 
         # All block types store exercises uniformly in exercises[].
         block_data["exercises"] = exercises_data

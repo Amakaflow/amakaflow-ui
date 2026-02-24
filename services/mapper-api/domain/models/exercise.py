@@ -78,6 +78,10 @@ class Exercise(BaseModel):
 
     # Load and rest
     load: Optional[Load] = Field(default=None, description="Weight/resistance")
+    load_options: Optional[List[Load]] = Field(
+        default=None,
+        description="Alternative load options for the exercise (e.g., different weights per set)",
+    )
     rest_seconds: Optional[int] = Field(
         default=None, ge=0, description="Rest period after exercise in seconds"
     )
