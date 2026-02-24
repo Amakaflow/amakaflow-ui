@@ -1,0 +1,343 @@
+"""
+Pydantic schemas for calendar API request/response validation.
+
+Updated with full calendar event fields for connected calendars,
+anchor workouts, and smart planner features.
+"""
+from datetime import date, time, datetime
+from decimal import Decimal
+from typing import Optional, Literal, Any
+from uuid import UUID
+from pydantic import BaseModel, Field
+
+
+# Type definitions
+SourceType = Literal[
+    "manual",
+    "gym_manual_sync",
+    "connected_calendar",
+    "smart_planner",
+    "template",
+    "gym_class",
+    "amaka",
+    "instagram",
+    "tiktok",
+    "garmin",
+    "runna",
+    "training_program",
+]
+
+WorkoutType = Literal[
+    "run",
+    "strength",
+    "hyrox",
+    "class",
+    "home_workout",
+    "mobility",
+    "recovery",
+]
+
+StatusType = Literal["planned", "completed"]
+
+PrimaryMuscleType = Literal["upper", "lower", "full_body", "core", "none"]
+
+ConnectedCalendarType = Literal["runna", "apple", "google", "outlook", "ics_custom"]
+
+IntegrationType = Literal["ics_url", "oauth", "os_integration"]
+
+SyncStatusType = Literal["active", "error", "paused"]
+
+
+class WorkoutEventBase(BaseModel):
+    """Base schema for workout event fields."""
+    title: str
+    date: date
+    source: SourceType = "manual"
+    type: Optional[WorkoutType] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    status: StatusType = "planned"
+
+    # New fields
+    is_anchor: bool = False
+    primary_muscle: Optional[PrimaryMuscleType] = None
+    intensity: Optional[int] = Field(default=1, ge=0, le=3)
+    connected_calendar_id: Optional[UUID] = None
+    connected_calendar_type: Optional[ConnectedCalendarType] = None
+    external_event_url: Optional[str] = None
+    recurrence_rule: Optional[str] = None
+
+    # Program integration fields (AMA-469)
+    program_id: Optional[UUID] = None
+    program_workout_id: Optional[UUID] = None
+    program_week_number: Optional[int] = None
+
+    json_payload: Optional[dict[str, Any]] = None
+
+
+class WorkoutEventCreate(WorkoutEventBase):
+    """Schema for creating a new workout event."""
+    pass
+
+
+class WorkoutEventUpdate(BaseModel):
+    """Schema for updating a workout event (all fields optional)."""
+    title: Optional[str] = None
+    date: Optional[date] = None
+    source: Optional[SourceType] = None
+    type: Optional[WorkoutType] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    status: Optional[StatusType] = None
+
+    # New fields
+    is_anchor: Optional[bool] = None
+    primary_muscle: Optional[PrimaryMuscleType] = None
+    intensity: Optional[int] = Field(default=None, ge=0, le=3)
+    connected_calendar_id: Optional[UUID] = None
+    connected_calendar_type: Optional[ConnectedCalendarType] = None
+    external_event_url: Optional[str] = None
+    recurrence_rule: Optional[str] = None
+
+    # Program integration fields (AMA-469)
+    program_id: Optional[UUID] = None
+    program_workout_id: Optional[UUID] = None
+    program_week_number: Optional[int] = None
+
+    json_payload: Optional[dict[str, Any]] = None
+
+
+class WorkoutEvent(WorkoutEventBase):
+    """Schema for workout event response (includes id and user_id)."""
+    id: UUID
+    user_id: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Connected Calendar schemas
+class ConnectedCalendarBase(BaseModel):
+    """Base schema for connected calendar fields."""
+    name: str
+    type: ConnectedCalendarType
+    integration_type: IntegrationType
+    is_workout_calendar: bool = True
+    ics_url: Optional[str] = None
+    color: Optional[str] = None
+
+
+class ConnectedCalendarCreate(ConnectedCalendarBase):
+    """Schema for creating a connected calendar."""
+    pass
+
+
+class ConnectedCalendarUpdate(BaseModel):
+    """Schema for updating a connected calendar."""
+    name: Optional[str] = None
+    is_workout_calendar: Optional[bool] = None
+    ics_url: Optional[str] = None
+    color: Optional[str] = None
+    sync_status: Optional[SyncStatusType] = None
+
+
+class ConnectedCalendar(ConnectedCalendarBase):
+    """Schema for connected calendar response."""
+    id: UUID
+    user_id: str
+    last_sync: Optional[str] = None
+    sync_status: SyncStatusType = "active"
+    sync_error_message: Optional[str] = None
+    workouts_this_week: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Program Events schemas (AMA-469)
+class ProgramEventCreate(BaseModel):
+    """Schema for creating a single program event in bulk."""
+    title: str
+    date: date
+    type: Optional[WorkoutType] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    primary_muscle: Optional[PrimaryMuscleType] = None
+    intensity: Optional[int] = Field(default=1, ge=0, le=3)
+    program_workout_id: UUID
+    program_week_number: int = Field(ge=1)
+    json_payload: Optional[dict[str, Any]] = None
+
+
+class BulkProgramEventsCreate(BaseModel):
+    """Schema for bulk creating program events."""
+    program_id: UUID
+    events: list[ProgramEventCreate]
+
+
+class BulkProgramEventsResponse(BaseModel):
+    """Response schema for bulk program event creation."""
+    program_id: UUID
+    events_created: int
+    event_ids: list[UUID]
+    event_mapping: dict[str, str] = Field(
+        description="Mapping of program_workout_id to calendar_event_id"
+    )
+
+
+class ProgramEventsResponse(BaseModel):
+    """Response schema for listing program events."""
+    program_id: UUID
+    events: list[WorkoutEvent]
+    total: int
+
+
+# ============================================
+# TRAINING PROGRAMS SCHEMAS (AMA-528)
+# ============================================
+
+# Type definitions for training programs
+ProgramGoalType = Literal[
+    "strength", "hypertrophy", "fat_loss", "endurance", "general_fitness"
+]
+
+PeriodizationType = Literal["linear", "undulating", "block", "conjugate"]
+
+ExperienceLevelType = Literal["beginner", "intermediate", "advanced"]
+
+ProgramStatusType = Literal["draft", "active", "paused", "completed", "archived"]
+
+
+class ProgramExercise(BaseModel):
+    """Schema for an exercise within a program workout."""
+    id: Optional[UUID] = None
+    exercise_order: int = 0
+    name: str
+    sets: int
+    reps: str  # Can be "8-12" or "8" or "AMRAP"
+    rest_seconds: int = 60
+    weight: Optional[float] = None
+    notes: Optional[str] = None
+    tempo: Optional[str] = None  # e.g., "3-1-2-0"
+    rpe: Optional[int] = Field(default=None, ge=1, le=10)
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProgramWorkout(BaseModel):
+    """Schema for a workout within a program week."""
+    id: UUID
+    week_id: UUID
+    user_id: Optional[str] = None
+    day_of_week: int = Field(ge=0, le=6)  # 0-6 (Sunday-Saturday)
+    name: str
+    workout_type: str
+    target_duration_minutes: Optional[int] = None
+    exercises: list[ProgramExercise] = []
+    is_completed: bool = False
+    completed_at: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProgramWeek(BaseModel):
+    """Schema for a week within a training program."""
+    id: UUID
+    program_id: UUID
+    user_id: Optional[str] = None
+    week_number: int = Field(ge=1)
+    focus: Optional[str] = None
+    intensity_percentage: Optional[int] = Field(default=None, ge=0, le=100)
+    volume_modifier: float = 1.0
+    is_deload: bool = False
+    workouts: list[ProgramWorkout] = []
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TrainingProgram(BaseModel):
+    """Schema for a complete training program."""
+    id: UUID
+    user_id: str
+    name: str
+    goal: ProgramGoalType
+    periodization_model: PeriodizationType
+    duration_weeks: int = Field(ge=1)
+    sessions_per_week: int = Field(ge=1, le=7)
+    experience_level: ExperienceLevelType
+    equipment_available: list[str] = []
+    time_per_session_minutes: int = Field(ge=1)
+    status: ProgramStatusType = "draft"
+    current_week: int = Field(default=1, ge=1)
+    weeks: list[ProgramWeek] = []
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Request schemas for training programs
+class TrainingProgramStatusUpdate(BaseModel):
+    """Schema for updating program status."""
+    user_id: str
+    status: ProgramStatusType
+
+
+class TrainingProgramProgressUpdate(BaseModel):
+    """Schema for updating program progress (current week)."""
+    user_id: str
+    current_week: int = Field(ge=1)
+
+
+class WorkoutCompleteUpdate(BaseModel):
+    """Schema for marking a workout complete/incomplete."""
+    user_id: str
+    is_completed: bool = True
+
+
+class TrainingProgramDelete(BaseModel):
+    """Schema for deleting a training program."""
+    user_id: str
+
+
+# Response schemas for training programs
+class TrainingProgramResponse(BaseModel):
+    """Response schema for a single training program."""
+    success: bool
+    program: Optional[TrainingProgram] = None
+    message: Optional[str] = None
+
+
+class TrainingProgramsListResponse(BaseModel):
+    """Response schema for listing training programs."""
+    success: bool
+    programs: list[TrainingProgram]
+    count: int
+
+
+class TrainingProgramStatusResponse(BaseModel):
+    """Response schema for status/progress updates."""
+    success: bool
+    message: str
+
+
+class WorkoutResponse(BaseModel):
+    """Response schema for a single workout."""
+    success: bool
+    workout: Optional[ProgramWorkout] = None
+    message: Optional[str] = None

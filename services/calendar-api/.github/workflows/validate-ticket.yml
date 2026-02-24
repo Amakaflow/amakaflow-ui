@@ -1,0 +1,10 @@
+name: Validate Linear Ticket
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  call-shared:
+    uses: Amakaflow/.github/.github/workflows/validate-ticket.yml@main
+    secrets: inherit
