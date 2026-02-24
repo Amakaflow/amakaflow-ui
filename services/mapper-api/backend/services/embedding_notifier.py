@@ -40,7 +40,7 @@ async def notify_embedding_update(workout_id: str, chat_api_url: str) -> None:
     """
     url = f"{chat_api_url}/internal/embeddings/webhook"
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
             response = await client.post(url, json={"workout_id": workout_id})
             response.raise_for_status()
         logger.debug(

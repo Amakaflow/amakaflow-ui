@@ -57,6 +57,9 @@ router = APIRouter(
     tags=["Workouts"],
 )
 
+# Module-level set to retain background task references and prevent GC before completion.
+_background_tasks: set[asyncio.Task] = set()
+
 
 # =============================================================================
 # Request/Response Models
@@ -232,7 +235,7 @@ class WorkoutOperationResponse(BaseModel):
 
 
 @router.post("/workouts/save")
-def save_workout_endpoint(
+async def save_workout_endpoint(
     request: SaveWorkoutRequest,
     user_id: str = Depends(get_current_user),
     save_workout_use_case: SaveWorkoutUseCase = Depends(get_save_workout_use_case),
@@ -281,7 +284,7 @@ def save_workout_endpoint(
             device=request.device,
         )
 
-        # Step 3: Queue workout for export if save was successful
+        # Step 3: Queue workout for export and notify embedding webhook if save was successful
         if result.success and result.workout_id:
             export_queue.enqueue(
                 workout_id=result.workout_id,
@@ -289,15 +292,15 @@ def save_workout_endpoint(
                 device=request.device,
                 export_formats=request.exports or {},
             )
-
-        # Step 4: Notify chat-api to generate embedding (fire-and-forget)
-        if result.success and result.workout_id:
-            asyncio.create_task(
+            # Notify chat-api to generate embedding (fire-and-forget)
+            _task = asyncio.create_task(
                 notify_embedding_update(
                     workout_id=result.workout_id,
                     chat_api_url=get_settings().chat_api_url,
                 )
             )
+            _background_tasks.add(_task)
+            _task.add_done_callback(_background_tasks.discard)
 
         # Step 5: Convert use case result to HTTP response
         if result.success:
@@ -724,7 +727,7 @@ def update_workout_tags_endpoint(
         422: {"model": PatchWorkoutErrorResponse, "description": "Validation error"},
     },
 )
-def patch_workout_endpoint(
+async def patch_workout_endpoint(
     workout_id: str,
     request: PatchWorkoutRequest,
     user_id: str = Depends(get_current_user),
@@ -786,12 +789,14 @@ def patch_workout_endpoint(
         )
 
     # Notify chat-api to regenerate embedding (fire-and-forget)
-    asyncio.create_task(
+    _task = asyncio.create_task(
         notify_embedding_update(
             workout_id=workout_id,
             chat_api_url=get_settings().chat_api_url,
         )
     )
+    _background_tasks.add(_task)
+    _task.add_done_callback(_background_tasks.discard)
 
     return PatchWorkoutResponse(
         success=True,
