@@ -369,3 +369,259 @@ class TestReturnType:
             raw_text="Squat",
         )
         assert "JSON" in result
+
+
+# ---------------------------------------------------------------------------
+# 8. AMA-757 — Comprehensive structure detection rules and examples
+# ---------------------------------------------------------------------------
+
+
+class TestStructureDecisionTree:
+    """AMA-757 item 1: explicit structure decision tree mappings."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Deadlift 10-8-6",
+        )
+
+    def test_emom_maps_to_emom(self, base_prompt: str):
+        assert 'EMOM' in base_prompt
+        assert '"emom"' in base_prompt
+
+    def test_amrap_maps_to_amrap(self, base_prompt: str):
+        assert 'AMRAP' in base_prompt
+        assert '"amrap"' in base_prompt
+
+    def test_tabata_maps_to_tabata(self, base_prompt: str):
+        assert 'Tabata' in base_prompt or 'tabata' in base_prompt
+        assert '"tabata"' in base_prompt
+
+    def test_for_time_maps_to_for_time(self, base_prompt: str):
+        assert 'For Time' in base_prompt or 'for-time' in base_prompt
+        assert '"for-time"' in base_prompt
+
+    def test_a1_a2_maps_to_superset(self, base_prompt: str):
+        assert 'A1' in base_prompt or 'A1/A2' in base_prompt
+        assert '"superset"' in base_prompt
+
+    def test_3_plus_rotating_maps_to_circuit(self, base_prompt: str):
+        assert '"circuit"' in base_prompt
+
+    def test_same_implement_maps_to_complex(self, base_prompt: str):
+        assert '"complex"' in base_prompt
+
+    def test_descending_reps_maps_to_ladder(self, base_prompt: str):
+        assert '"ladder"' in base_prompt
+
+    def test_pyramid_reps_maps_to_pyramid(self, base_prompt: str):
+        assert '"pyramid"' in base_prompt
+
+
+class TestLadderPyramidComplexExamples:
+    """AMA-757 item 2: rep_scheme and rep_scheme_type fields in JSON examples."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Deadlift 10-8-6",
+        )
+
+    def test_rep_scheme_field_present(self, base_prompt: str):
+        assert 'rep_scheme' in base_prompt
+
+    def test_rep_scheme_type_field_present(self, base_prompt: str):
+        assert 'rep_scheme_type' in base_prompt
+
+    def test_descending_rep_scheme_type_present(self, base_prompt: str):
+        assert 'descending' in base_prompt
+
+    def test_ascending_or_pyramid_rep_scheme_type_present(self, base_prompt: str):
+        assert 'ascending' in base_prompt or 'pyramid' in base_prompt
+
+
+class TestSessionGroupingRules:
+    """AMA-757 item 3: session field rules and AM/PM multi-session JSON example."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="youtube",
+            video_duration_sec=None,
+            raw_text="AM: Strength, PM: Cardio",
+        )
+
+    def test_session_field_rule_present(self, base_prompt: str):
+        assert '"session"' in base_prompt
+
+    def test_am_pm_example_present(self, base_prompt: str):
+        assert 'AM' in base_prompt or 'am' in base_prompt.lower()
+        assert 'PM' in base_prompt or 'pm' in base_prompt.lower()
+
+    def test_multi_session_json_example_present(self, base_prompt: str):
+        # Should have both AM and PM session values as strings in JSON
+        assert ('"AM"' in base_prompt or '"am"' in base_prompt or
+                '"AM strength"' in base_prompt or 'session' in base_prompt)
+
+
+class TestLoadVariants:
+    """AMA-757 item 4: load_variants for M/F weights and RX/Scaled."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Barbell Squat RX: 60kg, Scaled: 40kg",
+        )
+
+    def test_load_variants_field_present(self, base_prompt: str):
+        assert 'load_variants' in base_prompt
+
+    def test_rx_scaled_example_present(self, base_prompt: str):
+        assert 'RX' in base_prompt or 'Scaled' in base_prompt or 'rx' in base_prompt.lower()
+
+    def test_male_female_weights_mentioned(self, base_prompt: str):
+        # M/F or male/female weight variants
+        assert (
+            'male' in base_prompt.lower()
+            or ' M/' in base_prompt
+            or '/F ' in base_prompt
+            or 'gender' in base_prompt.lower()
+            or 'M:' in base_prompt
+            or '"M"' in base_prompt
+            or '"F"' in base_prompt
+        )
+
+
+class TestPercentageLoads:
+    """AMA-757 item 5: load_type: "percentage" for 1RM-based loads."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Back Squat 80% of 1RM",
+        )
+
+    def test_load_type_percentage_present(self, base_prompt: str):
+        assert '"percentage"' in base_prompt
+
+    def test_one_rm_reference_present(self, base_prompt: str):
+        assert '1RM' in base_prompt or '1rm' in base_prompt.lower()
+
+    def test_load_type_field_present(self, base_prompt: str):
+        assert 'load_type' in base_prompt
+
+
+class TestAlternativeWeights:
+    """AMA-757 item 6: load_options for alternative weight choices."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="tiktok",
+            video_duration_sec=None,
+            raw_text="KB Swing use 8kg or 12kg",
+        )
+
+    def test_load_options_field_present(self, base_prompt: str):
+        assert 'load_options' in base_prompt
+
+    def test_alternative_weight_example_present(self, base_prompt: str):
+        # Should reference "or" weight choices in an example
+        assert '8kg' in base_prompt or '12kg' in base_prompt or 'load_options' in base_prompt
+
+
+class TestBilingualHandling:
+    """AMA-757 item 7: bilingual/non-English workout text handling rules."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Sentadilla 3x10",
+        )
+
+    def test_bilingual_rule_present(self, base_prompt: str):
+        assert 'language' in base_prompt.lower() or 'bilingual' in base_prompt.lower()
+
+    def test_original_language_instruction_present(self, base_prompt: str):
+        # Exercise names in original language, structure values stay English
+        assert 'original language' in base_prompt.lower() or 'original' in base_prompt.lower()
+
+    def test_structure_values_english_rule_present(self, base_prompt: str):
+        # Rule that structure field values remain English literals
+        assert 'English' in base_prompt or 'english' in base_prompt.lower()
+
+
+class TestConfidenceRules:
+    """AMA-757 item 8: confidence < 0.8 rules and structure_options population."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="instagram",
+            video_duration_sec=None,
+            raw_text="Push-ups and pull-ups 3 sets",
+        )
+
+    def test_ambiguous_signal_rule_present(self, base_prompt: str):
+        assert 'ambiguous' in base_prompt.lower()
+
+    def test_mixed_cues_rule_present(self, base_prompt: str):
+        assert 'mixed' in base_prompt.lower() or 'ambiguous' in base_prompt.lower()
+
+    def test_structure_options_population_rule_present(self, base_prompt: str):
+        assert 'structure_options' in base_prompt
+
+    def test_confidence_below_threshold_rule_present(self, base_prompt: str):
+        # Rule that < 0.8 requires structure_options
+        assert '0.8' in base_prompt
+
+
+class TestCompleteJSONExamples:
+    """AMA-757 item 9: two complete JSON examples (ladder + multi-session)."""
+
+    @pytest.fixture()
+    def base_prompt(self) -> str:
+        return build_prompt(
+            platform="youtube",
+            video_duration_sec=None,
+            raw_text="Deadlift 10-8-6-4-2, AM Strength PM Cardio",
+        )
+
+    def test_descending_ladder_json_example_present(self, base_prompt: str):
+        # Must have a ladder example with rep_scheme showing descending pattern
+        assert 'rep_scheme_type' in base_prompt
+        assert 'descending' in base_prompt
+        # Must contain a rep_scheme array or string like "10-8-6-4-2"
+        assert ('10-8-6' in base_prompt or '"rep_scheme"' in base_prompt)
+
+    def test_ladder_example_has_deadlift_or_similar(self, base_prompt: str):
+        # The example should use a recognisable exercise
+        assert (
+            'Deadlift' in base_prompt
+            or 'deadlift' in base_prompt
+            or 'ladder' in base_prompt.lower()
+        )
+
+    def test_multi_session_json_example_present(self, base_prompt: str):
+        # AM strength + PM cardio example with session field
+        assert '"session"' in base_prompt
+        assert (
+            '"AM"' in base_prompt
+            or 'AM strength' in base_prompt
+            or '"AM Strength"' in base_prompt
+        )
+        assert (
+            '"PM"' in base_prompt
+            or 'PM cardio' in base_prompt
+            or '"PM Cardio"' in base_prompt
+        )

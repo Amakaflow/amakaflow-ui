@@ -250,6 +250,195 @@ When the workout is detected as timed-station (caption uses "MM-MM:" format or "
 - Do NOT use "Complete as fast as possible" for timed-station exercises
 - Format: "<N> minute cap" where N is the window duration
 
+STRUCTURE DECISION TREE — MAP WORKOUT TYPE TO structure FIELD VALUE:
+Use this mapping when assigning the structure field to any block:
+- EMOM keyword detected → structure: "emom"
+- AMRAP keyword detected → structure: "amrap"
+- Tabata keyword detected → structure: "tabata"
+- For Time keyword detected → structure: "for-time"
+- A1/A2 notation (exactly 2 exercises paired) → structure: "superset"
+- 3 or more rotating exercises in a round → structure: "circuit"
+- Same implement, multiple movements performed in sequence → structure: "complex"
+- Descending rep scheme (e.g. 10-8-6, 21-15-9) → structure: "ladder"
+- Up-then-down rep scheme (e.g. 3-6-9-6-3, 5-10-5) → structure: "pyramid"
+
+LADDER / PYRAMID / COMPLEX / DROP-SET EXAMPLES:
+When a workout uses a non-uniform rep scheme, populate rep_scheme and rep_scheme_type:
+- rep_scheme: the rep sequence as a list or string (e.g. [10, 8, 6, 4, 2])
+- rep_scheme_type: one of "descending", "ascending", "pyramid", "drop-set", "wave"
+
+Descending ladder example (10-8-6-4-2 Deadlifts):
+{{
+  "label": "Deadlift Ladder",
+  "structure": "ladder",
+  "structure_confidence": 0.95,
+  "structure_options": [],
+  "rep_scheme": [10, 8, 6, 4, 2],
+  "rep_scheme_type": "descending",
+  "exercises": [
+    {{
+      "name": "Deadlift",
+      "sets": 5,
+      "reps": null,
+      "rep_scheme": [10, 8, 6, 4, 2],
+      "rep_scheme_type": "descending",
+      "type": "strength",
+      "notes": "Reset between each set"
+    }}
+  ],
+  "supersets": []
+}}
+
+Pyramid example (3-6-9-6-3 reps):
+{{
+  "label": "Pyramid Sets",
+  "structure": "pyramid",
+  "structure_confidence": 0.9,
+  "structure_options": [],
+  "rep_scheme": [3, 6, 9, 6, 3],
+  "rep_scheme_type": "pyramid",
+  "exercises": [
+    {{
+      "name": "Pull-ups",
+      "sets": 5,
+      "reps": null,
+      "rep_scheme": [3, 6, 9, 6, 3],
+      "rep_scheme_type": "pyramid",
+      "type": "strength",
+      "notes": null
+    }}
+  ],
+  "supersets": []
+}}
+
+Complex example (same barbell, multiple movements back-to-back):
+{{
+  "label": "Barbell Complex",
+  "structure": "complex",
+  "structure_confidence": 0.9,
+  "structure_options": [],
+  "rounds": 4,
+  "exercises": [
+    {{"name": "Barbell Row", "sets": null, "reps": 6, "type": "strength", "notes": "Do not rerack between movements"}},
+    {{"name": "Hang Power Clean", "sets": null, "reps": 6, "type": "strength", "notes": null}},
+    {{"name": "Front Squat", "sets": null, "reps": 6, "type": "strength", "notes": null}},
+    {{"name": "Push Press", "sets": null, "reps": 6, "type": "strength", "notes": null}}
+  ],
+  "supersets": []
+}}
+
+SESSION GROUPING RULES:
+Use the session field on a block when the workout is explicitly split across multiple sessions in the same day (e.g. AM/PM splits, morning strength + evening cardio).
+- Set session to a short descriptive string matching the label (e.g. "AM", "PM", "Morning", "Evening")
+- Only set session when the text explicitly names the split (e.g. "AM session", "Morning:", "PM:")
+- Do NOT set session for single-session workouts or for distinct blocks within a single session
+
+Multi-session (AM strength + PM cardio) JSON example:
+{{
+  "title": "Two-a-Day Training",
+  "workout_type": "mixed",
+  "workout_type_confidence": 0.95,
+  "video_duration_sec": null,
+  "blocks": [
+    {{
+      "label": "AM Strength",
+      "session": "AM",
+      "structure": null,
+      "structure_confidence": 0.9,
+      "structure_options": [],
+      "rounds": null,
+      "exercises": [
+        {{"name": "Back Squat", "sets": 4, "reps": 5, "type": "strength", "notes": null}},
+        {{"name": "Romanian Deadlift", "sets": 3, "reps": 8, "type": "strength", "notes": null}}
+      ],
+      "supersets": []
+    }},
+    {{
+      "label": "PM Cardio",
+      "session": "PM",
+      "structure": null,
+      "structure_confidence": 0.9,
+      "structure_options": [],
+      "rounds": null,
+      "exercises": [
+        {{"name": "Run", "sets": 1, "reps": null, "distance_m": 5000, "type": "cardio", "notes": "Easy pace"}}
+      ],
+      "supersets": []
+    }}
+  ]
+}}
+
+LOAD VARIANTS — M/F WEIGHTS AND RX/SCALED:
+When a workout specifies different loads for different populations (e.g. male/female prescribed weights, RX vs Scaled), use the load_variants field.
+- load_variants: an object with keys for each variant (e.g. "M", "F", "RX", "Scaled") and values as load strings
+- Populate load_variants whenever the text specifies 2+ distinct loading options for the same exercise
+
+Load variants JSON example:
+{{
+  "name": "Barbell Thruster",
+  "sets": 5,
+  "reps": 10,
+  "type": "strength",
+  "load_variants": {{
+    "M": "43kg",
+    "F": "29kg",
+    "RX": "43kg",
+    "Scaled": "20kg"
+  }},
+  "notes": "RX and Scaled options listed"
+}}
+
+PERCENTAGE LOADS:
+When load is expressed as a percentage of a max (e.g. "80% of 1RM", "70% 1RM", "75% max"), use load_type: "percentage".
+- load_type: "percentage"
+- load: the percentage value as a string (e.g. "80%")
+- Do NOT convert percentage loads to absolute weights — preserve as stated
+
+Percentage load JSON example:
+{{
+  "name": "Back Squat",
+  "sets": 3,
+  "reps": 5,
+  "type": "strength",
+  "load": "80%",
+  "load_type": "percentage",
+  "notes": "80% of 1RM"
+}}
+
+ALTERNATIVE WEIGHTS — LOAD OPTIONS:
+When the workout offers a choice of weights (e.g. "use 8kg or 12kg"), use the load_options field.
+- load_options: a list of weight strings the athlete can choose from
+- Use load_options when the text explicitly offers alternatives (e.g. "8kg or 12kg", "choose 20 or 24kg")
+
+Alternative weights JSON example:
+{{
+  "name": "Kettlebell Swing",
+  "sets": 4,
+  "reps": 20,
+  "type": "strength",
+  "load_options": ["8kg", "12kg"],
+  "notes": "Choose weight appropriate to skill level"
+}}
+
+BILINGUAL HANDLING:
+If the workout text is in a language other than English (e.g. Spanish, Portuguese, French, German):
+- Extract workout content normally using the same rules
+- Exercise names should be kept in the original language as written in the source text (do NOT translate them)
+- All structure field values remain English literals (e.g. structure: "circuit", not "circuito")
+- All other structural fields (sets, reps, rounds, etc.) follow the same rules regardless of source language
+- If exercise names appear in mixed language (e.g. "Sentadilla / Squat"), use the form closest to the original source text
+
+CONFIDENCE RULES — WHEN TO SET structure_confidence < 0.8:
+Set structure_confidence below 0.8 and populate structure_options with alternatives when:
+- The workout text contains ambiguous signals (e.g. exercises listed with no sets, no round count, no pairing cues)
+- Mixed cues are present (e.g. text says "3 rounds" but exercises have individual set counts — could be circuit or straight sets)
+- Two or more structures are plausible given the available information
+- The block uses a format you have not seen before and cannot confidently classify
+- Keywords are absent and exercise grouping is unclear
+
+When structure_confidence < 0.8, you MUST populate structure_options with the plausible alternative structure values.
+Example: if a block could be either circuit or straight sets, set structure_options: ["circuit", null].
+
 Return ONLY a valid JSON object.
 
 STRUCTURE FOR CIRCUIT / ROUNDS BLOCKS (3+ exercises, repeated):
