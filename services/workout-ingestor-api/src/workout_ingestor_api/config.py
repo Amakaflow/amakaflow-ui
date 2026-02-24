@@ -45,6 +45,7 @@ class Settings:
 
         # Model configuration
         self.PARSE_MODEL: str = os.getenv("PARSE_MODEL", "gpt-4o-mini")
+        self.ANTHROPIC_PARSE_MODEL: str = os.getenv("ANTHROPIC_PARSE_MODEL", "claude-3-5-sonnet-20241022")
 
 
 settings = Settings()

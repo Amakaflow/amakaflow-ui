@@ -152,7 +152,7 @@ def _parse_with_anthropic(
     context = AIRequestContext(
         user_id=user_id,
         feature_name="youtube_parse_transcript_anthropic",
-        custom_properties={"model": "claude-3-5-sonnet-20241022"},
+        custom_properties={"model": settings.ANTHROPIC_PARSE_MODEL},
     )
 
     try:
@@ -178,7 +178,7 @@ def _parse_with_anthropic(
 
     def _make_api_call() -> Dict:
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=settings.ANTHROPIC_PARSE_MODEL,
             max_tokens=4096,
             system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_message}],
