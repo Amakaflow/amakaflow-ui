@@ -211,16 +211,19 @@ Example: "In a 5 minute window complete: 0-5: 1000m Ski, 5-10: 50m Sled Push, 15
 CONFIDENCE SCORING — INCLUDE IN EVERY BLOCK:
 - "structure_confidence": float 0.0–1.0 — your confidence in the "structure" field
 - "structure_options": list[str] — required when structure_confidence < 0.8; empty list [] when confidence >= 0.8
+- "needs_clarification": boolean — set to true only when structure_confidence < 0.5 (interactive clarification needed before save)
 
 Confidence scale:
-- 1.0   : unambiguous keyword signal ("AMRAP", "EMOM", "For Time", "Tabata", "3 rounds", "repeat N times", explicit round count like "x4")
+- 1.0      : unambiguous keyword signal ("AMRAP", "EMOM", "For Time", "Tabata", "3 rounds", "repeat N times", explicit round count like "x4")
 - 0.85–0.99: exercises with explicit sets and reps but no grouping/round signal — clearly straight sets
-- 0.8   : moderately confident — use for borderline cases where structure is likely correct but not certain
-- 0.5–0.79: ambiguous — two structures are plausible (e.g. could be circuit or superset; set structure_options accordingly)
-- 0.3–0.49: very ambiguous — exercises listed with no sets, no reps, and no round/repeat signal
-- 0.0–0.29: reserved for extreme ambiguity; use sparingly
+- 0.8      : moderately confident — use for borderline cases where structure is likely correct but not certain
+- 0.5–0.79 : ambiguous — two structures are plausible (e.g. could be circuit or superset); set structure_options with alternatives
+- 0.3–0.49 : very ambiguous — exercises listed with no sets, no reps, and no round/repeat signal; set needs_clarification: true
+- 0.0–0.29 : reserved for extreme ambiguity where structure cannot be inferred at all; set needs_clarification: true
 
-When structure_confidence < 0.8, you MUST populate structure_options with the plausible alternative structure values.
+When structure_confidence >= 0.8: set structure_options: [] and omit needs_clarification (or set false).
+When structure_confidence 0.5–0.79: you MUST populate structure_options with all plausible alternative structure values.
+When structure_confidence < 0.5: you MUST populate structure_options AND set needs_clarification: true.
 
 SUPERSET DETECTION — CHECK ONLY IF NOT A CIRCUIT:
 Supersets are EXACTLY 2 exercises paired back-to-back. Detect when:
@@ -251,16 +254,20 @@ When the workout is detected as timed-station (caption uses "MM-MM:" format or "
 - Format: "<N> minute cap" where N is the window duration
 
 STRUCTURE DECISION TREE — MAP WORKOUT TYPE TO structure FIELD VALUE:
-Use this mapping when assigning the structure field to any block:
-- EMOM keyword detected → structure: "emom"
-- AMRAP keyword detected → structure: "amrap"
-- Tabata keyword detected → structure: "tabata"
-- For Time keyword detected → structure: "for-time"
-- A1/A2 notation (exactly 2 exercises paired) → structure: "superset"
-- 3 or more rotating exercises in a round → structure: "circuit"
-- Same implement, multiple movements performed in sequence → structure: "complex"
-- Descending rep scheme (e.g. 10-8-6, 21-15-9) → structure: "ladder"
-- Up-then-down rep scheme (e.g. 3-6-9-6-3, 5-10-5) → structure: "pyramid"
+Apply these rules in order from top to bottom. The first rule that matches wins.
+
+1. If keyword "EMOM" appears anywhere in the block label, title, or surrounding text → structure: "emom", structure_confidence: 1.0
+2. If keyword "AMRAP" appears → structure: "amrap", structure_confidence: 1.0
+3. If keyword "Tabata" appears → structure: "tabata", structure_confidence: 1.0
+4. If keyword "For Time" appears → structure: "for-time", structure_confidence: 1.0
+5. If exercises are labeled A1/A2, B1/B2, 1a/1b (exactly 2 exercises paired) OR the word "superset" appears → structure: "superset", structure_confidence: 1.0
+6. If 3 or more exercises rotate together with a shared rest period and no explicit superset label → structure: "circuit", structure_confidence: 0.9
+7. If multiple movements are performed with the same implement without putting it down (e.g. barbell complex, dumbbell complex) → structure: "complex", structure_confidence: 0.9
+8. If rep counts follow a strictly descending pattern (e.g. 21-15-9, 10-9-8...1, 10-8-6-4-2) → structure: "ladder", structure_confidence: 0.95
+9. If rep counts go up then back down (e.g. 3-6-9-6-3, 5-10-15-10-5) → structure: "pyramid", structure_confidence: 0.9
+10. Otherwise → structure: null (straight sets)
+
+When you are genuinely unsure between two structures (e.g. could be circuit or superset, could be ladder or for-time), set structure_confidence < 0.8 and populate structure_options with both candidates.
 
 LADDER / PYRAMID / COMPLEX / DROP-SET EXAMPLES:
 When a workout uses a non-uniform rep scheme, populate rep_scheme and rep_scheme_type:
@@ -421,19 +428,37 @@ Alternative weights JSON example:
 }}
 
 BILINGUAL HANDLING:
-If the workout text is in a language other than English (e.g. Spanish, Portuguese, French, German):
-- Extract workout content normally using the same rules
-- Exercise names should be kept in the original language as written in the source text (do NOT translate them)
-- All structure field values remain English literals (e.g. structure: "circuit", not "circuito")
-- All other structural fields (sets, reps, rounds, etc.) follow the same rules regardless of source language
-- If exercise names appear in mixed language (e.g. "Sentadilla / Squat"), use the form closest to the original source text
+If the workout text contains mixed languages or is written entirely in a non-English language (e.g. Spanish, Portuguese, French, German):
+- When the same content appears in two languages, extract workout structure (sets, reps, rounds, structure type) from whichever language provides more detail — do not simply take the first language encountered.
+- Always output exercise names in English regardless of the source language. Translate or normalise to the standard English name (e.g. "Sentadilla" → "Squat", "Développé couché" → "Bench Press", "Agachamento" → "Squat").
+- If the workout contains a bilingual phrase (e.g. "Sentadilla / Squat" or "Course à pied / Running"), use the English term as the exercise name.
+- All structure field values remain English literals (e.g. structure: "circuit", not "circuito").
+- All other structural fields (sets, reps, rounds, etc.) follow the same rules regardless of source language.
+- If both language versions of a note or cue add value (e.g. technique details in one language plus safety note in the other), preserve both versions in the notes field — e.g. notes: ">15% elevation gain / plus de 15% de pente".
 
-CONFIDENCE RULES — WHEN TO SET structure_confidence < 0.8:
-Set structure_confidence below 0.8 and populate structure_options with alternatives when:
-- The workout text contains ambiguous signals (e.g. exercises listed with no sets, no round count, no pairing cues)
-- Mixed cues are present (e.g. text says "3 rounds" but exercises have individual set counts — could be circuit or straight sets)
-- Two or more structures are plausible given the available information
-- The block uses a format you have not seen before and cannot confidently classify
+CONFIDENCE RULES — THREE-TIER THRESHOLDS:
+The value of structure_confidence determines how the UI handles the result — apply these thresholds precisely:
+
+Tier 1 — structure_confidence >= 0.8 (high confidence):
+- Output the best-guess structure as-is.
+- Set structure_options: [] (empty — the LLM is confident, no alternatives needed).
+- The app saves without flagging the user.
+
+Tier 2 — structure_confidence 0.5–0.79 (moderate confidence):
+- Output the best-guess structure AND populate structure_options with the alternative candidates.
+- The app displays a visual flag so the user can correct it if needed, but does not block saving.
+- Example: if a block looks like a circuit but might be straight sets, set structure: "circuit", structure_confidence: 0.65, structure_options: ["circuit", null]
+
+Tier 3 — structure_confidence < 0.5 (low confidence):
+- Output the best-guess structure, populate structure_options with all plausible alternatives, AND set needs_clarification: true.
+- The app presents the structure_options to the user for interactive selection before saving.
+- Use this tier when exercises are listed with no sets, no reps, and no grouping signal — the structure cannot be inferred.
+
+Additional triggers for dropping below 0.8:
+- The workout text contains ambiguous signals (exercises listed with no sets, no round count, no pairing cues)
+- Mixed cues are present (e.g. text says "3 rounds" but exercises have individual set counts)
+- Two or more structures are equally plausible given the available information
+- The block uses an unfamiliar format that cannot be confidently classified
 - Keywords are absent and exercise grouping is unclear
 
 When structure_confidence < 0.8, you MUST populate structure_options with the plausible alternative structure values.
