@@ -122,7 +122,7 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Test
-        run: pytest tests/ -m "not slow and not e2e and not golden and not load" || true
+        run: pytest tests/ -m "not slow and not e2e and not golden and not load"
 
   calendar-api:
     needs: changes
@@ -183,4 +183,4 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Test
-        run: pytest tests/ -m "not slow and not e2e and not golden and not load" || true
+        run: pytest tests/ -m "not slow and not e2e and not golden and not load"
