@@ -28,7 +28,7 @@ from fastapi.responses import JSONResponse, Response  # noqa: E402
 from workout_ingestor_api.auth import get_current_user, get_optional_user, get_user_with_metadata  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from workout_ingestor_api.models import Workout, Block, STRUCTURE_CONFIDENCE_THRESHOLD  # noqa: E402
+from workout_ingestor_api.models import Workout, Block, STRUCTURE_CONFIDENCE_THRESHOLD, NEEDS_CLARIFICATION_THRESHOLD  # noqa: E402
 from workout_ingestor_api.services.ocr_service import OCRService  # noqa: E402
 from workout_ingestor_api.services.parser_service import ParserService  # noqa: E402
 from workout_ingestor_api.services.video_service import VideoService  # noqa: E402
@@ -657,9 +657,40 @@ def ingest_url(
                 "source_url": str(body.url),
             }
 
-    # 6. Compute needs_clarification
+    # 6. Compute needs_clarification and enforce structure_options population.
+    #
+    # AMA-208: Two-tier confidence threshold (design doc Phase 4c):
+    #   >= 0.8          → confident: no flag, structure_options may be empty
+    #   0.5 – 0.79      → soft flag: needs_clarification=False BUT structure_options MUST be populated
+    #   < 0.5           → needs interactive clarification: needs_clarification=True, structure_options MUST be populated
+    #
+    # If the LLM omitted structure_confidence entirely, default to 1.0 (single clear structure).
+    # If the LLM gave a value in the ambiguous range but forgot structure_options, add a placeholder
+    # so the UI always has something to show.
+    for block in workout_data.get("blocks", []):
+        confidence = block.get("structure_confidence")
+        if confidence is None:
+            # LLM omitted the field — infer a sensible default.
+            # Single-structure output with an explicit structure name → confident.
+            block["structure_confidence"] = 1.0
+            confidence = 1.0
+            if not block.get("structure_options"):
+                block["structure_options"] = []
+
+        if confidence < STRUCTURE_CONFIDENCE_THRESHOLD:
+            # Both the soft-flag zone (0.5–0.79) and clarification zone (< 0.5) require
+            # structure_options to be non-empty so the UI can present alternatives.
+            if not block.get("structure_options"):
+                current_structure = block.get("structure")
+                if current_structure:
+                    block["structure_options"] = [current_structure]
+                else:
+                    # LLM gave no structure and no options — provide the two most
+                    # common candidates so the UI always has something to show.
+                    block["structure_options"] = ["circuit", "regular"]
+
     workout_data["needs_clarification"] = any(
-        block.get("structure_confidence", 1.0) < STRUCTURE_CONFIDENCE_THRESHOLD
+        block.get("structure_confidence", 1.0) < NEEDS_CLARIFICATION_THRESHOLD
         for block in workout_data.get("blocks", [])
     )
 

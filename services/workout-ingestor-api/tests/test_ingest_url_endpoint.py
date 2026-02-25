@@ -235,17 +235,83 @@ class TestIngestUrlBlockPortability:
         assert response.json()["needs_clarification"] is True
 
     def test_needs_clarification_threshold_boundary(self, client):
-        """Exactly 0.8 is confident (< 0.8 is the trigger); 0.79 is not."""
+        """AMA-208: needs_clarification fires at < 0.5, NOT at < 0.8.
+        The 0.5–0.79 band is a soft flag only (needs_clarification stays False).
+        """
+        # Exactly 0.5 → no clarification (boundary is exclusive below)
         data = self._make_workout_data()
-        data["blocks"][0]["structure_confidence"] = 0.8
+        data["blocks"][0]["structure_confidence"] = 0.5
+        data["blocks"][0]["structure_options"] = ["circuit", "regular"]
         response = self._post_ingest(client, data)
         assert response.status_code == 200
         assert response.json()["needs_clarification"] is False
 
-        data["blocks"][0]["structure_confidence"] = 0.79
+        # 0.49 → needs_clarification
+        data["blocks"][0]["structure_confidence"] = 0.49
+        data["blocks"][0]["structure_options"] = ["circuit", "regular"]
         response = self._post_ingest(client, data)
         assert response.status_code == 200
         assert response.json()["needs_clarification"] is True
+
+        # 0.79 is in the soft-flag zone → no clarification (was incorrectly True before AMA-208)
+        data["blocks"][0]["structure_confidence"] = 0.79
+        data["blocks"][0]["structure_options"] = ["circuit", "regular"]
+        response = self._post_ingest(client, data)
+        assert response.status_code == 200
+        assert response.json()["needs_clarification"] is False
+
+        # 0.8 → confident, no clarification
+        data["blocks"][0]["structure_confidence"] = 0.8
+        data["blocks"][0]["structure_options"] = []
+        response = self._post_ingest(client, data)
+        assert response.status_code == 200
+        assert response.json()["needs_clarification"] is False
+
+    def test_soft_flag_range_structure_options_populated(self, client):
+        """AMA-208: In the 0.5–0.79 soft-flag range, structure_options must be non-empty.
+        If the LLM forgot to populate them, the route layer adds a fallback placeholder
+        using the block's chosen structure value.
+        """
+        data = self._make_workout_data(blocks=[{
+            "label": "Block 1",
+            "structure": "circuit",
+            "structure_confidence": 0.65,
+            # Deliberately omit structure_options to simulate LLM forgetting
+            "exercises": [{"name": "Squat", "sets": 3, "reps": 10, "type": "strength"}],
+            "supersets": [],
+        }])
+        response = self._post_ingest(client, data)
+        assert response.status_code == 200
+        block = response.json()["blocks"][0]
+        # structure_options must be non-empty (route fills in a fallback)
+        assert block["structure_options"]
+
+    def test_clarification_range_structure_options_populated(self, client):
+        """AMA-208: Below 0.5, structure_options must also be non-empty."""
+        data = self._make_workout_data(blocks=[{
+            "label": "Block 1",
+            "structure": "regular",
+            "structure_confidence": 0.3,
+            # Deliberately omit structure_options to simulate LLM forgetting
+            "exercises": [{"name": "Squat", "sets": 3, "reps": 10, "type": "strength"}],
+            "supersets": [],
+        }])
+        response = self._post_ingest(client, data)
+        assert response.status_code == 200
+        block = response.json()["blocks"][0]
+        assert block["structure_options"]
+        assert response.json()["needs_clarification"] is True
+
+    def test_missing_structure_confidence_defaults_to_1(self, client):
+        """AMA-208: If the LLM omits structure_confidence entirely, it defaults to 1.0."""
+        data = self._make_workout_data()
+        data["blocks"][0].pop("structure_confidence", None)
+        data["blocks"][0].pop("structure_options", None)
+        response = self._post_ingest(client, data)
+        assert response.status_code == 200
+        result = response.json()
+        assert result["needs_clarification"] is False
+        assert result["blocks"][0]["structure_confidence"] == 1.0
 
     def test_existing_block_id_is_preserved(self, client):
         fixed_id = str(_uuid.uuid4())
