@@ -187,14 +187,7 @@ function sanitizeYoutubeWorkout(workout: WorkoutStructure): WorkoutStructure {
         return null;
       }
 
-      let structure = block.structure || null;
-      if (!structure) {
-        if (cleanedExercises.length === 2) {
-          structure = 'superset';
-        } else if (cleanedExercises.length > 2) {
-          structure = 'circuit';
-        }
-      }
+      const structure = block.structure || null;
 
       return {
         ...block,
