@@ -81,8 +81,8 @@ class TestPinterestAdapterFetch:
             mock_instance = MagicMock()
             mock_cls.return_value = mock_instance
             # _get_pin_metadata is async; mock it as AsyncMock
-            mock_instance._get_pin_metadata = AsyncMock(return_value=p)
-            mock_instance._resolve_short_url = AsyncMock(return_value=url)
+            mock_instance.get_pin_metadata = AsyncMock(return_value=p)
+            mock_instance.resolve_short_url = AsyncMock(return_value=url)
             adapter = PinterestAdapter()
             return adapter.fetch(url, source_id)
 
@@ -131,8 +131,8 @@ class TestPinterestAdapterFetch:
         ) as mock_cls:
             mock_instance = MagicMock()
             mock_cls.return_value = mock_instance
-            mock_instance._get_pin_metadata = AsyncMock(return_value=pin)
-            mock_instance._resolve_short_url = AsyncMock(
+            mock_instance.get_pin_metadata = AsyncMock(return_value=pin)
+            mock_instance.resolve_short_url = AsyncMock(
                 return_value="https://www.pinterest.com/pin/123456789/"
             )
             adapter = PinterestAdapter()
@@ -146,7 +146,7 @@ class TestPinterestAdapterFetch:
         ) as mock_cls:
             mock_instance = MagicMock()
             mock_cls.return_value = mock_instance
-            mock_instance._resolve_short_url = AsyncMock(
+            mock_instance.resolve_short_url = AsyncMock(
                 side_effect=RuntimeError("Network timeout")
             )
             adapter = PinterestAdapter()
@@ -197,9 +197,9 @@ class TestPinterestAdapterVisionSuccess:
         ) as mock_vis_cls:
             mock_svc = MagicMock()
             mock_svc_cls.return_value = mock_svc
-            mock_svc._resolve_short_url = AsyncMock(return_value=url)
-            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
-            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+            mock_svc.resolve_short_url = AsyncMock(return_value=url)
+            mock_svc.get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc.download_image = AsyncMock(return_value=b"fake-image-bytes")
 
             mock_vis_cls.extract_text_from_images = MagicMock(return_value=vision_text)
 
@@ -268,9 +268,9 @@ class TestPinterestAdapterVisionFallback:
         ) as mock_vis_cls:
             mock_svc = MagicMock()
             mock_svc_cls.return_value = mock_svc
-            mock_svc._resolve_short_url = AsyncMock(return_value=url)
-            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
-            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+            mock_svc.resolve_short_url = AsyncMock(return_value=url)
+            mock_svc.get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc.download_image = AsyncMock(return_value=b"fake-image-bytes")
 
             mock_vis_cls.extract_text_from_images = MagicMock(side_effect=exc)
 
@@ -291,9 +291,9 @@ class TestPinterestAdapterVisionFallback:
         ) as mock_vis_cls:
             mock_svc = MagicMock()
             mock_svc_cls.return_value = mock_svc
-            mock_svc._resolve_short_url = AsyncMock(return_value=url)
-            mock_svc._get_pin_metadata = AsyncMock(return_value=p)
-            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+            mock_svc.resolve_short_url = AsyncMock(return_value=url)
+            mock_svc.get_pin_metadata = AsyncMock(return_value=p)
+            mock_svc.download_image = AsyncMock(return_value=b"fake-image-bytes")
 
             mock_vis_cls.extract_text_from_images = MagicMock(return_value="   ")
 
@@ -329,10 +329,10 @@ class TestPinterestAdapterVisionFallback:
         ) as mock_svc_cls:
             mock_svc = MagicMock()
             mock_svc_cls.return_value = mock_svc
-            mock_svc._resolve_short_url = AsyncMock(
+            mock_svc.resolve_short_url = AsyncMock(
                 return_value="https://www.pinterest.com/pin/123456789/"
             )
-            mock_svc._get_pin_metadata = AsyncMock(return_value=pin)
+            mock_svc.get_pin_metadata = AsyncMock(return_value=pin)
             adapter = PinterestAdapter()
             result = adapter.fetch("https://www.pinterest.com/pin/123456789/", "123456789")
 
@@ -359,9 +359,9 @@ class TestPinterestAdapterAsyncioFix:
         ) as mock_vis_cls:
             mock_svc = MagicMock()
             mock_svc_cls.return_value = mock_svc
-            mock_svc._resolve_short_url = AsyncMock(return_value=url)
-            mock_svc._get_pin_metadata = AsyncMock(return_value=pin)
-            mock_svc._download_image = AsyncMock(return_value=b"fake-image-bytes")
+            mock_svc.resolve_short_url = AsyncMock(return_value=url)
+            mock_svc.get_pin_metadata = AsyncMock(return_value=pin)
+            mock_svc.download_image = AsyncMock(return_value=b"fake-image-bytes")
             mock_vis_cls.extract_text_from_images = MagicMock(
                 return_value="10 squats, 10 push-ups"
             )
