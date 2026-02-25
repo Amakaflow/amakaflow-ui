@@ -555,9 +555,10 @@ class TestBilingualHandling:
     def test_bilingual_rule_present(self, base_prompt: str):
         assert 'BILINGUAL' in base_prompt
 
-    def test_original_language_instruction_present(self, base_prompt: str):
-        # Exercise names in original language, structure values stay English
-        assert 'original language' in base_prompt.lower() or 'original' in base_prompt.lower()
+    def test_english_exercise_names_instruction_present(self, base_prompt: str):
+        # Phase 4f (AMA-747): exercise names must be output in English regardless of source language
+        # The old rule ("keep in original language") was replaced by this in the design doc.
+        assert 'English' in base_prompt or 'english' in base_prompt.lower()
 
     def test_structure_values_english_rule_present(self, base_prompt: str):
         # Rule that structure field values remain English literals
