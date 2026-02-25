@@ -178,6 +178,16 @@ class TestBlockPortabilityFields:
         from workout_ingestor_api.models import STRUCTURE_CONFIDENCE_THRESHOLD
         assert 0.0 < STRUCTURE_CONFIDENCE_THRESHOLD < 1.0
 
+    def test_needs_clarification_threshold_constant_exists(self):
+        """AMA-208: NEEDS_CLARIFICATION_THRESHOLD must exist and be < STRUCTURE_CONFIDENCE_THRESHOLD."""
+        from workout_ingestor_api.models import NEEDS_CLARIFICATION_THRESHOLD, STRUCTURE_CONFIDENCE_THRESHOLD
+        assert 0.0 < NEEDS_CLARIFICATION_THRESHOLD < STRUCTURE_CONFIDENCE_THRESHOLD
+
+    def test_needs_clarification_threshold_value(self):
+        """AMA-208: NEEDS_CLARIFICATION_THRESHOLD must be 0.5 per design doc Phase 4c."""
+        from workout_ingestor_api.models import NEEDS_CLARIFICATION_THRESHOLD
+        assert NEEDS_CLARIFICATION_THRESHOLD == 0.5
+
     def test_convert_to_new_structure_preserves_portability_fields(self):
         """convert_to_new_structure must not drop id, source, or confidence fields."""
         fixed_id = str(_uuid.uuid4())

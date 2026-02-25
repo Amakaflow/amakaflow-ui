@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, Literal
 # AMA-213: Workout type detection
 WorkoutType = Literal['strength', 'circuit', 'hiit', 'cardio', 'follow_along', 'mixed']
 
-STRUCTURE_CONFIDENCE_THRESHOLD = 0.8
+# AMA-208: Two-tier confidence threshold system (per design doc Phase 4c)
+# >= 0.8  → confident, save as-is (no flag, no clarification)
+# 0.5–0.79 → ambiguous, soft flag in UI — structure_options MUST be populated
+# < 0.5   → needs interactive clarification — structure_options MUST be populated
+STRUCTURE_CONFIDENCE_THRESHOLD = 0.8   # kept for backward-compat (soft-flag boundary)
+NEEDS_CLARIFICATION_THRESHOLD = 0.5   # below this → needs_clarification = True
 
 
 class Exercise(BaseModel):
@@ -66,7 +71,7 @@ class Block(BaseModel):
     # Portability and confidence fields (AMA-714)
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source: Optional[Dict[str, str]] = None  # {platform, source_id, source_url}
-    structure_confidence: float = Field(default=1.0, ge=0.0, le=1.0)  # 0.0–1.0; <0.8 triggers app clarification
+    structure_confidence: float = Field(default=1.0, ge=0.0, le=1.0)  # 0.0–1.0; <0.5 → needs_clarification; 0.5–0.79 → soft flag; >=0.8 → confident
     structure_options: List[str] = Field(default_factory=list)  # LLM candidate structures
     structure: Optional[Literal[
         'superset',
