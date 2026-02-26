@@ -66,6 +66,7 @@ type BulkImportAction =
   | { type: 'TOGGLE_WORKOUT_SELECTION'; id: string }
   | { type: 'SELECT_ALL_WORKOUTS' }
   | { type: 'DESELECT_ALL_WORKOUTS' }
+  | { type: 'UPDATE_PREVIEW_WORKOUT'; id: string; workout: unknown }
 
   // Import execution
   | { type: 'START_IMPORT'; jobId: string }
@@ -276,6 +277,18 @@ function bulkImportReducer(
         preview: { ...state.preview, workouts, stats },
       };
     }
+
+    case 'UPDATE_PREVIEW_WORKOUT':
+      if (!state.preview) return state;
+      return {
+        ...state,
+        preview: {
+          ...state.preview,
+          workouts: state.preview.workouts.map(w =>
+            w.id === action.id ? { ...w, workout: action.workout } : w
+          ),
+        },
+      };
 
     // Import execution
     case 'START_IMPORT':
