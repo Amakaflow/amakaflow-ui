@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, GripVertical, Pencil, Check, X } from 'lucide-react';
 
 export interface ExerciseRowData {
@@ -20,6 +20,12 @@ interface ExerciseRowProps {
 export function ExerciseRow({ exercise, blockIndex, exerciseIndex, onRename, onDelete }: ExerciseRowProps) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(exercise.name);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraftName(exercise.name);
+    }
+  }, [exercise.name, editing]);
 
   const commit = () => {
     const trimmed = draftName.trim();

@@ -22,7 +22,11 @@ export function BlockSection({ block, blockIndex, onRenameExercise, onDeleteExer
   return (
     <div className="rounded-xl border border-white/10 overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 bg-white/5">
-        <button onClick={() => setExpanded(v => !v)} className="p-0.5">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="p-0.5"
+          aria-label={expanded ? 'Collapse block' : 'Expand block'}
+        >
           {expanded
             ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
             : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
@@ -42,7 +46,7 @@ export function BlockSection({ block, blockIndex, onRenameExercise, onDeleteExer
         <div className="p-2 space-y-1">
           {exercises.map((exercise, ei) => (
             <ExerciseRow
-              key={ei}
+              key={(exercise as ExerciseRowData & { _uid?: number })._uid ?? ei}
               exercise={exercise}
               blockIndex={blockIndex}
               exerciseIndex={ei}

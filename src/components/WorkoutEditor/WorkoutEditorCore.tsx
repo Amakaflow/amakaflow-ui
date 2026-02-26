@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Pencil, Check, X } from 'lucide-react';
 import { BlockSection, BlockData } from './primitives/BlockSection';
+import { ExerciseRowData } from './primitives/ExerciseRow';
 import { WorkoutOperation } from '../../types/workout-operations';
 
 export interface WorkoutCoreData {
@@ -8,13 +9,21 @@ export interface WorkoutCoreData {
   blocks?: BlockData[];
 }
 
+// Internal types that carry stable UIDs for React keys
+interface InternalExerciseData extends ExerciseRowData { _uid: number; }
+interface InternalBlockData extends BlockData { exercises: InternalExerciseData[]; _uid: number; }
+interface InternalWorkoutData extends WorkoutCoreData { blocks?: InternalBlockData[]; }
+
+let _uidCounter = 0;
+function nextUid() { return ++_uidCounter; }
+
 interface WorkoutEditorCoreProps {
   initialWorkout: WorkoutCoreData;
   onChange: (ops: WorkoutOperation[], updatedWorkout: WorkoutCoreData) => void;
 }
 
-function applyOpLocally(workout: WorkoutCoreData, op: WorkoutOperation): WorkoutCoreData {
-  const w = structuredClone(workout);
+function applyOpLocally(workout: InternalWorkoutData, op: WorkoutOperation): InternalWorkoutData {
+  const w = structuredClone(workout) as InternalWorkoutData;
   if (op.op === 'rename_workout') {
     w.title = op.title;
   } else if (op.op === 'rename_exercise') {
@@ -52,30 +61,43 @@ function applyOpLocally(workout: WorkoutCoreData, op: WorkoutOperation): Workout
 }
 
 export function WorkoutEditorCore({ initialWorkout, onChange }: WorkoutEditorCoreProps) {
-  const [workout, setWorkout] = useState<WorkoutCoreData>(() => structuredClone(initialWorkout));
+  const [workout, setWorkout] = useState<InternalWorkoutData>(() => {
+    const cloned = structuredClone(initialWorkout) as InternalWorkoutData;
+    cloned.blocks?.forEach(block => {
+      (block as InternalBlockData)._uid = nextUid();
+      block.exercises = (block.exercises || []).map(ex => ({
+        ...ex,
+        _uid: nextUid(),
+      }));
+    });
+    return cloned;
+  });
   const [pendingOps, setPendingOps] = useState<WorkoutOperation[]>([]);
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(initialWorkout.title || '');
 
   const pushOp = useCallback((op: WorkoutOperation) => {
-    setPendingOps(prev => {
-      const newOps = [...prev, op];
-      setWorkout(current => {
-        const updated = applyOpLocally(current, op);
-        onChange(newOps, updated);
-        return updated;
-      });
-      return newOps;
-    });
-  }, [onChange]);
+    setWorkout(current => applyOpLocally(current, op));
+    setPendingOps(prev => [...prev, op]);
+  }, []);
 
-  const commitTitle = () => {
+  // Call onChange AFTER state settles, not inside updaters
+  useEffect(() => {
+    if (pendingOps.length > 0) {
+      onChange(pendingOps, workout);
+    }
+    // Note: intentionally only re-runs when pendingOps changes (not workout)
+    // workout is captured at the time pendingOps updates, which is correct
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOps]);
+
+  const commitTitle = useCallback(() => {
     const trimmed = draftTitle.trim();
     if (trimmed && trimmed !== workout.title) {
       pushOp({ op: 'rename_workout', title: trimmed });
     }
     setEditingTitle(false);
-  };
+  }, [draftTitle, workout, pushOp]);
 
   const blocks = workout.blocks || [];
 
@@ -117,12 +139,12 @@ export function WorkoutEditorCore({ initialWorkout, onChange }: WorkoutEditorCor
       <div className="space-y-2">
         {blocks.map((block, bi) => (
           <BlockSection
-            key={bi}
+            key={block._uid}
             block={block}
             blockIndex={bi}
-            onRenameExercise={(bi, ei, name) => pushOp({ op: 'rename_exercise', block_index: bi, exercise_index: ei, name })}
-            onDeleteExercise={(bi, ei) => pushOp({ op: 'delete_exercise', block_index: bi, exercise_index: ei })}
-            onDeleteBlock={bi => pushOp({ op: 'delete_block', block_index: bi })}
+            onRenameExercise={(blockIdx, exIdx, name) => pushOp({ op: 'rename_exercise', block_index: blockIdx, exercise_index: exIdx, name })}
+            onDeleteExercise={(blockIdx, exIdx) => pushOp({ op: 'delete_exercise', block_index: blockIdx, exercise_index: exIdx })}
+            onDeleteBlock={(blockIdx) => pushOp({ op: 'delete_block', block_index: blockIdx })}
           />
         ))}
         {blocks.length === 0 && (

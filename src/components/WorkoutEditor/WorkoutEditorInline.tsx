@@ -16,7 +16,7 @@ export function WorkoutEditorInline({ workoutData, onApplyOps, className }: Work
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = useCallback(async (ops: WorkoutOperation[]) => {
+  const handleChange = useCallback(async (ops: WorkoutOperation[], _updatedWorkout: WorkoutCoreData) => {
     // Send only the latest op
     const latestOp = ops[ops.length - 1];
     if (!latestOp) return;
