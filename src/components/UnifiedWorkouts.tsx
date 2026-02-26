@@ -5,7 +5,7 @@
  * with compact/card view toggle, search, pagination, and edit-to-workflow.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dumbbell,
   Clock,
@@ -80,6 +80,7 @@ import type { WorkoutHistoryItem } from '../lib/workout-history';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { ViewWorkout } from './ViewWorkout';
 import { WorkoutEditSheet } from './WorkoutEditor/WorkoutEditSheet';
+import { WorkoutCoreData } from './WorkoutEditor/WorkoutEditorCore';
 import { ProgramsSection } from './ProgramsSection';
 import { TagPill } from './TagPill';
 import { TagManagementModal } from './TagManagementModal';
@@ -206,7 +207,12 @@ export function UnifiedWorkouts({
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
 
   // Edit workout sheet state
-  const [editingWorkout, setEditingWorkout] = useState<{ id: string; title: string; updated_at: string; workout_data: any } | null>(null);
+  const [editingWorkout, setEditingWorkout] = useState<{
+    id: string; title: string; updated_at: string; workout_data: WorkoutCoreData
+  } | null>(null);
+
+  // Ref to hold a pending edit that should open after ViewWorkout closes
+  const pendingEditRef = useRef<UnifiedWorkout | null>(null);
 
   // Tag state
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -290,6 +296,14 @@ export function UnifiedWorkouts({
       loadCompletions();
     }
   }, [showActivityHistory, completions.length, loadCompletions]);
+
+  // When ViewWorkout closes, open the pending edit if one was queued
+  useEffect(() => {
+    if (!viewingWorkout && pendingEditRef.current) {
+      handleEditWorkout(pendingEditRef.current);
+      pendingEditRef.current = null;
+    }
+  }, [viewingWorkout]);
 
   // Derive available platforms from data
   const availablePlatforms = useMemo(() => {
@@ -635,7 +649,7 @@ export function UnifiedWorkouts({
       id: raw.id,
       title: raw.title ?? raw.workout_data?.title ?? raw.workout?.title ?? 'Workout',
       updated_at: raw.updated_at ?? raw.updatedAt ?? new Date().toISOString(),
-      workout_data: raw.workout_data ?? raw.workout ?? {},
+      workout_data: (raw.workout_data ?? raw.workout ?? {}) as WorkoutCoreData,
     });
   };
 
@@ -1559,13 +1573,9 @@ export function UnifiedWorkouts({
           workout={viewingWorkout}
           onClose={() => setViewingWorkout(null)}
           onEdit={() => {
-            const viewing = viewingWorkout;
+            const unified = allWorkouts.find(w => w.id === viewingWorkout.id);
+            if (unified) pendingEditRef.current = unified;
             setViewingWorkout(null);
-            // Brief timeout lets the ViewWorkout sheet close first
-            setTimeout(() => {
-              const unified = allWorkouts.find(w => w.id === viewing.id);
-              if (unified) handleEditWorkout(unified);
-            }, 50);
           }}
         />
       )}

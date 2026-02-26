@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Save, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Save, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { WorkoutEditorCore, WorkoutCoreData } from './WorkoutEditorCore';
 import { WorkoutOperation } from '../../types/workout-operations';
@@ -25,6 +25,15 @@ export function WorkoutEditSheet({ workout, open, onClose, onSaved }: WorkoutEdi
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handleChange = (ops: WorkoutOperation[]) => {
@@ -41,9 +50,9 @@ export function WorkoutEditSheet({ workout, open, onClose, onSaved }: WorkoutEdi
       const result = await applyWorkoutOperations(workout.id, pendingOps, workout.updated_at);
       onSaved({
         ...workout,
-        title: (result.workout as any).title ?? workout.title,
-        updated_at: (result.workout as any).updated_at ?? workout.updated_at,
-        workout_data: (result.workout as any).workout_data ?? workout.workout_data,
+        title: result.workout.title,
+        updated_at: result.workout.updated_at,
+        workout_data: result.workout.workout_data as WorkoutCoreData,
       });
       onClose();
     } catch (e: unknown) {
@@ -61,10 +70,15 @@ export function WorkoutEditSheet({ workout, open, onClose, onSaved }: WorkoutEdi
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
+      <div aria-hidden="true" className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col rounded-t-2xl bg-background border-t border-white/10">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-sheet-title"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col rounded-t-2xl bg-background border-t border-white/10"
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-white/20" />
@@ -72,8 +86,8 @@ export function WorkoutEditSheet({ workout, open, onClose, onSaved }: WorkoutEdi
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2">
-          <h2 className="text-lg font-semibold">Edit Workout</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg">
+          <h2 id="edit-sheet-title" className="text-lg font-semibold">Edit Workout</h2>
+          <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -85,14 +99,14 @@ export function WorkoutEditSheet({ workout, open, onClose, onSaved }: WorkoutEdi
               <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm text-amber-400 font-medium">Workout was updated elsewhere</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Your changes have been discarded.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Reload the workout to see the latest version.</p>
               </div>
               <button
                 className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
                 onClick={onClose}
               >
-                <RefreshCw className="w-3 h-3" />
-                Reload
+                <X className="w-3 h-3" />
+                Dismiss
               </button>
             </div>
           </div>
