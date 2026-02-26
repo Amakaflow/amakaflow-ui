@@ -44,6 +44,7 @@ export function ExerciseRow({ exercise, blockIndex, exerciseIndex, onRename, onD
             autoFocus
             value={draftName}
             onChange={e => setDraftName(e.target.value)}
+            onBlur={commit}
             onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
             className="flex-1 bg-white/10 rounded px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-primary"
           />

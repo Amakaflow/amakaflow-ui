@@ -5,14 +5,14 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface WorkoutEditorInlineProps {
   /** Current workout data to render */
-  workout: WorkoutCoreData;
-  /** Called with the latest single op; should return updated workout or throw */
-  onApplyOps: (ops: WorkoutOperation[]) => Promise<WorkoutCoreData>;
-  /** Called after each successful op application with the new workout */
-  onUpdate: (updated: WorkoutCoreData) => void;
+  workoutData: WorkoutCoreData;
+  /** Called with the latest single op; resolves on success, rejects on failure */
+  onApplyOps(ops: WorkoutOperation[]): Promise<void>;
+  /** Optional className applied to the outer wrapper div */
+  className?: string;
 }
 
-export function WorkoutEditorInline({ workout, onApplyOps, onUpdate }: WorkoutEditorInlineProps) {
+export function WorkoutEditorInline({ workoutData, onApplyOps, className }: WorkoutEditorInlineProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,17 +24,17 @@ export function WorkoutEditorInline({ workout, onApplyOps, onUpdate }: WorkoutEd
     setSaving(true);
     setError(null);
     try {
-      const updated = await onApplyOps([latestOp]);
-      onUpdate(updated);
+      await onApplyOps([latestOp]);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Operation failed');
     } finally {
       setSaving(false);
     }
-  }, [onApplyOps, onUpdate]);
+  }, [onApplyOps]);
 
   return (
-    <div className="space-y-3">
+    <div className={className ? `space-y-3 ${className}` : 'space-y-3'}>
       {saving && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
@@ -48,7 +48,7 @@ export function WorkoutEditorInline({ workout, onApplyOps, onUpdate }: WorkoutEd
         </div>
       )}
       <WorkoutEditorCore
-        initialWorkout={workout}
+        initialWorkout={workoutData}
         onChange={handleChange}
       />
     </div>

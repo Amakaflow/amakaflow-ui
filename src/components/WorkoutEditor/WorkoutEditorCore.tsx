@@ -20,8 +20,31 @@ function applyOpLocally(workout: WorkoutCoreData, op: WorkoutOperation): Workout
   } else if (op.op === 'rename_exercise') {
     const ex = w.blocks?.[op.block_index]?.exercises?.[op.exercise_index];
     if (ex) ex.name = op.name;
+  } else if (op.op === 'edit_exercise') {
+    const ex = w.blocks?.[op.block_index]?.exercises?.[op.exercise_index];
+    if (ex) {
+      if (op.sets !== undefined) ex.sets = op.sets;
+      if (op.reps !== undefined) ex.reps = op.reps;
+      if (op.duration_sec !== undefined) ex.duration_sec = op.duration_sec;
+      if (op.rest_sec !== undefined) ex.rest_sec = op.rest_sec;
+    }
   } else if (op.op === 'delete_exercise') {
     w.blocks?.[op.block_index]?.exercises?.splice(op.exercise_index, 1);
+  } else if (op.op === 'swap_exercise') {
+    const exercises = w.blocks?.[op.block_index]?.exercises;
+    if (exercises) {
+      const a = exercises[op.exercise_index];
+      const b = exercises[op.target_exercise_index];
+      if (a !== undefined && b !== undefined) {
+        exercises[op.exercise_index] = b;
+        exercises[op.target_exercise_index] = a;
+      }
+    }
+  } else if (op.op === 'reorder_block') {
+    if (w.blocks) {
+      const [moved] = w.blocks.splice(op.from_index, 1);
+      w.blocks.splice(op.to_index, 0, moved);
+    }
   } else if (op.op === 'delete_block') {
     w.blocks?.splice(op.block_index, 1);
   }
