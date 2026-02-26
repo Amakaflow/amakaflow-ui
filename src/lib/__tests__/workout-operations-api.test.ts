@@ -89,6 +89,9 @@ describe('mixWorkouts', () => {
     mockErr(404, { detail: { workout_id: 'missing' } });
     await expect(
       mixWorkouts([{ workout_id: 'missing', block_indices: [0] }], 'x')
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({
+      status: 404,
+      message: expect.stringContaining('missing'),
+    });
   });
 });

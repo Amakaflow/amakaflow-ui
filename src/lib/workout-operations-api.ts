@@ -32,7 +32,7 @@ async function ingestorPost<T>(endpoint: string, body: unknown): Promise<T> {
     });
   }
 
-  return response.json() as Promise<T>;
+  return response.json();
 }
 
 /**

@@ -254,6 +254,10 @@ class BulkImportApiClient {
    * POST /import/preview/operations
    * Applies operations to a PreviewWorkout in the job cache.
    * No DB write — changes are persisted at execute time.
+   *
+   * Note: errors thrown here do not carry a `.status` property (inherited from
+   * the base `request()` method). Callers should handle generic errors via
+   * the `.message` property.
    */
   async applyPreviewOperations(
     jobId: string,
