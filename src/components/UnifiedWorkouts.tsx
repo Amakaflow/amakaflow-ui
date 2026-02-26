@@ -5,7 +5,7 @@
  * with compact/card view toggle, search, pagination, and edit-to-workflow.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dumbbell,
   Clock,
@@ -32,6 +32,7 @@ import {
   Star,
   Tag,
   Settings2,
+  Shuffle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -79,6 +80,9 @@ import {
 import type { WorkoutHistoryItem } from '../lib/workout-history';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { ViewWorkout } from './ViewWorkout';
+import { WorkoutEditSheet } from './WorkoutEditor/WorkoutEditSheet';
+import { MixWizardModal } from './MixWizard/MixWizardModal';
+import { WorkoutCoreData } from './WorkoutEditor/WorkoutEditorCore';
 import { ProgramsSection } from './ProgramsSection';
 import { TagPill } from './TagPill';
 import { TagManagementModal } from './TagManagementModal';
@@ -204,10 +208,21 @@ export function UnifiedWorkouts({
   // View workout modal state
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
 
+  // Edit workout sheet state
+  const [editingWorkout, setEditingWorkout] = useState<{
+    id: string; title: string; updated_at: string; workout_data: WorkoutCoreData
+  } | null>(null);
+
+  // Ref to hold a pending edit that should open after ViewWorkout closes
+  const pendingEditRef = useRef<UnifiedWorkout | null>(null);
+
   // Tag state
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
+
+  // Mix Workouts wizard state
+  const [showMixWizard, setShowMixWizard] = useState(false);
 
   // Activity History state (AMA-196)
   const [showActivityHistory, setShowActivityHistory] = useState(false);
@@ -286,6 +301,14 @@ export function UnifiedWorkouts({
       loadCompletions();
     }
   }, [showActivityHistory, completions.length, loadCompletions]);
+
+  // When ViewWorkout closes, open the pending edit if one was queued
+  useEffect(() => {
+    if (!viewingWorkout && pendingEditRef.current) {
+      handleEditWorkout(pendingEditRef.current);
+      pendingEditRef.current = null;
+    }
+  }, [viewingWorkout]);
 
   // Derive available platforms from data
   const availablePlatforms = useMemo(() => {
@@ -620,6 +643,19 @@ export function UnifiedWorkouts({
       };
       setViewingWorkout(historyItem);
     }
+  };
+
+  // Edit workout sheet handler - opens WorkoutEditSheet for history workouts
+  const handleEditWorkout = (workout: UnifiedWorkout) => {
+    // Only saved history workouts support operations
+    const raw = (workout._original?.data ?? workout._original) as any;
+    if (!raw?.id) return;
+    setEditingWorkout({
+      id: raw.id,
+      title: raw.title ?? raw.workout_data?.title ?? raw.workout?.title ?? 'Workout',
+      updated_at: raw.updated_at ?? raw.updatedAt ?? new Date().toISOString(),
+      workout_data: (raw.workout_data ?? raw.workout ?? {}) as WorkoutCoreData,
+    });
   };
 
   // Export to CSV format via API
@@ -1541,6 +1577,26 @@ export function UnifiedWorkouts({
         <ViewWorkout
           workout={viewingWorkout}
           onClose={() => setViewingWorkout(null)}
+          onEdit={() => {
+            const unified = allWorkouts.find(w => w.id === viewingWorkout.id);
+            if (unified) pendingEditRef.current = unified;
+            setViewingWorkout(null);
+          }}
+        />
+      )}
+
+      {/* Edit Workout Sheet */}
+      {editingWorkout && (
+        <WorkoutEditSheet
+          workout={editingWorkout}
+          open={true}
+          onClose={() => setEditingWorkout(null)}
+          onSaved={(updated) => {
+            setAllWorkouts(prev =>
+              prev.map(w => w.id === updated.id ? { ...w, title: updated.title } : w)
+            );
+            setEditingWorkout(null);
+          }}
         />
       )}
 
@@ -1558,6 +1614,26 @@ export function UnifiedWorkouts({
         onClose={() => setShowTagManagement(false)}
         profileId={profileId}
         onTagsChange={loadTags}
+      />
+
+      {/* Mix Workouts FAB */}
+      <button
+        onClick={() => setShowMixWizard(true)}
+        className="fixed bottom-24 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+        aria-label="Mix workouts"
+      >
+        <Shuffle className="w-5 h-5" />
+        <span className="text-sm font-medium hidden sm:inline">Mix</span>
+      </button>
+
+      {/* Mix Workouts Wizard */}
+      <MixWizardModal
+        open={showMixWizard}
+        workouts={allWorkouts}
+        onClose={() => setShowMixWizard(false)}
+        onSave={(_preview, _title) => {
+          setShowMixWizard(false);
+        }}
       />
     </div>
   );
