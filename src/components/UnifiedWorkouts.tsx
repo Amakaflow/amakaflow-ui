@@ -32,6 +32,7 @@ import {
   Star,
   Tag,
   Settings2,
+  Shuffle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -80,6 +81,7 @@ import type { WorkoutHistoryItem } from '../lib/workout-history';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { ViewWorkout } from './ViewWorkout';
 import { WorkoutEditSheet } from './WorkoutEditor/WorkoutEditSheet';
+import { MixWizardModal } from './MixWizard/MixWizardModal';
 import { WorkoutCoreData } from './WorkoutEditor/WorkoutEditorCore';
 import { ProgramsSection } from './ProgramsSection';
 import { TagPill } from './TagPill';
@@ -218,6 +220,9 @@ export function UnifiedWorkouts({
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
+
+  // Mix Workouts wizard state
+  const [showMixWizard, setShowMixWizard] = useState(false);
 
   // Activity History state (AMA-196)
   const [showActivityHistory, setShowActivityHistory] = useState(false);
@@ -1609,6 +1614,26 @@ export function UnifiedWorkouts({
         onClose={() => setShowTagManagement(false)}
         profileId={profileId}
         onTagsChange={loadTags}
+      />
+
+      {/* Mix Workouts FAB */}
+      <button
+        onClick={() => setShowMixWizard(true)}
+        className="fixed bottom-24 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+        aria-label="Mix workouts"
+      >
+        <Shuffle className="w-5 h-5" />
+        <span className="text-sm font-medium hidden sm:inline">Mix</span>
+      </button>
+
+      {/* Mix Workouts Wizard */}
+      <MixWizardModal
+        open={showMixWizard}
+        workouts={allWorkouts}
+        onClose={() => setShowMixWizard(false)}
+        onSave={(_preview, _title) => {
+          setShowMixWizard(false);
+        }}
       />
     </div>
   );
