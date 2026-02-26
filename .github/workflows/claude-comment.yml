@@ -1,0 +1,45 @@
+name: Claude On-Demand
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: >
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' &&
+       contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_sticky_comment: true
+          claude_args: '--model claude-sonnet-4-6 --max-turns 12'
+          prompt: |
+            You are a senior React/TypeScript engineer responding to a request
+            in a GitHub PR or issue comment. The request follows "@claude".
+
+            Only change what is necessary to address the request.
+            Follow existing patterns in the codebase — do not refactor
+            unrelated code. After making changes, commit and push directly
+            to the PR branch.
+
+            Guidelines:
+            - Preserve existing TypeScript types — avoid `any`
+            - Follow React hook rules and existing component patterns
+            - Never use dangerouslySetInnerHTML or expose secrets in client code
+            - Add or update tests for any logic you change
