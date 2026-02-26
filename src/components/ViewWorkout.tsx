@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { X, Clock, Watch, Bike, Dumbbell, Copy, Check } from 'lucide-react';
+import { X, Clock, Watch, Bike, Dumbbell, Copy, Check, Pencil } from 'lucide-react';
 import { WorkoutHistoryItem } from '../lib/workout-history';
 import { Block, Exercise } from '../types/workout';
 import { getStructureDisplayName } from '../lib/workout-utils';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 type Props = {
   workout: WorkoutHistoryItem;
   onClose: () => void;
+  onEdit?: () => void;
 };
 
 // Helper function to get device icon
@@ -62,7 +63,7 @@ function countBlockExercises(block: Block): number {
   return blockExercises + supersetExercises;
 }
 
-export function ViewWorkout({ workout, onClose }: Props) {
+export function ViewWorkout({ workout, onClose, onEdit }: Props) {
   const workoutData = workout.workout || workout.data || workout;
   const blocks = workoutData?.blocks || [];
   const hasExports = !!(workout.exports);
@@ -210,6 +211,17 @@ export function ViewWorkout({ workout, onClose }: Props) {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {onEdit && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onEdit}
+                  className="flex items-center gap-1"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

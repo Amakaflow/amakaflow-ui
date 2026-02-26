@@ -23,6 +23,7 @@ import {
   Circle,
   AlertTriangle,
   Minus,
+  Pencil,
 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -56,6 +57,7 @@ interface UnifiedWorkoutCardProps {
   onSync?: (workout: UnifiedWorkout) => void;
   onDelete?: (workout: UnifiedWorkout) => void;
   onFollowAlong?: (workout: UnifiedWorkout) => void;
+  onEdit?: (workout: UnifiedWorkout) => void;
   className?: string;
 }
 
@@ -264,6 +266,7 @@ export function UnifiedWorkoutCard({
   onSync,
   onDelete,
   onFollowAlong,
+  onEdit,
   className,
 }: UnifiedWorkoutCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -378,6 +381,12 @@ export function UnifiedWorkoutCard({
                     <DropdownMenuItem onClick={() => onSync(workout)}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Sync to device
+                    </DropdownMenuItem>
+                  )}
+                  {onEdit && (
+                    <DropdownMenuItem onClick={() => onEdit(workout)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
                     </DropdownMenuItem>
                   )}
                   {onDelete && (
