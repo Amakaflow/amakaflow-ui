@@ -22,6 +22,7 @@ import {
   BulkStatusResponse,
   ColumnMapping,
 } from '../types/bulk-import';
+import { WorkoutOperation, PreviewOperationResponse } from '../types/workout-operations';
 
 // Use centralized API config
 const INGESTOR_API_BASE_URL = API_URLS.INGESTOR;
@@ -247,6 +248,22 @@ class BulkImportApiClient {
         method: 'POST',
       }
     );
+  }
+
+  /**
+   * POST /import/preview/operations
+   * Applies operations to a PreviewWorkout in the job cache.
+   * No DB write — changes are persisted at execute time.
+   */
+  async applyPreviewOperations(
+    jobId: string,
+    itemId: string,
+    operations: WorkoutOperation[]
+  ): Promise<PreviewOperationResponse> {
+    return this.request<PreviewOperationResponse>('/import/preview/operations', {
+      method: 'POST',
+      body: JSON.stringify({ job_id: jobId, item_id: itemId, operations }),
+    });
   }
 
   /**
