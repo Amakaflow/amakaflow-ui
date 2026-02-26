@@ -25,6 +25,7 @@ import {
   getActiveSteps,
   canProceedFromStep,
 } from '../types/bulk-import';
+import { PreviewWorkoutPayload } from '../types/workout-operations';
 
 // ============================================================================
 // Action Types
@@ -66,7 +67,7 @@ type BulkImportAction =
   | { type: 'TOGGLE_WORKOUT_SELECTION'; id: string }
   | { type: 'SELECT_ALL_WORKOUTS' }
   | { type: 'DESELECT_ALL_WORKOUTS' }
-  | { type: 'UPDATE_PREVIEW_WORKOUT'; id: string; workout: unknown }
+  | { type: 'UPDATE_PREVIEW_WORKOUT'; id: string; workout: PreviewWorkoutPayload }
 
   // Import execution
   | { type: 'START_IMPORT'; jobId: string }

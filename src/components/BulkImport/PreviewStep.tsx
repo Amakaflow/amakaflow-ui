@@ -5,8 +5,9 @@
  * Shows workout list with validation issues and allows selection.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useBulkImport } from '../../context/BulkImportContext';
+import { BulkImportAction } from '../../context/BulkImportContext';
 import { useBulkImportApi } from '../../hooks/useBulkImportApi';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -30,6 +31,31 @@ import { WorkoutEditorInline } from '../WorkoutEditor/WorkoutEditorInline';
 import { WorkoutCoreData } from '../WorkoutEditor/WorkoutEditorCore';
 import { WorkoutOperation } from '../../types/workout-operations';
 import { bulkImportApi } from '../../lib/bulk-import-api';
+
+interface PreviewWorkoutInlineEditorProps {
+  jobId: string;
+  workoutId: string;
+  workoutData: WorkoutCoreData;
+  dispatch: React.Dispatch<BulkImportAction>;
+}
+
+function PreviewWorkoutInlineEditor({ jobId, workoutId, workoutData, dispatch }: PreviewWorkoutInlineEditorProps) {
+  const handleApplyOps = useCallback(async (ops: WorkoutOperation[]) => {
+    const result = await bulkImportApi.applyPreviewOperations(jobId, workoutId, ops);
+    dispatch({
+      type: 'UPDATE_PREVIEW_WORKOUT',
+      id: workoutId,
+      workout: result.preview.workout,
+    });
+  }, [jobId, workoutId, dispatch]);
+
+  return (
+    <WorkoutEditorInline
+      workoutData={workoutData}
+      onApplyOps={handleApplyOps}
+    />
+  );
+}
 
 interface PreviewStepProps {
   userId: string;
@@ -254,7 +280,7 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                   <button
                     onClick={() => toggleEditing(workout.id)}
                     className="p-1.5 hover:bg-white/10 rounded-lg"
-                    aria-label="Edit"
+                    aria-label={`Edit ${workout.title}`}
                   >
                     <Pencil className={cn('w-4 h-4', editingWorkouts.has(workout.id) ? 'text-primary' : 'text-muted-foreground')} />
                   </button>
@@ -364,22 +390,13 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
               )}
 
               {/* Inline Editor */}
-              {editingWorkouts.has(workout.id) && (
+              {editingWorkouts.has(workout.id) && workout.workout.blocks && (
                 <div className="px-4 pb-4 border-t border-white/5 pt-4">
-                  <WorkoutEditorInline
+                  <PreviewWorkoutInlineEditor
+                    jobId={state.jobId!}
+                    workoutId={workout.id}
                     workoutData={workout.workout as WorkoutCoreData}
-                    onApplyOps={async (ops: WorkoutOperation[]) => {
-                      const result = await bulkImportApi.applyPreviewOperations(
-                        state.jobId!,
-                        workout.id,
-                        ops
-                      );
-                      dispatch({
-                        type: 'UPDATE_PREVIEW_WORKOUT',
-                        id: workout.id,
-                        workout: result.preview.workout,
-                      });
-                    }}
+                    dispatch={dispatch}
                   />
                 </div>
               )}
