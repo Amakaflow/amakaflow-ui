@@ -25,6 +25,7 @@ export function SelectWorkoutsStep({ workouts, selected, onToggle }: SelectWorko
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search workouts..."
+          aria-label="Search workouts"
           className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm outline-none"
         />
       </div>

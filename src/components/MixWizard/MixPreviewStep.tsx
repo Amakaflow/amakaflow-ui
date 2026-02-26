@@ -4,6 +4,7 @@ import { mixWorkouts } from '../../lib/workout-operations-api';
 import { MixPreviewWorkout, MixSource } from '../../types/workout-operations';
 import { WorkoutEditorInline } from '../WorkoutEditor/WorkoutEditorInline';
 import { WorkoutCoreData } from '../WorkoutEditor/WorkoutEditorCore';
+import { BlockData } from '../WorkoutEditor/primitives/BlockSection';
 
 interface MixPreviewStepProps {
   sources: MixSource[];
@@ -52,7 +53,7 @@ export function MixPreviewStep({ sources, title, onTitleChange, onPreviewReady }
         <AlertCircle className="w-8 h-8 text-red-400" />
         <p className="text-sm text-red-400">{error}</p>
         <button onClick={() => setRetryKey(k => k + 1)} className="flex items-center gap-1 text-sm text-primary underline">
-          <RefreshCw className="w-3 h-3" /> Retry
+          <RefreshCw aria-hidden="true" className="w-3 h-3" /> Retry
         </button>
       </div>
     );
@@ -62,7 +63,7 @@ export function MixPreviewStep({ sources, title, onTitleChange, onPreviewReady }
 
   const workoutData: WorkoutCoreData = {
     title: preview.workout.title,
-    blocks: preview.workout.blocks as any,
+    blocks: preview.workout.blocks as unknown as BlockData[],
   };
 
   return (

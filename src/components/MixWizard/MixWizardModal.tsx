@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight, Save, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { UnifiedWorkout } from '../../types/unified-workout';
+import { UnifiedWorkout, isHistoryWorkout } from '../../types/unified-workout';
 import { MixPreviewWorkout, MixSource } from '../../types/workout-operations';
 import { SelectWorkoutsStep } from './SelectWorkoutsStep';
 import { SelectBlocksStep, BlockSelection } from './SelectBlocksStep';
 import { MixPreviewStep } from './MixPreviewStep';
 
 type WizardStep = 1 | 2 | 3;
-
 
 interface MixWizardModalProps {
   open: boolean;
@@ -25,6 +24,17 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
   const [preview, setPreview] = useState<MixPreviewWorkout | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (!open) {
+      setStep(1);
+      setSelectedWorkoutIds([]);
+      setSelectedBlocks([]);
+      setMixTitle('Mixed Workout');
+      setPreview(null);
+      setSaving(false);
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const toggleWorkout = (id: string) => {
@@ -40,21 +50,23 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
     });
   };
 
-  const buildSources = (): MixSource[] => {
+  const sources = useMemo(() => {
     return selectedWorkoutIds.map(wid => ({
       workout_id: wid,
-      block_indices: selectedBlocks.filter(s => s.workoutId === wid).map(s => s.blockIndex),
+      block_indices: selectedBlocks
+        .filter(s => s.workoutId === wid)
+        .map(s => s.blockIndex),
     })).filter(s => s.block_indices.length > 0);
-  };
+  }, [selectedWorkoutIds, selectedBlocks]);
 
   const handleNext = () => {
     if (step === 1) {
       const allBlocks: BlockSelection[] = [];
       for (const wid of selectedWorkoutIds) {
         const w = workouts.find(x => x.id === wid);
-        const data = (w?._original?.data as any);
-        const blocks = data?.workout_data?.blocks || data?.workout?.blocks || [];
-        blocks.forEach((_: unknown, bi: number) => allBlocks.push({ workoutId: wid, blockIndex: bi }));
+        if (!w || !isHistoryWorkout(w)) continue;
+        const blocks = (w._original.data as { workout_data?: { blocks?: unknown[] } }).workout_data?.blocks ?? [];
+        blocks.forEach((_, bi) => allBlocks.push({ workoutId: wid, blockIndex: bi }));
       }
       setSelectedBlocks(allBlocks);
       setStep(2);
@@ -72,8 +84,11 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
     if (!preview) return;
     setSaving(true);
     try {
-      onSave(preview, mixTitle);
+      await Promise.resolve(onSave(preview, mixTitle));
       onClose();
+    } catch (e) {
+      // onSave failed — keep modal open, user can retry
+      console.error('Failed to save mixed workout:', e);
     } finally {
       setSaving(false);
     }
@@ -106,7 +121,7 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {step === 1 && <SelectWorkoutsStep workouts={workouts} selected={selectedWorkoutIds} onToggle={toggleWorkout} />}
             {step === 2 && <SelectBlocksStep workouts={workouts} selectedWorkoutIds={selectedWorkoutIds} selectedBlocks={selectedBlocks} onToggleBlock={toggleBlock} />}
-            {step === 3 && <MixPreviewStep sources={buildSources()} title={mixTitle} onTitleChange={setMixTitle} onPreviewReady={setPreview} />}
+            {step === 3 && <MixPreviewStep sources={sources} title={mixTitle} onTitleChange={setMixTitle} onPreviewReady={setPreview} />}
           </div>
 
           <div className="px-5 py-4 border-t border-white/10 flex items-center gap-3">

@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react';
-import { UnifiedWorkout } from '../../types/unified-workout';
+import { UnifiedWorkout, isHistoryWorkout } from '../../types/unified-workout';
 import { cn } from '../ui/utils';
 
 export interface BlockSelection {
@@ -15,9 +15,10 @@ interface SelectBlocksStepProps {
 }
 
 function getBlocks(workout: UnifiedWorkout): Array<{ label?: string; exerciseCount: number }> {
-  const data = (workout._original?.data as any);
-  const blocks = data?.workout_data?.blocks || data?.workout?.blocks || [];
-  return blocks.map((b: any) => ({ label: b.label, exerciseCount: (b.exercises || []).length }));
+  if (!isHistoryWorkout(workout)) return [];
+  const data = workout._original.data as { workout_data?: { blocks?: Array<{ label?: string; exercises?: unknown[] }> } };
+  const blocks = data.workout_data?.blocks ?? [];
+  return blocks.map(b => ({ label: b.label, exerciseCount: (b.exercises ?? []).length }));
 }
 
 export function SelectBlocksStep({ workouts, selectedWorkoutIds, selectedBlocks, onToggleBlock }: SelectBlocksStepProps) {
