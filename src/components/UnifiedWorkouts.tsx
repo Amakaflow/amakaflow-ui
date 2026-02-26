@@ -79,6 +79,7 @@ import {
 import type { WorkoutHistoryItem } from '../lib/workout-history';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { ViewWorkout } from './ViewWorkout';
+import { WorkoutEditSheet } from './WorkoutEditor/WorkoutEditSheet';
 import { ProgramsSection } from './ProgramsSection';
 import { TagPill } from './TagPill';
 import { TagManagementModal } from './TagManagementModal';
@@ -203,6 +204,9 @@ export function UnifiedWorkouts({
 
   // View workout modal state
   const [viewingWorkout, setViewingWorkout] = useState<WorkoutHistoryItem | null>(null);
+
+  // Edit workout sheet state
+  const [editingWorkout, setEditingWorkout] = useState<{ id: string; title: string; updated_at: string; workout_data: any } | null>(null);
 
   // Tag state
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -620,6 +624,19 @@ export function UnifiedWorkouts({
       };
       setViewingWorkout(historyItem);
     }
+  };
+
+  // Edit workout sheet handler - opens WorkoutEditSheet for history workouts
+  const handleEditWorkout = (workout: UnifiedWorkout) => {
+    // Only saved history workouts support operations
+    const raw = (workout._original?.data ?? workout._original) as any;
+    if (!raw?.id) return;
+    setEditingWorkout({
+      id: raw.id,
+      title: raw.title ?? raw.workout_data?.title ?? raw.workout?.title ?? 'Workout',
+      updated_at: raw.updated_at ?? raw.updatedAt ?? new Date().toISOString(),
+      workout_data: raw.workout_data ?? raw.workout ?? {},
+    });
   };
 
   // Export to CSV format via API
@@ -1541,6 +1558,30 @@ export function UnifiedWorkouts({
         <ViewWorkout
           workout={viewingWorkout}
           onClose={() => setViewingWorkout(null)}
+          onEdit={() => {
+            const viewing = viewingWorkout;
+            setViewingWorkout(null);
+            // Brief timeout lets the ViewWorkout sheet close first
+            setTimeout(() => {
+              const unified = allWorkouts.find(w => w.id === viewing.id);
+              if (unified) handleEditWorkout(unified);
+            }, 50);
+          }}
+        />
+      )}
+
+      {/* Edit Workout Sheet */}
+      {editingWorkout && (
+        <WorkoutEditSheet
+          workout={editingWorkout}
+          open={true}
+          onClose={() => setEditingWorkout(null)}
+          onSaved={(updated) => {
+            setAllWorkouts(prev =>
+              prev.map(w => w.id === updated.id ? { ...w, title: updated.title } : w)
+            );
+            setEditingWorkout(null);
+          }}
         />
       )}
 
