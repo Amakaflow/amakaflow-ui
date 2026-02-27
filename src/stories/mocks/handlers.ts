@@ -103,6 +103,33 @@ const SAMPLE_EXERCISE_MAPPINGS = [
   { id: 'map-3', source_name: 'Bench Press', device_name: 'Bench Press', confidence: 0.99 },
 ];
 
+const SAMPLE_PROGRAMS = [
+  {
+    id: 'prog-1',
+    title: '12-Week Strength Builder',
+    description: 'Progressive overload strength program',
+    sport: 'STRENGTH',
+    durationWeeks: 12,
+    currentWeek: 3,
+    status: 'active',
+    workoutsPerWeek: 4,
+    createdAt: '2026-01-01T00:00:00Z',
+    weeks: [],
+  },
+  {
+    id: 'prog-2',
+    title: 'Hyrox 8-Week Prep',
+    description: 'Competition preparation for Hyrox',
+    sport: 'HYROX',
+    durationWeeks: 8,
+    currentWeek: 1,
+    status: 'draft',
+    workoutsPerWeek: 5,
+    createdAt: '2026-02-01T00:00:00Z',
+    weeks: [],
+  },
+];
+
 // ============================================================================
 // Handlers
 // ============================================================================
@@ -148,5 +175,51 @@ export const handlers = [
   // --- Chat API ---
   http.get(`${CHAT}/health`, () =>
     HttpResponse.json({ status: 'healthy' })
+  ),
+
+  // Feature flags (used by ChatPanel)
+  http.get(`${CHAT}/feature-flags`, () =>
+    HttpResponse.json({ chat_enabled: true, chat_beta_period: false, chat_beta_access: true, chat_voice_enabled: true, chat_rate_limit_tier: 'pro', chat_functions_enabled: ['get_user_profile', 'search_workouts'] })
+  ),
+
+  // Programs
+  http.get(`${INGESTOR}/programs`, () =>
+    HttpResponse.json({ programs: SAMPLE_PROGRAMS, total: SAMPLE_PROGRAMS.length })
+  ),
+  http.get(`${INGESTOR}/programs/:id`, () =>
+    HttpResponse.json(SAMPLE_PROGRAMS[0])
+  ),
+
+  // Follow-along
+  http.get(`${INGESTOR}/follow-along`, () =>
+    HttpResponse.json({ workouts: SAMPLE_WORKOUTS, total: SAMPLE_WORKOUTS.length })
+  ),
+  http.post(`${INGESTOR}/follow-along/setup`, () =>
+    HttpResponse.json({ success: true })
+  ),
+
+  // Volume analytics
+  http.get(`${INGESTOR}/analytics/volume`, () =>
+    HttpResponse.json({ periods: [{ week: '2026-W08', volume_kg: 12500, sessions: 4 }, { week: '2026-W07', volume_kg: 11200, sessions: 3 }, { week: '2026-W06', volume_kg: 13800, sessions: 5 }] })
+  ),
+
+  // Exercise history
+  http.get(`${INGESTOR}/analytics/exercise-history`, () =>
+    HttpResponse.json({ exercises: [{ name: 'Bench Press', records: [{ date: '2026-02-20', weight_kg: 80, reps: 5 }, { date: '2026-02-13', weight_kg: 77.5, reps: 5 }] }, { name: 'Squat', records: [{ date: '2026-02-19', weight_kg: 100, reps: 5 }] }] })
+  ),
+
+  // Mobile companion / device pairing
+  http.get(`${INGESTOR}/devices/pairing-status`, () =>
+    HttpResponse.json({ paired: false, platform: null })
+  ),
+
+  // Strava
+  http.get('http://localhost:8006/strava/auth-url', () =>
+    HttpResponse.json({ url: 'https://www.strava.com/oauth/authorize?client_id=demo' })
+  ),
+
+  // Linked accounts
+  http.get(`${INGESTOR}/accounts`, () =>
+    HttpResponse.json({ accounts: [{ provider: 'strava', connected: true, username: 'alex.runner' }, { provider: 'garmin', connected: false }] })
   ),
 ];
