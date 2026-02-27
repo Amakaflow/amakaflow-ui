@@ -226,10 +226,12 @@ export interface InstagramReelResponse {
  * Calls POST /ingest/instagram_reel on workout-ingestor-api.
  */
 export async function ingestInstagramReel(url: string, skipCache = false): Promise<InstagramReelResponse> {
+  // Normalize /reels/ → /reel/ (Instagram uses both forms)
+  const normalizedUrl = url.replace(/instagram\.com\/reels\//i, 'instagram.com/reel/');
   const response = await authenticatedFetch(`${WORKOUT_INGESTOR_API_URL}/ingest/instagram_reel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, skip_cache: skipCache }),
+    body: JSON.stringify({ url: normalizedUrl, skip_cache: skipCache }),
   });
 
   if (!response.ok) {

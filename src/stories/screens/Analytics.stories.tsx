@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Analytics } from '../../components/Analytics';
 
@@ -51,4 +52,22 @@ export const Default: Story = {
 export const Empty: Story = {
   name: 'Empty state',
   args: { user: { ...mockUser, workoutsThisWeek: 0 }, history: [] },
+};
+
+export const Loading: Story = {
+  name: 'Loading state',
+  args: {
+    user: { ...mockUser, workoutsThisWeek: 0 },
+    history: [],
+  },
+  decorators: [
+    (Story) => (
+      <div className="relative">
+        <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+          <div className="text-muted-foreground text-sm">Loading analytics...</div>
+        </div>
+        <Story />
+      </div>
+    ),
+  ],
 };

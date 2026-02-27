@@ -86,11 +86,9 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@chromatic-com/storybook": "^5.0.1",
     "@playwright/test": "^1.48.0",
     "@storybook/addon-a11y": "^10.2.13",
     "@storybook/addon-docs": "^10.2.13",
-    "@storybook/addon-onboarding": "^10.2.13",
     "@storybook/addon-vitest": "^10.2.13",
     "@storybook/react-vite": "^10.2.13",
     "@testing-library/jest-dom": "^6.9.1",

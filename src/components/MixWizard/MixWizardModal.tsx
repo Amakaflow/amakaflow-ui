@@ -35,6 +35,15 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
     }
   }, [open]);
 
+  const sources = useMemo(() => {
+    return selectedWorkoutIds.map(wid => ({
+      workout_id: wid,
+      block_indices: selectedBlocks
+        .filter(s => s.workoutId === wid)
+        .map(s => s.blockIndex),
+    })).filter(s => s.block_indices.length > 0);
+  }, [selectedWorkoutIds, selectedBlocks]);
+
   if (!open) return null;
 
   const toggleWorkout = (id: string) => {
@@ -49,15 +58,6 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
         : [...prev, sel];
     });
   };
-
-  const sources = useMemo(() => {
-    return selectedWorkoutIds.map(wid => ({
-      workout_id: wid,
-      block_indices: selectedBlocks
-        .filter(s => s.workoutId === wid)
-        .map(s => s.blockIndex),
-    })).filter(s => s.block_indices.length > 0);
-  }, [selectedWorkoutIds, selectedBlocks]);
 
   const handleNext = () => {
     if (step === 1) {

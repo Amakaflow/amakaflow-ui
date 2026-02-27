@@ -7,16 +7,16 @@ import React from 'react';
 
 const MOCK_USER = {
   id: 'user_storybook',
-  firstName: 'David',
-  lastName: 'Andrews',
-  fullName: 'David Andrews',
-  username: 'davidandrews',
+  firstName: 'Alex',
+  lastName: 'Storybook',
+  fullName: 'Alex Storybook',
+  username: 'alex.storybook',
   primaryEmailAddress: {
-    emailAddress: 'david@amakaflow.com',
+    emailAddress: 'alex@example.com',
     id: 'email_storybook',
   },
-  emailAddresses: [{ emailAddress: 'david@amakaflow.com', id: 'email_storybook' }],
-  imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david',
+  emailAddresses: [{ emailAddress: 'alex@example.com', id: 'email_storybook' }],
+  imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=storybook',
   publicMetadata: {},
   unsafeMetadata: {},
   createdAt: new Date('2024-01-01'),

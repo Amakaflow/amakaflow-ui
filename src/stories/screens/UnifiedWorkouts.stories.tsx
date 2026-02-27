@@ -123,6 +123,7 @@ export const Empty: Story = {
 export const Loading: Story = {
   name: 'Loading state',
   parameters: {
+    test: { skip: true }, // intentionally hangs — excluded from Vitest CI runner
     msw: {
       handlers: [
         http.get('http://localhost:8004/workouts', async () => {

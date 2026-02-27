@@ -55,3 +55,18 @@ export const Empty: Story = {
     },
   },
 };
+
+export const Loading: Story = {
+  name: 'Loading state',
+  parameters: {
+    test: { skip: true },
+    msw: {
+      handlers: [
+        http.get('http://localhost:8003/events', async () => {
+          await new Promise((r) => setTimeout(r, 60000));
+          return HttpResponse.json({ events: [] });
+        }),
+      ],
+    },
+  },
+};

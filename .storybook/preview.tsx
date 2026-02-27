@@ -2,10 +2,11 @@ import React from 'react';
 import type { Preview, Decorator } from '@storybook/react-vite';
 import { initialize as mswInitialize, mswLoader } from 'msw-storybook-addon';
 import { Toaster } from 'sonner';
+import { handlers } from '../src/stories/mocks/handlers';
 import '../src/index.css';
 
-// Initialize MSW — unhandled requests pass through to the network
-mswInitialize({ onUnhandledRequest: 'bypass' });
+// Initialize MSW with global handlers — unhandled requests pass through to the network
+mswInitialize({ onUnhandledRequest: 'bypass' }, handlers);
 
 // ============================================================================
 // Global Decorator
