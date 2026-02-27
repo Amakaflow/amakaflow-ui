@@ -9,6 +9,28 @@ Run `npm i` to install the dependencies.
 
 Run `npm run dev` to start the development server.
 
+## Storybook (Component Library & Figma Prototyping)
+
+Storybook renders all screens without requiring login — no Clerk auth needed. Use it to capture screens with the HTML to Figma plugin for prototyping.
+
+```bash
+npm run storybook
+```
+
+Opens at `http://localhost:6006`. Each screen is under **Screens/** in the sidebar.
+
+### Figma workflow
+1. Run `npm run storybook`
+2. Open a story in the browser (e.g. `Screens/UnifiedWorkouts`)
+3. Run the **HTML to Figma** Figma plugin on the story URL
+4. Organise frames and add flow connectors in Figma
+5. Prototype flows, then use Figma Make to regenerate code
+
+### Stories location
+All stories live in `src/stories/screens/`.
+
+---
+
 ## Testing
 
 This project includes comprehensive unit tests using Vitest and React Testing Library.

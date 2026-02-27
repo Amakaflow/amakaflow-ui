@@ -69,7 +69,7 @@ import {
 } from '../lib/workout-filters';
 import { fetchAllWorkouts } from '../lib/unified-workouts';
 import { deleteWorkoutFromHistory } from '../lib/workout-history';
-import { toggleWorkoutFavorite } from '../lib/workout-api';
+import { toggleWorkoutFavorite, saveWorkoutToAPI } from '../lib/workout-api';
 import { deleteFollowAlong } from '../lib/follow-along-api';
 import {
   isHistoryWorkout,
@@ -1631,8 +1631,16 @@ export function UnifiedWorkouts({
         open={showMixWizard}
         workouts={allWorkouts}
         onClose={() => setShowMixWizard(false)}
-        onSave={(_preview, _title) => {
+        onSave={async (preview, title) => {
+          await saveWorkoutToAPI({
+            profile_id: profileId,
+            workout_data: preview.workout,
+            title,
+            sources: [],
+            device: 'web',
+          });
           setShowMixWizard(false);
+          loadWorkouts();
         }}
       />
     </div>

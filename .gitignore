@@ -42,3 +42,6 @@ supabase/
 
 # Test coverage
 coverage/
+
+*storybook.log
+storybook-static
