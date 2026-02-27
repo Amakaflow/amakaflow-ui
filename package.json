@@ -23,7 +23,9 @@
     "db:reset": "npx supabase db reset",
     "db:migrate": "npx supabase migration up",
     "db:link": "npx supabase link --project-ref wdeqaibnwjekcyfpuple",
-    "db:setup": "npm run db:link && npm run db:push"
+    "db:setup": "npm run db:link && npm run db:push",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.56.0",
@@ -61,6 +63,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "*",
     "cmdk": "^1.1.1",
+    "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lottie-react": "^2.4.1",
@@ -83,16 +86,32 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@chromatic-com/storybook": "^5.0.1",
+    "@playwright/test": "^1.48.0",
+    "@storybook/addon-a11y": "^10.2.13",
+    "@storybook/addon-docs": "^10.2.13",
+    "@storybook/addon-onboarding": "^10.2.13",
+    "@storybook/addon-vitest": "^10.2.13",
+    "@storybook/react-vite": "^10.2.13",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.10.0",
     "@vitejs/plugin-react-swc": "^3.10.2",
+    "@vitest/browser-playwright": "^4.0.10",
     "@vitest/coverage-v8": "^4.0.10",
     "@vitest/ui": "^4.0.10",
-    "@playwright/test": "^1.48.0",
     "jsdom": "^27.2.0",
+    "msw": "^2.12.10",
+    "msw-storybook-addon": "^2.0.6",
+    "playwright": "^1.58.2",
+    "storybook": "^10.2.13",
     "vite": "6.3.5",
     "vitest": "^4.0.10"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }
