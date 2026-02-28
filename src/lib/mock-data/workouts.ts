@@ -1,6 +1,6 @@
 import { WorkoutHistoryItem } from '../workout-history';
 
-export const MOCK_WORKOUTS: WorkoutHistoryItem[] = [
+export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
   {
     id: 'mock-workout-1',
     workout: {
