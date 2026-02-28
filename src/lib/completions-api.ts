@@ -6,9 +6,141 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
+
+// =============================================================================
+// Demo mock data
+// =============================================================================
+
+const DEMO_COMPLETIONS: WorkoutCompletion[] = [
+  {
+    id: 'comp-1',
+    workoutName: 'Hyrox Session',
+    startedAt: '2026-02-20T08:30:00Z',
+    durationSeconds: 4500,
+    avgHeartRate: 158,
+    maxHeartRate: 182,
+    minHeartRate: 120,
+    activeCalories: 620,
+    totalCalories: 680,
+    distanceMeters: 8000,
+    source: 'garmin',
+  },
+  {
+    id: 'comp-2',
+    workoutName: 'Upper Body Strength',
+    startedAt: '2026-02-22T10:00:00Z',
+    durationSeconds: 4200,
+    avgHeartRate: 128,
+    maxHeartRate: 155,
+    minHeartRate: 98,
+    activeCalories: 380,
+    totalCalories: 420,
+    source: 'apple_watch',
+  },
+  {
+    id: 'comp-3',
+    workoutName: 'Lower Body Power',
+    startedAt: '2026-02-18T07:00:00Z',
+    durationSeconds: 4800,
+    avgHeartRate: 135,
+    maxHeartRate: 162,
+    minHeartRate: 100,
+    activeCalories: 450,
+    totalCalories: 510,
+    source: 'garmin',
+  },
+  {
+    id: 'comp-4',
+    workoutName: 'Morning Run',
+    startedAt: '2026-02-17T06:15:00Z',
+    durationSeconds: 2700,
+    avgHeartRate: 148,
+    maxHeartRate: 168,
+    minHeartRate: 118,
+    activeCalories: 390,
+    totalCalories: 430,
+    distanceMeters: 5000,
+    steps: 5200,
+    source: 'garmin',
+  },
+  {
+    id: 'comp-5',
+    workoutName: 'Push Day — PPL',
+    startedAt: '2026-02-15T09:30:00Z',
+    durationSeconds: 4500,
+    avgHeartRate: 122,
+    maxHeartRate: 148,
+    minHeartRate: 95,
+    activeCalories: 360,
+    totalCalories: 400,
+    source: 'apple_watch',
+  },
+  {
+    id: 'comp-6',
+    workoutName: 'Pull Day — PPL',
+    startedAt: '2026-02-13T10:00:00Z',
+    durationSeconds: 4200,
+    avgHeartRate: 130,
+    maxHeartRate: 158,
+    minHeartRate: 98,
+    activeCalories: 395,
+    totalCalories: 435,
+    source: 'apple_watch',
+  },
+  {
+    id: 'comp-7',
+    workoutName: 'HIIT Cardio Blast',
+    startedAt: '2026-02-11T07:30:00Z',
+    durationSeconds: 2700,
+    avgHeartRate: 168,
+    maxHeartRate: 188,
+    minHeartRate: 130,
+    activeCalories: 480,
+    totalCalories: 520,
+    source: 'garmin',
+  },
+  {
+    id: 'comp-8',
+    workoutName: 'Leg Day — PPL',
+    startedAt: '2026-02-08T09:00:00Z',
+    durationSeconds: 5100,
+    avgHeartRate: 138,
+    maxHeartRate: 165,
+    minHeartRate: 102,
+    activeCalories: 490,
+    totalCalories: 545,
+    source: 'apple_watch',
+  },
+  {
+    id: 'comp-9',
+    workoutName: 'Zone 2 Bike Ride',
+    startedAt: '2026-02-06T06:00:00Z',
+    durationSeconds: 3900,
+    avgHeartRate: 138,
+    maxHeartRate: 150,
+    minHeartRate: 112,
+    activeCalories: 540,
+    totalCalories: 590,
+    distanceMeters: 25000,
+    source: 'garmin',
+  },
+  {
+    id: 'comp-10',
+    workoutName: 'Full Body Conditioning',
+    startedAt: '2026-02-04T08:30:00Z',
+    durationSeconds: 4500,
+    avgHeartRate: 142,
+    maxHeartRate: 172,
+    minHeartRate: 105,
+    activeCalories: 530,
+    totalCalories: 580,
+    source: 'apple_watch',
+  },
+];
 
 /**
  * AMA-314: Transform heart rate samples from iOS format to web format.
@@ -167,6 +299,11 @@ export async function fetchWorkoutCompletions(
   limit: number = 50,
   offset: number = 0
 ): Promise<WorkoutCompletionsResponse> {
+  if (isDemoMode) {
+    const sliced = DEMO_COMPLETIONS.slice(offset, offset + limit);
+    return { completions: sliced, total: DEMO_COMPLETIONS.length };
+  }
+
   const params = new URLSearchParams({
     limit: limit.toString(),
     offset: offset.toString(),
@@ -209,6 +346,25 @@ export async function fetchWorkoutCompletions(
   };
 }
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function makeDemoHRSamples(avgHR: number, durationSeconds: number): Array<{ t: number; bpm: number }> {
+  const samples: Array<{ t: number; bpm: number }> = [];
+  const count = Math.min(60, Math.floor(durationSeconds / 60));
+  for (let i = 0; i < count; i++) {
+    const progress = i / count;
+    const variance = Math.sin(progress * Math.PI * 3) * 12;
+    samples.push({ t: i * 60, bpm: Math.round(avgHR + variance) });
+  }
+  return samples;
+}
+
 /**
  * Fetch a single workout completion with full details including intervals.
  *
@@ -217,6 +373,19 @@ export async function fetchWorkoutCompletions(
 export async function fetchWorkoutCompletionById(
   completionId: string
 ): Promise<WorkoutCompletionDetail | null> {
+  if (isDemoMode) {
+    const base = DEMO_COMPLETIONS.find((c) => c.id === completionId);
+    if (!base) return null;
+    const endedAt = new Date(new Date(base.startedAt).getTime() + base.durationSeconds * 1000).toISOString();
+    return {
+      ...base,
+      endedAt,
+      durationFormatted: formatDuration(base.durationSeconds),
+      heartRateSamples: base.avgHeartRate ? makeDemoHRSamples(base.avgHeartRate, base.durationSeconds) : undefined,
+      createdAt: base.startedAt,
+    };
+  }
+
   const response = await authenticatedFetch(
     `${MAPPER_API_BASE_URL}/workouts/completions/${completionId}`,
     {

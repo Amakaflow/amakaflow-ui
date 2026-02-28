@@ -3,7 +3,6 @@
 import { useProgramWizard } from '@/context/ProgramWizardContext';
 import { SessionDuration, DayOfWeek, DAYS_OF_WEEK, DAY_LABELS } from '@/types/program-wizard';
 import { Slider } from '@/components/ui/slider';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/components/ui/utils';
 
 const sessionDurations: SessionDuration[] = [30, 45, 60, 90];
@@ -96,13 +95,21 @@ export function ScheduleStep() {
                     : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600'
                 )}
               >
-                <Checkbox
-                  checked={isSelected}
+                <div
+                  aria-hidden="true"
                   className={cn(
-                    'pointer-events-none',
-                    isSelected && 'border-white data-[state=checked]:bg-white data-[state=checked]:text-zinc-900 dark:border-zinc-900 dark:data-[state=checked]:bg-zinc-900 dark:data-[state=checked]:text-white'
+                    'w-4 h-4 rounded flex items-center justify-center border',
+                    isSelected
+                      ? 'border-white bg-white dark:border-zinc-900 dark:bg-zinc-900'
+                      : 'border-zinc-300 dark:border-zinc-600'
                   )}
-                />
+                >
+                  {isSelected && (
+                    <svg className="w-3 h-3 text-zinc-900 dark:text-white" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
                 <span className="text-sm font-medium">{DAY_LABELS[day].short}</span>
               </button>
             );

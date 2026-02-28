@@ -42,7 +42,7 @@ export function ProgramWizard({ userId, isOpen, onClose, onComplete }: ProgramWi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0" hideClose>
         <ProgramWizardProvider>
           <ProgramWizardContent
             userId={userId}
