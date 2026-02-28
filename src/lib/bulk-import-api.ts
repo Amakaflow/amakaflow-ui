@@ -8,6 +8,7 @@
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
 import { isDemoMode } from './demo-mode';
+import { getImportScenario } from './demo-scenario';
 
 // ============================================================================
 // Demo Mode Mock Data
@@ -149,6 +150,278 @@ const DEMO_STATUS_COMPLETE: BulkStatusResponse = {
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
+
+// ── Scenario: Messy CSV ──────────────────────────────────────────────────────
+
+const MESSY_JOB_ID = 'demo-import-job-messy';
+
+const MESSY_DETECT: BulkDetectResponse = {
+  success: true,
+  job_id: MESSY_JOB_ID,
+  total: 4,
+  success_count: 3,
+  error_count: 1,
+  metadata: {
+    programName: 'gym_log_2025.csv',
+    detectedFormat: 'csv_flat',
+    sheetNames: [],
+  },
+  items: [
+    { id: 'messy-1', sourceIndex: 0, sourceType: 'file', sourceRef: 'gym_log_2025.csv — rows 2–18', rawData: {}, parsedTitle: 'Upper Body A', parsedExerciseCount: 7, parsedBlockCount: 1, confidence: 58 },
+    { id: 'messy-2', sourceIndex: 1, sourceType: 'file', sourceRef: 'gym_log_2025.csv — rows 19–31', rawData: {}, parsedTitle: 'Lower Body', parsedExerciseCount: 5, parsedBlockCount: 1, confidence: 62 },
+    { id: 'messy-3', sourceIndex: 2, sourceType: 'file', sourceRef: 'gym_log_2025.csv — rows 32–44', rawData: {}, parsedTitle: 'Upper Body B', parsedExerciseCount: 6, parsedBlockCount: 1, confidence: 55 },
+    { id: 'messy-4', sourceIndex: 3, sourceType: 'file', sourceRef: 'gym_log_2025.csv — rows 45–52', rawData: {}, parsedTitle: 'Upper Body A', parsedExerciseCount: 7, parsedBlockCount: 1, confidence: 57, isDuplicate: true },
+  ],
+};
+
+const MESSY_MAP: BulkMapResponse = {
+  success: true,
+  job_id: MESSY_JOB_ID,
+  mapped_count: 3,
+  workouts: [],
+};
+
+const MESSY_MATCH: BulkMatchResponse = {
+  success: true,
+  job_id: MESSY_JOB_ID,
+  total_exercises: 8,
+  matched: 3,
+  needs_review: 4,
+  unmapped: 1,
+  exercises: [
+    { id: 'mex-1', originalName: 'Bench press', matchedGarminName: 'Bench Press', confidence: 96, suggestions: [], status: 'matched', sourceWorkoutIds: ['messy-1'], occurrenceCount: 3 },
+    { id: 'mex-2', originalName: 'db fly', matchedGarminName: 'Dumbbell Fly', confidence: 78, suggestions: [{ name: 'Cable Fly', confidence: 71 }, { name: 'Pec Deck', confidence: 65 }], status: 'needs_review', sourceWorkoutIds: ['messy-1'], occurrenceCount: 2 },
+    { id: 'mex-3', originalName: 'tri ext', matchedGarminName: 'Tricep Extension', confidence: 69, suggestions: [{ name: 'Skull Crusher', confidence: 60 }], status: 'needs_review', sourceWorkoutIds: ['messy-1', 'messy-3'], occurrenceCount: 4 },
+    { id: 'mex-4', originalName: 'squats', matchedGarminName: 'Squat', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['messy-2'], occurrenceCount: 3 },
+    { id: 'mex-5', originalName: 'leg press machine', matchedGarminName: 'Leg Press', confidence: 92, suggestions: [], status: 'matched', sourceWorkoutIds: ['messy-2'], occurrenceCount: 2 },
+    { id: 'mex-6', originalName: 'Nordic curls', matchedGarminName: 'Nordic Hamstring Curl', confidence: 74, suggestions: [{ name: 'Hamstring Curl', confidence: 68 }], status: 'needs_review', sourceWorkoutIds: ['messy-2'], occurrenceCount: 1 },
+    { id: 'mex-7', originalName: 'rear delt x', matchedGarminName: '', confidence: 38, suggestions: [{ name: 'Rear Delt Fly', confidence: 55 }, { name: 'Face Pull', confidence: 48 }], status: 'needs_review', sourceWorkoutIds: ['messy-3'], occurrenceCount: 2 },
+    { id: 'mex-8', originalName: 'whatever band thing', matchedGarminName: '', confidence: 12, suggestions: [], status: 'unmapped', sourceWorkoutIds: ['messy-3'], occurrenceCount: 1 },
+  ],
+};
+
+const MESSY_PREVIEW: BulkPreviewResponse = {
+  success: true,
+  job_id: MESSY_JOB_ID,
+  workouts: [
+    {
+      id: 'mprev-1', detectedItemId: 'messy-1', title: 'Upper Body A', exerciseCount: 7, blockCount: 1,
+      estimatedDuration: 55, validationIssues: ['2 exercises need review before import'], selected: true, isDuplicate: false,
+      workout: { blocks: [{ label: 'Upper Body', exercises: [{ name: 'Bench press', sets: 4, reps: 8 }, { name: 'db fly', sets: 3, reps: 12 }, { name: 'tri ext', sets: 3, reps: 15 }] }] },
+    },
+    {
+      id: 'mprev-2', detectedItemId: 'messy-2', title: 'Lower Body', exerciseCount: 5, blockCount: 1,
+      estimatedDuration: 50, validationIssues: ['1 exercise needs review before import'], selected: true, isDuplicate: false,
+      workout: { blocks: [{ label: 'Lower Body', exercises: [{ name: 'squats', sets: 4, reps: 5 }, { name: 'leg press machine', sets: 3, reps: 12 }, { name: 'Nordic curls', sets: 3, reps: 8 }] }] },
+    },
+    {
+      id: 'mprev-3', detectedItemId: 'messy-3', title: 'Upper Body B', exerciseCount: 6, blockCount: 1,
+      estimatedDuration: 50, validationIssues: ['1 exercise unmatched and will be skipped', '1 exercise needs review before import'], selected: true, isDuplicate: false,
+      workout: { blocks: [{ label: 'Upper Body', exercises: [{ name: 'rear delt x', sets: 3, reps: 15 }, { name: 'whatever band thing', sets: 2, reps: 20 }] }] },
+    },
+    {
+      id: 'mprev-4', detectedItemId: 'messy-4', title: 'Upper Body A (duplicate)', exerciseCount: 7, blockCount: 1,
+      estimatedDuration: 55, validationIssues: ['Duplicate of "Upper Body A" — already in import list'], selected: false, isDuplicate: true,
+      workout: { blocks: [] },
+    },
+  ],
+  stats: {
+    totalDetected: 4, totalSelected: 3, totalSkipped: 1,
+    exercisesMatched: 3, exercisesNeedingReview: 4, exercisesUnmapped: 1,
+    newExercisesToCreate: 0, estimatedDuration: 155, duplicatesFound: 1,
+    validationErrors: 1, validationWarnings: 3,
+  },
+};
+
+const MESSY_STATUS_COMPLETE: BulkStatusResponse = {
+  success: true,
+  job_id: MESSY_JOB_ID,
+  status: 'complete',
+  progress: 100,
+  results: [
+    { workoutId: 'messy-1', title: 'Upper Body A', status: 'success', savedWorkoutId: 'saved-m1' },
+    { workoutId: 'messy-2', title: 'Lower Body', status: 'success', savedWorkoutId: 'saved-m2' },
+    { workoutId: 'messy-3', title: 'Upper Body B', status: 'partial', savedWorkoutId: 'saved-m3' },
+  ],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+// ── Scenario: Large Program (8 workouts) ─────────────────────────────────────
+
+const LARGE_JOB_ID = 'demo-import-job-large';
+
+const LARGE_DETECT: BulkDetectResponse = {
+  success: true,
+  job_id: LARGE_JOB_ID,
+  total: 8,
+  success_count: 8,
+  error_count: 0,
+  metadata: {
+    programName: '10-Week Strength Block',
+    detectedFormat: 'excel_multi_sheet',
+    sheetNames: ['W1 Upper', 'W1 Lower', 'W1 Push', 'W1 Pull', 'W2 Upper', 'W2 Lower', 'W2 Push', 'W2 Pull'],
+  },
+  items: [
+    { id: 'lg-1', sourceIndex: 0, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W1 Upper', rawData: {}, parsedTitle: 'Week 1 — Upper A', parsedExerciseCount: 6, parsedBlockCount: 3, confidence: 98 },
+    { id: 'lg-2', sourceIndex: 1, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W1 Lower', rawData: {}, parsedTitle: 'Week 1 — Lower A', parsedExerciseCount: 5, parsedBlockCount: 2, confidence: 97 },
+    { id: 'lg-3', sourceIndex: 2, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W1 Push', rawData: {}, parsedTitle: 'Week 1 — Push', parsedExerciseCount: 7, parsedBlockCount: 3, confidence: 96 },
+    { id: 'lg-4', sourceIndex: 3, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W1 Pull', rawData: {}, parsedTitle: 'Week 1 — Pull', parsedExerciseCount: 6, parsedBlockCount: 3, confidence: 95 },
+    { id: 'lg-5', sourceIndex: 4, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W2 Upper', rawData: {}, parsedTitle: 'Week 2 — Upper A', parsedExerciseCount: 6, parsedBlockCount: 3, confidence: 98 },
+    { id: 'lg-6', sourceIndex: 5, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W2 Lower', rawData: {}, parsedTitle: 'Week 2 — Lower A', parsedExerciseCount: 5, parsedBlockCount: 2, confidence: 97 },
+    { id: 'lg-7', sourceIndex: 6, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W2 Push', rawData: {}, parsedTitle: 'Week 2 — Push', parsedExerciseCount: 7, parsedBlockCount: 3, confidence: 96 },
+    { id: 'lg-8', sourceIndex: 7, sourceType: 'file', sourceRef: 'strength_block.xlsx — Sheet: W2 Pull', rawData: {}, parsedTitle: 'Week 2 — Pull', parsedExerciseCount: 6, parsedBlockCount: 3, confidence: 94 },
+  ],
+};
+
+const LARGE_MAP: BulkMapResponse = { success: true, job_id: LARGE_JOB_ID, mapped_count: 8, workouts: [] };
+
+const LARGE_MATCH: BulkMatchResponse = {
+  success: true,
+  job_id: LARGE_JOB_ID,
+  total_exercises: 10,
+  matched: 9,
+  needs_review: 1,
+  unmapped: 0,
+  exercises: [
+    { id: 'lex-1', originalName: 'Bench Press', matchedGarminName: 'Bench Press', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-1', 'lg-3', 'lg-5', 'lg-7'], occurrenceCount: 8 },
+    { id: 'lex-2', originalName: 'Squat', matchedGarminName: 'Squat', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-2', 'lg-6'], occurrenceCount: 4 },
+    { id: 'lex-3', originalName: 'Deadlift', matchedGarminName: 'Deadlift', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-2', 'lg-6'], occurrenceCount: 4 },
+    { id: 'lex-4', originalName: 'Overhead Press', matchedGarminName: 'Shoulder Press', confidence: 91, suggestions: [{ name: 'Military Press', confidence: 85 }], status: 'matched', sourceWorkoutIds: ['lg-1', 'lg-3', 'lg-5', 'lg-7'], occurrenceCount: 8 },
+    { id: 'lex-5', originalName: 'Pull-up', matchedGarminName: 'Pull Up', confidence: 98, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-4', 'lg-8'], occurrenceCount: 4 },
+    { id: 'lex-6', originalName: 'Barbell Row', matchedGarminName: 'Bent Over Row', confidence: 89, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-4', 'lg-8'], occurrenceCount: 4 },
+    { id: 'lex-7', originalName: 'Incline DB Press', matchedGarminName: 'Incline Dumbbell Press', confidence: 94, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-3', 'lg-7'], occurrenceCount: 4 },
+    { id: 'lex-8', originalName: 'Romanian DL', matchedGarminName: 'Romanian Deadlift', confidence: 96, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-2', 'lg-6'], occurrenceCount: 4 },
+    { id: 'lex-9', originalName: 'Face Pull', matchedGarminName: 'Face Pull', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['lg-4', 'lg-8'], occurrenceCount: 4 },
+    { id: 'lex-10', originalName: 'Lateral Raise', matchedGarminName: 'Lateral Raise', confidence: 99, suggestions: [], status: 'needs_review', sourceWorkoutIds: ['lg-3', 'lg-7'], occurrenceCount: 4 },
+  ],
+};
+
+const LARGE_PREVIEW: BulkPreviewResponse = {
+  success: true,
+  job_id: LARGE_JOB_ID,
+  workouts: [
+    { id: 'lprev-1', detectedItemId: 'lg-1', title: 'Week 1 — Upper A', exerciseCount: 6, blockCount: 3, estimatedDuration: 70, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Horizontal Push', exercises: [{ name: 'Bench Press', sets: 4, reps: 5 }, { name: 'Incline DB Press', sets: 3, reps: 8 }] }, { label: 'Vertical Push', exercises: [{ name: 'Overhead Press', sets: 3, reps: 6 }] }, { label: 'Accessory', exercises: [{ name: 'Lateral Raise', sets: 3, reps: 15 }] }] } },
+    { id: 'lprev-2', detectedItemId: 'lg-2', title: 'Week 1 — Lower A', exerciseCount: 5, blockCount: 2, estimatedDuration: 75, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Squat', sets: 5, reps: 3 }, { name: 'Deadlift', sets: 3, reps: 5 }] }, { label: 'Accessory', exercises: [{ name: 'Romanian DL', sets: 3, reps: 10 }] }] } },
+    { id: 'lprev-3', detectedItemId: 'lg-3', title: 'Week 1 — Push', exerciseCount: 7, blockCount: 3, estimatedDuration: 65, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Bench Press', sets: 4, reps: 6 }] }, { label: 'Secondary', exercises: [{ name: 'Incline DB Press', sets: 3, reps: 10 }, { name: 'Overhead Press', sets: 3, reps: 8 }] }, { label: 'Accessory', exercises: [{ name: 'Lateral Raise', sets: 4, reps: 15 }] }] } },
+    { id: 'lprev-4', detectedItemId: 'lg-4', title: 'Week 1 — Pull', exerciseCount: 6, blockCount: 3, estimatedDuration: 65, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Pull-up', sets: 4, reps: 6 }, { name: 'Barbell Row', sets: 4, reps: 6 }] }, { label: 'Accessory', exercises: [{ name: 'Face Pull', sets: 3, reps: 20 }] }] } },
+    { id: 'lprev-5', detectedItemId: 'lg-5', title: 'Week 2 — Upper A', exerciseCount: 6, blockCount: 3, estimatedDuration: 70, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Horizontal Push', exercises: [{ name: 'Bench Press', sets: 4, reps: 4 }, { name: 'Incline DB Press', sets: 3, reps: 8 }] }] } },
+    { id: 'lprev-6', detectedItemId: 'lg-6', title: 'Week 2 — Lower A', exerciseCount: 5, blockCount: 2, estimatedDuration: 75, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Squat', sets: 5, reps: 2 }, { name: 'Deadlift', sets: 3, reps: 4 }] }] } },
+    { id: 'lprev-7', detectedItemId: 'lg-7', title: 'Week 2 — Push', exerciseCount: 7, blockCount: 3, estimatedDuration: 65, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Bench Press', sets: 4, reps: 5 }] }] } },
+    { id: 'lprev-8', detectedItemId: 'lg-8', title: 'Week 2 — Pull', exerciseCount: 6, blockCount: 3, estimatedDuration: 65, validationIssues: [], selected: true, isDuplicate: false, workout: { blocks: [{ label: 'Primary', exercises: [{ name: 'Pull-up', sets: 4, reps: 5 }, { name: 'Barbell Row', sets: 4, reps: 5 }] }] } },
+  ],
+  stats: {
+    totalDetected: 8, totalSelected: 8, totalSkipped: 0,
+    exercisesMatched: 9, exercisesNeedingReview: 1, exercisesUnmapped: 0,
+    newExercisesToCreate: 0, estimatedDuration: 550, duplicatesFound: 0,
+    validationErrors: 0, validationWarnings: 0,
+  },
+};
+
+const LARGE_STATUS_COMPLETE: BulkStatusResponse = {
+  success: true,
+  job_id: LARGE_JOB_ID,
+  status: 'complete',
+  progress: 100,
+  results: ['lg-1','lg-2','lg-3','lg-4','lg-5','lg-6','lg-7','lg-8'].map((id, i) => ({
+    workoutId: id,
+    title: LARGE_DETECT.items[i].parsedTitle,
+    status: 'success' as const,
+    savedWorkoutId: `saved-${id}`,
+  })),
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+// ── Scenario: Single Workout ──────────────────────────────────────────────────
+
+const SINGLE_JOB_ID = 'demo-import-job-single';
+
+const SINGLE_DETECT: BulkDetectResponse = {
+  success: true,
+  job_id: SINGLE_JOB_ID,
+  total: 1,
+  success_count: 1,
+  error_count: 0,
+  metadata: {
+    programName: 'monday_session.csv',
+    detectedFormat: 'csv_flat',
+    sheetNames: [],
+  },
+  items: [
+    { id: 'sw-1', sourceIndex: 0, sourceType: 'file', sourceRef: 'monday_session.csv', rawData: {}, parsedTitle: 'Monday Session', parsedExerciseCount: 4, parsedBlockCount: 1, confidence: 91 },
+  ],
+};
+
+const SINGLE_MAP: BulkMapResponse = { success: true, job_id: SINGLE_JOB_ID, mapped_count: 1, workouts: [] };
+
+const SINGLE_MATCH: BulkMatchResponse = {
+  success: true,
+  job_id: SINGLE_JOB_ID,
+  total_exercises: 4,
+  matched: 4,
+  needs_review: 0,
+  unmapped: 0,
+  exercises: [
+    { id: 'sex-1', originalName: 'Bench Press', matchedGarminName: 'Bench Press', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['sw-1'], occurrenceCount: 1 },
+    { id: 'sex-2', originalName: 'Squat', matchedGarminName: 'Squat', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['sw-1'], occurrenceCount: 1 },
+    { id: 'sex-3', originalName: 'Deadlift', matchedGarminName: 'Deadlift', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['sw-1'], occurrenceCount: 1 },
+    { id: 'sex-4', originalName: 'Pull-up', matchedGarminName: 'Pull Up', confidence: 98, suggestions: [], status: 'matched', sourceWorkoutIds: ['sw-1'], occurrenceCount: 1 },
+  ],
+};
+
+const SINGLE_PREVIEW: BulkPreviewResponse = {
+  success: true,
+  job_id: SINGLE_JOB_ID,
+  workouts: [
+    {
+      id: 'sprev-1', detectedItemId: 'sw-1', title: 'Monday Session', exerciseCount: 4, blockCount: 1,
+      estimatedDuration: 50, validationIssues: [], selected: true, isDuplicate: false,
+      workout: { blocks: [{ label: 'Main Lifts', exercises: [{ name: 'Bench Press', sets: 3, reps: 5 }, { name: 'Squat', sets: 3, reps: 5 }, { name: 'Deadlift', sets: 1, reps: 5 }, { name: 'Pull-up', sets: 3, reps: 8 }] }] },
+    },
+  ],
+  stats: {
+    totalDetected: 1, totalSelected: 1, totalSkipped: 0,
+    exercisesMatched: 4, exercisesNeedingReview: 0, exercisesUnmapped: 0,
+    newExercisesToCreate: 0, estimatedDuration: 50, duplicatesFound: 0,
+    validationErrors: 0, validationWarnings: 0,
+  },
+};
+
+const SINGLE_STATUS_COMPLETE: BulkStatusResponse = {
+  success: true,
+  job_id: SINGLE_JOB_ID,
+  status: 'complete',
+  progress: 100,
+  results: [{ workoutId: 'sw-1', title: 'Monday Session', status: 'success', savedWorkoutId: 'saved-sw1' }],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+// ── Scenario resolver ────────────────────────────────────────────────────────
+
+type ScenarioData = {
+  detect: BulkDetectResponse;
+  map: BulkMapResponse;
+  match: BulkMatchResponse;
+  preview: BulkPreviewResponse;
+  execute: BulkExecuteResponse;
+  status: BulkStatusResponse;
+};
+
+function getDemoScenarioData(): ScenarioData {
+  const scenario = getImportScenario();
+  switch (scenario) {
+    case 'messy-csv':
+      return { detect: MESSY_DETECT, map: MESSY_MAP, match: MESSY_MATCH, preview: MESSY_PREVIEW, execute: { success: true, job_id: MESSY_JOB_ID, status: 'running', message: 'Import started successfully' }, status: MESSY_STATUS_COMPLETE };
+    case 'large-program':
+      return { detect: LARGE_DETECT, map: LARGE_MAP, match: LARGE_MATCH, preview: LARGE_PREVIEW, execute: { success: true, job_id: LARGE_JOB_ID, status: 'running', message: 'Import started successfully' }, status: LARGE_STATUS_COMPLETE };
+    case 'single-workout':
+      return { detect: SINGLE_DETECT, map: SINGLE_MAP, match: SINGLE_MATCH, preview: SINGLE_PREVIEW, execute: { success: true, job_id: SINGLE_JOB_ID, status: 'running', message: 'Import started successfully' }, status: SINGLE_STATUS_COMPLETE };
+    default:
+      return { detect: DEMO_DETECT_RESPONSE, map: DEMO_MAP_RESPONSE, match: DEMO_MATCH_RESPONSE, preview: DEMO_PREVIEW_RESPONSE, execute: DEMO_EXECUTE_RESPONSE, status: DEMO_STATUS_COMPLETE };
+  }
+}
 import {
   BulkInputType,
   BulkDetectRequest,
@@ -236,7 +509,7 @@ class BulkImportApiClient {
     sourceType: BulkInputType,
     sources: string[]
   ): Promise<BulkDetectResponse> {
-    if (isDemoMode) return { ...DEMO_DETECT_RESPONSE, items: DEMO_DETECT_RESPONSE.items.map(i => ({ ...i, sourceType })) };
+    if (isDemoMode) { const s = getDemoScenarioData(); return { ...s.detect, items: s.detect.items.map(i => ({ ...i, sourceType })) }; }
     const request: BulkDetectRequest = {
       profile_id: profileId,
       source_type: sourceType,
@@ -254,7 +527,7 @@ class BulkImportApiClient {
    * Uploads a file and returns detected items
    */
   async detectFile(profileId: string, file: File): Promise<BulkDetectResponse> {
-    if (isDemoMode) return { ...DEMO_DETECT_RESPONSE, items: DEMO_DETECT_RESPONSE.items.map(i => ({ ...i, sourceRef: `${file.name} — Sheet: ${i.parsedTitle}` })) };
+    if (isDemoMode) { const s = getDemoScenarioData(); return { ...s.detect, items: s.detect.items.map(i => ({ ...i, sourceRef: `${file.name} — Sheet: ${i.parsedTitle}` })) }; }
     const formData = new FormData();
     formData.append('file', file);
     formData.append('profile_id', profileId);
@@ -283,7 +556,7 @@ class BulkImportApiClient {
     profileId: string,
     columnMappings: ColumnMapping[]
   ): Promise<BulkMapResponse> {
-    if (isDemoMode) return DEMO_MAP_RESPONSE;
+    if (isDemoMode) return getDemoScenarioData().map;
     // Transform camelCase to snake_case for backend
     const snakeCaseMappings = columnMappings.map(m => ({
       source_column: m.sourceColumn,
@@ -315,7 +588,7 @@ class BulkImportApiClient {
     profileId: string,
     userMappings?: Record<string, string>
   ): Promise<BulkMatchResponse> {
-    if (isDemoMode) return DEMO_MATCH_RESPONSE;
+    if (isDemoMode) return getDemoScenarioData().match;
     const request: BulkMatchRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -337,7 +610,7 @@ class BulkImportApiClient {
     profileId: string,
     selectedIds: string[]
   ): Promise<BulkPreviewResponse> {
-    if (isDemoMode) return DEMO_PREVIEW_RESPONSE;
+    if (isDemoMode) return getDemoScenarioData().preview;
     const request: BulkPreviewRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -361,7 +634,7 @@ class BulkImportApiClient {
     device: string,
     asyncMode: boolean = true
   ): Promise<BulkExecuteResponse> {
-    if (isDemoMode) return DEMO_EXECUTE_RESPONSE;
+    if (isDemoMode) return getDemoScenarioData().execute;
     const request: BulkExecuteRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -381,7 +654,7 @@ class BulkImportApiClient {
    * Used for polling during async import
    */
   async getStatus(jobId: string, profileId: string): Promise<BulkStatusResponse> {
-    if (isDemoMode) return DEMO_STATUS_COMPLETE;
+    if (isDemoMode) return getDemoScenarioData().status;
     return this.request<BulkStatusResponse>(`/import/status/${jobId}?profile_id=${encodeURIComponent(profileId)}`, {
       method: 'GET',
     });
