@@ -154,7 +154,7 @@ export function Analytics({ user, history }: Props) {
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
-                <YAxis />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="workouts" fill="#0ea5e9" />
               </BarChart>
@@ -207,7 +207,7 @@ export function Analytics({ user, history }: Props) {
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="week" />
-              <YAxis />
+              <YAxis allowDecimals={false} />
               <Tooltip />
               <Line type="monotone" dataKey="workouts" stroke="#8b5cf6" strokeWidth={2} />
             </LineChart>
