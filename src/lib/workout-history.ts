@@ -2,6 +2,8 @@
 import { WorkoutStructure, ExportFormats } from '../types/workout';
 import { DeviceId } from './devices';
 import { getWorkoutsFromAPI, SavedWorkout } from './workout-api';
+import { isDemoMode } from './demo-mode';
+import { MOCK_WORKOUT_HISTORY } from './mock-data';
 
 // AMA-307: Sync status entry type
 export type SyncStatusEntry = {
@@ -185,6 +187,7 @@ export async function saveWorkoutToHistory(
   validation?: any,
   workoutId?: string  // AMA-206: Pass workout ID for explicit updates
 ): Promise<WorkoutHistoryItem> {
+  if (isDemoMode) { console.log('[demo] saveWorkoutToHistory skipped'); return {} as WorkoutHistoryItem; }
   // Pattern 2: local-only save
   if (typeof profileIdOrData !== 'string') {
     return saveWorkoutToHistoryLocal(profileIdOrData);
@@ -243,6 +246,7 @@ export async function saveWorkoutToHistory(
  * When no profileId is provided, returns localStorage-only history.
  */
 export async function getWorkoutHistory(profileId?: string): Promise<WorkoutHistoryItem[]> {
+  if (isDemoMode) return MOCK_WORKOUT_HISTORY;
   const localHistory = readHistoryFromLocalStorage();
 
   if (!profileId) {
