@@ -5,6 +5,8 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
+import { sampleCalendarEvents, mockConnectedCalendars } from './calendar-mock-data';
 
 // Use centralized API config
 const API_BASE_URL = API_URLS.CALENDAR;
@@ -127,6 +129,7 @@ class CalendarApiClient {
   // ==========================================
 
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
+    if (isDemoMode) return sampleCalendarEvents as any;
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar?start=${start}&end=${end}`,
       { headers: this.getHeaders() }
@@ -143,6 +146,7 @@ class CalendarApiClient {
   }
 
   async createEvent(event: CreateWorkoutEvent): Promise<WorkoutEvent> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
     const response = await authenticatedFetch(`${this.baseUrl}/calendar`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -152,6 +156,7 @@ class CalendarApiClient {
   }
 
   async updateEvent(eventId: string, event: UpdateWorkoutEvent): Promise<WorkoutEvent> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
     const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -161,6 +166,7 @@ class CalendarApiClient {
   }
 
   async deleteEvent(eventId: string): Promise<void> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return; }
     const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -176,6 +182,7 @@ class CalendarApiClient {
   // ==========================================
 
   async getConnectedCalendars(): Promise<ConnectedCalendar[]> {
+    if (isDemoMode) return mockConnectedCalendars as any;
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar/connected-calendars`,
       { headers: this.getHeaders() }
@@ -184,6 +191,7 @@ class CalendarApiClient {
   }
 
   async createConnectedCalendar(calendar: CreateConnectedCalendar): Promise<ConnectedCalendar> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
     const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -193,6 +201,7 @@ class CalendarApiClient {
   }
 
   async deleteConnectedCalendar(calendarId: string): Promise<void> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return; }
     const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars/${calendarId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -209,6 +218,7 @@ class CalendarApiClient {
     events_updated: number;
     total_events: number;
   }> {
+    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar/connected-calendars/${calendarId}/sync`,
       {
