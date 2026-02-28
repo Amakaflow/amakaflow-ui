@@ -391,6 +391,10 @@ export async function getPrograms(
   profileId: string,
   includeInactive: boolean = false
 ): Promise<WorkoutProgram[]> {
+  if (isDemoMode) {
+    const { DEMO_PROGRAMS } = await import('./mock-data/demo-extended');
+    return DEMO_PROGRAMS;
+  }
   try {
     const queryParams = new URLSearchParams({
       profile_id: profileId,
@@ -549,6 +553,10 @@ export interface UserTag {
  * Get all tags for a user
  */
 export async function getUserTags(profileId: string): Promise<UserTag[]> {
+  if (isDemoMode) {
+    const { DEMO_USER_TAGS } = await import('./mock-data/demo-extended');
+    return DEMO_USER_TAGS;
+  }
   try {
     const queryParams = new URLSearchParams({
       profile_id: profileId,

@@ -5,7 +5,6 @@ import { X, Plus } from 'lucide-react';
 import { useProgramWizard } from '@/context/ProgramWizardContext';
 import { FocusArea, FOCUS_AREA_LABELS } from '@/types/program-wizard';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/utils';
 
@@ -94,13 +93,21 @@ export function PreferencesStep() {
                     : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600'
                 )}
               >
-                <Checkbox
-                  checked={isSelected}
+                <div
+                  aria-hidden="true"
                   className={cn(
-                    'pointer-events-none',
-                    isSelected && 'border-white data-[state=checked]:bg-white data-[state=checked]:text-zinc-900 dark:border-zinc-900 dark:data-[state=checked]:bg-zinc-900 dark:data-[state=checked]:text-white'
+                    'w-4 h-4 rounded flex items-center justify-center border flex-shrink-0',
+                    isSelected
+                      ? 'border-white bg-white dark:border-zinc-900 dark:bg-zinc-900'
+                      : 'border-zinc-400 dark:border-zinc-500'
                   )}
-                />
+                >
+                  {isSelected && (
+                    <svg className="w-3 h-3 text-zinc-900 dark:text-white" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
                 <span>{FOCUS_AREA_LABELS[area]}</span>
               </button>
             );
