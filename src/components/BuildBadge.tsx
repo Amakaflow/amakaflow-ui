@@ -1,4 +1,5 @@
 import buildInfoJson from "../build-info.json";
+import { isDemoMode } from "../lib/demo-mode";
 
 type BuildInfo = {
   appName: string;
@@ -11,8 +12,8 @@ type BuildInfo = {
 const buildInfo = buildInfoJson as BuildInfo;
 
 export function BuildBadge() {
-  // Hide in production
-  if (import.meta.env.PROD) return null;
+  // Hide in production and demo mode
+  if (import.meta.env.PROD || isDemoMode) return null;
 
   // Debug logging
   if (import.meta.env.DEV) {

@@ -97,6 +97,13 @@ export function EquipmentStep() {
         })}
       </div>
 
+      {/* Validation hint when nothing selected */}
+      {!state.equipmentPreset && !state.useCustomEquipment && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Please select an equipment option to continue
+        </p>
+      )}
+
       {/* Custom Equipment Toggle */}
       <div className="border-t border-zinc-200 dark:border-zinc-700 pt-6">
         <button
