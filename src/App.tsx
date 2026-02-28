@@ -36,6 +36,7 @@ import { CreateAIWorkout } from './components/CreateAIWorkout';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { ChatPanel } from './components/ChatPanel';
+import { DemoNav } from './components/DemoNav';
 import { ChatProvider } from './context/ChatContext';
 import { ChatAwareLayout } from './components/ChatAwareLayout';
 import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from './types/workout';
@@ -2126,6 +2127,9 @@ export default function App() {
 
       {/* Chat Panel - side panel available on all authenticated views */}
       <ChatPanel />
+
+      {/* Demo navigation panel */}
+      <DemoNav onNavigate={(v) => setCurrentView(v as any)} currentView={currentView} />
     </ChatAwareLayout>
     </ChatProvider>
   );
