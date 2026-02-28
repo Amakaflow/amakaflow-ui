@@ -7,6 +7,148 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
+
+// ============================================================================
+// Demo Mode Mock Data
+// ============================================================================
+
+const DEMO_JOB_ID = 'demo-import-job-001';
+
+const DEMO_DETECT_RESPONSE: BulkDetectResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  total: 3,
+  success_count: 3,
+  error_count: 0,
+  metadata: {
+    programName: 'Push Pull Legs Program',
+    detectedFormat: 'excel_multi_sheet',
+    sheetNames: ['Push Day', 'Pull Day', 'Leg Day'],
+  },
+  items: [
+    {
+      id: 'demo-item-1',
+      sourceIndex: 0,
+      sourceType: 'file',
+      sourceRef: 'program.xlsx — Sheet: Push Day',
+      rawData: { sheet: 'Push Day' },
+      parsedTitle: 'Push Day',
+      parsedExerciseCount: 6,
+      parsedBlockCount: 2,
+      confidence: 97,
+    },
+    {
+      id: 'demo-item-2',
+      sourceIndex: 1,
+      sourceType: 'file',
+      sourceRef: 'program.xlsx — Sheet: Pull Day',
+      rawData: { sheet: 'Pull Day' },
+      parsedTitle: 'Pull Day',
+      parsedExerciseCount: 5,
+      parsedBlockCount: 2,
+      confidence: 95,
+    },
+    {
+      id: 'demo-item-3',
+      sourceIndex: 2,
+      sourceType: 'file',
+      sourceRef: 'program.xlsx — Sheet: Leg Day',
+      rawData: { sheet: 'Leg Day' },
+      parsedTitle: 'Leg Day',
+      parsedExerciseCount: 5,
+      parsedBlockCount: 2,
+      confidence: 96,
+    },
+  ],
+};
+
+const DEMO_MAP_RESPONSE: BulkMapResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  mapped_count: 3,
+  workouts: [],
+};
+
+const DEMO_MATCH_RESPONSE: BulkMatchResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  total_exercises: 5,
+  matched: 4,
+  needs_review: 1,
+  unmapped: 0,
+  exercises: [
+    { id: 'ex-1', originalName: 'Bench Press', matchedGarminName: 'Bench Press', confidence: 99, suggestions: [], status: 'matched', sourceWorkoutIds: ['demo-item-1'], occurrenceCount: 1 },
+    { id: 'ex-2', originalName: 'Overhead Press', matchedGarminName: 'Shoulder Press', confidence: 91, suggestions: [{ name: 'Military Press', confidence: 85 }], status: 'matched', sourceWorkoutIds: ['demo-item-1'], occurrenceCount: 1 },
+    { id: 'ex-3', originalName: 'Pull-ups', matchedGarminName: 'Pull Up', confidence: 98, suggestions: [], status: 'matched', sourceWorkoutIds: ['demo-item-2'], occurrenceCount: 1 },
+    { id: 'ex-4', originalName: 'Barbell Row', matchedGarminName: 'Bent Over Row', confidence: 88, suggestions: [{ name: 'Barbell Row', confidence: 82 }], status: 'needs_review', sourceWorkoutIds: ['demo-item-2'], occurrenceCount: 2 },
+    { id: 'ex-5', originalName: 'Back Squat', matchedGarminName: 'Squat', confidence: 95, suggestions: [], status: 'matched', sourceWorkoutIds: ['demo-item-3'], occurrenceCount: 1 },
+  ],
+};
+
+const DEMO_PREVIEW_RESPONSE: BulkPreviewResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  workouts: [
+    {
+      id: 'prev-1', detectedItemId: 'demo-item-1', title: 'Push Day', exerciseCount: 6, blockCount: 2,
+      estimatedDuration: 65, validationIssues: [], selected: true, isDuplicate: false,
+      workout: {
+        blocks: [
+          { label: 'Horizontal Push', exercises: [{ name: 'Bench Press', sets: 4, reps: 8 }, { name: 'Incline DB Press', sets: 3, reps: 10 }] },
+          { label: 'Vertical Push', exercises: [{ name: 'Overhead Press', sets: 3, reps: 8 }, { name: 'Lateral Raise', sets: 3, reps: 15 }] },
+        ],
+      },
+    },
+    {
+      id: 'prev-2', detectedItemId: 'demo-item-2', title: 'Pull Day', exerciseCount: 5, blockCount: 2,
+      estimatedDuration: 55, validationIssues: [], selected: true, isDuplicate: false,
+      workout: {
+        blocks: [
+          { label: 'Vertical Pull', exercises: [{ name: 'Pull-ups', sets: 4, reps: 8 }, { name: 'Lat Pulldown', sets: 3, reps: 10 }] },
+          { label: 'Horizontal Pull', exercises: [{ name: 'Barbell Row', sets: 4, reps: 8 }, { name: 'Face Pull', sets: 3, reps: 15 }] },
+        ],
+      },
+    },
+    {
+      id: 'prev-3', detectedItemId: 'demo-item-3', title: 'Leg Day', exerciseCount: 5, blockCount: 2,
+      estimatedDuration: 70, validationIssues: [], selected: true, isDuplicate: false,
+      workout: {
+        blocks: [
+          { label: 'Quads', exercises: [{ name: 'Back Squat', sets: 4, reps: 5 }, { name: 'Leg Press', sets: 3, reps: 12 }] },
+          { label: 'Posterior Chain', exercises: [{ name: 'Romanian Deadlift', sets: 3, reps: 10 }, { name: 'Leg Curl', sets: 3, reps: 12 }] },
+        ],
+      },
+    },
+  ],
+  stats: {
+    totalDetected: 3, totalSelected: 3, totalSkipped: 0,
+    exercisesMatched: 4, exercisesNeedingReview: 1, exercisesUnmapped: 0,
+    newExercisesToCreate: 0, estimatedDuration: 190, duplicatesFound: 0,
+    validationErrors: 0, validationWarnings: 0,
+  },
+};
+
+const DEMO_EXECUTE_RESPONSE: BulkExecuteResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  status: 'running',
+  message: 'Import started successfully',
+};
+
+const DEMO_STATUS_COMPLETE: BulkStatusResponse = {
+  success: true,
+  job_id: DEMO_JOB_ID,
+  status: 'complete',
+  progress: 100,
+  results: [
+    { workoutId: 'demo-item-1', title: 'Push Day', status: 'success', savedWorkoutId: 'saved-1' },
+    { workoutId: 'demo-item-2', title: 'Pull Day', status: 'success', savedWorkoutId: 'saved-2' },
+    { workoutId: 'demo-item-3', title: 'Leg Day', status: 'success', savedWorkoutId: 'saved-3' },
+  ],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 import {
   BulkInputType,
   BulkDetectRequest,
@@ -94,6 +236,7 @@ class BulkImportApiClient {
     sourceType: BulkInputType,
     sources: string[]
   ): Promise<BulkDetectResponse> {
+    if (isDemoMode) return { ...DEMO_DETECT_RESPONSE, items: DEMO_DETECT_RESPONSE.items.map(i => ({ ...i, sourceType })) };
     const request: BulkDetectRequest = {
       profile_id: profileId,
       source_type: sourceType,
@@ -111,6 +254,7 @@ class BulkImportApiClient {
    * Uploads a file and returns detected items
    */
   async detectFile(profileId: string, file: File): Promise<BulkDetectResponse> {
+    if (isDemoMode) return { ...DEMO_DETECT_RESPONSE, items: DEMO_DETECT_RESPONSE.items.map(i => ({ ...i, sourceRef: `${file.name} — Sheet: ${i.parsedTitle}` })) };
     const formData = new FormData();
     formData.append('file', file);
     formData.append('profile_id', profileId);
@@ -139,6 +283,7 @@ class BulkImportApiClient {
     profileId: string,
     columnMappings: ColumnMapping[]
   ): Promise<BulkMapResponse> {
+    if (isDemoMode) return DEMO_MAP_RESPONSE;
     // Transform camelCase to snake_case for backend
     const snakeCaseMappings = columnMappings.map(m => ({
       source_column: m.sourceColumn,
@@ -170,6 +315,7 @@ class BulkImportApiClient {
     profileId: string,
     userMappings?: Record<string, string>
   ): Promise<BulkMatchResponse> {
+    if (isDemoMode) return DEMO_MATCH_RESPONSE;
     const request: BulkMatchRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -191,6 +337,7 @@ class BulkImportApiClient {
     profileId: string,
     selectedIds: string[]
   ): Promise<BulkPreviewResponse> {
+    if (isDemoMode) return DEMO_PREVIEW_RESPONSE;
     const request: BulkPreviewRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -214,6 +361,7 @@ class BulkImportApiClient {
     device: string,
     asyncMode: boolean = true
   ): Promise<BulkExecuteResponse> {
+    if (isDemoMode) return DEMO_EXECUTE_RESPONSE;
     const request: BulkExecuteRequest = {
       job_id: jobId,
       profile_id: profileId,
@@ -233,6 +381,7 @@ class BulkImportApiClient {
    * Used for polling during async import
    */
   async getStatus(jobId: string, profileId: string): Promise<BulkStatusResponse> {
+    if (isDemoMode) return DEMO_STATUS_COMPLETE;
     return this.request<BulkStatusResponse>(`/import/status/${jobId}?profile_id=${encodeURIComponent(profileId)}`, {
       method: 'GET',
     });
