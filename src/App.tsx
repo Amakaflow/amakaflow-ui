@@ -36,6 +36,7 @@ import { CreateAIWorkout } from './components/CreateAIWorkout';
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { ChatPanel } from './components/ChatPanel';
+import { DemoNav } from './components/DemoNav';
 import { ChatProvider } from './context/ChatContext';
 import { ChatAwareLayout } from './components/ChatAwareLayout';
 import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from './types/workout';
@@ -51,6 +52,7 @@ import { DeviceId, getDeviceById } from './lib/devices';
 import { saveWorkoutToHistory, getWorkoutHistory, getWorkoutHistoryFromLocalStorage, setCurrentProfileId } from './lib/workout-history';
 import { applyWorkoutTypeDefaults } from './lib/workoutTypeDefaults';
 import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from './lib/clerk-auth';
+import { isDemoMode, DEMO_USER } from './lib/demo-mode';
 import { User } from './types/auth';
 import { isAccountConnectedSync, isAccountConnected } from './lib/linked-accounts';
 import type { BulkInputType } from './types/bulk-import';
@@ -172,6 +174,12 @@ export default function App() {
   // Sync Clerk user with Supabase profile, or create default user if Clerk not configured
   useEffect(() => {
     const syncUser = async () => {
+      if (isDemoMode) {
+        setUser(DEMO_USER as AppUser);
+        setAuthLoading(false);
+        return;
+      }
+
       // If Clerk not configured, create default user for development
       if (!hasClerk && !user) {
         setAuthLoading(true);
@@ -1599,8 +1607,18 @@ export default function App() {
                 <Settings className="w-4 h-4" />
                 Settings
               </Button>
-              {import.meta.env.VITE_CLERK_PUBLISHABLE_KEY && !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY.includes('placeholder') && (
-                <UserButton afterSignOutUrl="/" />
+              {isDemoMode ? (
+                <span className="text-sm font-medium text-muted-foreground px-2">
+                  {user?.name ?? 'Demo User'}
+                </span>
+              ) : (
+                <>
+                  <SignedIn><UserButton afterSignOutUrl="/" /></SignedIn>
+                  <SignedOut>
+                    <SignInButton mode="modal"><Button variant="outline" size="sm">Sign in</Button></SignInButton>
+                    <SignUpButton mode="modal"><Button size="sm">Sign up</Button></SignUpButton>
+                  </SignedOut>
+                </>
               )}
             </div>
           </div>
@@ -2109,6 +2127,9 @@ export default function App() {
 
       {/* Chat Panel - side panel available on all authenticated views */}
       <ChatPanel />
+
+      {/* Demo navigation panel */}
+      <DemoNav onNavigate={(v) => setCurrentView(v as any)} currentView={currentView} />
     </ChatAwareLayout>
     </ChatProvider>
   );

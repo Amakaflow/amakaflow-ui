@@ -1,0 +1,32 @@
+export const MOCK_PROGRAMS = [
+  {
+    id: 'prog-1',
+    name: 'Hyrox 8-Week Prep',
+    description: 'Race-ready in 8 weeks with progressive overload and Hyrox-specific conditioning.',
+    duration_weeks: 8,
+    sessions_per_week: 4,
+    difficulty: 'intermediate',
+    tags: ['hyrox', 'endurance', 'strength'],
+    created_at: '2026-01-15T10:00:00Z',
+  },
+  {
+    id: 'prog-2',
+    name: 'Strength Foundation 12-Week',
+    description: 'Build a base of strength across all major movement patterns.',
+    duration_weeks: 12,
+    sessions_per_week: 3,
+    difficulty: 'beginner',
+    tags: ['strength', 'hypertrophy'],
+    created_at: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'prog-3',
+    name: 'Marathon Training Block',
+    description: 'Peak for a marathon with structured long runs, speed work, and recovery.',
+    duration_weeks: 16,
+    sessions_per_week: 5,
+    difficulty: 'advanced',
+    tags: ['running', 'endurance'],
+    created_at: '2026-02-10T10:00:00Z',
+  },
+];
