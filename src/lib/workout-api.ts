@@ -7,6 +7,7 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
@@ -90,6 +91,10 @@ async function workoutApiCall<T>(
  * Save a workout to Supabase via mapper API
  */
 export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<SavedWorkout> {
+  if (isDemoMode) {
+    console.log('[demo] saveWorkoutToAPI skipped');
+    return { id: 'demo-' + Date.now(), ...request, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
+  }
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
     '/workouts/save',
     {
@@ -115,6 +120,7 @@ export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<Sav
  * Get workouts for a user
  */
 export async function getWorkoutsFromAPI(params: GetWorkoutsParams): Promise<SavedWorkout[]> {
+  if (isDemoMode) return [];
   const queryParams = new URLSearchParams({
     profile_id: params.profile_id,
   });
