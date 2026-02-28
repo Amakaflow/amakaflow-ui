@@ -365,6 +365,10 @@ class ProgressionApiClient {
    * Each session includes all sets with weight, reps, and calculated estimated 1RM.
    */
   async getExerciseHistory(params: GetExerciseHistoryParams): Promise<ExerciseHistory> {
+    if (isDemoMode) {
+      const { getDemoExerciseHistory } = await import('./mock-data/demo-extended');
+      return getDemoExerciseHistory(params.exerciseId);
+    }
     const searchParams = new URLSearchParams();
     if (params.limit !== undefined) {
       searchParams.set('limit', params.limit.toString());

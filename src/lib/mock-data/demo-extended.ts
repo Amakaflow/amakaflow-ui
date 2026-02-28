@@ -8,6 +8,7 @@ import type { WorkoutProgram, UserTag } from '../workout-api';
 import type { TrainingProgram } from '../../types/training-program';
 import type {
   ExercisesWithHistoryResponse,
+  ExerciseHistory,
   VolumeAnalytics,
 } from '../../types/progression';
 import type { PairedDevice } from '../mobile-api';
@@ -133,6 +134,146 @@ export const DEMO_EXERCISES_WITH_HISTORY: ExercisesWithHistoryResponse = {
     { exerciseId: 'ex-row', exerciseName: 'Barbell Row', sessionCount: 11 },
   ],
 };
+
+// ─── Progression — Per-Exercise History ──────────────────────────────────────
+
+function makeSession(
+  id: string,
+  daysAgo: number,
+  exerciseId: string,
+  exerciseName: string,
+  workoutName: string,
+  sets: { w: number; r: number }[]
+) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  const dateStr = date.toISOString().split('T')[0];
+  const setDetails = sets.map((s, i) => {
+    const est1rm = s.r > 0 ? Math.round(s.w / (1.0278 - 0.0278 * s.r)) : null;
+    return {
+      setNumber: i + 1,
+      weight: s.w,
+      weightUnit: 'lbs',
+      repsCompleted: s.r,
+      repsPlanned: s.r,
+      status: 'completed',
+      estimated1Rm: est1rm,
+      isPr: false,
+    };
+  });
+  const best1rm = Math.max(...setDetails.map(s => s.estimated1Rm ?? 0));
+  const maxWeight = Math.max(...sets.map(s => s.w));
+  return {
+    completionId: `${exerciseId}-${id}`,
+    workoutDate: dateStr,
+    workoutName,
+    exerciseName,
+    sets: setDetails,
+    sessionBest1Rm: best1rm > 0 ? best1rm : null,
+    sessionMaxWeight: maxWeight,
+    sessionTotalVolume: sets.reduce((acc, s) => acc + s.w * s.r, 0),
+  };
+}
+
+const BENCH_SESSIONS = [
+  makeSession('s1', 3,  'ex-bench', 'Bench Press', 'Push Day', [{ w: 185, r: 5 }, { w: 185, r: 5 }, { w: 185, r: 4 }]),
+  makeSession('s2', 10, 'ex-bench', 'Bench Press', 'Push Day', [{ w: 180, r: 5 }, { w: 180, r: 5 }, { w: 180, r: 5 }]),
+  makeSession('s3', 17, 'ex-bench', 'Bench Press', 'Push Day', [{ w: 175, r: 5 }, { w: 175, r: 5 }, { w: 175, r: 4 }]),
+  makeSession('s4', 24, 'ex-bench', 'Bench Press', 'Upper A',  [{ w: 170, r: 6 }, { w: 170, r: 6 }, { w: 170, r: 5 }]),
+  makeSession('s5', 31, 'ex-bench', 'Bench Press', 'Push Day', [{ w: 165, r: 6 }, { w: 165, r: 6 }, { w: 165, r: 6 }]),
+  makeSession('s6', 38, 'ex-bench', 'Bench Press', 'Upper A',  [{ w: 160, r: 8 }, { w: 160, r: 7 }, { w: 155, r: 8 }]),
+  makeSession('s7', 45, 'ex-bench', 'Bench Press', 'Push Day', [{ w: 155, r: 8 }, { w: 155, r: 8 }, { w: 155, r: 7 }]),
+  makeSession('s8', 52, 'ex-bench', 'Bench Press', 'Upper A',  [{ w: 150, r: 8 }, { w: 150, r: 8 }, { w: 150, r: 8 }]),
+];
+BENCH_SESSIONS[0].sets[0].isPr = true;
+
+const SQUAT_SESSIONS = [
+  makeSession('s1', 4,  'ex-squat', 'Back Squat', 'Leg Day',   [{ w: 225, r: 5 }, { w: 225, r: 5 }, { w: 225, r: 4 }]),
+  makeSession('s2', 11, 'ex-squat', 'Back Squat', 'Lower A',   [{ w: 215, r: 5 }, { w: 215, r: 5 }, { w: 215, r: 5 }]),
+  makeSession('s3', 18, 'ex-squat', 'Back Squat', 'Leg Day',   [{ w: 205, r: 5 }, { w: 205, r: 5 }, { w: 205, r: 5 }]),
+  makeSession('s4', 25, 'ex-squat', 'Back Squat', 'Lower A',   [{ w: 200, r: 5 }, { w: 200, r: 5 }, { w: 195, r: 6 }]),
+  makeSession('s5', 32, 'ex-squat', 'Back Squat', 'Leg Day',   [{ w: 190, r: 6 }, { w: 190, r: 6 }, { w: 190, r: 5 }]),
+  makeSession('s6', 39, 'ex-squat', 'Back Squat', 'Lower A',   [{ w: 180, r: 8 }, { w: 180, r: 7 }, { w: 175, r: 8 }]),
+];
+SQUAT_SESSIONS[0].sets[0].isPr = true;
+
+const DEADLIFT_SESSIONS = [
+  makeSession('s1', 5,  'ex-deadlift', 'Deadlift', 'Lower B',  [{ w: 275, r: 3 }, { w: 275, r: 3 }, { w: 265, r: 3 }]),
+  makeSession('s2', 12, 'ex-deadlift', 'Deadlift', 'Lower B',  [{ w: 265, r: 3 }, { w: 265, r: 3 }, { w: 265, r: 3 }]),
+  makeSession('s3', 19, 'ex-deadlift', 'Deadlift', 'Lower B',  [{ w: 255, r: 4 }, { w: 255, r: 4 }, { w: 245, r: 4 }]),
+  makeSession('s4', 26, 'ex-deadlift', 'Deadlift', 'Strength', [{ w: 245, r: 5 }, { w: 245, r: 4 }, { w: 235, r: 5 }]),
+  makeSession('s5', 33, 'ex-deadlift', 'Deadlift', 'Lower B',  [{ w: 235, r: 5 }, { w: 235, r: 5 }, { w: 225, r: 5 }]),
+];
+DEADLIFT_SESSIONS[0].sets[0].isPr = true;
+
+const OHP_SESSIONS = [
+  makeSession('s1', 3,  'ex-ohp', 'Overhead Press', 'Push Day', [{ w: 115, r: 5 }, { w: 115, r: 5 }, { w: 110, r: 5 }]),
+  makeSession('s2', 10, 'ex-ohp', 'Overhead Press', 'Upper A',  [{ w: 110, r: 5 }, { w: 110, r: 5 }, { w: 110, r: 5 }]),
+  makeSession('s3', 17, 'ex-ohp', 'Overhead Press', 'Push Day', [{ w: 105, r: 6 }, { w: 105, r: 6 }, { w: 105, r: 5 }]),
+  makeSession('s4', 24, 'ex-ohp', 'Overhead Press', 'Upper A',  [{ w: 100, r: 6 }, { w: 100, r: 6 }, { w: 100, r: 6 }]),
+  makeSession('s5', 31, 'ex-ohp', 'Overhead Press', 'Push Day', [{ w:  95, r: 8 }, { w:  95, r: 7 }, { w:  95, r: 7 }]),
+];
+OHP_SESSIONS[0].sets[0].isPr = true;
+
+const ROW_SESSIONS = [
+  makeSession('s1', 4,  'ex-row', 'Barbell Row', 'Pull Day', [{ w: 155, r: 6 }, { w: 155, r: 6 }, { w: 155, r: 5 }]),
+  makeSession('s2', 11, 'ex-row', 'Barbell Row', 'Upper B',  [{ w: 150, r: 6 }, { w: 150, r: 6 }, { w: 150, r: 6 }]),
+  makeSession('s3', 18, 'ex-row', 'Barbell Row', 'Pull Day', [{ w: 145, r: 8 }, { w: 145, r: 7 }, { w: 140, r: 8 }]),
+  makeSession('s4', 25, 'ex-row', 'Barbell Row', 'Upper B',  [{ w: 135, r: 8 }, { w: 135, r: 8 }, { w: 135, r: 7 }]),
+];
+ROW_SESSIONS[0].sets[0].isPr = true;
+
+export const DEMO_EXERCISE_HISTORIES: Record<string, ExerciseHistory> = {
+  'ex-bench': {
+    exerciseId: 'ex-bench', exerciseName: 'Bench Press',
+    supports1Rm: true, oneRmFormula: 'brzycki',
+    sessions: BENCH_SESSIONS, totalSessions: 18,
+    allTimeBest1Rm: Math.max(...BENCH_SESSIONS.map(s => s.sessionBest1Rm ?? 0)),
+    allTimeMaxWeight: 185,
+  },
+  'ex-squat': {
+    exerciseId: 'ex-squat', exerciseName: 'Back Squat',
+    supports1Rm: true, oneRmFormula: 'brzycki',
+    sessions: SQUAT_SESSIONS, totalSessions: 16,
+    allTimeBest1Rm: Math.max(...SQUAT_SESSIONS.map(s => s.sessionBest1Rm ?? 0)),
+    allTimeMaxWeight: 225,
+  },
+  'ex-deadlift': {
+    exerciseId: 'ex-deadlift', exerciseName: 'Deadlift',
+    supports1Rm: true, oneRmFormula: 'brzycki',
+    sessions: DEADLIFT_SESSIONS, totalSessions: 14,
+    allTimeBest1Rm: Math.max(...DEADLIFT_SESSIONS.map(s => s.sessionBest1Rm ?? 0)),
+    allTimeMaxWeight: 275,
+  },
+  'ex-ohp': {
+    exerciseId: 'ex-ohp', exerciseName: 'Overhead Press',
+    supports1Rm: true, oneRmFormula: 'brzycki',
+    sessions: OHP_SESSIONS, totalSessions: 12,
+    allTimeBest1Rm: Math.max(...OHP_SESSIONS.map(s => s.sessionBest1Rm ?? 0)),
+    allTimeMaxWeight: 115,
+  },
+  'ex-row': {
+    exerciseId: 'ex-row', exerciseName: 'Barbell Row',
+    supports1Rm: true, oneRmFormula: 'brzycki',
+    sessions: ROW_SESSIONS, totalSessions: 11,
+    allTimeBest1Rm: Math.max(...ROW_SESSIONS.map(s => s.sessionBest1Rm ?? 0)),
+    allTimeMaxWeight: 155,
+  },
+};
+
+// Fallback for any exerciseId not in the map
+export function getDemoExerciseHistory(exerciseId: string): ExerciseHistory {
+  return DEMO_EXERCISE_HISTORIES[exerciseId] ?? {
+    exerciseId,
+    exerciseName: 'Exercise',
+    supports1Rm: true,
+    oneRmFormula: 'brzycki',
+    sessions: [],
+    totalSessions: 0,
+    allTimeBest1Rm: null,
+    allTimeMaxWeight: null,
+  };
+}
 
 // ─── Progression — Volume Analytics ──────────────────────────────────────────
 
