@@ -7,6 +7,7 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 import type { TrainingProgram, ProgramStatus, ProgramWorkout } from '../types/training-program';
 
 const CALENDAR_API_BASE_URL = API_URLS.CALENDAR;
@@ -48,6 +49,10 @@ export async function getTrainingProgram(
   programId: string,
   userId: string
 ): Promise<TrainingProgram | null> {
+  if (isDemoMode) {
+    const { DEMO_TRAINING_PROGRAMS } = await import('./mock-data/demo-extended');
+    return DEMO_TRAINING_PROGRAMS.find(p => p.id === programId) || DEMO_TRAINING_PROGRAMS[0] || null;
+  }
   const queryParams = new URLSearchParams({ user_id: userId });
   const response = await trainingProgramApiCall<{
     success: boolean;
@@ -66,6 +71,10 @@ export async function getTrainingPrograms(
   userId: string,
   includeArchived: boolean = false
 ): Promise<TrainingProgram[]> {
+  if (isDemoMode) {
+    const { DEMO_TRAINING_PROGRAMS } = await import('./mock-data/demo-extended');
+    return DEMO_TRAINING_PROGRAMS;
+  }
   const queryParams = new URLSearchParams({
     user_id: userId,
     include_archived: includeArchived.toString(),
