@@ -1374,8 +1374,8 @@ export default function App() {
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-6 min-w-0">
+              <div className="flex items-center gap-3 shrink-0">
                 <Button
                   variant="ghost"
                   className="p-0 h-auto hover:bg-transparent"
@@ -1405,7 +1405,7 @@ export default function App() {
                 </Button>
               </div>
               
-              <nav className="hidden md:flex items-center gap-1">
+              <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
                 <Button
                   variant={(currentView === 'workflow' || currentView === 'bulk-import' || currentView === 'import') ? 'default' : 'ghost'}
                   size="sm"
@@ -1557,7 +1557,7 @@ export default function App() {
               </nav>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant={currentView === 'help' ? 'default' : 'ghost'}
                 size="sm"
