@@ -88,20 +88,21 @@ expect(result.current.phase).toBe('results');
 1. Create `src/components/<Feature>/hooks/use<Feature>.ts` — logic first, no JSX
 2. Write `renderHook()` tests — no DOM, no rendering the screen
 3. Create `src/components/<Feature>/<Feature>.tsx` — thin shell, imports only `use<Feature>`
-4. Add one line to `src/app/router.tsx`:
+4. Create `src/components/<Feature>/index.ts` — re-export the screen component
+5. Add one line to `src/app/router.tsx`:
    ```typescript
    export const MyScreen = lazy(() =>
-     import('../components/MyFeature/MyScreen').then(m => ({ default: m.MyScreen }))
+     import('../components/MyFeature').then(m => ({ default: m.MyScreen }))
    );
    ```
-5. Add `'my-feature'` to the `View` union in `src/app/router.tsx` (lines 3–20).
-6. In `src/app/WorkflowView.tsx`, add a render block:
+6. Add `'my-feature'` to the `View` union near the top of `src/app/router.tsx`.
+7. In `src/app/WorkflowView.tsx`, add a render block:
    ```tsx
    {currentView === 'my-feature' && (
      <MyScreen userId={user.id} onDone={() => setCurrentView('home')} />
    )}
    ```
-   `Suspense` is already handled by `AppShell` — no changes needed there.
+   `Suspense` is already in `AppShell` — no changes needed there.
 
 ---
 
