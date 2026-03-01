@@ -1673,12 +1673,14 @@ export default function App() {
                 setCurrentStep('add-sources');
               }}
             />
-            {/* Version timestamp */}
-            <div className="mt-8 text-center">
-              <p className="text-xs text-muted-foreground">
-                Build: {new Date(buildTimestamp).toLocaleString()}
-              </p>
-            </div>
+            {/* Version timestamp — dev only */}
+            {!isDemoMode && (
+              <div className="mt-8 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Build: {new Date(buildTimestamp).toLocaleString()}
+                </p>
+              </div>
+            )}
           </>
         )}
 
