@@ -198,19 +198,27 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
 
     // Calculate positions for avg and max annotations (find closest points in time)
     const avgTime = sortedSamples[0].t + (sortedSamples[sortedSamples.length - 1].t - sortedSamples[0].t) / 2;
-    const avgSample = sortedSamples.reduce((prev, curr) => 
-      Math.abs(curr.t - avgTime) < Math.abs(prev.t - avgTime) ? curr : prev
+    const { sample: avgSample, index: avgIndex } = sortedSamples.reduce(
+      (best, curr, idx) => Math.abs(curr.t - avgTime) < Math.abs(best.sample.t - avgTime)
+        ? { sample: curr, index: idx }
+        : best,
+      { sample: sortedSamples[0], index: 0 }
     );
     const avgX = timeRange > 0
       ? xOffset + ((avgSample.t - sortedSamples[0].t) / timeRange) * width
-      : xOffset + (sortedSamples.indexOf(avgSample) / (sortedSamples.length - 1)) * width;
+      : xOffset + (avgIndex / (sortedSamples.length - 1)) * width;
     const avgY = height - ((avgBpm - minBpm) / bpmRange) * height;
 
     // Find max HR sample
-    const maxSample = sortedSamples.reduce((prev, curr) => curr.bpm > prev.bpm ? curr : prev);
+    const { sample: maxSample, index: maxIndex } = sortedSamples.reduce(
+      (best, curr, idx) => curr.bpm > best.sample.bpm
+        ? { sample: curr, index: idx }
+        : best,
+      { sample: sortedSamples[0], index: 0 }
+    );
     const maxX = timeRange > 0
       ? xOffset + ((maxSample.t - sortedSamples[0].t) / timeRange) * width
-      : xOffset + (sortedSamples.indexOf(maxSample) / (sortedSamples.length - 1)) * width;
+      : xOffset + (maxIndex / (sortedSamples.length - 1)) * width;
     const maxY = height - ((maxSample.bpm - minBpm) / bpmRange) * height;
 
     return {
@@ -223,7 +231,7 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
       maxX,
       maxY,
     };
-  }, [samples, maxHR]);
+  }, [samples]);
 
   if (!samples || samples.length < 2) {
     return (
@@ -239,13 +247,13 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
       <div className="h-16 mb-2">
         <svg viewBox="0 0 130 60" className="w-full h-full" preserveAspectRatio="none">
           {/* Y-axis labels */}
-          <text x="2" y="8" fill="#94a3b8" fontSize="5" fontFamily="system-ui">
+          <text x="2" y="8" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
             {maxBpmVal}
           </text>
-          <text x="2" y="34" fill="#94a3b8" fontSize="5" fontFamily="system-ui">
+          <text x="2" y="34" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
             {avgBpm}
           </text>
-          <text x="2" y="58" fill="#94a3b8" fontSize="5" fontFamily="system-ui">
+          <text x="2" y="58" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
             {minBpm}
           </text>
           
@@ -256,7 +264,7 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
           <line x1="12" y1="58" x2="128" y2="58" stroke="#475569" strokeWidth="0.5" />
           
           {/* Unit label (bpm) */}
-          <text x="14" y="6" fill="#64748b" fontSize="4" fontFamily="system-ui">bpm</text>
+          <text x="14" y="6" fill="#64748b" fontSize={4} fontFamily="system-ui">bpm</text>
           
           {/* Heart rate path */}
           <path
@@ -271,13 +279,13 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
           
           {/* AVG point annotation */}
           <circle cx={avgX} cy={avgY} r="2" fill="#f97316" />
-          <text x={avgX + 3} y={avgY + 1} fill="#f97316" fontSize="4" fontFamily="system-ui" fontWeight="600">
+          <text x={avgX + 3} y={avgY + 1} fill="#f97316" fontSize={4} fontFamily="system-ui" fontWeight="600">
             {avgBpm}
           </text>
           
           {/* MAX point annotation */}
           <circle cx={maxX} cy={maxY} r="2" fill="#f97316" />
-          <text x={maxX + 3} y={maxY + 1} fill="#f97316" fontSize="4" fontFamily="system-ui" fontWeight="600">
+          <text x={maxX + 3} y={maxY + 1} fill="#f97316" fontSize={4} fontFamily="system-ui" fontWeight="600">
             {maxHR}
           </text>
         </svg>
