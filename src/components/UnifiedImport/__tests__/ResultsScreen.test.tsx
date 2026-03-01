@@ -150,4 +150,46 @@ describe('ResultsScreen', () => {
     expect(screen.getByText(/2 blocks/i)).toBeInTheDocument();
     expect(screen.getByText(/6 exercises/i)).toBeInTheDocument();
   });
+
+  it('Expand button shows block list for that workout', async () => {
+    const mockProcessed: ProcessedItem[] = [{
+      queueId: 'q1',
+      status: 'done',
+      workoutTitle: 'Push Day',
+      blockCount: 2,
+      exerciseCount: 6,
+      workout: {
+        blocks: [
+          { id: 'b1', label: 'Warm-up', exercises: [{}, {}] },
+          { id: 'b2', label: 'Main set', exercises: [{}, {}, {}, {}] },
+        ]
+      }
+    }];
+    const mockQueue: QueueItem[] = [{ id: 'q1', type: 'url', label: 'youtube.com/...', raw: 'https://youtube.com' }];
+
+    render(
+      <ResultsScreen
+        queueItems={mockQueue}
+        processedItems={mockProcessed}
+        onSaveAll={vi.fn()}
+        onBuildOne={vi.fn()}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    // Block list not visible initially
+    expect(screen.queryByText('Warm-up')).not.toBeInTheDocument();
+
+    // Click expand
+    fireEvent.click(screen.getByRole('button', { name: /expand/i }));
+
+    // Block list now visible
+    expect(screen.getByText('Warm-up')).toBeInTheDocument();
+    expect(screen.getByText('Main set')).toBeInTheDocument();
+
+    // Click collapse — block list disappears again
+    fireEvent.click(screen.getByRole('button', { name: /collapse/i }));
+    expect(screen.queryByText('Warm-up')).not.toBeInTheDocument();
+  });
 });
