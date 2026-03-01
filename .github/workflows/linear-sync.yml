@@ -51,20 +51,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$ISSUE_QUERY")
 
-          ISSUE_UUID=$(echo "$ISSUE_RESP" | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-nodes = d.get('data',{}).get('issues',{}).get('nodes',[])
-print(nodes[0]['id'] if nodes else '')")
-
-          TEAM_ID=$(echo "$ISSUE_RESP" | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-nodes = d.get('data',{}).get('issues',{}).get('nodes',[])
-print(nodes[0]['team']['id'] if nodes else '')")
-
-          CURRENT_STATE=$(echo "$ISSUE_RESP" | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-nodes = d.get('data',{}).get('issues',{}).get('nodes',[])
-print(nodes[0]['state']['name'] if nodes else '')")
+          ISSUE_UUID=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['id'] if n else '')")
+          TEAM_ID=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['team']['id'] if n else '')")
+          CURRENT_STATE=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['state']['name'] if n else '')")
 
           if [[ -z "$ISSUE_UUID" ]]; then
             echo "Could not find $TICKET_ID in Linear — skipping"
@@ -83,12 +72,7 @@ print(nodes[0]['state']['name'] if nodes else '')")
             -H "Content-Type: application/json" \
             -d "$STATES_QUERY")
 
-          STATE_UUID=$(echo "$STATES_RESP" | python3 -c "
-import sys, json; target = sys.argv[1]
-d = json.load(sys.stdin)
-nodes = d.get('data',{}).get('workflowStates',{}).get('nodes',[])
-match = [n for n in nodes if n['name'] == target]
-print(match[0]['id'] if match else '')" "$TARGET_STATE")
+          STATE_UUID=$(echo "$STATES_RESP" | python3 -c "import sys,json; target=sys.argv[1]; d=json.load(sys.stdin); n=d.get('data',{}).get('workflowStates',{}).get('nodes',[]); m=[x for x in n if x['name']==target]; print(m[0]['id'] if m else '')" "$TARGET_STATE")
 
           if [[ -z "$STATE_UUID" ]]; then
             echo "State '$TARGET_STATE' not found in Linear"
@@ -102,14 +86,10 @@ print(match[0]['id'] if match else '')" "$TARGET_STATE")
             -H "Content-Type: application/json" \
             -d "$UPDATE")
 
-          SUCCESS=$(echo "$UPDATE_RESP" | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-print('true' if d.get('data',{}).get('issueUpdate',{}).get('success') else 'false')")
+          SUCCESS=$(echo "$UPDATE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('data',{}).get('issueUpdate',{}).get('success') else 'false')")
 
           if [[ "$SUCCESS" == "true" ]]; then
-            NEW=$(echo "$UPDATE_RESP" | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-print(d.get('data',{}).get('issueUpdate',{}).get('issue',{}).get('state',{}).get('name',''))")
+            NEW=$(echo "$UPDATE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('issueUpdate',{}).get('issue',{}).get('state',{}).get('name',''))")
             echo "✓ $TICKET_ID → '$NEW'"
           else
             echo "✗ Update failed: $UPDATE_RESP"

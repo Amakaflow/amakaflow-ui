@@ -45,12 +45,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$QUERY")
 
-          DESCRIPTION=$(echo "$RESPONSE" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-nodes = data.get('data', {}).get('issues', {}).get('nodes', [])
-print(nodes[0]['description'] if nodes else '')
-")
+          DESCRIPTION=$(echo "$RESPONSE" | python3 -c "import sys,json; data=json.load(sys.stdin); nodes=data.get('data',{}).get('issues',{}).get('nodes',[]); print(nodes[0]['description'] if nodes else '')")
 
           if [[ -z "$DESCRIPTION" ]]; then
             echo "Could not fetch $TICKET_ID from Linear — skipping"
@@ -82,11 +77,7 @@ print(nodes[0]['description'] if nodes else '')
 
           if [[ -n "$FAILURES" ]]; then
             echo "has_failures=true" >> "$GITHUB_OUTPUT"
-            {
-              echo "failures<<FAILURES_EOF"
-              printf "%b" "$FAILURES"
-              echo "FAILURES_EOF"
-            } >> "$GITHUB_OUTPUT"
+            printf 'failures<<EOF\n%b\nEOF\n' "$FAILURES" >> "$GITHUB_OUTPUT"
           else
             echo "has_failures=false" >> "$GITHUB_OUTPUT"
             echo "failures=" >> "$GITHUB_OUTPUT"
@@ -94,7 +85,7 @@ print(nodes[0]['description'] if nodes else '')
 
       - name: Post result comment
         if: steps.validate.outputs.skip != 'true'
-        uses: actions/github-script@60a0d83039f74b59f9e1b65e43b5b3a0f8b28a1f  # v7.0.1
+        uses: actions/github-script@v7
         env:
           TICKET_ID: ${{ steps.validate.outputs.ticket_id }}
           HAS_FAILURES: ${{ steps.validate.outputs.has_failures }}
@@ -107,7 +98,7 @@ print(nodes[0]['description'] if nodes else '')
             const failures = hasFail ? (process.env.FAILURES || '').trim() : '';
 
             const body = hasFail
-              ? `${marker}\n## ❌ Ticket Validation Failed\n\nThe linked Linear ticket **${ticketId}** is missing required sections. Joshua cannot reliably implement this without complete specs.\n\n**Missing:**\n${failures}\n\n**Fix:** Update the ticket in Linear, then re-push to re-run this check.`
+              ? `${marker}\n## ❌ Ticket Validation Failed\n\nThe linked Linear ticket **${ticketId}** is missing required sections.\n\n**Missing:**\n${failures}\n\n**Fix:** Update the ticket in Linear, then re-push to re-run this check.`
               : `${marker}\n## ✅ Ticket Validated\n\n**${ticketId}** has all required sections: repo, file paths, acceptance criteria, checkboxes, and test command.`;
 
             const { data: comments } = await github.rest.issues.listComments({
