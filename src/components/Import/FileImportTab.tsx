@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { Button } from '../ui/button';
 import { Upload } from 'lucide-react';
 
 interface FileImportTabProps {

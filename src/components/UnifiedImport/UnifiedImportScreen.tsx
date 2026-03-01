@@ -135,6 +135,47 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
     setProcessedItems(prev => prev.filter(p => p.queueId !== queueId));
   };
 
+  // ── handleFilesDetected ────────────────────────────────────────────────────
+  //
+  // Called by the pure FileImportTab presenter with the selected files.
+  // Runs detectFile to get column info, populates mapping state, then
+  // transitions to 'column-mapping' phase.
+
+  const handleFilesDetected = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setMappingLoading(true);
+    try {
+      const response = await bulkImportApi.detectFile(userId, files[0]);
+      const firstItem = response.items[0];
+
+      if (firstItem?.raw_data?.column_info) {
+        const columns: ColumnMapping[] = firstItem.raw_data.column_info.map(
+          (col: { name: string; index: number; detected_type: string | null; confidence: number; sample_values?: string[] }, idx: number) => ({
+            sourceColumn: col.name || `Column ${idx + 1}`,
+            sourceColumnIndex: col.index ?? idx,
+            targetField: col.detected_type || 'ignore',
+            confidence: col.confidence || 0,
+            userOverride: false,
+            sampleValues: col.sample_values || [],
+          })
+        );
+        setMappingColumns(columns);
+        setMappingPatterns(firstItem.patterns || []);
+      } else {
+        setMappingColumns([]);
+        setMappingPatterns([]);
+      }
+    } catch {
+      setMappingColumns([]);
+      setMappingPatterns([]);
+    } finally {
+      setMappingLoading(false);
+    }
+
+    setPhase('column-mapping');
+  };
+
   // ── Phase: processing ──────────────────────────────────────────────────────
 
   if (phase === 'processing') {
@@ -269,8 +310,7 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
 
         <TabsContent value="file">
           <FileImportTab
-            userId={userId}
-            onFilesDetected={() => setPhase('column-mapping')}
+            onFilesDetected={handleFilesDetected}
           />
         </TabsContent>
 
