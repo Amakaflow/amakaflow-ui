@@ -72,7 +72,7 @@ export function useImportQueue(): ImportQueueResult {
     const base64Items = await Promise.all(
       mediaItems.map(async item => ({
         base64: await fileToBase64(item.raw),
-        type: item.type as 'image' | 'pdf',
+        type: item.type,
       }))
     );
 
