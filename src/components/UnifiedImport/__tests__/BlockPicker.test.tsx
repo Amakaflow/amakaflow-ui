@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { BlockPicker } from '../BlockPicker';
-import type { ProcessedItem, QueueItem } from '../../../types/unified-import';
+import type { ProcessedItem, QueueItem, SelectedBlock } from '../../../types/unified-import';
 
 const sources: ProcessedItem[] = [
   {
@@ -118,7 +118,7 @@ describe('BlockPicker', () => {
         onCancel={vi.fn()}
       />
     );
-    expect(screen.getByRole('button', { name: /edit this workout/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /save workout/i })).toBeDisabled();
   });
 
   it('enables confirm button when blocks are selected', () => {
@@ -132,10 +132,10 @@ describe('BlockPicker', () => {
         onCancel={vi.fn()}
       />
     );
-    expect(screen.getByRole('button', { name: /edit this workout/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /save workout/i })).not.toBeDisabled();
   });
 
-  it('calls onCancel when Cancel is clicked', () => {
+  it('calls onCancel when Back is clicked', () => {
     const onCancel = vi.fn();
     render(
       <BlockPicker
@@ -147,7 +147,7 @@ describe('BlockPicker', () => {
         onCancel={onCancel}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -165,7 +165,7 @@ describe('BlockPicker', () => {
         onCancel={vi.fn()}
       />
     );
-    expect(screen.getByRole('button', { name: /edit this workout.*2 blocks/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save workout.*2 blocks/i })).toBeInTheDocument();
   });
 
   it('shows selected blocks in the right-column preview', () => {
@@ -181,7 +181,60 @@ describe('BlockPicker', () => {
         onCancel={vi.fn()}
       />
     );
-    // Right column shows "Selected (1)"
-    expect(screen.getByText(/selected \(1\)/i)).toBeInTheDocument();
+    // Right column shows "Your workout (1 block)"
+    expect(screen.getByText(/your workout.*1 block/i)).toBeInTheDocument();
+  });
+
+  it('selected panel shows drag handles and remove buttons', () => {
+    const selected: SelectedBlock[] = [
+      { workoutIndex: 0, blockIndex: 0, blockId: 'b1', blockLabel: 'Warm-up' },
+      { workoutIndex: 0, blockIndex: 1, blockId: 'b2', blockLabel: 'Main set' },
+    ];
+
+    render(
+      <BlockPicker
+        queueItems={[]}
+        processedItems={[{
+          queueId: 'q1', status: 'done', workoutTitle: 'Test',
+          workout: { blocks: [
+            { id: 'b1', label: 'Warm-up', exercises: [] },
+            { id: 'b2', label: 'Main set', exercises: [] },
+          ]}
+        }]}
+        selectedBlocks={selected}
+        onSelectionChange={vi.fn()}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    // Each selected block has a remove button
+    const removeButtons = screen.getAllByRole('button', { name: /remove block/i });
+    expect(removeButtons).toHaveLength(2);
+
+    // Each has a drag handle
+    const dragHandles = screen.getAllByRole('button', { name: /drag to reorder/i });
+    expect(dragHandles).toHaveLength(2);
+  });
+
+  it('Add your own block button adds a custom block', async () => {
+    const onSelectionChange = vi.fn();
+    render(
+      <BlockPicker
+        queueItems={[]}
+        processedItems={[]}
+        selectedBlocks={[]}
+        onSelectionChange={onSelectionChange}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add your own block/i }));
+    expect(onSelectionChange).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ blockLabel: 'Custom block', workoutIndex: -1 })
+      ])
+    );
   });
 });
