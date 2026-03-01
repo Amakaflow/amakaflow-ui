@@ -1,0 +1,146 @@
+{
+  "_purpose": "API contract for POST /import/detect. Used in E2E tests to mock the workout-ingestor-api detection endpoint. When real API integration is validated, compare the live response shape against this file.",
+  "_service": "workout-ingestor-api",
+  "_base_url_env": "VITE_INGESTOR_API_URL (default: http://localhost:8004)",
+
+  "request": {
+    "method": "POST",
+    "path": "/import/detect",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer <jwt>"
+    },
+    "body": {
+      "profile_id": "<userId: string>",
+      "source_type": "urls | images | file",
+      "sources": ["<url-or-base64-string>"]
+    }
+  },
+
+  "response": {
+    "success": true,
+    "job_id": "<string>",
+    "total": "<number — count of sources submitted>",
+    "success_count": "<number — items successfully parsed>",
+    "error_count": "<number — items that failed>",
+    "metadata": {
+      "programName": "<optional string>",
+      "detectedFormat": "<optional string e.g. excel_multi_sheet, csv_flat>",
+      "sheetNames": ["<optional array of sheet names>"]
+    },
+    "items": [
+      {
+        "id": "<string>",
+        "sourceIndex": "<number — 0-based, matches position in sources array>",
+        "sourceType": "urls | images | file",
+        "sourceRef": "<string — original URL, filename, or image identifier>",
+        "rawData": "<object — backend's parsed workout structure, passed through to save>",
+        "parsedTitle": "<string | null>",
+        "parsedExerciseCount": "<number | null>",
+        "parsedBlockCount": "<number | null>",
+        "confidence": "<number 0-100>",
+        "errors": ["<optional error strings — non-empty means item failed>"],
+        "warnings": ["<optional warning strings>"]
+      }
+    ]
+  },
+
+  "e2e_fixture_success": {
+    "_note": "Used in E2E tests for the happy path. Two URL sources → two parsed workouts.",
+    "success": true,
+    "job_id": "test-job-001",
+    "total": 2,
+    "success_count": 2,
+    "error_count": 0,
+    "metadata": {},
+    "items": [
+      {
+        "id": "item-1",
+        "sourceIndex": 0,
+        "sourceType": "urls",
+        "sourceRef": "https://youtube.com/watch?v=abc123",
+        "rawData": {
+          "blocks": [
+            { "label": "Warm-up", "exercises": [{ "name": "Jumping Jacks", "sets": 2, "reps": 20 }] },
+            { "label": "Main", "exercises": [{ "name": "Squat", "sets": 4, "reps": 8 }, { "name": "Bench Press", "sets": 4, "reps": 8 }] },
+            { "label": "Cool-down", "exercises": [{ "name": "Stretch", "sets": 1, "reps": 1 }] }
+          ]
+        },
+        "parsedTitle": "Morning Workout",
+        "parsedExerciseCount": 4,
+        "parsedBlockCount": 3,
+        "confidence": 92,
+        "errors": []
+      },
+      {
+        "id": "item-2",
+        "sourceIndex": 1,
+        "sourceType": "urls",
+        "sourceRef": "https://tiktok.com/v/xyz",
+        "rawData": {
+          "blocks": [
+            { "label": "Circuit A", "exercises": [{ "name": "Burpees", "sets": 3, "reps": 10 }, { "name": "Mountain Climbers", "sets": 3, "reps": 20 }] }
+          ]
+        },
+        "parsedTitle": "Evening Circuit",
+        "parsedExerciseCount": 2,
+        "parsedBlockCount": 1,
+        "confidence": 88,
+        "errors": []
+      }
+    ]
+  },
+
+  "e2e_fixture_partial_failure": {
+    "_note": "Used in E2E tests for the mixed success/failure path. First item succeeds, second fails.",
+    "success": true,
+    "job_id": "test-job-002",
+    "total": 2,
+    "success_count": 1,
+    "error_count": 1,
+    "metadata": {},
+    "items": [
+      {
+        "id": "item-ok",
+        "sourceIndex": 0,
+        "sourceType": "urls",
+        "sourceRef": "https://youtube.com/watch?v=good",
+        "rawData": { "blocks": [{ "label": "Main", "exercises": [{ "name": "Squat" }] }] },
+        "parsedTitle": "Good Workout",
+        "parsedExerciseCount": 1,
+        "parsedBlockCount": 1,
+        "confidence": 90,
+        "errors": []
+      },
+      {
+        "id": "item-err",
+        "sourceIndex": 1,
+        "sourceType": "urls",
+        "sourceRef": "https://invalid.example.com/404",
+        "rawData": {},
+        "parsedTitle": null,
+        "parsedExerciseCount": 0,
+        "parsedBlockCount": 0,
+        "confidence": 0,
+        "errors": ["Could not fetch video content — URL returned 404"]
+      }
+    ]
+  },
+
+  "how_to_use_with_page_route": {
+    "_note": "When VITE_DEMO_MODE is false (real backend not available), intercept at the network level in Playwright:",
+    "python_snippet": [
+      "import json",
+      "from pathlib import Path",
+      "",
+      "contract = json.loads(Path('src/components/UnifiedImport/__tests__/api-contracts/detect-contract.json').read_text())",
+      "fixture = contract['e2e_fixture_success']",
+      "",
+      "def handle_detect(route):",
+      "    route.fulfill(status=200, content_type='application/json', body=json.dumps(fixture))",
+      "",
+      "page.route('**/import/detect', handle_detect)",
+      "# Then navigate and interact as normal"
+    ]
+  }
+}

@@ -26,6 +26,7 @@ import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
 import { BulkImport } from './components/BulkImport';
+import { UnifiedImportScreen } from './components/UnifiedImport';
 import { HelpPage } from './components/help/HelpPage';
 import { ExerciseHistory } from './components/ExerciseHistory';
 import { VolumeAnalytics } from './components/VolumeAnalytics';
@@ -63,7 +64,7 @@ type AppUser = User & {
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai' ;
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai' ;
 
 export default function App() {
   // Clerk authentication
@@ -1403,44 +1404,21 @@ export default function App() {
               </div>
               
               <nav className="hidden md:flex items-center gap-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant={(currentView === 'workflow' || currentView === 'bulk-import') ? 'default' : 'ghost'}
-                      size="sm"
-                      className="gap-1"
-                    >
-                      Import
-                      <ChevronDown className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        checkUnsavedChanges(() => {
-                          setCurrentView('workflow');
-                        });
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Single Import
-                      <span className="ml-auto text-xs text-muted-foreground">URL, Image, Text</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        checkUnsavedChanges(() => {
-                          clearWorkflowState();
-                          setBulkImportType('file');
-                          setCurrentView('bulk-import');
-                        });
-                      }}
-                    >
-                      <Layers className="w-4 h-4 mr-2" />
-                      Bulk Import
-                      <span className="ml-auto text-xs text-muted-foreground">Files, URLs, Images</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button
+                  variant={(currentView === 'workflow' || currentView === 'bulk-import' || currentView === 'import') ? 'default' : 'ghost'}
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => {
+                    checkUnsavedChanges(() => {
+                      clearWorkflowState();
+                      setBulkImportType(undefined);
+                      setCurrentView('import');
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Import
+                </Button>
                 <Button
                   variant={currentView === 'create-ai' ? 'default' : 'ghost'}
                   size="sm"
@@ -2036,6 +2014,13 @@ export default function App() {
             }}
           />
           </div>
+        )}
+
+        {currentView === 'import' && (
+          <UnifiedImportScreen
+            userId={user.id}
+            onDone={() => setCurrentView('workouts')}
+          />
         )}
 
         {currentView === 'program-detail' && selectedProgramId && (
