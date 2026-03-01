@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster, toast } from 'sonner';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { Badge } from './components/ui/badge';
@@ -14,26 +14,28 @@ import { AddSources, Source } from './components/AddSources';
 import { StructureWorkout } from './components/StructureWorkout';
 import { ValidateMap } from './components/ValidateMap';
 import { PublishExport } from './components/PublishExport';
-import { Analytics } from './components/Analytics';
 import { TeamSharing } from './components/TeamSharing';
-import { UserSettings } from './components/UserSettings';
-import { StravaEnhance } from './components/StravaEnhance';
 import { ProfileCompletion } from './components/ProfileCompletion';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { WorkoutTypeConfirmDialog } from './components/WorkoutTypeConfirmDialog';
-import { Calendar } from './components/Calendar';
-import { UnifiedWorkouts } from './components/UnifiedWorkouts';
-import { MobileCompanion } from './components/MobileCompanion';
-import { BulkImport } from './components/BulkImport';
-import { UnifiedImportScreen } from './components/UnifiedImport';
-import { HelpPage } from './components/help/HelpPage';
-import { ExerciseHistory } from './components/ExerciseHistory';
-import { VolumeAnalytics } from './components/VolumeAnalytics';
 import { PinterestBulkImportModal } from './components/PinterestBulkImportModal';
-import { ProgramDetail } from './components/ProgramDetail';
-import { ProgramsList } from './components/ProgramsList';
-import { CreateAIWorkout } from './components/CreateAIWorkout';
+
+// Lazy-loaded heavy views — split into separate chunks to reduce initial bundle
+const Analytics = lazy(() => import('./components/Analytics').then(m => ({ default: m.Analytics })));
+const UserSettings = lazy(() => import('./components/UserSettings').then(m => ({ default: m.UserSettings })));
+const StravaEnhance = lazy(() => import('./components/StravaEnhance').then(m => ({ default: m.StravaEnhance })));
+const Calendar = lazy(() => import('./components/Calendar').then(m => ({ default: m.Calendar })));
+const UnifiedWorkouts = lazy(() => import('./components/UnifiedWorkouts').then(m => ({ default: m.UnifiedWorkouts })));
+const MobileCompanion = lazy(() => import('./components/MobileCompanion').then(m => ({ default: m.MobileCompanion })));
+const BulkImport = lazy(() => import('./components/BulkImport').then(m => ({ default: m.BulkImport })));
+const UnifiedImportScreen = lazy(() => import('./components/UnifiedImport').then(m => ({ default: m.UnifiedImportScreen })));
+const HelpPage = lazy(() => import('./components/help/HelpPage').then(m => ({ default: m.HelpPage })));
+const ExerciseHistory = lazy(() => import('./components/ExerciseHistory').then(m => ({ default: m.ExerciseHistory })));
+const VolumeAnalytics = lazy(() => import('./components/VolumeAnalytics').then(m => ({ default: m.VolumeAnalytics })));
+const ProgramDetail = lazy(() => import('./components/ProgramDetail').then(m => ({ default: m.ProgramDetail })));
+const ProgramsList = lazy(() => import('./components/ProgramsList').then(m => ({ default: m.ProgramsList })));
+const CreateAIWorkout = lazy(() => import('./components/CreateAIWorkout').then(m => ({ default: m.CreateAIWorkout })));
 import BuildBadge from './components/BuildBadge';
 import { DevSystemStatus } from './components/DevSystemStatus';
 import { ChatPanel } from './components/ChatPanel';
@@ -1662,8 +1664,9 @@ export default function App() {
         </div>
       )}
 
-           {/* Main Content */}
-           <div data-assistant-target="main-content" className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
+      {/* Main Content */}
+      <main id="main-content" data-assistant-target="main-content" className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
+        <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
         {/* Welcome Guide (shown on home view) */}
         {currentView === 'home' && (
           <>
@@ -2062,7 +2065,8 @@ export default function App() {
             }}
           />
         )}
-      </div>
+        </Suspense>
+      </main>
 
       {/* Footer Stats (only in workflow) */}
       {currentView === 'workflow' && workout && (
