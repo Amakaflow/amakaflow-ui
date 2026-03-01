@@ -2,10 +2,22 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useWorkflowGeneration } from '../useWorkflowGeneration';
 
+// Use vi.hoisted so these are available when vi.mock factories run (which are hoisted)
+const {
+  mockGenerateWorkoutStructureReal,
+  mockCheckApiHealth,
+  mockCreateEmptyWorkout,
+} = vi.hoisted(() => ({
+  mockGenerateWorkoutStructureReal: vi.fn(),
+  mockCheckApiHealth: vi.fn().mockResolvedValue(true),
+  mockCreateEmptyWorkout: vi.fn(),
+}));
+
 vi.mock('../../../lib/api', () => ({
-  checkApiHealth: vi.fn().mockResolvedValue(true),
-  generateWorkoutStructure: vi.fn(),
+  checkApiHealth: mockCheckApiHealth,
+  generateWorkoutStructure: mockGenerateWorkoutStructureReal,
   normalizeWorkoutStructure: vi.fn((w: unknown) => w),
+  createEmptyWorkout: mockCreateEmptyWorkout,
 }));
 
 vi.mock('../../../lib/mock-api', () => ({
@@ -19,6 +31,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
@@ -44,7 +57,10 @@ const defaultProps = {
 };
 
 describe('useWorkflowGeneration', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCheckApiHealth.mockResolvedValue(true);
+  });
 
   it('starts with loading=false', () => {
     const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
@@ -52,8 +68,7 @@ describe('useWorkflowGeneration', () => {
   });
 
   it('sets loading=true during generation, then false on success', async () => {
-    const { generateWorkoutStructure } = await import('../../../lib/api');
-    (generateWorkoutStructure as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkout);
+    mockGenerateWorkoutStructureReal.mockResolvedValue(mockWorkout);
 
     const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
 
@@ -72,8 +87,7 @@ describe('useWorkflowGeneration', () => {
   });
 
   it('calls onWorkoutGenerated with workout and sources on success', async () => {
-    const { generateWorkoutStructure } = await import('../../../lib/api');
-    (generateWorkoutStructure as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkout);
+    mockGenerateWorkoutStructureReal.mockResolvedValue(mockWorkout);
 
     const onWorkoutGenerated = vi.fn();
     const { result } = renderHook(() =>
@@ -89,8 +103,7 @@ describe('useWorkflowGeneration', () => {
   });
 
   it('abort: handleCancelGeneration resets loading to false', async () => {
-    const { generateWorkoutStructure } = await import('../../../lib/api');
-    (generateWorkoutStructure as ReturnType<typeof vi.fn>).mockImplementation(
+    mockGenerateWorkoutStructureReal.mockImplementation(
       (_sources: unknown, signal: AbortSignal) =>
         new Promise((_resolve, reject) => {
           signal.addEventListener('abort', () =>
@@ -114,5 +127,144 @@ describe('useWorkflowGeneration', () => {
     });
 
     expect(result.current.loading).toBe(false);
+  });
+
+  // --- New tests ---
+
+  it('handleLoadTemplate: calls onWorkoutGenerated with the template and onStepChange("structure")', () => {
+    const onWorkoutGenerated = vi.fn();
+    const onStepChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkflowGeneration({ ...defaultProps, onWorkoutGenerated, onStepChange })
+    );
+
+    const template = { title: 'My Template', blocks: [], source: '' };
+    act(() => {
+      result.current.handleLoadTemplate(template as any);
+    });
+
+    expect(onWorkoutGenerated).toHaveBeenCalledWith(template, []);
+    expect(onStepChange).toHaveBeenCalledWith('structure');
+  });
+
+  it('handleCreateNew: calls onWorkoutGenerated with empty workout and onStepChange("structure")', async () => {
+    const emptyWorkout = { title: 'New Workout', blocks: [], source: '' };
+    mockCreateEmptyWorkout.mockResolvedValue(emptyWorkout);
+
+    const onWorkoutGenerated = vi.fn();
+    const onStepChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkflowGeneration({ ...defaultProps, onWorkoutGenerated, onStepChange })
+    );
+
+    await act(async () => {
+      await result.current.handleCreateNew();
+    });
+
+    expect(onWorkoutGenerated).toHaveBeenCalledWith(emptyWorkout, []);
+    expect(onStepChange).toHaveBeenCalledWith('structure');
+  });
+
+  it('handleCreateNew: shows error toast when API fails', async () => {
+    mockCreateEmptyWorkout.mockRejectedValue(new Error('Server error'));
+
+    const { toast } = await import('sonner');
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    await act(async () => {
+      await result.current.handleCreateNew();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Failed to create workout. Please try again.');
+  });
+
+  it('handleStartNew: calls onClearWorkout, onStepChange("add-sources"), onViewChange("workflow"), onClearEditingFlags', () => {
+    const onClearWorkout = vi.fn();
+    const onStepChange = vi.fn();
+    const onViewChange = vi.fn();
+    const onClearEditingFlags = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkflowGeneration({
+        ...defaultProps,
+        onClearWorkout,
+        onStepChange,
+        onViewChange,
+        onClearEditingFlags,
+      })
+    );
+
+    act(() => {
+      result.current.handleStartNew();
+    });
+
+    expect(onClearWorkout).toHaveBeenCalledTimes(1);
+    expect(onStepChange).toHaveBeenCalledWith('add-sources');
+    expect(onViewChange).toHaveBeenCalledWith('workflow');
+    expect(onClearEditingFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleWelcomeDismiss: sets localStorage key and welcomeDismissed becomes true', () => {
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    expect(result.current.welcomeDismissed).toBe(false);
+
+    act(() => {
+      result.current.handleWelcomeDismiss();
+    });
+
+    expect(localStorage.getItem('amakaflow_welcome_dismissed')).toBe('true');
+    expect(result.current.welcomeDismissed).toBe(true);
+  });
+
+  it('welcomeDismissed initial state: reads from localStorage (starts as true when already dismissed)', () => {
+    // Pre-populate localStorage before rendering the hook
+    localStorage.setItem('amakaflow_welcome_dismissed', 'true');
+
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    expect(result.current.welcomeDismissed).toBe(true);
+  });
+
+  it('handlePinterestBulkClose: resets pinterestBulkModal.open to false', () => {
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    expect(result.current.pinterestBulkModal.open).toBe(false);
+
+    act(() => {
+      result.current.handlePinterestBulkClose();
+    });
+
+    expect(result.current.pinterestBulkModal.open).toBe(false);
+    expect(result.current.pinterestBulkModal.workouts).toEqual([]);
+    expect(result.current.pinterestBulkModal.originalTitle).toBe('');
+    expect(result.current.pinterestBulkModal.sourceUrl).toBe('');
+  });
+
+  it('handleCancelGeneration: no-op when no abort controller (does not throw)', () => {
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    expect(() => {
+      act(() => {
+        result.current.handleCancelGeneration();
+      });
+    }).not.toThrow();
+  });
+
+  it('handleGenerateStructure: shows error toast (not cancelled) when API throws a non-abort error', async () => {
+    mockGenerateWorkoutStructureReal.mockRejectedValue(new Error('Network failure'));
+
+    const { toast } = await import('sonner');
+    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
+
+    await act(async () => {
+      await result.current.handleGenerateStructure([
+        { id: '1', type: 'text' as const, content: 'test' },
+      ]);
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Network failure'),
+      expect.anything()
+    );
   });
 });
