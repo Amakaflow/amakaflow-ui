@@ -229,6 +229,55 @@ describe('useImportFlow', () => {
     expect(onDone).toHaveBeenCalledOnce();
   });
 
+  // ── Test: handleImport error handling ──────────────────────────────────────
+
+  it('handleImport resets phase to input on error', async () => {
+    const detectMock = vi.fn().mockRejectedValueOnce(new Error('network error'));
+    const processingMock = makeProcessingMock({ detect: detectMock });
+    const queueMock = makeQueueMock({
+      queue: [makeQueueItem({ id: 'q-1', type: 'url', raw: 'https://example.com' })],
+      toDetectPayload: vi.fn().mockResolvedValue({ urls: ['https://example.com'], base64Items: [] }),
+    });
+    mockUseImportQueue.mockReturnValue(queueMock);
+    mockUseImportProcessing.mockReturnValue(processingMock);
+
+    const { result } = renderHook(() => useImportFlow(defaultProps));
+
+    await act(async () => { await result.current.handleImport(); });
+
+    expect(result.current.phase).toBe('input');
+  });
+
+  // ── Test: handleSaveAll error handling ─────────────────────────────────────
+
+  it('handleSaveAll does not call onDone if any save fails', async () => {
+    const doneItem1 = makeProcessedItem({ queueId: 'q-1', workout: { title: 'Push Day', blocks: [] } });
+    const doneItem2 = makeProcessedItem({ queueId: 'q-2', workoutTitle: 'Pull Day', workout: { title: 'Pull Day', blocks: [] } });
+    const processingMock = makeProcessingMock({ processedItems: [doneItem1, doneItem2] });
+    mockUseImportProcessing.mockReturnValue(processingMock);
+
+    // Make saveWorkoutToHistory throw for the second item
+    mockSaveWorkoutToHistory
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('API error'));
+
+    const onDone = vi.fn();
+    const { result } = renderHook(() => useImportFlow({ ...defaultProps, onDone }));
+
+    let caughtError: Error | undefined;
+    await act(async () => {
+      try {
+        await result.current.handleSaveAll();
+      } catch (err) {
+        caughtError = err as Error;
+      }
+    });
+
+    expect(onDone).not.toHaveBeenCalled();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError?.message).toMatch(/Failed to save 1 of 2/);
+  });
+
   // ── Test (handleBlockPickerConfirm) ────────────────────────────────────────
 
   it('handleBlockPickerConfirm calls onEditWorkout', () => {

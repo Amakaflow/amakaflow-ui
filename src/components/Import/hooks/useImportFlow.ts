@@ -3,6 +3,7 @@ import { useImportQueue } from './useImportQueue';
 import { useImportProcessing } from './useImportProcessing';
 import { bulkImportApi } from '../../../lib/bulk-import-api';
 import { saveWorkoutToHistory } from '../../../lib/workout-history';
+import type { WorkoutStructure } from '../../../types/workout';
 import type { Phase, ImportTab, QueueItem, ProcessedItem, SelectedBlock, ColumnMappingState } from '../../../types/import';
 import type { ColumnMapping } from '../../../types/bulk-import';
 import type React from 'react';
@@ -73,26 +74,30 @@ export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowPr
   // 3. Set phase to 'processing', call detect(), set phase to 'results'
 
   const handleImport = async (): Promise<void> => {
-    const { urls, base64Items } = await queue.toDetectPayload();
+    try {
+      const { urls, base64Items } = await queue.toDetectPayload();
 
-    const urlQueueIds = queue.queue
-      .filter(i => i.type === 'url')
-      .map(i => i.id);
+      const urlQueueIds = queue.queue
+        .filter(i => i.type === 'url')
+        .map(i => i.id);
 
-    const base64QueueIds = queue.queue
-      .filter(i => i.type === 'image' || i.type === 'pdf')
-      .map(i => i.id);
+      const base64QueueIds = queue.queue
+        .filter(i => i.type === 'image' || i.type === 'pdf')
+        .map(i => i.id);
 
-    setPhase('processing');
+      setPhase('processing');
 
-    await processing.detect(userId, {
-      urls,
-      base64Items,
-      urlQueueIds,
-      base64QueueIds,
-    });
+      await processing.detect(userId, {
+        urls,
+        base64Items,
+        urlQueueIds,
+        base64QueueIds,
+      });
 
-    setPhase('results');
+      setPhase('results');
+    } catch {
+      setPhase('input'); // reset so user can retry
+    }
   };
 
   // ── handleSaveAll ─────────────────────────────────────────────────────────────
@@ -104,16 +109,24 @@ export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowPr
       p => p.status === 'done' && p.workout
     );
 
+    const errors: Array<{ queueId: string; error: unknown }> = [];
+
     for (const item of doneItems) {
       try {
         // DeviceId does not include a neutral 'import' value, so 'garmin' is used
         // as the source for all imported items. When DeviceId gains an 'import'
         // or 'file' variant this should be updated to reflect the actual source.
-        await saveWorkoutToHistory(userId, item.workout as any, 'garmin');
-      } catch {
-        // Swallow individual failures — callers can surface toast notifications
-        // at a higher level if needed.
+        // item.workout is Record<string, unknown> at the type boundary; at runtime
+        // it carries a valid WorkoutStructure produced by the detection pipeline.
+        await saveWorkoutToHistory(userId, item.workout as WorkoutStructure, 'garmin');
+      } catch (err) {
+        errors.push({ queueId: item.queueId, error: err });
       }
+    }
+
+    if (errors.length > 0) {
+      // Some saves failed — don't call onDone, let the caller show an error
+      throw new Error(`Failed to save ${errors.length} of ${doneItems.length} workouts`);
     }
 
     onDone();
