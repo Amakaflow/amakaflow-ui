@@ -5,6 +5,7 @@ import { useImportFlow } from '../useImportFlow';
 import type { ImportQueueResult } from '../useImportQueue';
 import type { ImportProcessingResult } from '../useImportProcessing';
 import type { ProcessedItem, QueueItem } from '../../../../types/import';
+import type { ColumnMapping } from '../../../../types/bulk-import';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -28,6 +29,17 @@ vi.mock('../../../../lib/bulk-import-api', () => ({
         },
       ],
     }),
+    applyMappings: vi.fn().mockResolvedValue({
+      success: true,
+      job_id: 'job-1',
+      mapped_count: 1,
+      workouts: [
+        {
+          detected_item_id: 'q-file-1',
+          parsed_workout: { title: 'Leg Day', blocks: [] },
+        },
+      ],
+    }),
   },
 }));
 
@@ -36,10 +48,12 @@ vi.mock('../../../../lib/bulk-import-api', () => ({
 import { useImportQueue } from '../useImportQueue';
 import { useImportProcessing } from '../useImportProcessing';
 import { saveWorkoutToHistory } from '../../../../lib/workout-history';
+import { bulkImportApi } from '../../../../lib/bulk-import-api';
 
 const mockUseImportQueue = useImportQueue as Mock;
 const mockUseImportProcessing = useImportProcessing as Mock;
 const mockSaveWorkoutToHistory = saveWorkoutToHistory as Mock;
+const mockApplyMappings = bulkImportApi.applyMappings as Mock;
 
 function makeQueueItem(overrides: Partial<QueueItem & { type: 'url'; raw: string }> = {}): QueueItem {
   return {
@@ -163,7 +177,7 @@ describe('useImportFlow', () => {
 
   // ── Test 3 ─────────────────────────────────────────────────────────────────
 
-  it('handleColumnMappingComplete transitions: column-mapping → results', async () => {
+  it('handleColumnMappingComplete: calls applyMappings API, maps response to ProcessedItem[], transitions → results', async () => {
     const setItemsMock = vi.fn();
     const processingMock = makeProcessingMock({ setItems: setItemsMock });
     mockUseImportProcessing.mockReturnValue(processingMock);
@@ -177,16 +191,33 @@ describe('useImportFlow', () => {
     });
     expect(result.current.phase).toBe('column-mapping');
 
-    const mappingResults: ProcessedItem[] = [
-      makeProcessedItem({ queueId: 'q-file-1', workoutTitle: 'Leg Day' }),
+    const columns: ColumnMapping[] = [
+      {
+        sourceColumn: 'Exercise',
+        sourceColumnIndex: 0,
+        targetField: 'exercise',
+        confidence: 90,
+        userOverride: false,
+        sampleValues: ['Squat'],
+      },
     ];
 
-    act(() => {
-      result.current.handleColumnMappingComplete(mappingResults);
+    await act(async () => {
+      await result.current.handleColumnMappingComplete(columns);
     });
 
     expect(result.current.phase).toBe('results');
-    expect(setItemsMock).toHaveBeenCalledWith(mappingResults);
+
+    // API should have been called with the jobId from detectFile + columns
+    expect(mockApplyMappings).toHaveBeenCalledWith('job-1', 'user-1', columns);
+
+    // setItems should receive the ProcessedItem[] mapped from the API response
+    expect(setItemsMock).toHaveBeenCalledOnce();
+    const calledWith: ProcessedItem[] = setItemsMock.mock.calls[0][0];
+    expect(calledWith).toHaveLength(1);
+    expect(calledWith[0].queueId).toBe('q-file-1');
+    expect(calledWith[0].status).toBe('done');
+    expect(calledWith[0].workoutTitle).toBe('Leg Day');
   });
 
   // ── Test 4 ─────────────────────────────────────────────────────────────────

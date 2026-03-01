@@ -46,7 +46,7 @@ export interface ImportFlowResult {
    * are added inside the handler.
    */
   handleFilesDetected: (files: File[]) => Promise<void>;
-  handleColumnMappingComplete: (results: ProcessedItem[]) => void;
+  handleColumnMappingComplete: (columns: ColumnMapping[]) => Promise<void>;
   goToBlockPicker: () => void;
   cancelBlockPicker: () => void;
   /** Confirms block picker selection by forwarding the combined workout to onEditWorkout. */
@@ -205,12 +205,34 @@ export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowPr
 
   // ── handleColumnMappingComplete ───────────────────────────────────────────────
   //
-  // Called when MapStep has completed and returns processed items.
-  // 1. Inject results into useImportProcessing via setItems
-  // 2. Transition to 'results'
+  // Called when MapStep has completed column mapping and passes back ColumnMapping[].
+  // 1. Call bulkImportApi.applyMappings with jobId + columns to get processed workouts
+  // 2. Map the API response to ProcessedItem[]
+  // 3. Inject results into useImportProcessing via setItems
+  // 4. Transition to 'results'
 
-  const handleColumnMappingComplete = (results: ProcessedItem[]): void => {
-    processing.setItems(results);
+  const handleColumnMappingComplete = async (columns: ColumnMapping[]): Promise<void> => {
+    const jobId = columnMappingState?.jobId ?? '';
+    let processedItems: ProcessedItem[] = [];
+
+    try {
+      const response = await bulkImportApi.applyMappings(jobId, userId, columns);
+
+      processedItems = response.workouts.map((w, idx) => ({
+        queueId: w.detected_item_id || `file-${idx}`,
+        status: 'done' as const,
+        workout: w.parsed_workout as Record<string, unknown>,
+        workoutTitle: (w.parsed_workout as { title?: string }).title,
+        blockCount: (w.parsed_workout as { blocks?: unknown[] }).blocks?.length,
+        exerciseCount: undefined,
+        sourceIcon: 'file' as const,
+      }));
+    } catch {
+      // If applyMappings fails, still advance to results with an empty list
+      // so the user sees the results screen (which can show zero items).
+    }
+
+    processing.setItems(processedItems);
     setPhase('results');
   };
 

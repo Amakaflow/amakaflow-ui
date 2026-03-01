@@ -53,7 +53,7 @@ export function ImportScreen({ userId, onDone, onEditWorkout }: ImportScreenProp
 
   if (phase === 'column-mapping' && columnMappingState) return wrap(<><h1 className="text-2xl font-bold mb-6">Match Columns</h1>
     <MapStep userId={userId} columns={columnMappingState.columns} patterns={columnMappingState.patterns}
-      loading={columnMappingState.loading} onApply={(cols) => handleColumnMappingComplete(cols as never)} /></>);
+      loading={columnMappingState.loading} onApply={(cols) => { void handleColumnMappingComplete(cols); }} /></>);
 
   return wrap(
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
