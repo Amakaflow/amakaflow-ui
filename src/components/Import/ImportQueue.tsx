@@ -47,11 +47,16 @@ export function ImportQueue({ queue, onQueueChange }: ImportQueueProps) {
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
-    if (text.trim().startsWith('http')) {
-      setTimeout(() => {
-        const urls = parseUrls(text);
-        if (urls.length > 0) addUrls();
-      }, 100);
+    const urls = parseUrls(text);
+    if (urls.length > 0 && text.trim().startsWith('http')) {
+      e.preventDefault();
+      const newItems: QueueItem[] = urls.map(url => ({
+        id: crypto.randomUUID(),
+        type: 'url' as const,
+        label: makeLabel(url),
+        raw: url,
+      }));
+      onQueueChange([...queue, ...newItems]);
     }
   };
 
