@@ -26,6 +26,7 @@ import { Calendar } from './components/Calendar';
 import { UnifiedWorkouts } from './components/UnifiedWorkouts';
 import { MobileCompanion } from './components/MobileCompanion';
 import { BulkImport } from './components/BulkImport';
+import { UnifiedImportScreen } from './components/UnifiedImport';
 import { HelpPage } from './components/help/HelpPage';
 import { ExerciseHistory } from './components/ExerciseHistory';
 import { VolumeAnalytics } from './components/VolumeAnalytics';
@@ -2016,9 +2017,10 @@ export default function App() {
         )}
 
         {currentView === 'import' && (
-          <div className="container mx-auto px-4 py-8">
-            <p className="text-muted-foreground">Unified import — coming soon</p>
-          </div>
+          <UnifiedImportScreen
+            userId={user.id}
+            onDone={() => setCurrentView('workouts')}
+          />
         )}
 
         {currentView === 'program-detail' && selectedProgramId && (
