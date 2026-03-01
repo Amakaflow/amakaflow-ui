@@ -105,6 +105,8 @@ type Props = {
   onSave?: () => void | Promise<void>;
   isEditingFromHistory?: boolean;
   isCreatingFromScratch?: boolean;
+  /** When true, hides the Export Destination card and action buttons (import-edit context) */
+  hideExport?: boolean;
   loading: boolean;
   selectedDevice: DeviceId;
   onDeviceChange: (device: DeviceId) => void;
@@ -699,6 +701,7 @@ export function StructureWorkout({
   onSave,
   isEditingFromHistory = false,
   isCreatingFromScratch = false,
+  hideExport = false,
   loading,
   selectedDevice,
   onDeviceChange,
@@ -1199,8 +1202,8 @@ export function StructureWorkout({
           </Button>
         )}
 
-        {/* Export Destination — at bottom of workout builder */}
-        <Card>
+        {/* Export Destination — hidden when editing from import flow */}
+        {!hideExport && <Card>
           <CardContent className="space-y-4 pt-6">
             {/* Export Destination Selector */}
             <div className="space-y-3">
@@ -1372,7 +1375,7 @@ export function StructureWorkout({
               )}
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Exercise Search Modal */}
         {showExerciseSearch && addingToBlock !== null && (
