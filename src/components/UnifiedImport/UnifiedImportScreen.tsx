@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
-import { Link, FileSpreadsheet, Plug } from 'lucide-react';
+import { Link, FileSpreadsheet, Plug, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
 import { ImportQueue } from './ImportQueue';
 import { ProcessingView } from './ProcessingView';
@@ -9,6 +9,7 @@ import { ResultsScreen } from './ResultsScreen';
 import { BlockPicker } from './BlockPicker';
 import { FileImportTab } from './FileImportTab';
 import { IntegrationsTab } from './IntegrationsTab';
+import { ClipQueueTab } from './ClipQueueTab';
 import { MapStep } from '../BulkImport/MapStep';
 import { BulkImportProvider } from '../../context/BulkImportContext';
 import { bulkImportApi, fileToBase64 } from '../../lib/bulk-import-api';
@@ -236,6 +237,10 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
             <FileSpreadsheet className="w-4 h-4" />
             File
           </TabsTrigger>
+          <TabsTrigger value="clip-queue" className="gap-2">
+            <Bookmark className="w-4 h-4" />
+            Clip Queue
+          </TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2">
             <Plug className="w-4 h-4" />
             Integrations
@@ -258,6 +263,10 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
             userId={userId}
             onFilesDetected={() => setPhase('column-mapping')}
           />
+        </TabsContent>
+
+        <TabsContent value="clip-queue">
+          <ClipQueueTab />
         </TabsContent>
 
         <TabsContent value="integrations">

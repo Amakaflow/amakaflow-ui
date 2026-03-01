@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { X, Plus, Image, FileText, Link } from 'lucide-react';
+import { cn } from '../ui/utils';
 import type { QueueItem } from '../../types/unified-import';
 
 interface ImportQueueProps {
@@ -28,6 +29,8 @@ function makeLabel(url: string): string {
 
 export function ImportQueue({ queue, onQueueChange }: ImportQueueProps) {
   const [urlInput, setUrlInput] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addUrls = () => {
     const urls = parseUrls(urlInput);
@@ -79,23 +82,41 @@ export function ImportQueue({ queue, onQueueChange }: ImportQueueProps) {
         </Button>
       </div>
 
-      {/* Image / PDF picker */}
-      <div>
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            multiple
-            className="hidden"
-            onChange={e => handleFiles(e.target.files)}
-          />
-          <Button variant="outline" size="sm" className="gap-2" asChild>
-            <span>
-              <Image className="w-4 h-4" />
-              Add images / PDFs
-            </span>
-          </Button>
-        </label>
+      {/* Image / PDF drop zone */}
+      <div
+        className={cn(
+          'border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors',
+          isDragOver
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:bg-muted/30'
+        )}
+        onClick={() => fileInputRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={e => {
+          e.preventDefault();
+          setIsDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        role="button"
+        aria-label="Drop images or PDFs here"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+      >
+        <Image className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          Drop images or PDFs here, or{' '}
+          <span className="text-primary underline">browse</span>
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG, HEIC, PDF</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          multiple
+          className="hidden"
+          onChange={e => handleFiles(e.target.files)}
+        />
       </div>
 
       {/* Queue list */}

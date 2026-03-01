@@ -28,7 +28,6 @@ const StravaEnhance = lazy(() => import('./components/StravaEnhance').then(m => 
 const Calendar = lazy(() => import('./components/Calendar').then(m => ({ default: m.Calendar })));
 const UnifiedWorkouts = lazy(() => import('./components/UnifiedWorkouts').then(m => ({ default: m.UnifiedWorkouts })));
 const MobileCompanion = lazy(() => import('./components/MobileCompanion').then(m => ({ default: m.MobileCompanion })));
-const BulkImport = lazy(() => import('./components/BulkImport').then(m => ({ default: m.BulkImport })));
 const UnifiedImportScreen = lazy(() => import('./components/UnifiedImport').then(m => ({ default: m.UnifiedImportScreen })));
 const HelpPage = lazy(() => import('./components/help/HelpPage').then(m => ({ default: m.HelpPage })));
 const ExerciseHistory = lazy(() => import('./components/ExerciseHistory').then(m => ({ default: m.ExerciseHistory })));
@@ -58,15 +57,13 @@ import { useClerkUser, getUserProfileFromClerk, syncClerkUserToProfile } from '.
 import { isDemoMode, DEMO_USER } from './lib/demo-mode';
 import { User } from './types/auth';
 import { isAccountConnectedSync, isAccountConnected } from './lib/linked-accounts';
-import type { BulkInputType } from './types/bulk-import';
-
 type AppUser = User & {
   avatar?: string;
   mode: 'individual' | 'trainer';
 };
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
-type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai' ;
+type View = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai';
 
 export default function App() {
   // Clerk authentication
@@ -94,7 +91,6 @@ export default function App() {
   const [isEditingFromImport, setIsEditingFromImport] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
-  const [bulkImportType, setBulkImportType] = useState<BulkInputType | undefined>(undefined);
   // Training program detail view state
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   // Pinterest bulk import modal state
@@ -417,28 +413,6 @@ export default function App() {
     loadHistory();
   }, [user]);
 
-  // Keyboard shortcuts for import
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + I = Open bulk import (file mode)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'i' && !e.shiftKey) {
-        e.preventDefault();
-        clearWorkflowState();
-        setBulkImportType('file');
-        setCurrentView('bulk-import');
-      }
-      // Cmd/Ctrl + Shift + I = Open bulk import (URLs mode)
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'I') {
-        e.preventDefault();
-        clearWorkflowState();
-        setBulkImportType('urls');
-        setCurrentView('bulk-import');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleStartNew = () => {
     setSources([]);
@@ -663,18 +637,16 @@ export default function App() {
         toast.dismiss('generate-structure');
 
         toast.error(
-          `"${originalTitle}" contains ${bulkWorkouts.length} separate workouts (${workoutLabels.slice(0, 3).join(', ')}${workoutLabels.length > 3 ? '...' : ''}). Please use Bulk Import to import all workouts at once.`,
+          `"${originalTitle}" contains ${bulkWorkouts.length} separate workouts (${workoutLabels.slice(0, 3).join(', ')}${workoutLabels.length > 3 ? '...' : ''}). Please use Import to import all workouts at once.`,
           {
             duration: 15000,
             id: 'pinterest-bulk-error',
             action: {
-              label: 'Go to Bulk Import',
+              label: 'Go to Import',
               onClick: () => {
-                // Navigate to Bulk Import with URLs mode
                 clearWorkflowState();
-                setBulkImportType('urls');
-                setCurrentView('bulk-import');
-                toast.info(`Paste your Pinterest URL in the Bulk Import to import all ${bulkWorkouts.length} workouts.`);
+                setCurrentView('import');
+                toast.info(`Paste your Pinterest URL in Import to import all ${bulkWorkouts.length} workouts.`);
               },
             },
           }
@@ -1409,13 +1381,12 @@ export default function App() {
               
               <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
                 <Button
-                  variant={(currentView === 'workflow' || currentView === 'bulk-import' || currentView === 'import') ? 'default' : 'ghost'}
+                  variant={(currentView === 'workflow' || currentView === 'import') ? 'default' : 'ghost'}
                   size="sm"
                   className="gap-1"
                   onClick={() => {
                     checkUnsavedChanges(() => {
                       clearWorkflowState();
-                      setBulkImportType(undefined);
                       setCurrentView('import');
                     });
                   }}
@@ -2012,23 +1983,6 @@ export default function App() {
             userId={user.id}
             onBack={() => setCurrentView('settings')}
           />
-        )}
-
-        {currentView === 'bulk-import' && (
-          <div data-assistant-target="import-section">
-          <BulkImport
-            userId={user.id}
-            onBack={() => {
-              setBulkImportType(undefined);
-              setCurrentView('workouts');
-            }}
-            initialInputType={bulkImportType}
-            onViewCalendar={() => {
-              setBulkImportType(undefined);
-              setCurrentView('calendar');
-            }}
-          />
-          </div>
         )}
 
         {currentView === 'import' && (

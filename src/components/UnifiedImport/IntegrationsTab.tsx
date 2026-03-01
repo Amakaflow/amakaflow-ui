@@ -6,7 +6,6 @@ const INTEGRATIONS = [
   { name: 'Strava', description: 'Pull activities from your Strava account', icon: '🚴' },
   { name: 'Garmin Connect', description: 'Import from Garmin workout library', icon: '⌚' },
   { name: 'FIT / TCX files', description: 'Upload Garmin or device export files', icon: '📁' },
-  { name: 'Browser Clip Queue', description: 'URLs clipped via browser extension appear here', icon: '🔗' },
 ];
 
 export function IntegrationsTab() {
