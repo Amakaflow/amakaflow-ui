@@ -15,14 +15,20 @@ import {
 
 interface WelcomeGuideProps {
   onGetStarted: () => void;
+  onDismiss?: () => void;
 }
 
-export function WelcomeGuide({ onGetStarted }: WelcomeGuideProps) {
+export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) {
     return null;
   }
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    onDismiss?.();
+  };
 
   const steps = [
     {
@@ -69,7 +75,7 @@ export function WelcomeGuide({ onGetStarted }: WelcomeGuideProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setDismissed(true)}
+              onClick={handleDismiss}
               className="h-8 w-8 p-0"
             >
               <X className="w-4 h-4" />
@@ -122,8 +128,8 @@ export function WelcomeGuide({ onGetStarted }: WelcomeGuideProps) {
                 Get Started
               </Button>
               <Button 
-                variant="outline" 
-                onClick={() => setDismissed(true)}
+                variant="outline"
+                onClick={handleDismiss}
                 size="lg"
               >
                 Skip for now
