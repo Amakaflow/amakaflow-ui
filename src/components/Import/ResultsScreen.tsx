@@ -114,15 +114,28 @@ export function ResultsScreen({
                   </div>
                 </div>
                 {isExpanded && (
-                  <div className="border-t pt-3 mt-3 space-y-1">
-                    {(processed.workout?.blocks ?? []).map((block: { id: string; label?: string; exercises?: unknown[] }, idx: number) => (
-                      <div key={block.id ?? idx} className="flex items-center gap-2 text-sm px-2 py-1 rounded bg-muted/30">
-                        <span className="font-medium">{block.label ?? `Block ${idx + 1}`}</span>
-                        {block.exercises?.length ? (
-                          <span className="text-muted-foreground text-xs">
-                            · {block.exercises.length} exercise{block.exercises.length !== 1 ? 's' : ''}
-                          </span>
-                        ) : null}
+                  <div className="border-t pt-3 mt-3 space-y-2">
+                    {(processed.workout?.blocks ?? []).map((block: { id: string; label?: string; exercises?: Array<{ name: string; sets?: number; reps?: number | string; duration_sec?: number }> }, idx: number) => (
+                      <div key={block.id ?? idx} className="text-sm px-2 py-1 rounded bg-muted/30">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{block.label ?? `Block ${idx + 1}`}</span>
+                          {block.exercises?.length ? (
+                            <span className="text-muted-foreground text-xs shrink-0">
+                              {block.exercises.length} ex.
+                            </span>
+                          ) : null}
+                        </div>
+                        {block.exercises && block.exercises.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 pl-2">
+                            {block.exercises.map((ex, i) => (
+                              <li key={i} className="text-xs text-muted-foreground flex items-center gap-2">
+                                <span className="text-foreground">{ex.name}</span>
+                                {ex.sets && ex.reps && <span>{ex.sets}×{ex.reps}</span>}
+                                {ex.duration_sec && !ex.reps && <span>{ex.duration_sec}s</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     ))}
                     {(!processed.workout?.blocks || processed.workout.blocks.length === 0) && (

@@ -52,6 +52,7 @@ import {
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
 import { WorkoutStructure, ExportFormats, ValidationResponse, WorkoutType } from '../types/workout';
+import type { ProcessedItem } from '../types/import';
 import {
   generateWorkoutStructure as generateWorkoutStructureReal,
   checkApiHealth,
@@ -117,6 +118,8 @@ export function WorkflowView({
   const [isCreatingFromScratch, setIsCreatingFromScratch] = useState(false);
   const [isEditingFromImport, setIsEditingFromImport] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [importProcessedItems, setImportProcessedItems] = useState<ProcessedItem[]>([]);
+  const [editingImportQueueId, setEditingImportQueueId] = useState<string | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [pinterestBulkModal, setPinterestBulkModal] = useState<{
@@ -1085,7 +1088,28 @@ export function WorkflowView({
           <Button
             variant="ghost"
             onClick={() => {
-              const destination = isEditingFromImport ? 'import' : 'workouts';
+              if (isEditingFromImport) {
+                // Auto-save edits back to the import results list — no confirm needed
+                if (editingImportQueueId && workout) {
+                  setImportProcessedItems(prev => prev.map(item =>
+                    item.queueId === editingImportQueueId
+                      ? {
+                          ...item,
+                          workout: workout as unknown as Record<string, unknown>,
+                          workoutTitle: workout.name,
+                          blockCount: workout.blocks?.length,
+                          exerciseCount: workout.blocks?.reduce((acc, b) => acc + (b.exercises?.length ?? 0), 0),
+                        }
+                      : item
+                  ));
+                }
+                setEditingImportQueueId(null);
+                setCurrentView('import');
+                setIsEditingFromHistory(false);
+                setIsEditingFromImport(false);
+                setEditingWorkoutId(null);
+                return;
+              }
               if (workout && !workoutSaved) {
                 setConfirmDialog({
                   open: true,
@@ -1093,7 +1117,7 @@ export function WorkflowView({
                   description:
                     'Are you sure you want to go back? Any unsaved changes will be lost.',
                   onConfirm: () => {
-                    setCurrentView(destination as View);
+                    setCurrentView('workouts');
                     setIsEditingFromHistory(false);
                     setIsEditingFromImport(false);
                     setEditingWorkoutId(null);
@@ -1101,7 +1125,7 @@ export function WorkflowView({
                 });
                 return;
               }
-              setCurrentView(destination as View);
+              setCurrentView('workouts');
               setIsEditingFromHistory(false);
               setIsEditingFromImport(false);
               setEditingWorkoutId(null);
@@ -1359,7 +1383,10 @@ export function WorkflowView({
           <ImportScreen
             userId={user.id}
             onDone={() => setCurrentView('workouts')}
-            onEditWorkout={rawWorkout => {
+            initialProcessedItems={importProcessedItems.length > 0 ? importProcessedItems : undefined}
+            onUpdateProcessedItems={setImportProcessedItems}
+            onEditWorkout={(queueId, rawWorkout) => {
+              setEditingImportQueueId(queueId || null);
               const normalizedWorkout = normalizeWorkoutStructure(rawWorkout);
               setWorkout(normalizedWorkout);
               setValidation(null);

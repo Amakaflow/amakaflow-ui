@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useImportQueue } from './useImportQueue';
 import { useImportProcessing } from './useImportProcessing';
 import { bulkImportApi } from '../../../lib/bulk-import-api';
@@ -13,7 +13,11 @@ import type React from 'react';
 export interface UseImportFlowProps {
   userId: string;
   onDone: () => void;
-  onEditWorkout: (workout: Record<string, unknown>) => void;
+  onEditWorkout: (queueId: string, workout: Record<string, unknown>) => void;
+  /** Seed processedItems on mount (used when returning from edit). */
+  initialProcessedItems?: ProcessedItem[];
+  /** Called whenever processedItems changes while phase is 'results'. */
+  onUpdateProcessedItems?: (items: ProcessedItem[]) => void;
 }
 
 export interface ImportFlowResult {
@@ -55,7 +59,7 @@ export interface ImportFlowResult {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowProps): ImportFlowResult {
+export function useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems }: UseImportFlowProps): ImportFlowResult {
   const [phase, setPhase] = useState<Phase>('input');
   const [activeTab, setActiveTab] = useState<ImportTab>('urls-media');
   const [selectedBlocks, setSelectedBlocks] = useState<SelectedBlock[]>([]);
@@ -65,6 +69,27 @@ export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowPr
 
   const queue = useImportQueue();
   const processing = useImportProcessing();
+
+  // ── Restore state from parent (e.g. returning from StructureWorkout edit) ────
+
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (!initialized.current && initialProcessedItems && initialProcessedItems.length > 0) {
+      processing.setItems(initialProcessedItems);
+      setPhase('results');
+    }
+    initialized.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Sync processedItems up to parent while in results phase ──────────────────
+
+  useEffect(() => {
+    if (phase === 'results') {
+      onUpdateProcessedItems?.(processing.processedItems);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processing.processedItems, phase]);
 
   // ── handleImport ─────────────────────────────────────────────────────────────
   //
@@ -242,7 +267,7 @@ export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowPr
   // The caller navigates away; this hook stays in block-picker phase.
 
   const handleBlockPickerConfirm = (workout: Record<string, unknown>): void => {
-    onEditWorkout(workout);
+    onEditWorkout('', workout);
     // stays in block-picker phase — caller can navigate away
   };
 
