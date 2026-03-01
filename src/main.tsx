@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
-import App from "./App.tsx";
+import { AppShell } from "./app/AppShell.tsx";
 import { ClerkWrapper } from "./components/ClerkWrapper.tsx";
 import "./index.css";
 
@@ -32,7 +32,7 @@ if (!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ClerkWrapper>
-      <App />
+      <AppShell />
     </ClerkWrapper>
   </StrictMode>
 );
