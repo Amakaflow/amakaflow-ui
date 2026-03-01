@@ -10,9 +10,10 @@ import { BlockPicker } from './BlockPicker';
 import { FileImportTab } from './FileImportTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { MapStep } from '../BulkImport/MapStep';
-import { BulkImportProvider, useBulkImport } from '../../context/BulkImportContext';
-import { useBulkImportApi } from '../../hooks/useBulkImportApi';
+import { BulkImportProvider } from '../../context/BulkImportContext';
+import { bulkImportApi, fileToBase64 } from '../../lib/bulk-import-api';
 import { saveWorkoutToHistory } from '../../lib/workout-history';
+import type { DetectedItem } from '../../types/bulk-import';
 import type {
   ImportTab,
   QueueItem,
@@ -35,35 +36,34 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
   const [phase, setPhase] = useState<Phase>('input');
   const [selectedBlocks, setSelectedBlocks] = useState<SelectedBlock[]>([]);
 
-  const { state } = useBulkImport();
-  const { detectFromUrls, detectFromImages } = useBulkImportApi({ userId });
-
   const handleImport = async () => {
     setPhase('processing');
-
-    const initial: ProcessedItem[] = queue.map(item => ({
-      queueId: item.id,
-      status: 'pending',
-    }));
-    setProcessedItems(initial);
-
-    const urlItems = queue.filter(i => i.type === 'url');
-    const mediaItems = queue.filter(i => i.type === 'image' || i.type === 'pdf');
-    const urls = urlItems.map(i => i.raw as string);
-    const files = mediaItems.map(i => i.raw as File);
-
-    // Mark all as detecting
+    setProcessedItems(queue.map(item => ({ queueId: item.id, status: 'pending' })));
     setProcessedItems(prev => prev.map(p => ({ ...p, status: 'detecting' })));
 
     try {
-      if (urls.length > 0) await detectFromUrls(urls);
-      if (files.length > 0) await detectFromImages(files);
+      // Call the API directly so we can use the response immediately — avoids the
+      // stale-closure problem that arises when reading BulkImportContext state
+      // after dispatching to it (React doesn't re-render mid-async-function).
+      const allDetected: DetectedItem[] = [];
 
-      // Map detected items from context back to queue items by source index
-      const detectedItems = state.detected.items;
+      const urlItems = queue.filter(i => i.type === 'url');
+      if (urlItems.length > 0) {
+        const urls = urlItems.map(i => i.raw as string);
+        const response = await bulkImportApi.detect(userId, 'urls', urls);
+        allDetected.push(...response.items);
+      }
+
+      const mediaItems = queue.filter(i => i.type === 'image' || i.type === 'pdf');
+      if (mediaItems.length > 0) {
+        const base64s = await Promise.all(mediaItems.map(i => fileToBase64(i.raw as File)));
+        const response = await bulkImportApi.detect(userId, 'images', base64s);
+        allDetected.push(...response.items);
+      }
+
       setProcessedItems(
         queue.map((qItem, idx) => {
-          const detected = detectedItems[idx];
+          const detected = allDetected[idx];
           if (!detected) {
             return { queueId: qItem.id, status: 'failed', errorMessage: 'No result returned' };
           }
