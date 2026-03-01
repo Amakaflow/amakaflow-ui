@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
-import { X, Plus, Image, FileText, Link } from 'lucide-react';
+import { X, Plus, Image, FileText, Link, Clipboard } from 'lucide-react';
 import { cn } from '../ui/utils';
 import type { QueueItem } from '../../types/import';
 
@@ -45,6 +45,37 @@ export function ImportQueue({ queue, onQueueChange }: ImportQueueProps) {
     setUrlInput('');
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (text.trim().startsWith('http')) {
+      setTimeout(() => {
+        const urls = parseUrls(text);
+        if (urls.length > 0) addUrls();
+      }, 100);
+    }
+  };
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) return;
+      setUrlInput(text);
+      const urls = parseUrls(text);
+      if (urls.length > 0) {
+        const newItems: QueueItem[] = urls.map(url => ({
+          id: crypto.randomUUID(),
+          type: 'url' as const,
+          label: makeLabel(url),
+          raw: url,
+        }));
+        onQueueChange([...queue, ...newItems]);
+        setUrlInput('');
+      }
+    } catch {
+      // Clipboard permission denied — silently ignore
+    }
+  };
+
   const remove = (id: string) => {
     onQueueChange(queue.filter(item => item.id !== id));
   };
@@ -68,18 +99,27 @@ export function ImportQueue({ queue, onQueueChange }: ImportQueueProps) {
           placeholder="Paste URLs here — one per line, or comma-separated"
           value={urlInput}
           onChange={e => setUrlInput(e.target.value)}
+          onPaste={handlePaste}
           rows={3}
           className="resize-none"
         />
-        <Button
-          onClick={addUrls}
-          disabled={urlInput.trim().length === 0}
-          size="sm"
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add to queue
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={addUrls}
+            disabled={urlInput.trim().length === 0}
+            size="sm"
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add to queue
+          </Button>
+          {typeof navigator !== 'undefined' && navigator.clipboard && (
+            <Button variant="outline" size="sm" onClick={pasteFromClipboard} className="gap-2">
+              <Clipboard className="w-4 h-4" />
+              Paste from clipboard
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Image / PDF drop zone */}
