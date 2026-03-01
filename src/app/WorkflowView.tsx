@@ -30,6 +30,7 @@ import { ValidateMap } from '../components/ValidateMap';
 import { PublishExport } from '../components/PublishExport';
 import { TeamSharing } from '../components/TeamSharing';
 import { WelcomeGuide } from '../components/WelcomeGuide';
+import { HomeScreen } from '../components/Home/HomeScreen';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkoutTypeConfirmDialog } from '../components/WorkoutTypeConfirmDialog';
 import { PinterestBulkImportModal } from '../components/PinterestBulkImportModal';
@@ -95,6 +96,13 @@ export function WorkflowView({
   setCurrentView,
   stravaConnected,
 }: WorkflowViewProps) {
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => localStorage.getItem('amakaflow_welcome_dismissed') === 'true'
+  );
+  const handleWelcomeDismiss = () => {
+    localStorage.setItem('amakaflow_welcome_dismissed', 'true');
+    setWelcomeDismissed(true);
+  };
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('add-sources');
   const [showStravaEnhance, setShowStravaEnhance] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
@@ -1037,24 +1045,34 @@ export function WorkflowView({
           currentView === 'workflow' && workout ? 'pb-32' : ''
         }`}
       >
-        {/* Welcome Guide (shown on home view) */}
+        {/* Home view */}
         {currentView === 'home' && (
-          <>
-            <WelcomeGuide
-              onGetStarted={() => {
-                setCurrentView('workflow');
-                setCurrentStep('add-sources');
-              }}
+          welcomeDismissed ? (
+            <HomeScreen
+              user={user}
+              recentWorkouts={workoutHistoryList}
+              onNavigate={setCurrentView}
             />
-            {/* Version timestamp — dev only */}
-            {!isDemoMode && (
-              <div className="mt-8 text-center">
-                <p className="text-xs text-muted-foreground">
-                  Build: {new Date(buildTimestamp).toLocaleString()}
-                </p>
-              </div>
-            )}
-          </>
+          ) : (
+            <>
+              <WelcomeGuide
+                onGetStarted={() => {
+                  handleWelcomeDismiss();
+                  setCurrentView('workflow');
+                  setCurrentStep('add-sources');
+                }}
+                onDismiss={handleWelcomeDismiss}
+              />
+              {/* Version timestamp — dev only */}
+              {!isDemoMode && (
+                <div className="mt-8 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Build: {new Date(buildTimestamp).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </>
+          )
         )}
 
         {currentView === 'workflow' && currentStepIndex > 0 && !isEditingFromHistory && (
