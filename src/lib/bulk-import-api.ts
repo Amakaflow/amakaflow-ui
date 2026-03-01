@@ -33,7 +33,27 @@ const DEMO_DETECT_RESPONSE: BulkDetectResponse = {
       sourceIndex: 0,
       sourceType: 'file',
       sourceRef: 'program.xlsx — Sheet: Push Day',
-      rawData: { sheet: 'Push Day' },
+      rawData: {
+        title: 'Push Day',
+        blocks: [
+          {
+            id: 'pd-block-1', label: 'Horizontal Push', structure: null,
+            exercises: [
+              { id: 'pd-ex-1', name: 'Bench Press', sets: 4, reps: 8, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pd-ex-2', name: 'Incline DB Press', sets: 3, reps: 10, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+          {
+            id: 'pd-block-2', label: 'Vertical Push', structure: null,
+            exercises: [
+              { id: 'pd-ex-3', name: 'Overhead Press', sets: 3, reps: 8, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pd-ex-4', name: 'Lateral Raise', sets: 3, reps: 15, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pd-ex-5', name: 'Tricep Pushdown', sets: 3, reps: 12, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pd-ex-6', name: 'Cable Fly', sets: 3, reps: 15, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+        ],
+      },
       parsedTitle: 'Push Day',
       parsedExerciseCount: 6,
       parsedBlockCount: 2,
@@ -44,7 +64,26 @@ const DEMO_DETECT_RESPONSE: BulkDetectResponse = {
       sourceIndex: 1,
       sourceType: 'file',
       sourceRef: 'program.xlsx — Sheet: Pull Day',
-      rawData: { sheet: 'Pull Day' },
+      rawData: {
+        title: 'Pull Day',
+        blocks: [
+          {
+            id: 'pull-block-1', label: 'Vertical Pull', structure: null,
+            exercises: [
+              { id: 'pull-ex-1', name: 'Pull-ups', sets: 4, reps: 8, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pull-ex-2', name: 'Lat Pulldown', sets: 3, reps: 10, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+          {
+            id: 'pull-block-2', label: 'Horizontal Pull', structure: null,
+            exercises: [
+              { id: 'pull-ex-3', name: 'Barbell Row', sets: 4, reps: 8, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pull-ex-4', name: 'Face Pull', sets: 3, reps: 15, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'pull-ex-5', name: 'Bicep Curl', sets: 3, reps: 12, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+        ],
+      },
       parsedTitle: 'Pull Day',
       parsedExerciseCount: 5,
       parsedBlockCount: 2,
@@ -55,7 +94,26 @@ const DEMO_DETECT_RESPONSE: BulkDetectResponse = {
       sourceIndex: 2,
       sourceType: 'file',
       sourceRef: 'program.xlsx — Sheet: Leg Day',
-      rawData: { sheet: 'Leg Day' },
+      rawData: {
+        title: 'Leg Day',
+        blocks: [
+          {
+            id: 'leg-block-1', label: 'Quads', structure: null,
+            exercises: [
+              { id: 'leg-ex-1', name: 'Back Squat', sets: 4, reps: 5, reps_range: null, duration_sec: null, rest_sec: 120, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'leg-ex-2', name: 'Leg Press', sets: 3, reps: 12, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+          {
+            id: 'leg-block-2', label: 'Posterior Chain', structure: null,
+            exercises: [
+              { id: 'leg-ex-3', name: 'Romanian Deadlift', sets: 3, reps: 10, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'leg-ex-4', name: 'Leg Curl', sets: 3, reps: 12, reps_range: null, duration_sec: null, rest_sec: 60, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'leg-ex-5', name: 'Calf Raise', sets: 4, reps: 15, reps_range: null, duration_sec: null, rest_sec: 45, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+        ],
+      },
       parsedTitle: 'Leg Day',
       parsedExerciseCount: 5,
       parsedBlockCount: 2,
@@ -349,7 +407,24 @@ const SINGLE_DETECT: BulkDetectResponse = {
     sheetNames: [],
   },
   items: [
-    { id: 'sw-1', sourceIndex: 0, sourceType: 'file', sourceRef: 'monday_session.csv', rawData: {}, parsedTitle: 'Monday Session', parsedExerciseCount: 4, parsedBlockCount: 1, confidence: 91 },
+    {
+      id: 'sw-1', sourceIndex: 0, sourceType: 'file', sourceRef: 'monday_session.csv',
+      rawData: {
+        title: 'Monday Session',
+        blocks: [
+          {
+            id: 'sw-block-1', label: 'Main Lifts', structure: null,
+            exercises: [
+              { id: 'sw-ex-1', name: 'Bench Press', sets: 3, reps: 5, reps_range: null, duration_sec: null, rest_sec: 120, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'sw-ex-2', name: 'Squat', sets: 3, reps: 5, reps_range: null, duration_sec: null, rest_sec: 120, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'sw-ex-3', name: 'Deadlift', sets: 1, reps: 5, reps_range: null, duration_sec: null, rest_sec: 180, rest_type: 'timed', distance_m: null, distance_range: null },
+              { id: 'sw-ex-4', name: 'Pull-up', sets: 3, reps: 8, reps_range: null, duration_sec: null, rest_sec: 90, rest_type: 'timed', distance_m: null, distance_range: null },
+            ],
+          },
+        ],
+      },
+      parsedTitle: 'Monday Session', parsedExerciseCount: 4, parsedBlockCount: 1, confidence: 91,
+    },
   ],
 };
 

@@ -187,7 +187,14 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
           processedItems={processedItems}
           selectedBlocks={selectedBlocks}
           onSelectionChange={setSelectedBlocks}
-          onConfirm={() => console.log('TODO: open StructureWorkout editor with', selectedBlocks)}
+          onConfirm={() => {
+            const doneItems = processedItems.filter(p => p.status === 'done');
+            const blocks = selectedBlocks
+              .map(sel => doneItems[sel.workoutIndex]?.workout?.blocks?.[sel.blockIndex])
+              .filter(Boolean);
+            const combinedWorkout = { title: 'Combined Workout', blocks };
+            if (onEditWorkout) onEditWorkout(combinedWorkout);
+          }}
           onCancel={() => setPhase('results')}
         />
       </div>
