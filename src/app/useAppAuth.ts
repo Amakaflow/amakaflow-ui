@@ -73,7 +73,6 @@ export function useAppAuth(): UseAppAuthResult {
       setAuthLoading(true);
       try {
         if (clerkUser) {
-          console.log('Clerk user found, syncing with profile:', clerkUser.id);
           // Sync Clerk user to Supabase profile
           const profile = await syncClerkUserToProfile(clerkUser);
           if (profile) {
@@ -153,31 +152,24 @@ export function useAppAuth(): UseAppAuthResult {
   // Load user profile from Supabase (for Clerk user)
   const loadUserProfile = async (clerkUserId: string, retryCount = 0): Promise<void> => {
     try {
-      console.log(`Loading profile for Clerk user ${clerkUserId} (attempt ${retryCount + 1})`);
       const profile = await getUserProfileFromClerk(clerkUserId);
 
       if (profile) {
-        console.log('Profile found:', profile);
-        console.log('Selected devices:', profile.selectedDevices, 'Length:', profile.selectedDevices.length);
         setUser({
           ...profile,
           avatar: clerkUser?.imageUrl,
           mode: 'individual' as const,
         });
       } else {
-        console.log('No profile found, retry count:', retryCount);
-        // Profile might not be created yet
-        // Retry up to 3 times with increasing delays
+        // Profile might not be created yet — retry up to 3 times with increasing delays
         if (retryCount < 3) {
-          console.log(`Retrying in ${500 * (retryCount + 1)}ms...`);
           setTimeout(() => {
             loadUserProfile(clerkUserId, retryCount + 1);
           }, 500 * (retryCount + 1)); // 500ms, 1000ms, 1500ms
           return;
         }
 
-        // If profile still doesn't exist after retries, sync it
-        console.log('Profile still not found after retries, syncing Clerk user');
+        // Profile still not found after retries — sync via Clerk
         if (clerkUser) {
           const syncedProfile = await syncClerkUserToProfile(clerkUser);
           if (syncedProfile) {

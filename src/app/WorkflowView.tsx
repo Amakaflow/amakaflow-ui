@@ -1067,7 +1067,7 @@ export function WorkflowView({
           <Button
             variant="ghost"
             onClick={() => {
-              const destination = isEditingFromImport ? 'import' : 'history';
+              const destination = isEditingFromImport ? 'import' : 'workouts';
               if (workout && !workoutSaved) {
                 setConfirmDialog({
                   open: true,
@@ -1137,7 +1137,7 @@ export function WorkflowView({
                         const { getWorkoutHistory } = await import('../lib/workout-history');
                         await refreshHistory();
                         if (isEditingFromHistory) {
-                          setCurrentView('history' as View);
+                          setCurrentView('workouts');
                           setIsEditingFromHistory(false);
                           setEditingWorkoutId(null);
                         } else if (isCreatingFromScratch) {
