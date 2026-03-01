@@ -229,6 +229,17 @@ describe('useImportFlow', () => {
     expect(onDone).toHaveBeenCalledOnce();
   });
 
+  // ── Test (handleBlockPickerConfirm) ────────────────────────────────────────
+
+  it('handleBlockPickerConfirm calls onEditWorkout', () => {
+    const mockOnEditWorkout = vi.fn();
+    const props = { ...defaultProps, onEditWorkout: mockOnEditWorkout };
+    const mockWorkout = { title: 'Test Workout' };
+    const { result } = renderHook(() => useImportFlow(props));
+    act(() => { result.current.handleBlockPickerConfirm(mockWorkout); });
+    expect(mockOnEditWorkout).toHaveBeenCalledWith(mockWorkout);
+  });
+
   // ── Test 6 ─────────────────────────────────────────────────────────────────
 
   it('goToBlockPicker transitions: results → block-picker', async () => {

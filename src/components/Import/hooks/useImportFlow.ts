@@ -38,15 +38,23 @@ export interface ImportFlowResult {
   handleSaveAll: () => Promise<void>;
   handleRetry: (queueId: string) => void;
   handleRemoveResult: (queueId: string) => void;
+  /**
+   * Called by FileImportTab with the selected files. Internally calls addFiles,
+   * then runs detectFile to populate columnMappingState, then transitions to
+   * column-mapping phase. Do NOT call addFiles separately before this — files
+   * are added inside the handler.
+   */
   handleFilesDetected: (files: File[]) => Promise<void>;
   handleColumnMappingComplete: (results: ProcessedItem[]) => void;
   goToBlockPicker: () => void;
   cancelBlockPicker: () => void;
+  /** Confirms block picker selection by forwarding the combined workout to onEditWorkout. */
+  handleBlockPickerConfirm: (workout: Record<string, unknown>) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useImportFlow({ userId, onDone, onEditWorkout: _onEditWorkout }: UseImportFlowProps): ImportFlowResult {
+export function useImportFlow({ userId, onDone, onEditWorkout }: UseImportFlowProps): ImportFlowResult {
   const [phase, setPhase] = useState<Phase>('input');
   const [activeTab, setActiveTab] = useState<ImportTab>('urls-media');
   const [selectedBlocks, setSelectedBlocks] = useState<SelectedBlock[]>([]);
@@ -98,6 +106,9 @@ export function useImportFlow({ userId, onDone, onEditWorkout: _onEditWorkout }:
 
     for (const item of doneItems) {
       try {
+        // DeviceId does not include a neutral 'import' value, so 'garmin' is used
+        // as the source for all imported items. When DeviceId gains an 'import'
+        // or 'file' variant this should be updated to reflect the actual source.
         await saveWorkoutToHistory(userId, item.workout as any, 'garmin');
       } catch {
         // Swallow individual failures — callers can surface toast notifications
@@ -190,6 +201,16 @@ export function useImportFlow({ userId, onDone, onEditWorkout: _onEditWorkout }:
     setPhase('results');
   };
 
+  // ── handleBlockPickerConfirm ──────────────────────────────────────────────────
+  //
+  // Spec: BLOCK_PICKER → onConfirm(combined) → calls onEditWorkout
+  // The caller navigates away; this hook stays in block-picker phase.
+
+  const handleBlockPickerConfirm = (workout: Record<string, unknown>): void => {
+    onEditWorkout(workout);
+    // stays in block-picker phase — caller can navigate away
+  };
+
   // ── goToBlockPicker / cancelBlockPicker ───────────────────────────────────────
 
   const goToBlockPicker = (): void => {
@@ -229,5 +250,6 @@ export function useImportFlow({ userId, onDone, onEditWorkout: _onEditWorkout }:
     handleColumnMappingComplete,
     goToBlockPicker,
     cancelBlockPicker,
+    handleBlockPickerConfirm,
   };
 }
