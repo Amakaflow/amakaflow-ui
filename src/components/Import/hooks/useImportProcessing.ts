@@ -21,6 +21,7 @@ export interface DetectPayload {
 
 export interface ImportProcessingResult {
   processedItems: ProcessedItem[];
+  /** Replaces all processedItems with results from the API. Call clearResults() before re-detecting. */
   detect: (userId: string, payload: DetectPayload) => Promise<void>;
   retry: (queueId: string, userId: string, item: QueueItem) => Promise<void>;
   removeResult: (queueId: string) => void;
@@ -94,6 +95,8 @@ export function useImportProcessing(): ImportProcessingResult {
         return mapDetectedToProcessed(queueId, detected);
       });
 
+      // Intentional replace-all: detect() always replaces the full list with the
+      // fresh API results. Callers should call clearResults() before re-detecting.
       setProcessedItems(results);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Processing failed';
@@ -108,7 +111,7 @@ export function useImportProcessing(): ImportProcessingResult {
     setProcessedItems(prev =>
       prev.map(p =>
         p.queueId === queueId
-          ? { queueId, status: 'pending', errorMessage: undefined }
+          ? { ...p, status: 'pending', errorMessage: undefined }
           : p
       )
     );

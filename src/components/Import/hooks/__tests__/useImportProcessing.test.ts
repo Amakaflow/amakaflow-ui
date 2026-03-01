@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useImportProcessing } from '../useImportProcessing';
+import type { QueueItem } from '../../../../types/import';
 
 // ── Mock bulkImportApi ────────────────────────────────────────────────────────
 // vi.mock is hoisted to the top of the file, so we must use vi.hoisted to
@@ -184,6 +185,63 @@ describe('useImportProcessing', () => {
   });
 
   // ── Test 5 ─────────────────────────────────────────────────────────────────
+
+  it('retry preserves workout data while pending', async () => {
+    // Set up a successful item first
+    mockDetect.mockResolvedValueOnce(makeDetectResponse([makeDetectedItem({ parsedTitle: 'Morning Run', rawData: { title: 'Morning Run' } })]));
+    const { result } = renderHook(() => useImportProcessing());
+    await act(async () => {
+      await result.current.detect('user-1', {
+        urls: ['https://example.com'],
+        urlQueueIds: ['q1'],
+        base64Items: [],
+        base64QueueIds: [],
+      });
+    });
+    expect(result.current.processedItems[0].status).toBe('done');
+    const workoutBeforeRetry = result.current.processedItems[0].workout;
+
+    // Start retry with deferred promise
+    let resolveRetry!: (val: any) => void;
+    const retryPromise = new Promise(res => { resolveRetry = res; });
+    mockDetect.mockReturnValueOnce(retryPromise);
+    const queueItem: QueueItem = { id: 'q1', type: 'url', label: 'Example', raw: 'https://example.com' };
+    act(() => { void result.current.retry('q1', 'user-1', queueItem); });
+    await act(async () => {});
+
+    // Workout data should be preserved during pending state
+    expect(result.current.processedItems[0].status).toBe('pending');
+    expect(result.current.processedItems[0].workout).toEqual(workoutBeforeRetry);
+
+    resolveRetry(makeDetectResponse([makeDetectedItem({ parsedTitle: 'Updated', rawData: { title: 'Updated' } })]));
+    await act(async () => { await retryPromise; });
+    expect(result.current.processedItems[0].status).toBe('done');
+  });
+
+  // ── Test 6 ─────────────────────────────────────────────────────────────────
+
+  it('detect handles mixed URLs and base64 items, mapping results by position', async () => {
+    mockDetect
+      .mockResolvedValueOnce(makeDetectResponse([makeDetectedItem({ parsedTitle: 'URL Workout', rawData: {} })]))
+      .mockResolvedValueOnce(makeDetectResponse([makeDetectedItem({ parsedTitle: 'Photo Workout', rawData: { title: 'Photo Workout' } })]));
+
+    const { result } = renderHook(() => useImportProcessing());
+    await act(async () => {
+      await result.current.detect('user-1', {
+        urls: ['https://example.com'],
+        urlQueueIds: ['q-url'],
+        base64Items: [{ base64: 'base64data', type: 'image' }],
+        base64QueueIds: ['q-img'],
+      });
+    });
+
+    expect(result.current.processedItems).toHaveLength(2);
+    expect(result.current.processedItems[0].queueId).toBe('q-url');
+    expect(result.current.processedItems[1].queueId).toBe('q-img');
+    expect(result.current.processedItems[1].workout).toEqual({ title: 'Photo Workout' });
+  });
+
+  // ── Test 7 ─────────────────────────────────────────────────────────────────
 
   it('clearResults empties processedItems', async () => {
     const item1 = makeDetectedItem({ id: 'det-1', parsedTitle: 'Workout A' });

@@ -21,8 +21,7 @@ export interface ProcessedItem {
   queueId: string;        // links back to QueueItem.id
   status: ItemStatus;
   errorMessage?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  workout?: any;          // WorkoutStructure — typed loosely to avoid circular deps
+  workout?: Record<string, unknown>;  // WorkoutStructure — typed loosely to avoid circular deps
   workoutTitle?: string;
   blockCount?: number;
   exerciseCount?: number;
