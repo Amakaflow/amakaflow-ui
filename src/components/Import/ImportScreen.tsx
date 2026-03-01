@@ -10,17 +10,23 @@ import { BlockPicker } from './BlockPicker';
 import { ClipQueueTab } from './ClipQueueTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { MapStep } from '../BulkImport/MapStep';
-import type { QueueItem } from '../../types/import';
+import type { QueueItem, ProcessedItem } from '../../types/import';
 import type { ReactNode } from 'react';
-interface ImportScreenProps { userId: string; onDone: () => void; onEditWorkout: (w: Record<string, unknown>) => void; }
+interface ImportScreenProps {
+  userId: string;
+  onDone: () => void;
+  onEditWorkout: (queueId: string, w: Record<string, unknown>) => void;
+  initialProcessedItems?: ProcessedItem[];
+  onUpdateProcessedItems?: (items: ProcessedItem[]) => void;
+}
 const wrap = (children: ReactNode) => <div className="container mx-auto px-4 py-8 max-w-3xl">{children}</div>;
 
-export function ImportScreen({ userId, onDone, onEditWorkout }: ImportScreenProps) {
+export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems }: ImportScreenProps) {
   const { phase, activeTab, setActiveTab, queue, addUrls, addFiles, removeQueueItem,
     processedItems, selectedBlocks, setSelectedBlocks, columnMappingState,
     handleImport, handleSaveAll, handleRetry, handleRemoveResult,
     handleFilesDetected, handleColumnMappingComplete, goToBlockPicker,
-    cancelBlockPicker, handleBlockPickerConfirm } = useImportFlow({ userId, onDone, onEditWorkout });
+    cancelBlockPicker, handleBlockPickerConfirm } = useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems });
 
   const handleQueueChange = (next: QueueItem[]) => {
     queue.forEach(i => { if (!next.find(q => q.id === i.id)) removeQueueItem(i.id); });
@@ -36,7 +42,7 @@ export function ImportScreen({ userId, onDone, onEditWorkout }: ImportScreenProp
       <p className="text-muted-foreground mt-1">Review what was found. Save all or build a combined workout.</p></div>
     <ResultsScreen queueItems={queue} processedItems={processedItems} onSaveAll={handleSaveAll}
       onBuildOne={goToBlockPicker} onRemove={handleRemoveResult}
-      onEdit={(id) => { const i = processedItems.find(p => p.queueId === id); if (i?.workout) onEditWorkout(i.workout); }} />
+      onEdit={(id) => { const i = processedItems.find(p => p.queueId === id); if (i?.workout) onEditWorkout(id, i.workout); }} />
   </>);
 
   if (phase === 'block-picker') return wrap(<>
