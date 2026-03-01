@@ -4,7 +4,7 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { X, Plus, Image, FileText, Link } from 'lucide-react';
 import { cn } from '../ui/utils';
-import type { QueueItem } from '../../types/unified-import';
+import type { QueueItem } from '../../types/import';
 
 interface ImportQueueProps {
   queue: QueueItem[];
