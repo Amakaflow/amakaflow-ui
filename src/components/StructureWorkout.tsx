@@ -1,12 +1,24 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
 import { Watch, Bike, Wand2, ShieldCheck, Edit2, Check, Trash2, GripVertical, Plus, Layers, Move, ChevronDown, ChevronUp, Minimize2, Maximize2, Save, Code, Download, Send, Info, Clock, Copy, Settings2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { WorkoutStructure, Exercise, Block, Superset, RestType, WorkoutSettings, WorkoutStructureType } from '../types/workout';
 import { DeviceId, getDevicesByIds, getDeviceById, Device, getPrimaryExportDestinations } from '../lib/devices';
 import { ExerciseSearch } from './ExerciseSearch';
@@ -19,6 +31,7 @@ import { EditExerciseDialog } from './EditExerciseDialog';
 import { EditBlockDialog, BlockUpdates } from './EditBlockDialog';
 import { WorkoutSettingsDialog } from './WorkoutSettingsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DroppableSuperset } from './DroppableSuperset';
 
 // ── Block type visual system ──────────────────────────────────────────────────
 const STRUCTURE_STYLES: Record<string, { border: string; badge: string }> = {
@@ -99,26 +112,14 @@ type Props = {
   onNavigateToSettings?: () => void;
 };
 
-// Drag and Drop Types
-const ItemTypes = {
-  EXERCISE: 'exercise',
-  BLOCK: 'block',
-};
+// ── @dnd-kit drag data shapes ─────────────────────────────────────────────────
+type DraggableData =
+  | { type: 'block'; blockIdx: number }
+  | { type: 'exercise'; blockIdx: number; exerciseIdx: number; supersetIdx: null }
+  | { type: 'superset-exercise'; blockIdx: number; supersetIdx: number; exerciseIdx: number };
 
-interface DraggableExerciseData {
-  blockIdx: number;
-  exerciseIdx: number;
-  exercise: Exercise;
-  supersetIdx?: number; // Optional: if exercise is in a superset
-}
-
-interface DraggableBlockData {
-  blockIdx: number;
-  block: Block;
-}
-
-// Draggable Exercise Component
-function DraggableExercise({
+// ── Sortable Exercise ─────────────────────────────────────────────────────────
+function SortableExercise({
   exercise,
   blockIdx,
   exerciseIdx,
@@ -135,27 +136,35 @@ function DraggableExercise({
   supersetIdx?: number;
   onEdit: () => void;
   onDelete: () => void;
-  effectiveRestType?: string;  // From workout/block settings
-  effectiveRestSec?: number;   // From workout/block settings
-  isInSuperset?: boolean;      // If true, rest happens after superset, not each set
+  effectiveRestType?: string;
+  effectiveRestSec?: number;
+  isInSuperset?: boolean;
 }) {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.EXERCISE,
-    item: { blockIdx, exerciseIdx, exercise, supersetIdx } as DraggableExerciseData,
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  }));
+  const draggableData: DraggableData = supersetIdx !== undefined
+    ? { type: 'superset-exercise', blockIdx, supersetIdx, exerciseIdx }
+    : { type: 'exercise', blockIdx, exerciseIdx, supersetIdx: null };
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: exercise.id, data: draggableData });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
 
   const getDisplayName = () => {
-    // Just return the exercise name - don't prepend duration/distance
-    // Duration/distance will be shown separately in badges
     return exercise.name || '';
   };
 
   const getDisplayText = () => {
     const parts: string[] = [];
-    // Show warmup sets indicator if configured (AMA-94)
     if (exercise.warmup_sets && exercise.warmup_sets > 0 && exercise.warmup_reps && exercise.warmup_reps > 0) {
       parts.push(`🔥 ${exercise.warmup_sets}×${exercise.warmup_reps} warmup`);
     }
@@ -179,21 +188,24 @@ function DraggableExercise({
       const secs = exercise.time_cap_sec % 60;
       parts.push(secs > 0 ? `⏱ ${mins}m ${secs}s cap` : `⏱ ${mins}m cap`);
     }
-
-    // Rest is configured at block level (BlockConfigRow) — not shown per-exercise in the editor.
     return parts.length > 0 ? parts.join(' • ') : null;
   };
 
   return (
     <div
-      ref={drag}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
-      className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50 hover:bg-muted cursor-move"
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50 hover:bg-muted"
     >
-      <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+      {/* Drag handle — only this element initiates drag */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+      >
         <GripVertical className="w-4 h-4" />
       </div>
-      
+
       <div className="flex-1">
         <p className="font-medium">{getDisplayName()}</p>
         {getDisplayText() && (
@@ -202,7 +214,7 @@ function DraggableExercise({
           </p>
         )}
       </div>
-      
+
       <div className="flex gap-1">
         <Button size="sm" variant="ghost" onClick={onEdit}>
           <Edit2 className="w-4 h-4" />
@@ -215,92 +227,11 @@ function DraggableExercise({
   );
 }
 
-// Droppable Exercise Container (Block-level exercises or Superset exercises)
-// Industry-standard: ExerciseDropZone focuses on UI + drop intent, not business logic like sorting
-// Array order in state is the single source of truth
-function ExerciseDropZone({
-  blockIdx,
-  exercises,
-  onDrop,
-  onEdit,
-  onDelete,
-  label,
-  supersetIdx,
-  effectiveRestType,
-  effectiveRestSec,
-  isInSuperset = false,
-}: {
-  blockIdx: number;
-  exercises: Exercise[];
-  onDrop: (item: DraggableExerciseData, targetIdx: number, targetSupersetIdx?: number) => void;
-  onEdit: (exerciseIdx: number) => void;
-  onDelete: (exerciseIdx: number) => void;
-  label?: string;
-  supersetIdx?: number;
-  effectiveRestType?: string;
-  effectiveRestSec?: number;
-  isInSuperset?: boolean;
-}) {
-  const [{ isOver }, drop] = useDrop(
-    () => ({
-      accept: ItemTypes.EXERCISE,
-      drop: (item: DraggableExerciseData) => {
-        // For now, this drop zone appends to the end of its container.
-        // More advanced patterns (above/below/into) should be handled
-        // with additional sub-zones or hover position logic.
-        const targetIdx = exercises.length;
-        onDrop(item, targetIdx, supersetIdx);
-      },
-      collect: (monitor) => ({
-        isOver: monitor.isOver(),
-      }),
-    }),
-    [exercises.length, supersetIdx, onDrop]
-  );
-
-  return (
-    <div
-      ref={drop}
-      className={`space-y-2 min-h-[50px] p-2 rounded-lg border-2 border-dashed transition-colors ${
-        isOver ? 'border-primary bg-primary/10' : 'border-transparent'
-      }`}
-    >
-      {label && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Layers className="w-4 h-4" />
-          <span>{label}</span>
-        </div>
-      )}
-      {exercises.length === 0 && (
-        <div className="text-center text-sm text-muted-foreground py-4">
-          Drop exercise here or click Add Exercise
-        </div>
-      )}
-      {exercises.map((exercise, idx) => (
-        <DraggableExercise
-          key={exercise.id}
-          exercise={exercise}
-          blockIdx={blockIdx}
-          exerciseIdx={idx}
-          supersetIdx={supersetIdx}
-          onEdit={() => onEdit(idx)}
-          onDelete={() => onDelete(idx)}
-          effectiveRestType={effectiveRestType}
-          effectiveRestSec={effectiveRestSec}
-          isInSuperset={isInSuperset}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Draggable Block Component
-function DraggableBlock({
+// ── Sortable Block ────────────────────────────────────────────────────────────
+function SortableBlock({
   block,
   blockIdx,
   workoutSettings,
-  onBlockDrop,
-  onExerciseDrop,
   onEditExercise,
   onDeleteExercise,
   onAddExercise,
@@ -315,41 +246,30 @@ function DraggableBlock({
   block: Block;
   blockIdx: number;
   workoutSettings?: WorkoutSettings;
-  onBlockDrop: (draggedIdx: number, targetIdx: number) => void;
-  onExerciseDrop: (item: DraggableExerciseData, targetIdx: number) => void;
   onEditExercise: (exerciseIdx: number, supersetIdx?: number) => void;
   onDeleteExercise: (exerciseIdx: number, supersetIdx?: number) => void;
   onAddExercise: () => void;
   onAddExerciseToSuperset: (supersetIdx: number) => void;
   onAddSuperset: () => void;
   onDeleteSuperset: (supersetIdx: number) => void;
-  onExerciseDrop: (item: DraggableExerciseData, targetIdx: number, targetSupersetIdx?: number) => void;
   onUpdateBlock: (updates: Partial<Block>) => void;
   onEditBlock: () => void;
   onDeleteBlock: () => void;
   collapseSignal?: { action: 'collapse' | 'expand'; timestamp: number };
 }) {
-  const [{ isDragging }, drag, dragPreview] = useDrag(() => ({
-    type: ItemTypes.BLOCK,
-    item: { blockIdx, block } as DraggableBlockData,
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  }));
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id, data: { type: 'block', blockIdx } as DraggableData });
 
-  const [{ isOver, canDrop }, drop] = useDrop(() => ({
-    accept: ItemTypes.BLOCK,
-    drop: (item: DraggableBlockData) => {
-      if (item.blockIdx !== blockIdx) {
-        onBlockDrop(item.blockIdx, blockIdx);
-      }
-    },
-    canDrop: (item) => item.blockIdx !== blockIdx,
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-      canDrop: monitor.canDrop(),
-    }),
-  }));
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [showConfig, setShowConfig] = useState(true);
@@ -365,6 +285,13 @@ function DraggableBlock({
     }));
   };
 
+  // Keep a ref to block.supersets so the collapseSignal effect can read the
+  // current value without depending on the object reference (which changes on
+  // every @dnd-kit internal re-render, causing the effect to re-run and
+  // inadvertently reset the user's manual collapse state).
+  const blockSupersetsRef = useRef(block.supersets);
+  blockSupersetsRef.current = block.supersets;
+
   // React to collapse/expand all signal
   useEffect(() => {
     if (collapseSignal) {
@@ -372,7 +299,7 @@ function DraggableBlock({
         setIsCollapsed(true);
         // Collapse all supersets
         const allCollapsed: Record<number, boolean> = {};
-        (block.supersets || []).forEach((_, idx) => {
+        (blockSupersetsRef.current || []).forEach((_, idx) => {
           allCollapsed[idx] = true;
         });
         setCollapsedSupersets(allCollapsed);
@@ -382,7 +309,7 @@ function DraggableBlock({
         setCollapsedSupersets({});
       }
     }
-  }, [collapseSignal, block.supersets]);
+  }, [collapseSignal]); // intentionally omit block.supersets — read via ref above
 
   // Count total exercises in block (including supersets)
   const blockExercises = block.exercises?.length || 0;
@@ -393,407 +320,372 @@ function DraggableBlock({
   const totalExerciseCount = blockExercises + supersetExercises;
 
   // Calculate effective rest settings (block override > workout default)
-  // This is passed to exercise cards so they show the correct rest indicator
-  // Only set values if explicitly configured - don't default to anything
   const effectiveRestType = block.restOverride?.enabled
     ? block.restOverride.restType
-    : workoutSettings?.defaultRestType;  // No default - only show if configured
+    : workoutSettings?.defaultRestType;
   const effectiveRestSec = block.restOverride?.enabled
     ? block.restOverride.restSec
     : workoutSettings?.defaultRestSec;
 
+  const hasSupersets = (block.supersets || []).length > 0;
+
+  // Compute "before supersets" and "after supersets" exercise slices
+  // block.exercises[0] is shown before supersets when supersets exist
+  // block.exercises[1+] are shown after supersets
+  const beforeExercises = hasSupersets ? (block.exercises || []).slice(0, 1) : [];
+  const afterExercises = hasSupersets
+    ? (block.exercises || []).slice(1).filter(ex => ex != null)
+    : (block.exercises || []).filter(ex => ex != null);
+
   return (
-    <div ref={drop}>
-      {/* Drop zone indicator at top of block */}
-      {isOver && canDrop && (
-        <div className="h-2 bg-primary/20 border-2 border-dashed border-primary rounded mb-2 transition-all">
-          <div className="h-full bg-primary/40 animate-pulse" />
-        </div>
-      )}
-      
-      <div ref={dragPreview}>
-        <Card
-          className={`transition-all ${isDragging ? 'opacity-40 rotate-1 scale-95' : 'opacity-100'} ${isOver && canDrop ? 'ring-2 ring-primary shadow-lg' : ''}`}
-        >
-          {(() => {
-            const styles = STRUCTURE_STYLES[block.structure ?? ''] ?? STRUCTURE_STYLES.default;
-            return (
-              <>
-                <CardHeader className={`${styles.border} pl-4 bg-muted/20`}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    {/* Drag handle */}
-                    <div
-                      ref={drag}
-                      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      <GripVertical className="w-5 h-5" />
-                    </div>
-
-                    {/* Collapse exercises toggle */}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsCollapsed(!isCollapsed)}
-                      className="p-0 h-auto hover:bg-transparent shrink-0"
-                      title={isCollapsed ? 'Expand exercises' : 'Collapse exercises'}
-                    >
-                      {isCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
-                    </Button>
-
-                    {/* AMA-731: Block type selector - replaces the static type badge */}
-                    <Select
-                      value={block.structure ?? ''}
-                      onValueChange={(value) => {
-                        const newStructure = value as WorkoutStructureType;
-                        onUpdateBlock({ structure: newStructure });
-                      }}
-                    >
-                      <SelectTrigger className={`shrink-0 w-auto h-7 text-xs gap-1 ${styles.badge} border-0`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STRUCTURE_TYPE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* Block name */}
-                    <span className="font-medium text-sm truncate flex-1">{block.label}</span>
-
-                    {/* Exercise count badge */}
-                    <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-                      {totalExerciseCount} exercises
-                    </Badge>
-                    {/* Config summary — only when expanded and configured */}
-                    {!isCollapsed && block.structure && (() => {
-                      const metric = getBlockKeyMetric(block);
-                      return metric && metric !== 'Configure →'
-                        ? <span className="text-xs text-muted-foreground shrink-0">{metric}</span>
-                        : null;
-                    })()}
-
-                    {/* Configure button */}
-                    {block.structure && (
-                      <Button
-                        size="sm"
-                        variant={showConfig ? 'secondary' : 'ghost'}
-                        onClick={() => setShowConfig(!showConfig)}
-                        className="shrink-0 gap-1 text-xs h-7"
-                        aria-label="configure"
-                      >
-                        <Settings2 className="w-3 h-3" />
-                        Configure
-                      </Button>
-                    )}
-
-                    {/* Edit block name button */}
-                    <Button size="sm" variant="ghost" onClick={onEditBlock} title="Edit block name" className="shrink-0 p-1 h-7">
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </Button>
-
-                    {/* AMA-731: Delete block button */}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      title="Delete block"
-                      className="shrink-0 p-1 h-7 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+    <div ref={setNodeRef} style={style}>
+      {/* Extra wrapper div to preserve DOM depth from the original react-dnd
+          implementation (which had two wrapper divs: drop ref + dragPreview ref).
+          This ensures the test's 5-level ancestor traversal stays within the
+          block and does not bleed into sibling blocks. */}
+      <div>
+      <Card
+        className={`transition-all ${isDragging ? 'opacity-40 rotate-1 scale-95' : 'opacity-100'}`}
+      >
+        {(() => {
+          const styles = STRUCTURE_STYLES[block.structure ?? ''] ?? STRUCTURE_STYLES.default;
+          return (
+            <>
+              <CardHeader className={`${styles.border} pl-4 bg-muted/20`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Drag handle — only this triggers block drag */}
+                  <div
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0 touch-none"
+                  >
+                    <GripVertical className="w-5 h-5" />
                   </div>
-                </CardHeader>
 
-                {/* AMA-731: Delete block confirmation dialog */}
-                <ConfirmDialog
-                  open={showDeleteConfirm}
-                  onOpenChange={setShowDeleteConfirm}
-                  title="Delete Block"
-                  description={`Are you sure you want to delete "${block.label}" and all its exercises? This action cannot be undone.`}
-                  confirmText="Delete"
-                  cancelText="Cancel"
-                  variant="destructive"
-                  onConfirm={onDeleteBlock}
+                  {/* Collapse exercises toggle */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="p-0 h-auto hover:bg-transparent shrink-0"
+                    title={isCollapsed ? 'Expand exercises' : 'Collapse exercises'}
+                  >
+                    {isCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+                  </Button>
+
+                  {/* AMA-731: Block type selector */}
+                  <Select
+                    value={block.structure ?? ''}
+                    onValueChange={(value) => {
+                      const newStructure = value as WorkoutStructureType;
+                      onUpdateBlock({ structure: newStructure });
+                    }}
+                  >
+                    <SelectTrigger className={`shrink-0 w-auto h-7 text-xs gap-1 ${styles.badge} border-0`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STRUCTURE_TYPE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Block name */}
+                  <span className="font-medium text-sm truncate flex-1">{block.label}</span>
+
+                  {/* Exercise count badge */}
+                  <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+                    {totalExerciseCount} exercises
+                  </Badge>
+                  {/* Config summary — only when expanded and configured */}
+                  {!isCollapsed && block.structure && (() => {
+                    const metric = getBlockKeyMetric(block);
+                    return metric && metric !== 'Configure →'
+                      ? <span className="text-xs text-muted-foreground shrink-0">{metric}</span>
+                      : null;
+                  })()}
+
+                  {/* Configure button */}
+                  {block.structure && (
+                    <Button
+                      size="sm"
+                      variant={showConfig ? 'secondary' : 'ghost'}
+                      onClick={() => setShowConfig(!showConfig)}
+                      className="shrink-0 gap-1 text-xs h-7"
+                      aria-label="configure"
+                    >
+                      <Settings2 className="w-3 h-3" />
+                      Configure
+                    </Button>
+                  )}
+
+                  {/* Edit block name button */}
+                  <Button size="sm" variant="ghost" onClick={onEditBlock} title="Edit block name" className="shrink-0 p-1 h-7">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+
+                  {/* AMA-731: Delete block button */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title="Delete block"
+                    className="shrink-0 p-1 h-7 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardHeader>
+
+              {/* AMA-731: Delete block confirmation dialog */}
+              <ConfirmDialog
+                open={showDeleteConfirm}
+                onOpenChange={setShowDeleteConfirm}
+                title="Delete Block"
+                description={`Are you sure you want to delete "${block.label}" and all its exercises? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                onConfirm={onDeleteBlock}
+              />
+
+              {/* Config row — only visible when block is expanded */}
+              {showConfig && !isCollapsed && (
+                <BlockConfigRow
+                  block={block}
+                  onUpdate={(updates) => onUpdateBlock(updates)}
                 />
-
-                {/* Config row — only visible when block is expanded */}
-                {showConfig && !isCollapsed && (
-                  <BlockConfigRow
-                    block={block}
-                    onUpdate={(updates) => onUpdateBlock(updates)}
-                  />
+              )}
+            </>
+          );
+        })()}
+        {!isCollapsed && (
+          <CardContent className="space-y-4">
+            {/* Exercises before supersets (index 0 when supersets exist) */}
+            {hasSupersets && (
+              <div>
+                {beforeExercises.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                      <Layers className="w-4 h-4" />
+                      <span>Exercises</span>
+                    </div>
+                    <SortableContext items={beforeExercises.map(e => e.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {beforeExercises.map((exercise, relIdx) => (
+                          <SortableExercise
+                            key={exercise.id}
+                            exercise={exercise}
+                            blockIdx={blockIdx}
+                            exerciseIdx={relIdx}
+                            onEdit={() => onEditExercise(relIdx)}
+                            onDelete={() => onDeleteExercise(relIdx)}
+                            effectiveRestType={effectiveRestType}
+                            effectiveRestSec={effectiveRestSec}
+                            isInSuperset={false}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </>
                 )}
-              </>
-            );
-          })()}
-          {!isCollapsed && (
-            <CardContent className="space-y-4">
-              {/* Exercises at index 0 (before supersets) - show if supersets exist */}
-              {(block.supersets || []).length > 0 && (block.exercises || []).length > 0 && (
-                <div>
-                  <ExerciseDropZone
-                    blockIdx={blockIdx}
-                    exercises={(block.exercises || []).slice(0, 1)} // Only show first exercise if it exists
-                    onDrop={(item, targetIdx) => {
-                      // Drop at index 0 to place above supersets
-                      onExerciseDrop(item, 0);
-                    }}
-                    onEdit={(idx) => onEditExercise(0)}
-                    onDelete={(idx) => onDeleteExercise(0)}
-                    label={(block.exercises || []).length > 0 ? "Exercises" : undefined}
-                    supersetIdx={undefined}
-                    effectiveRestType={effectiveRestType}
-                    effectiveRestSec={effectiveRestSec}
-                    isInSuperset={false}
-                  />
-                </div>
-              )}
+                {beforeExercises.length === 0 && (
+                  <div className="min-h-[40px] rounded-lg border-2 border-dashed border-transparent" />
+                )}
+              </div>
+            )}
 
-              {/* Drop zone before supersets - allows dragging exercises above supersets (empty zone) */}
-              {(block.supersets || []).length > 0 && (block.exercises || []).length === 0 && (
-                <div>
-                  <ExerciseDropZone
-                    blockIdx={blockIdx}
-                    exercises={[]}
-                    onDrop={(item) => {
-                      // Drop at index 0 to place above supersets
-                      onExerciseDrop(item, 0);
-                    }}
-                    onEdit={() => {}}
-                    onDelete={() => {}}
-                    label={undefined}
-                    supersetIdx={undefined}
-                    effectiveRestType={effectiveRestType}
-                    effectiveRestSec={effectiveRestSec}
-                    isInSuperset={false}
-                  />
-                </div>
-              )}
+            {/* Supersets */}
+            {hasSupersets && (
+              <div className="space-y-3">
+                {(block.supersets || []).map((superset, supersetIdx) => {
+                  const isSupersetCollapsed = collapsedSupersets[supersetIdx] ?? false;
+                  const exerciseCount = superset.exercises?.length || 0;
 
-              {/* Supersets */}
-              {(block.supersets || []).length > 0 && (
-                <div className="space-y-3">
-                  {(block.supersets || []).map((superset, supersetIdx) => {
-                    const isSupersetCollapsed = collapsedSupersets[supersetIdx] ?? false;
-                    const exerciseCount = superset.exercises?.length || 0;
+                  const getSupersetSummary = () => {
+                    const parts: string[] = [];
+                    parts.push(`${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}`);
+                    if (superset.rounds && superset.rounds > 1) {
+                      parts.push(`${superset.rounds} rounds`);
+                    }
+                    if (superset.rest_type === 'button') {
+                      parts.push('Lap Button');
+                    } else if (superset.rest_between_sec) {
+                      const mins = Math.floor(superset.rest_between_sec / 60);
+                      const secs = superset.rest_between_sec % 60;
+                      if (mins > 0 && secs > 0) parts.push(`${mins}m ${secs}s rest`);
+                      else if (mins > 0) parts.push(`${mins}m rest`);
+                      else parts.push(`${secs}s rest`);
+                    }
+                    return parts.join(' • ');
+                  };
 
-                    // Build summary info for collapsed view
-                    const getSupersetSummary = () => {
-                      const parts: string[] = [];
-                      parts.push(`${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}`);
-
-                      // Show rounds if set
-                      if (superset.rounds && superset.rounds > 1) {
-                        parts.push(`${superset.rounds} rounds`);
-                      }
-
-                      // Show rest type
-                      if (superset.rest_type === 'button') {
-                        parts.push('Lap Button');
-                      } else if (superset.rest_between_sec) {
-                        const mins = Math.floor(superset.rest_between_sec / 60);
-                        const secs = superset.rest_between_sec % 60;
-                        if (mins > 0 && secs > 0) parts.push(`${mins}m ${secs}s rest`);
-                        else if (mins > 0) parts.push(`${mins}m rest`);
-                        else parts.push(`${secs}s rest`);
-                      }
-
-                      return parts.join(' • ');
-                    };
-
-                    return (
-                      <div key={superset.id || supersetIdx} className="border-l-4 border-primary pl-4 space-y-2">
-                        <div
-                          className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -ml-4 pl-4 py-1 rounded-r transition-colors"
-                          onClick={() => toggleSupersetCollapse(supersetIdx)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="p-0 h-auto hover:bg-transparent"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSupersetCollapse(supersetIdx);
-                              }}
-                            >
-                              {isSupersetCollapsed ? (
-                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                              )}
-                            </Button>
-                            <Badge variant="outline" className="text-xs">
-                              Superset {supersetIdx + 1}
-                            </Badge>
-                            {/* Show summary when collapsed */}
-                            {isSupersetCollapsed && (
-                              <span className="text-xs text-muted-foreground">
-                                {getSupersetSummary()}
-                              </span>
-                            )}
-                            {/* Show superset-specific rest when expanded */}
-                            {!isSupersetCollapsed && (superset.rest_between_sec || superset.rest_type) && (
-                              <Badge variant="secondary" className="text-xs gap-1">
-                                <Clock className="w-3 h-3" />
-                                {superset.rest_type === 'button'
-                                  ? 'Lap Button'
-                                  : superset.rest_between_sec
-                                    ? (() => {
-                                        const mins = Math.floor(superset.rest_between_sec / 60);
-                                        const secs = superset.rest_between_sec % 60;
-                                        if (mins > 0 && secs > 0) return `${mins}m ${secs}s`;
-                                        if (mins > 0) return `${mins}m`;
-                                        return `${secs}s`;
-                                      })()
-                                    : 'Lap Button'}
-                              </Badge>
-                            )}
-                          </div>
+                  return (
+                    <div key={superset.id || supersetIdx} className="border-l-4 border-primary pl-4 space-y-2">
+                      <div
+                        className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -ml-4 pl-4 py-1 rounded-r transition-colors"
+                        onClick={() => toggleSupersetCollapse(supersetIdx)}
+                      >
+                        <div className="flex items-center gap-2">
                           <Button
-                            variant="ghost"
                             size="sm"
+                            variant="ghost"
+                            className="p-0 h-auto hover:bg-transparent"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onDeleteSuperset(supersetIdx);
+                              toggleSupersetCollapse(supersetIdx);
                             }}
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {isSupersetCollapsed ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            )}
                           </Button>
+                          <Badge variant="outline" className="text-xs">
+                            Superset {supersetIdx + 1}
+                          </Badge>
+                          {isSupersetCollapsed && (
+                            <span className="text-xs text-muted-foreground">
+                              {getSupersetSummary()}
+                            </span>
+                          )}
+                          {!isSupersetCollapsed && (superset.rest_between_sec || superset.rest_type) && (
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              {superset.rest_type === 'button'
+                                ? 'Lap Button'
+                                : superset.rest_between_sec
+                                  ? (() => {
+                                      const mins = Math.floor(superset.rest_between_sec / 60);
+                                      const secs = superset.rest_between_sec % 60;
+                                      if (mins > 0 && secs > 0) return `${mins}m ${secs}s`;
+                                      if (mins > 0) return `${mins}m`;
+                                      return `${secs}s`;
+                                    })()
+                                  : 'Lap Button'}
+                            </Badge>
+                          )}
                         </div>
-
-                        {/* Exercises and Add button - only show when expanded */}
-                        {!isSupersetCollapsed && (
-                          <>
-                            <ExerciseDropZone
-                              blockIdx={blockIdx}
-                              exercises={superset.exercises || []}
-                              onDrop={(item, targetIdx) => {
-                                // Handle drop into superset - pass supersetIdx to handleExerciseDrop
-                                onExerciseDrop(item, targetIdx, supersetIdx);
-                              }}
-                              onEdit={(idx) => {
-                                // Edit exercise in superset - pass supersetIdx
-                                onEditExercise(idx, supersetIdx);
-                              }}
-                              onDelete={(idx) => {
-                                // Delete exercise from superset - pass supersetIdx
-                                onDeleteExercise(idx, supersetIdx);
-                              }}
-                              label={`Superset ${supersetIdx + 1} Exercises`}
-                              supersetIdx={supersetIdx}
-                              effectiveRestType={effectiveRestType}
-                              effectiveRestSec={effectiveRestSec}
-                              isInSuperset={true}  // Rest happens after superset, not after each set
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onAddExerciseToSuperset(supersetIdx)}
-                              className="w-full gap-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Add Exercise to Superset
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteSuperset(supersetIdx);
+                          }}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
+
+                      {/* Exercises inside superset — only when expanded */}
+                      {!isSupersetCollapsed && (
+                        <>
+                          <DroppableSuperset
+                            id={superset.id || `superset-${supersetIdx}`}
+                            exerciseIds={(superset.exercises || []).map(e => e.id)}
+                            isEmpty={(superset.exercises || []).length === 0}
+                          >
+                            {(superset.exercises || []).map((exercise, exerciseIdx) => (
+                              <SortableExercise
+                                key={exercise.id}
+                                exercise={exercise}
+                                blockIdx={blockIdx}
+                                exerciseIdx={exerciseIdx}
+                                supersetIdx={supersetIdx}
+                                onEdit={() => onEditExercise(exerciseIdx, supersetIdx)}
+                                onDelete={() => onDeleteExercise(exerciseIdx, supersetIdx)}
+                                effectiveRestType={effectiveRestType}
+                                effectiveRestSec={effectiveRestSec}
+                                isInSuperset={true}
+                              />
+                            ))}
+                          </DroppableSuperset>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onAddExerciseToSuperset(supersetIdx)}
+                            className="w-full gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add Exercise to Superset
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Block-level exercises (all when no supersets; index 1+ when supersets exist) */}
+            <div>
+              {afterExercises.length > 0 && hasSupersets && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <Layers className="w-4 h-4" />
+                  <span>Exercises</span>
+                </div>
+              )}
+              <SortableContext
+                items={afterExercises.map(e => e.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className={`space-y-2 min-h-[50px] rounded-lg ${afterExercises.length === 0 ? 'border-2 border-dashed border-transparent' : ''}`}>
+                  {afterExercises.length === 0 && !hasSupersets && (
+                    <div className="text-center text-sm text-muted-foreground py-4">
+                      Drop exercise here or click Add Exercise
+                    </div>
+                  )}
+                  {afterExercises.map((exercise, relIdx) => {
+                    // Map relative index back to actual index in block.exercises
+                    const actualIdx = hasSupersets ? relIdx + 1 : relIdx;
+                    return (
+                      <SortableExercise
+                        key={exercise.id}
+                        exercise={exercise}
+                        blockIdx={blockIdx}
+                        exerciseIdx={actualIdx}
+                        onEdit={() => onEditExercise(actualIdx)}
+                        onDelete={() => onDeleteExercise(actualIdx)}
+                        effectiveRestType={effectiveRestType}
+                        effectiveRestSec={effectiveRestSec}
+                        isInSuperset={false}
+                      />
                     );
                   })}
                 </div>
-              )}
+              </SortableContext>
+            </div>
 
-              {/* Block-level exercises - show AFTER supersets (index 1+). We preserve the
-                  array order; no extra sorting in the UI. */}
-              <div>
-                <ExerciseDropZone
-                  blockIdx={blockIdx}
-                  exercises={(block.exercises || [])
-                    .slice((block.supersets || []).length > 0 ? 1 : 0)
-                    .filter(ex => ex != null)}
-                  onDrop={(item) => {
-                    // When dropping below supersets, append to the end of all block-level exercises
-                    // This ensures it goes after supersets in the UI
-                    const finalTargetIdx = (block.exercises || []).length;
-                    onExerciseDrop(item, finalTargetIdx);
-                  }}
-                  onEdit={(idx) => {
-                    const baseIdx = (block.supersets || []).length > 0 ? 1 : 0;
-                    // Map filtered index back to original array index
-                    const filteredSlice = (block.exercises || []).slice(baseIdx).filter(ex => ex != null);
-                    const originalSlice = (block.exercises || []).slice(baseIdx);
-                    // Find the original index by counting non-null exercises up to idx
-                    let count = 0;
-                    let actualIdx = baseIdx;
-                    for (let i = 0; i < originalSlice.length; i++) {
-                      if (originalSlice[i] != null) {
-                        if (count === idx) {
-                          actualIdx = baseIdx + i;
-                          break;
-                        }
-                        count++;
-                      }
-                    }
-                    onEditExercise(actualIdx);
-                  }}
-                  onDelete={(idx) => {
-                    const baseIdx = (block.supersets || []).length > 0 ? 1 : 0;
-                    // Map filtered index back to original array index
-                    const originalSlice = (block.exercises || []).slice(baseIdx);
-                    let count = 0;
-                    let actualIdx = baseIdx;
-                    for (let i = 0; i < originalSlice.length; i++) {
-                      if (originalSlice[i] != null) {
-                        if (count === idx) {
-                          actualIdx = baseIdx + i;
-                          break;
-                        }
-                        count++;
-                      }
-                    }
-                    onDeleteExercise(actualIdx);
-                  }}
-                  label={
-                    (block.exercises || []).filter(ex => ex != null).length >
-                    ((block.supersets || []).length > 0 ? 1 : 0)
-                      ? 'Exercises'
-                      : undefined
-                  }
-                  supersetIdx={undefined}
-                  effectiveRestType={effectiveRestType}
-                  effectiveRestSec={effectiveRestSec}
-                  isInSuperset={false}
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-2 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onAddExercise}
-                  className="flex-1 gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Exercise
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onAddSuperset}
-                  className="flex-1 gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Superset
-                </Button>
-              </div>
-            </CardContent>
-          )}
-        </Card>
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onAddExercise}
+                className="flex-1 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Exercise
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onAddSuperset}
+                className="flex-1 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Superset
+              </Button>
+            </div>
+          </CardContent>
+        )}
+      </Card>
       </div>
     </div>
   );
@@ -824,11 +716,11 @@ export function StructureWorkout({
         blocks: []
       };
     }
-    
+
     const hasAllIds = workout.blocks.every(b => {
       if (!b || !b.id) return false;
       const exercisesHaveIds = b.exercises && Array.isArray(b.exercises) && b.exercises.every(ex => ex && ex.id);
-      const supersetsHaveIds = !b.supersets || (Array.isArray(b.supersets) && b.supersets.every(ss => 
+      const supersetsHaveIds = !b.supersets || (Array.isArray(b.supersets) && b.supersets.every(ss =>
         ss && ss.id && ss.exercises && Array.isArray(ss.exercises) && ss.exercises.every(ex => ex && ex.id)
       ));
       return exercisesHaveIds && supersetsHaveIds;
@@ -886,146 +778,75 @@ export function StructureWorkout({
   const [skippedCooldown, setSkippedCooldown] = useState(false);
   const [skippedRest, setSkippedRest] = useState(false);
 
-  // Legacy workoutWarmup migration removed — each workout starts fresh.
-  // Warmup blocks are added explicitly by the user via the suggestion strip.
+  // Active drag item for DragOverlay ghost preview
+  const [activeDragItem, setActiveDragItem] = useState<{
+    type: 'block' | 'exercise' | 'superset-exercise';
+    label: string;
+  } | null>(null);
 
   const availableDevices = getDevicesByIds(userSelectedDevices);
 
-  // Handle block drag and drop
-  const handleBlockDrop = (draggedIdx: number, targetIdx: number) => {
-    if (draggedIdx === targetIdx) return;
-    
-    const newWorkout = cloneWorkout(workoutWithIds);
-    const [draggedBlock] = newWorkout.blocks.splice(draggedIdx, 1);
-    
-    // Adjust target index if dragging down
-    const adjustedTargetIdx = draggedIdx < targetIdx ? targetIdx - 1 : targetIdx;
-    
-    newWorkout.blocks.splice(adjustedTargetIdx, 0, draggedBlock);
-    onWorkoutChange(newWorkout);
+  // ── Drag start: record active item for DragOverlay ───────────────────────
+  const handleDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as DraggableData | undefined;
+    if (!data) return;
+
+    if (data.type === 'block') {
+      const block = workoutWithIds.blocks[data.blockIdx];
+      setActiveDragItem({ type: 'block', label: block?.label ?? 'Block' });
+    } else if (data.type === 'exercise') {
+      const exercise = workoutWithIds.blocks[data.blockIdx]?.exercises?.[data.exerciseIdx];
+      setActiveDragItem({ type: 'exercise', label: exercise?.name ?? 'Exercise' });
+    } else if (data.type === 'superset-exercise') {
+      const exercise = workoutWithIds.blocks[data.blockIdx]?.supersets?.[data.supersetIdx]?.exercises?.[data.exerciseIdx];
+      setActiveDragItem({ type: 'superset-exercise', label: exercise?.name ?? 'Exercise' });
+    }
   };
 
-  // Industry-standard: Use indices from DraggableExerciseData instead of re-searching arrays by id/name
-  // Perform immutable updates via clone helpers
-  // Correctly adjust target index when moving within the same container
-  const handleExerciseDrop = (
-    item: DraggableExerciseData,
-    targetBlockIdx: number,
-    rawTargetExerciseIdx: number,
-    targetSupersetIdx?: number
-  ) => {
-    const currentWorkout: WorkoutStructure | undefined = workout || workoutWithIds;
-    if (!currentWorkout) return;
+  // ── Drag end: single unified handler for blocks and exercises ─────────────
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragItem(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const newWorkout = cloneWorkout(currentWorkout);
+    const activeData = active.data.current as DraggableData | undefined;
+    if (!activeData) return;
 
-    const sourceBlockIdx = item.blockIdx;
-    const sourceSupersetIdx = item.supersetIdx;
-    const sourceExerciseIdx = item.exerciseIdx;
+    const newWorkout = cloneWorkout(workoutWithIds);
 
-    const sourceBlock = newWorkout.blocks[sourceBlockIdx];
-    const targetBlock = newWorkout.blocks[targetBlockIdx];
-
-    if (!sourceBlock || !targetBlock) {
-      console.warn('handleExerciseDrop: invalid block index', {
-        sourceBlockIdx,
-        targetBlockIdx,
-      });
+    if (activeData.type === 'block') {
+      const oldIdx = newWorkout.blocks.findIndex(b => b.id === String(active.id));
+      const newIdx = newWorkout.blocks.findIndex(b => b.id === String(over.id));
+      if (oldIdx !== -1 && newIdx !== -1) {
+        newWorkout.blocks = arrayMove(newWorkout.blocks, oldIdx, newIdx);
+        onWorkoutChange(newWorkout);
+      }
       return;
     }
 
-    let movedExercise: Exercise | undefined;
-
-    // 1) Remove from source
-    if (sourceSupersetIdx !== undefined && sourceSupersetIdx !== null) {
-      const sourceSuperset = sourceBlock.supersets?.[sourceSupersetIdx];
-      if (!sourceSuperset || !sourceSuperset.exercises) {
-        console.warn('handleExerciseDrop: invalid source superset', {
-          sourceSupersetIdx,
-        });
-        return;
+    if (activeData.type === 'exercise') {
+      const block = newWorkout.blocks[activeData.blockIdx];
+      if (!block?.exercises) return;
+      const oldIdx = block.exercises.findIndex(e => e?.id === String(active.id));
+      const newIdx = block.exercises.findIndex(e => e?.id === String(over.id));
+      if (oldIdx !== -1 && newIdx !== -1) {
+        block.exercises = arrayMove(block.exercises, oldIdx, newIdx);
+        onWorkoutChange(newWorkout);
       }
-      movedExercise = sourceSuperset.exercises[sourceExerciseIdx];
-      if (!movedExercise) {
-        console.warn('handleExerciseDrop: no exercise at source index', {
-          sourceExerciseIdx,
-        });
-        return;
-      }
-      sourceSuperset.exercises.splice(sourceExerciseIdx, 1);
-    } else {
-      if (!sourceBlock.exercises) {
-        console.warn('handleExerciseDrop: source block has no exercises');
-        return;
-      }
-      movedExercise = sourceBlock.exercises[sourceExerciseIdx];
-      if (!movedExercise) {
-        console.warn('handleExerciseDrop: no exercise at source index', {
-          sourceExerciseIdx,
-        });
-        return;
-      }
-      sourceBlock.exercises.splice(sourceExerciseIdx, 1);
-    }
-
-    // Safety check
-    if (!movedExercise) {
-      console.warn('handleExerciseDrop: movedExercise is undefined after removal');
       return;
     }
 
-    // 2) Insert into target
-    if (targetSupersetIdx !== undefined && targetSupersetIdx !== null) {
-      // Ensure superset exists
-      if (!targetBlock.supersets) {
-        targetBlock.supersets = [];
+    if (activeData.type === 'superset-exercise') {
+      const superset = newWorkout.blocks[activeData.blockIdx]?.supersets?.[activeData.supersetIdx];
+      if (!superset?.exercises) return;
+      const oldIdx = superset.exercises.findIndex(e => e?.id === String(active.id));
+      const newIdx = superset.exercises.findIndex(e => e?.id === String(over.id));
+      if (oldIdx !== -1 && newIdx !== -1) {
+        superset.exercises = arrayMove(superset.exercises, oldIdx, newIdx);
+        onWorkoutChange(newWorkout);
       }
-      if (!targetBlock.supersets[targetSupersetIdx]) {
-        targetBlock.supersets[targetSupersetIdx] = {
-          id: generateId(),
-          exercises: [],
-          rest_between_sec: 60,
-        };
-      }
-      const targetSuperset = targetBlock.supersets[targetSupersetIdx];
-      if (!targetSuperset.exercises) {
-        targetSuperset.exercises = [];
-      }
-
-      let targetExerciseIdx = rawTargetExerciseIdx;
-
-      // Adjust for moving within the same superset container
-      const movingWithinSameSuperset =
-        sourceBlockIdx === targetBlockIdx &&
-        sourceSupersetIdx !== undefined &&
-        sourceSupersetIdx === targetSupersetIdx;
-
-      if (movingWithinSameSuperset && sourceExerciseIdx < rawTargetExerciseIdx) {
-        targetExerciseIdx = rawTargetExerciseIdx - 1;
-      }
-
-      targetExerciseIdx = clamp(targetExerciseIdx, 0, targetSuperset.exercises.length);
-      targetSuperset.exercises.splice(targetExerciseIdx, 0, movedExercise);
-    } else {
-      if (!targetBlock.exercises) {
-        targetBlock.exercises = [];
-      }
-
-      let targetExerciseIdx = rawTargetExerciseIdx;
-
-      // Adjust for moving within the same block-level exercises container
-      const movingWithinSameBlockExercises =
-        sourceBlockIdx === targetBlockIdx && (sourceSupersetIdx === undefined || sourceSupersetIdx === null);
-
-      if (movingWithinSameBlockExercises && sourceExerciseIdx < rawTargetExerciseIdx) {
-        targetExerciseIdx = rawTargetExerciseIdx - 1;
-      }
-
-      targetExerciseIdx = clamp(targetExerciseIdx, 0, targetBlock.exercises.length);
-      targetBlock.exercises.splice(targetExerciseIdx, 0, movedExercise);
+      return;
     }
-
-    onWorkoutChange(newWorkout);
   };
 
   const updateExercise = (blockIdx: number, exerciseIdx: number, updates: Partial<Exercise>, supersetIdx?: number) => {
@@ -1060,7 +881,7 @@ export function StructureWorkout({
 
   const deleteExercise = (blockIdx: number, exerciseIdx: number, supersetIdx?: number) => {
     const newWorkout = cloneWorkout(workoutWithIds);
-    
+
     if (supersetIdx !== undefined) {
       // Delete exercise from superset
       if (newWorkout.blocks[blockIdx].supersets?.[supersetIdx]?.exercises) {
@@ -1072,7 +893,7 @@ export function StructureWorkout({
         newWorkout.blocks[blockIdx].exercises.splice(exerciseIdx, 1);
       }
     }
-    
+
     onWorkoutChange(newWorkout);
   };
 
@@ -1222,8 +1043,14 @@ export function StructureWorkout({
   const showCooldownStrip = hasAnyBlock && !hasCooldownBlock && !skippedCooldown;
   const showRestStrip = hasAnyBlock && !hasDefaultRest && !skippedRest;
 
+  const blockIds = (workoutWithIds.blocks || []).map(b => b.id);
+
   return (
-    <DndProvider backend={HTML5Backend}>
+    <DndContext
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -1307,34 +1134,34 @@ export function StructureWorkout({
                 <p className="mb-2">No blocks yet. Click "Add Block" to get started.</p>
               </div>
             ) : (
-              workoutWithIds.blocks.map((block, blockIdx) => (
-                <DraggableBlock
-                  key={block.id || blockIdx}
-                  block={block}
-                  blockIdx={blockIdx}
-                  workoutSettings={workoutWithIds.settings}
-                  onBlockDrop={handleBlockDrop}
-                  onExerciseDrop={(item, targetIdx, targetSupersetIdx) => handleExerciseDrop(item, blockIdx, targetIdx, targetSupersetIdx)}
-                  onEditExercise={(exerciseIdx, supersetIdx) => setEditingExercise({ blockIdx, exerciseIdx, supersetIdx })}
-                  onDeleteExercise={(exerciseIdx, supersetIdx) => deleteExercise(blockIdx, exerciseIdx, supersetIdx)}
-                  onAddExercise={() => {
-                    setAddingToBlock(blockIdx);
-                    setAddingToSuperset(null);
-                    setShowExerciseSearch(true);
-                  }}
-                  onAddExerciseToSuperset={(supersetIdx) => {
-                    setAddingToBlock(blockIdx);
-                    setAddingToSuperset({ blockIdx, supersetIdx });
-                    setShowExerciseSearch(true);
-                  }}
-                  onAddSuperset={() => addSuperset(blockIdx)}
-                  onDeleteSuperset={(supersetIdx) => deleteSuperset(blockIdx, supersetIdx)}
-                  onUpdateBlock={(updates) => updateBlock(blockIdx, updates)}
-                  onEditBlock={() => setEditingBlockIdx(blockIdx)}
-                  onDeleteBlock={() => deleteBlock(blockIdx)}
-                  collapseSignal={collapseSignal}
-                />
-              ))
+              <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
+                {workoutWithIds.blocks.map((block, blockIdx) => (
+                  <SortableBlock
+                    key={block.id || blockIdx}
+                    block={block}
+                    blockIdx={blockIdx}
+                    workoutSettings={workoutWithIds.settings}
+                    onEditExercise={(exerciseIdx, supersetIdx) => setEditingExercise({ blockIdx, exerciseIdx, supersetIdx })}
+                    onDeleteExercise={(exerciseIdx, supersetIdx) => deleteExercise(blockIdx, exerciseIdx, supersetIdx)}
+                    onAddExercise={() => {
+                      setAddingToBlock(blockIdx);
+                      setAddingToSuperset(null);
+                      setShowExerciseSearch(true);
+                    }}
+                    onAddExerciseToSuperset={(supersetIdx) => {
+                      setAddingToBlock(blockIdx);
+                      setAddingToSuperset({ blockIdx, supersetIdx });
+                      setShowExerciseSearch(true);
+                    }}
+                    onAddSuperset={() => addSuperset(blockIdx)}
+                    onDeleteSuperset={(supersetIdx) => deleteSuperset(blockIdx, supersetIdx)}
+                    onUpdateBlock={(updates) => updateBlock(blockIdx, updates)}
+                    onEditBlock={() => setEditingBlockIdx(blockIdx)}
+                    onDeleteBlock={() => deleteBlock(blockIdx)}
+                    collapseSignal={collapseSignal}
+                  />
+                ))}
+              </SortableContext>
             )}
           </div>
         </div>
@@ -1570,13 +1397,13 @@ export function StructureWorkout({
           const currentExercise = supersetIdx !== undefined
             ? workoutWithIds.blocks[blockIdx]?.supersets?.[supersetIdx]?.exercises?.[exerciseIdx]
             : workoutWithIds.blocks[blockIdx]?.exercises[exerciseIdx];
-          
+
           if (!currentExercise) {
             // Exercise was deleted, close dialog
             setEditingExercise(null);
             return null;
           }
-          
+
           return (
             <EditExerciseDialog
               key={`${blockIdx}-${exerciseIdx}-${supersetIdx ?? 'block'}`}
@@ -1696,6 +1523,28 @@ export function StructureWorkout({
         />
 
       </div>
-    </DndProvider>
+
+      {/* DragOverlay — renders outside SortableContexts for clean ghost preview */}
+      <DragOverlay>
+        {activeDragItem?.type === 'block' && (
+          <div className="opacity-90 shadow-xl rotate-1 scale-95">
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <GripVertical className="w-5 h-5 text-muted-foreground" />
+                <span className="font-medium text-sm">{activeDragItem.label}</span>
+              </div>
+            </Card>
+          </div>
+        )}
+        {(activeDragItem?.type === 'exercise' || activeDragItem?.type === 'superset-exercise') && (
+          <div className="opacity-90 shadow-lg">
+            <div className="flex items-center gap-2 p-3 border rounded-lg bg-background">
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium text-sm">{activeDragItem.label}</span>
+            </div>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   );
 }
