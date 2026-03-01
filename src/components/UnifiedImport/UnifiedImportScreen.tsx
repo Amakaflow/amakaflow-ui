@@ -166,14 +166,14 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
         setMappingColumns([]);
         setMappingPatterns([]);
       }
+      setPhase('column-mapping');
     } catch {
       setMappingColumns([]);
       setMappingPatterns([]);
+      toast.error('Could not read file — please try again');
     } finally {
       setMappingLoading(false);
     }
-
-    setPhase('column-mapping');
   };
 
   // ── Phase: processing ──────────────────────────────────────────────────────

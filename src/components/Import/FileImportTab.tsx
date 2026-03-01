@@ -21,7 +21,7 @@ export function FileImportTab({ onFilesDetected, disabled = false }: FileImportT
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Upload an Excel, CSV, or JSON file. You'll match columns before importing.
+        Upload an image or PDF of your workout. We'll read it for you.
       </p>
 
       <div
@@ -41,11 +41,11 @@ export function FileImportTab({ onFilesDetected, disabled = false }: FileImportT
       >
         <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
         <p className="text-sm font-medium">Drop files here or click to browse</p>
-        <p className="text-xs text-muted-foreground mt-1">Excel (.xlsx, .xls), CSV, JSON</p>
+        <p className="text-xs text-muted-foreground mt-1">Images (PNG, JPG) or PDF files</p>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,.csv,.json,.txt"
+          accept="image/*,application/pdf"
           multiple
           disabled={disabled}
           className="hidden"
