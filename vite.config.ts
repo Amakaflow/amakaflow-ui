@@ -46,6 +46,15 @@ export default defineConfig({
   build: {
     target: 'esnext',
     outDir: 'build',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-recharts': ['recharts'],
+          'vendor-sentry': ['@sentry/react', '@sentry/browser'],
+          'vendor-lottie': ['lottie-react'],
+        },
+      },
+    },
   },
   server: {
     port: 3000,

@@ -120,7 +120,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click the delete button
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Assert - dialog should be visible
@@ -153,7 +153,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
         expect(screen.getByText('Test Workout 1')).toBeInTheDocument();
       });
 
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Assert - check both buttons exist
@@ -187,7 +187,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear
@@ -229,7 +229,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear
@@ -271,7 +271,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear

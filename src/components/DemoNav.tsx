@@ -58,7 +58,7 @@ export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
     <>
       <button
         onClick={() => setOpen(prev => !prev)}
-        className="fixed bottom-4 right-4 z-50 bg-orange-500 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg hover:bg-orange-600 transition-colors"
+        className="fixed bottom-4 right-4 z-50 bg-orange-700 text-white text-xs font-bold px-3 py-2 rounded-full shadow-lg hover:bg-orange-800 transition-colors"
         title="Demo Nav (Shift+D)"
       >
         DEMO

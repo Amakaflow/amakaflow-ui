@@ -889,6 +889,7 @@ export function UnifiedWorkouts({
             className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <select
+            aria-label="Filter by source"
             value={sourceFilter}
             onChange={(e) => {
               setSourceFilter(e.target.value as 'all' | 'history' | 'video');
@@ -901,6 +902,7 @@ export function UnifiedWorkouts({
             <option value="video">Follow Along</option>
           </select>
           <select
+            aria-label="Filter by platform"
             value={platformFilter}
             onChange={(e) => {
               setPlatformFilter(e.target.value);
@@ -923,6 +925,7 @@ export function UnifiedWorkouts({
             ))}
           </select>
           <select
+            aria-label="Filter by category"
             value={categoryFilter}
             onChange={(e) => {
               setCategoryFilter(e.target.value);
@@ -938,6 +941,7 @@ export function UnifiedWorkouts({
             ))}
           </select>
           <select
+            aria-label="Filter by sync status"
             value={syncFilter}
             onChange={(e) => {
               setSyncFilter(e.target.value as 'all' | 'synced' | 'not-synced');
@@ -1010,6 +1014,7 @@ export function UnifiedWorkouts({
           </DropdownMenu>
           <div className="h-4 border-l mx-1" /> {/* Divider */}
           <select
+            aria-label="Sort by"
             value={sortOption}
             onChange={(e) => {
               setSortOption(e.target.value as SortOption);
@@ -1164,7 +1169,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={(e) => handleFavoriteToggle(workout, e)}
                       className="h-8 w-8 p-0"
-                      title={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      aria-label={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                     >
                       <Star
                         className={`w-4 h-4 ${
@@ -1179,7 +1184,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={() => handleView(workout)}
                       className="h-8 w-8 p-0"
-                      title="View"
+                      aria-label="View workout"
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
@@ -1188,7 +1193,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={() => handleEdit(workout)}
                       className="h-8 w-8 p-0"
-                      title="Edit"
+                      aria-label="Edit workout"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -1198,7 +1203,7 @@ export function UnifiedWorkouts({
                         variant="ghost"
                         onClick={() => handleLoad(workout)}
                         className="h-8 w-8 p-0"
-                        title="Load"
+                        aria-label="Load workout"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </Button>
@@ -1209,7 +1214,7 @@ export function UnifiedWorkouts({
                         variant="ghost"
                         onClick={() => window.open(workout.sourceUrl, '_blank')}
                         className="h-8 w-8 p-0"
-                        title="Open video"
+                        aria-label="Open video source"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Button>
@@ -1220,7 +1225,7 @@ export function UnifiedWorkouts({
                           size="sm"
                           variant="ghost"
                           className="h-8 w-8 p-0"
-                          title="Export"
+                          aria-label="Export workout"
                         >
                           <Download className="w-4 h-4" />
                         </Button>
@@ -1266,7 +1271,7 @@ export function UnifiedWorkouts({
                       onClick={() => handleDeleteClick(workout.id)}
                       disabled={deletingId === workout.id}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title="Delete"
+                      aria-label="Delete workout"
                       data-testid={`workout-delete-${workout.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1324,7 +1329,7 @@ export function UnifiedWorkouts({
                           {CATEGORY_DISPLAY_NAMES[workout.category]}
                         </Badge>
                         {hasSyncStatus && (
-                          <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
+                          <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium">
                             <CheckCircle2 className="w-4 h-4" />
                             Synced
                           </div>
