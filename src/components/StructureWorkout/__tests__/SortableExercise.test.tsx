@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { SortableExercise } from '../../SortableExercise';
+import { SortableExercise } from '../SortableExercise';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
-import { Exercise } from '../../../../types/workout';
+import { Exercise } from '../../../types/workout';
 
 const exercise: Exercise = {
   id: 'ex-1',
