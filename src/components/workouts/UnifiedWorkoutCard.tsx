@@ -351,6 +351,7 @@ export function UnifiedWorkoutCard({
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="More actions"
                     className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <MoreHorizontal className="h-4 w-4" />

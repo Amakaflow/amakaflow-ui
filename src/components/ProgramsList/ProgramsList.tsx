@@ -282,19 +282,26 @@ export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
           onViewDrafts={handleViewDrafts}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPrograms.map((program) => (
-            <ProgramCard
-              key={program.id}
-              program={program}
-              loadingAction={loadingActions[program.id]}
-              onView={() => onViewProgram(program.id)}
-              onActivate={() => handleActivate(program.id)}
-              onPause={() => handlePause(program.id)}
-              onDelete={() => handleDelete(program.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPrograms.map((program) => (
+              <ProgramCard
+                key={program.id}
+                program={program}
+                loadingAction={loadingActions[program.id]}
+                onView={() => onViewProgram(program.id)}
+                onActivate={() => handleActivate(program.id)}
+                onPause={() => handlePause(program.id)}
+                onDelete={() => handleDelete(program.id)}
+              />
+            ))}
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Button variant="outline" onClick={handleCreateProgram}>
+              Generate another program
+            </Button>
+          </div>
+        </>
       )}
 
       {/* Program Generation Wizard */}

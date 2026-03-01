@@ -225,11 +225,11 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
       <div className="flex justify-between text-sm">
         <span className="text-slate-300">
           <span className="text-white font-semibold">{avgHR || '--'}</span>{' '}
-          <span className="text-slate-400">AVG</span>
+          <span className="text-slate-400">bpm AVG</span>
         </span>
         <span className="text-slate-300">
           <span className="text-white font-semibold">{maxHR || '--'}</span>{' '}
-          <span className="text-slate-400">MAX</span>
+          <span className="text-slate-400">bpm MAX</span>
         </span>
       </div>
     </div>
@@ -438,7 +438,7 @@ function ExercisesTable({ intervals }: ExercisesTableProps) {
       {/* Table Header */}
       <div className="flex items-center py-3 px-4 bg-muted/30 text-xs text-muted-foreground uppercase tracking-wider border-b">
         <div style={{ width: 48 }}></div>
-        <div style={{ flex: 1 }}>SET # OLLB</div>
+        <div style={{ flex: 1 }}>Exercise</div>
         <div style={{ width: 70 }} className="text-center">SET</div>
         <div style={{ width: 80 }} className="text-center">Reps</div>
         <div style={{ width: 70 }} className="text-center">TIME</div>

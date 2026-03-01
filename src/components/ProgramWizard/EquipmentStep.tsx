@@ -8,7 +8,6 @@ import {
   ALL_EQUIPMENT,
   EQUIPMENT_LABELS_MAP,
 } from '@/types/program-wizard';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/components/ui/utils';
 
 const equipmentIcons: Record<EquipmentPreset, React.ComponentType<{ className?: string }>> = {
@@ -98,6 +97,13 @@ export function EquipmentStep() {
         })}
       </div>
 
+      {/* Validation hint when nothing selected */}
+      {!state.equipmentPreset && !state.useCustomEquipment && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Please select an equipment option to continue
+        </p>
+      )}
+
       {/* Custom Equipment Toggle */}
       <div className="border-t border-zinc-200 dark:border-zinc-700 pt-6">
         <button
@@ -110,10 +116,21 @@ export function EquipmentStep() {
               : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600'
           )}
         >
-          <Checkbox
-            checked={state.useCustomEquipment}
-            className="pointer-events-none"
-          />
+          <div
+            aria-hidden="true"
+            className={cn(
+              'w-4 h-4 rounded flex items-center justify-center border flex-shrink-0',
+              state.useCustomEquipment
+                ? 'border-zinc-900 bg-zinc-900 dark:border-zinc-100 dark:bg-zinc-100'
+                : 'border-zinc-300 dark:border-zinc-600'
+            )}
+          >
+            {state.useCustomEquipment && (
+              <svg className="w-3 h-3 text-white dark:text-zinc-900" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
           <div className="flex-1">
             <div
               className={cn(
@@ -153,13 +170,21 @@ export function EquipmentStep() {
                       : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600'
                   )}
                 >
-                  <Checkbox
-                    checked={isSelected}
+                  <div
+                    aria-hidden="true"
                     className={cn(
-                      'pointer-events-none',
-                      isSelected && 'border-white data-[state=checked]:bg-white data-[state=checked]:text-zinc-900 dark:border-zinc-900 dark:data-[state=checked]:bg-zinc-900 dark:data-[state=checked]:text-white'
+                      'w-4 h-4 rounded flex items-center justify-center border flex-shrink-0',
+                      isSelected
+                        ? 'border-white bg-white dark:border-zinc-900 dark:bg-zinc-900'
+                        : 'border-zinc-400 dark:border-zinc-500'
                     )}
-                  />
+                  >
+                    {isSelected && (
+                      <svg className="w-3 h-3 text-zinc-900 dark:text-white" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
                   <span className="truncate">{EQUIPMENT_LABELS_MAP[item] || item}</span>
                 </button>
               );

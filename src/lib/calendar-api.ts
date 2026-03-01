@@ -8,6 +8,30 @@ import { API_URLS } from './config';
 import { isDemoMode } from './demo-mode';
 import { sampleCalendarEvents, mockConnectedCalendars } from './calendar-mock-data';
 
+// Rebase demo events to the current week so the calendar shows populated data
+function rebaseDemoEvents(events: typeof sampleCalendarEvents): typeof sampleCalendarEvents {
+  if (events.length === 0) return events;
+  // Find the earliest date in the sample data
+  const dates = events.map((e) => e.date).sort();
+  const originDate = new Date(dates[0] + 'T00:00:00');
+  // Anchor to the most recent Sunday (start of current week)
+  const today = new Date();
+  const daysSinceSunday = today.getDay(); // 0 = Sunday
+  const currentWeekSunday = new Date(today);
+  currentWeekSunday.setDate(today.getDate() - daysSinceSunday);
+  currentWeekSunday.setHours(0, 0, 0, 0);
+  const offsetMs = currentWeekSunday.getTime() - originDate.getTime();
+  const offsetDays = Math.round(offsetMs / (1000 * 60 * 60 * 24));
+  return events.map((e) => {
+    const d = new Date(e.date + 'T00:00:00');
+    d.setDate(d.getDate() + offsetDays);
+    const rebased = d.toISOString().slice(0, 10);
+    return { ...e, date: rebased };
+  });
+}
+
+const DEMO_CALENDAR_EVENTS = rebaseDemoEvents(sampleCalendarEvents);
+
 // Use centralized API config
 const API_BASE_URL = API_URLS.CALENDAR;
 
@@ -129,7 +153,7 @@ class CalendarApiClient {
   // ==========================================
 
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
-    if (isDemoMode) return sampleCalendarEvents as any;
+    if (isDemoMode) return DEMO_CALENDAR_EVENTS as any;
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar?start=${start}&end=${end}`,
       { headers: this.getHeaders() }
