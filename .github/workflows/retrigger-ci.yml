@@ -2,7 +2,7 @@ name: Auto Retry Failed CI (Joshua PRs)
 
 on:
   workflow_run:
-    workflows: ["CI", "PR CI (Impacted)", "Validate Linear Ticket"]
+    workflows: ["CI", "PR CI (Impacted)", "Validate Linear Ticket", "Automatic Code Review"]
     types: [completed]
 
 jobs:
