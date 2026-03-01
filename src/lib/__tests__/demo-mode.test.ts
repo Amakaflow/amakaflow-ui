@@ -242,16 +242,31 @@ describe('workout-api demo intercept', () => {
 // ---------------------------------------------------------------------------
 
 describe('calendar-api demo intercept', () => {
+  // Helper to get current week's date range (Sunday to Saturday)
+  const getCurrentWeekRange = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const formatDate = (d: Date) => d.toISOString().slice(0, 10);
+    return { start: formatDate(weekStart), end: formatDate(weekEnd) };
+  };
+
   it('calendarApi.getEvents returns mock calendar events when isDemoMode=true', async () => {
     const { calendarApi } = await import('../calendar-api');
-    const result = await calendarApi.getEvents('2024-11-23', '2024-11-30');
+    const { start, end } = getCurrentWeekRange();
+    const result = await calendarApi.getEvents(start, end);
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeGreaterThan(0);
   });
 
   it('calendarApi.getEvents result items have required fields', async () => {
     const { calendarApi } = await import('../calendar-api');
-    const result = await calendarApi.getEvents('2024-11-23', '2024-11-30');
+    const { start, end } = getCurrentWeekRange();
+    const result = await calendarApi.getEvents(start, end);
     const first = result[0];
     expect(first).toHaveProperty('id');
     expect(first).toHaveProperty('title');

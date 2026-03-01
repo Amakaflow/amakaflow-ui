@@ -153,7 +153,12 @@ class CalendarApiClient {
   // ==========================================
 
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
-    if (isDemoMode) return DEMO_CALENDAR_EVENTS as any;
+    if (isDemoMode) {
+      // Filter demo events to only return those within the requested date range
+      return (DEMO_CALENDAR_EVENTS as any).filter(
+        (event: { date: string }) => event.date >= start && event.date <= end
+      );
+    }
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar?start=${start}&end=${end}`,
       { headers: this.getHeaders() }
