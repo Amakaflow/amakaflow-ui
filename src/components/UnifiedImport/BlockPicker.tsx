@@ -44,13 +44,14 @@ export function BlockPicker({
         {/* Left: source blocks */}
         <div className="space-y-4">
           {doneItems.map((item, workoutIndex) => {
-            const blocks: Array<{ id: string; label: string }> = item.workout?.blocks ?? [];
+            const blocks: Array<{ id: string; label: string; exercises?: unknown[] }> = item.workout?.blocks ?? [];
             return (
               <div key={item.queueId}>
                 <p className="text-sm font-medium mb-2">{item.workoutTitle}</p>
                 <div className="space-y-1">
                   {blocks.map((block, blockIndex) => {
                     const isSelected = selectedBlocks.some(s => s.blockId === block.id);
+                    const exerciseCount = block.exercises?.length ?? 0;
                     return (
                       <button
                         key={block.id}
@@ -70,7 +71,12 @@ export function BlockPicker({
                         )}
                       >
                         {isSelected && <Check className="w-3 h-3 text-primary shrink-0" />}
-                        {block.label ?? `Block ${blockIndex + 1}`}
+                        <span className="flex-1">{block.label ?? `Block ${blockIndex + 1}`}</span>
+                        {exerciseCount > 0 && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {exerciseCount} exercise{exerciseCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
