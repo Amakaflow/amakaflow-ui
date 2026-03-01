@@ -7,7 +7,6 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useBulkImport } from '../../context/BulkImportContext';
 import { useBulkImportApi } from '../../hooks/useBulkImportApi';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -40,6 +39,10 @@ import { ColumnMapping, MappingTargetField, DetectedPattern } from '../../types/
 
 interface MapStepProps {
   userId: string;
+  columns: ColumnMapping[];
+  patterns: DetectedPattern[];
+  loading: boolean;
+  onApply: (columns: ColumnMapping[]) => void;
 }
 
 // Field options for dropdown
@@ -80,11 +83,10 @@ const getConfidenceBg = (confidence: number) => {
   return 'bg-red-500/10';
 };
 
-export function MapStep({ userId }: MapStepProps) {
-  const { state, dispatch, goNext } = useBulkImport();
+export function MapStep({ userId, columns, patterns, loading, onApply }: MapStepProps) {
   const { applyColumnMappings } = useBulkImportApi({ userId });
 
-  const [localMappings, setLocalMappings] = useState<ColumnMapping[]>(state.mappings.columns);
+  const [localMappings, setLocalMappings] = useState<ColumnMapping[]>(columns);
 
   // Calculate if we have minimum required mappings
   const hasRequiredMappings = useMemo(() => {
@@ -111,14 +113,14 @@ export function MapStep({ userId }: MapStepProps) {
 
   // Reset to auto-detected mappings
   const resetMappings = useCallback(() => {
-    setLocalMappings(state.mappings.columns);
-  }, [state.mappings.columns]);
+    setLocalMappings(columns);
+  }, [columns]);
 
   // Apply mappings and proceed
   const handleApplyMappings = useCallback(async () => {
-    dispatch({ type: 'SET_COLUMN_MAPPINGS', columns: localMappings, patterns: state.mappings.patterns });
     await applyColumnMappings(localMappings);
-  }, [localMappings, state.mappings.patterns, dispatch, applyColumnMappings]);
+    onApply(localMappings);
+  }, [localMappings, applyColumnMappings, onApply]);
 
   // If no columns detected, file was parsed directly - allow skipping
   if (localMappings.length === 0) {
@@ -130,7 +132,7 @@ export function MapStep({ userId }: MapStepProps) {
           Your file format was recognized and parsed directly.
           No manual column mapping is needed.
         </p>
-        <Button onClick={goNext} size="lg" className="h-12">
+        <Button onClick={() => onApply([])} size="lg" className="h-12">
           Continue to Match Exercises
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
@@ -255,11 +257,11 @@ export function MapStep({ userId }: MapStepProps) {
       </div>
 
       {/* Detected Patterns */}
-      {state.mappings.patterns.length > 0 && (
+      {patterns.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-muted-foreground">Detected Patterns</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {state.mappings.patterns.map((pattern, index) => {
+            {patterns.map((pattern, index) => {
               const config = patternLabels[pattern.patternType];
               if (!config) return null;
 
@@ -307,11 +309,11 @@ export function MapStep({ userId }: MapStepProps) {
       {/* Apply Button */}
       <Button
         onClick={handleApplyMappings}
-        disabled={!hasRequiredMappings || state.loading}
+        disabled={!hasRequiredMappings || loading}
         className="w-full h-12 text-base"
         size="lg"
       >
-        {state.loading ? (
+        {loading ? (
           <>
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Applying Mappings...

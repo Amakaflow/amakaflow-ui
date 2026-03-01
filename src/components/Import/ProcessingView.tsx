@@ -1,7 +1,7 @@
 import { Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import type { ProcessedItem, QueueItem } from '../../types/unified-import';
+import type { ProcessedItem, QueueItem } from '../../types/import';
 
 interface ProcessingViewProps {
   queueItems: QueueItem[];
@@ -34,6 +34,7 @@ function StatusBadge({ status }: { status: ProcessedItem['status'] }) {
         </Badge>
       );
     case 'failed':
+    case 'error':
       return (
         <Badge variant="destructive" className="gap-1">
           <XCircle className="w-3 h-3" />
@@ -59,7 +60,7 @@ export function ProcessingView({ queueItems, processedItems, onRetry }: Processi
           >
             <span className="flex-1 text-sm truncate">{item.label}</span>
             <StatusBadge status={status} />
-            {status === 'failed' && (
+            {(status === 'failed' || status === 'error') && (
               <Button variant="ghost" size="sm" onClick={() => onRetry(item.id)}>
                 Retry
               </Button>

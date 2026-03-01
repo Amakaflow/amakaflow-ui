@@ -43,8 +43,8 @@ export const MobileCompanion = lazy(() =>
   import('../components/MobileCompanion').then(m => ({ default: m.MobileCompanion }))
 );
 
-export const UnifiedImportScreen = lazy(() =>
-  import('../components/UnifiedImport').then(m => ({ default: m.UnifiedImportScreen }))
+export const ImportScreen = lazy(() =>
+  import('../components/Import').then(m => ({ default: m.ImportScreen }))
 );
 
 export const HelpPage = lazy(() =>
