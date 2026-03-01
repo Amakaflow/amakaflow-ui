@@ -30,6 +30,7 @@ export function NavBar({
   user,
   currentView,
   stravaConnected,
+  hasClerk,
   onNavigate,
 }: NavBarProps) {
   return (
@@ -187,7 +188,7 @@ export function NavBar({
               <span className="text-sm font-medium text-muted-foreground px-2">
                 {user?.name ?? 'Demo User'}
               </span>
-            ) : (
+            ) : hasClerk ? (
               <>
                 <SignedIn><UserButton afterSignOutUrl="/" /></SignedIn>
                 <SignedOut>
@@ -195,7 +196,7 @@ export function NavBar({
                   <SignUpButton mode="modal"><Button size="sm">Sign up</Button></SignUpButton>
                 </SignedOut>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
