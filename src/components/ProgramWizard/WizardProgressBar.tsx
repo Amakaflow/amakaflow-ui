@@ -46,18 +46,21 @@ export function WizardProgressBar() {
               )}
             >
               {/* Step circle */}
-              <div
-                className={cn(
-                  'flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium transition-colors',
-                  isCompleted && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
-                  isActive && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
-                  isPending && 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
-                )}
-              >
-                {isCompleted ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <span>{index + 1}</span>
+              <div className="relative flex items-center justify-center w-7 h-7">
+                {/* Step number */}
+                <div
+                  className={cn(
+                    'absolute flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium transition-colors',
+                    isCompleted && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
+                    isActive && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
+                    isPending && 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
+                  )}
+                >
+                  {index + 1}
+                </div>
+                {/* Checkmark overlay for completed steps */}
+                {isCompleted && (
+                  <Check className="w-3.5 h-3.5 text-white dark:text-zinc-900 absolute" />
                 )}
               </div>
 
