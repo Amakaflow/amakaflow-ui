@@ -1169,6 +1169,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={(e) => handleFavoriteToggle(workout, e)}
                       className="h-8 w-8 p-0"
+                      title={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                       aria-label={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                     >
                       <Star
@@ -1184,6 +1185,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={() => handleView(workout)}
                       className="h-8 w-8 p-0"
+                      title="View workout"
                       aria-label="View workout"
                     >
                       <Eye className="w-4 h-4" />
@@ -1193,6 +1195,7 @@ export function UnifiedWorkouts({
                       variant="ghost"
                       onClick={() => handleEdit(workout)}
                       className="h-8 w-8 p-0"
+                      title="Edit workout"
                       aria-label="Edit workout"
                     >
                       <Edit className="w-4 h-4" />
@@ -1203,6 +1206,7 @@ export function UnifiedWorkouts({
                         variant="ghost"
                         onClick={() => handleLoad(workout)}
                         className="h-8 w-8 p-0"
+                        title="Load workout"
                         aria-label="Load workout"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -1214,6 +1218,7 @@ export function UnifiedWorkouts({
                         variant="ghost"
                         onClick={() => window.open(workout.sourceUrl, '_blank')}
                         className="h-8 w-8 p-0"
+                        title="Open video source"
                         aria-label="Open video source"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -1225,6 +1230,7 @@ export function UnifiedWorkouts({
                           size="sm"
                           variant="ghost"
                           className="h-8 w-8 p-0"
+                          title="Export workout"
                           aria-label="Export workout"
                         >
                           <Download className="w-4 h-4" />
@@ -1271,6 +1277,7 @@ export function UnifiedWorkouts({
                       onClick={() => handleDeleteClick(workout.id)}
                       disabled={deletingId === workout.id}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Delete workout"
                       aria-label="Delete workout"
                       data-testid={`workout-delete-${workout.id}`}
                     >
