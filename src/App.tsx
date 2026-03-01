@@ -1610,9 +1610,13 @@ export default function App() {
         <div className="border-b bg-card">
           <div className="container mx-auto px-4 py-6">
             <div className="mb-6">
-              <h1 className="text-2xl">{isEditingFromHistory ? 'Edit Workout' : 'Create Workout'}</h1>
+              <h1 className="text-2xl">
+                {isEditingFromImport ? 'Review Imported Workout' : isEditingFromHistory ? 'Edit Workout' : 'Create Workout'}
+              </h1>
               <p className="text-sm text-muted-foreground">
-                {isEditingFromHistory 
+                {isEditingFromImport
+                  ? 'Review and adjust your imported workout before saving'
+                  : isEditingFromHistory
                   ? 'Edit your workout directly or re-validate if needed'
                   : 'Ingest → Structure → Validate → Export'}
               </p>
@@ -1685,31 +1689,34 @@ export default function App() {
           </Button>
         )}
         {currentView === 'workflow' && isEditingFromHistory && (
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => {
+              const destination = isEditingFromImport ? 'import' : 'history';
               // Check if workout has been modified
-              if (workout) {
+              if (workout && !workoutSaved) {
                 setConfirmDialog({
                   open: true,
                   title: 'Unsaved Changes',
                   description: 'Are you sure you want to go back? Any unsaved changes will be lost.',
                   onConfirm: () => {
-                    setCurrentView('history');
+                    setCurrentView(destination);
                     setIsEditingFromHistory(false);
+                    setIsEditingFromImport(false);
                     setEditingWorkoutId(null);
                   },
                 });
                 return;
               }
-              setCurrentView('history');
+              setCurrentView(destination);
               setIsEditingFromHistory(false);
+              setIsEditingFromImport(false);
               setEditingWorkoutId(null);
-            }} 
+            }}
             className="mb-6"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to History
+            {isEditingFromImport ? 'Back to Import' : 'Back to History'}
           </Button>
         )}
 
