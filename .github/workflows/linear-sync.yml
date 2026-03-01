@@ -44,16 +44,24 @@ jobs:
 
           echo "Ticket: $TICKET_ID | Action: $ACTION | Target: $TARGET_STATE"
 
-          ISSUE_QUERY=$(jq -n --argjson num "$TICKET_NUMBER" \
-            '{"query": "{ issues(filter: { number: { eq: \($num) }, team: { name: { eq: \"MyAmaka\" } } }) { nodes { id team { id } state { name } } } }"}')
-          ISSUE_RESP=$(curl -sf -X POST https://api.linear.app/graphql \
+          ISSUE_QUERY=$(jq -n --argjson num "$TICKET_NUMBER" '{"query": "{ issues(filter: { number: { eq: \($num) }, team: { name: { eq: \"MyAmaka\" } } }) { nodes { id team { id } state { name } } } }"}')
+          ISSUE_RESP=$(curl -s -w "\n%{http_code}" -X POST https://api.linear.app/graphql \
             -H "Authorization: $LINEAR_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$ISSUE_QUERY")
 
-          ISSUE_UUID=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['id'] if n else '')")
-          TEAM_ID=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['team']['id'] if n else '')")
-          CURRENT_STATE=$(echo "$ISSUE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['state']['name'] if n else '')")
+          HTTP_CODE=$(echo "$ISSUE_RESP" | tail -1)
+          ISSUE_BODY=$(echo "$ISSUE_RESP" | head -n -1)
+
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "Linear API returned HTTP $HTTP_CODE — skipping"
+            echo "Response: $ISSUE_BODY"
+            exit 0
+          fi
+
+          ISSUE_UUID=$(echo "$ISSUE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['id'] if n else '')")
+          TEAM_ID=$(echo "$ISSUE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['team']['id'] if n else '')")
+          CURRENT_STATE=$(echo "$ISSUE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('data',{}).get('issues',{}).get('nodes',[]); print(n[0]['state']['name'] if n else '')")
 
           if [[ -z "$ISSUE_UUID" ]]; then
             echo "Could not find $TICKET_ID in Linear — skipping"
@@ -65,33 +73,49 @@ jobs:
             exit 0
           fi
 
-          STATES_QUERY=$(jq -n --arg teamId "$TEAM_ID" \
-            '{"query": "{ workflowStates(filter: { team: { id: { eq: \($teamId) } } }) { nodes { id name } } }"}')
-          STATES_RESP=$(curl -sf -X POST https://api.linear.app/graphql \
+          STATES_QUERY=$(jq -n --arg teamId "$TEAM_ID" '{"query": "{ workflowStates(filter: { team: { id: { eq: \($teamId) } } }) { nodes { id name } } }"}')
+          STATES_RESP=$(curl -s -w "\n%{http_code}" -X POST https://api.linear.app/graphql \
             -H "Authorization: $LINEAR_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$STATES_QUERY")
 
-          STATE_UUID=$(echo "$STATES_RESP" | python3 -c "import sys,json; target=sys.argv[1]; d=json.load(sys.stdin); n=d.get('data',{}).get('workflowStates',{}).get('nodes',[]); m=[x for x in n if x['name']==target]; print(m[0]['id'] if m else '')" "$TARGET_STATE")
+          HTTP_CODE=$(echo "$STATES_RESP" | tail -1)
+          STATES_BODY=$(echo "$STATES_RESP" | head -n -1)
 
-          if [[ -z "$STATE_UUID" ]]; then
-            echo "State '$TARGET_STATE' not found in Linear"
-            exit 1
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "Linear API (states) returned HTTP $HTTP_CODE — skipping"
+            echo "Response: $STATES_BODY"
+            exit 0
           fi
 
-          UPDATE=$(jq -n --arg id "$ISSUE_UUID" --arg stateId "$STATE_UUID" \
-            '{"query": "mutation { issueUpdate(id: \($id), input: { stateId: \($stateId) }) { success issue { identifier state { name } } } }"}')
-          UPDATE_RESP=$(curl -sf -X POST https://api.linear.app/graphql \
+          STATE_UUID=$(echo "$STATES_BODY" | python3 -c "import sys,json; target=sys.argv[1]; d=json.load(sys.stdin); n=d.get('data',{}).get('workflowStates',{}).get('nodes',[]); m=[x for x in n if x['name']==target]; print(m[0]['id'] if m else '')" "$TARGET_STATE")
+
+          if [[ -z "$STATE_UUID" ]]; then
+            echo "State '$TARGET_STATE' not found in Linear team states — skipping"
+            exit 0
+          fi
+
+          UPDATE=$(jq -n --arg id "$ISSUE_UUID" --arg stateId "$STATE_UUID" '{"query": "mutation { issueUpdate(id: \($id), input: { stateId: \($stateId) }) { success issue { identifier state { name } } } }"}')
+          UPDATE_RESP=$(curl -s -w "\n%{http_code}" -X POST https://api.linear.app/graphql \
             -H "Authorization: $LINEAR_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$UPDATE")
 
-          SUCCESS=$(echo "$UPDATE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('data',{}).get('issueUpdate',{}).get('success') else 'false')")
+          HTTP_CODE=$(echo "$UPDATE_RESP" | tail -1)
+          UPDATE_BODY=$(echo "$UPDATE_RESP" | head -n -1)
+
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "Linear API (update) returned HTTP $HTTP_CODE — skipping"
+            echo "Response: $UPDATE_BODY"
+            exit 0
+          fi
+
+          SUCCESS=$(echo "$UPDATE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('data',{}).get('issueUpdate',{}).get('success') else 'false')")
 
           if [[ "$SUCCESS" == "true" ]]; then
-            NEW=$(echo "$UPDATE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('issueUpdate',{}).get('issue',{}).get('state',{}).get('name',''))")
+            NEW=$(echo "$UPDATE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('issueUpdate',{}).get('issue',{}).get('state',{}).get('name',''))")
             echo "✓ $TICKET_ID → '$NEW'"
           else
-            echo "✗ Update failed: $UPDATE_RESP"
+            echo "✗ Update failed: $UPDATE_BODY"
             exit 1
           fi

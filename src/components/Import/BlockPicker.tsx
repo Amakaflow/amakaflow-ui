@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Button } from '../ui/button';
-import { Check, GripVertical, X, Plus } from 'lucide-react';
+import { Check, GripVertical, X, Plus, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '../ui/utils';
 import {
   DndContext,
@@ -71,6 +72,17 @@ export function BlockPicker({
   onConfirm,
   onCancel,
 }: BlockPickerProps) {
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (e: React.MouseEvent, blockId: string) => {
+    e.stopPropagation();
+    setExpandedBlocks(prev => {
+      const next = new Set(prev);
+      next.has(blockId) ? next.delete(blockId) : next.add(blockId);
+      return next;
+    });
+  };
+
   const toggle = (block: SelectedBlock) => {
     const exists = selectedBlocks.some(s => s.blockId === block.blockId);
     if (exists) {
@@ -126,34 +138,82 @@ export function BlockPicker({
                     if (!block.id) return null;
                     const isSelected = selectedBlocks.some(s => s.blockId === block.id);
                     const exerciseCount = block.exercises?.length ?? 0;
+                    const isExpanded = expandedBlocks.has(block.id);
+                    const exercises = (block.exercises ?? []) as Array<{
+                      name: string;
+                      sets?: number;
+                      reps?: number | string;
+                      duration_sec?: number;
+                    }>;
                     return (
-                      <button
+                      <div
                         key={block.id}
-                        role="checkbox"
-                        aria-checked={isSelected}
-                        onClick={() =>
-                          toggle({
-                            workoutIndex,
-                            blockIndex,
-                            blockId: block.id,
-                            blockLabel: block.label ?? `Block ${blockIndex + 1}`,
-                          })
-                        }
                         className={cn(
-                          'w-full text-left px-3 py-2 rounded-md border text-sm flex items-center gap-2 transition-colors',
+                          'rounded-md border text-sm transition-colors',
                           isSelected
-                            ? 'border-primary bg-primary/10 font-medium'
+                            ? 'border-primary bg-primary/10'
                             : 'border-border hover:bg-muted/50'
                         )}
                       >
-                        {isSelected && <Check className="w-3 h-3 text-primary shrink-0" />}
-                        <span className="flex-1 truncate">{block.label ?? `Block ${blockIndex + 1}`}</span>
-                        {exerciseCount > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <button
+                            role="checkbox"
+                            aria-checked={isSelected}
+                            onClick={() =>
+                              toggle({
+                                workoutIndex,
+                                blockIndex,
+                                blockId: block.id,
+                                blockLabel: block.label ?? `Block ${blockIndex + 1}`,
+                              })
+                            }
+                            className="flex items-center gap-2 flex-1 text-left min-w-0"
+                          >
+                            {isSelected && <Check className="w-3 h-3 text-primary shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <span className={cn('block truncate', isSelected && 'font-medium')}>
+                                {block.label ?? `Block ${blockIndex + 1}`}
+                              </span>
+                              {exerciseCount > 0 && !isExpanded && (
+                                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                  {exercises.slice(0, 3).map(e => e.name).join(' · ')}
+                                  {exerciseCount > 3 && ` +${exerciseCount - 3} more`}
+                                </p>
+                              )}
+                            </div>
+                          </button>
                           <span className="text-xs text-muted-foreground shrink-0">
-                            {exerciseCount} ex.
+                            {exerciseCount > 0 ? `${exerciseCount} ex.` : ''}
                           </span>
+                          {exerciseCount > 0 && (
+                            <button
+                              onClick={e => toggleExpand(e, block.id)}
+                              className="text-muted-foreground hover:text-foreground shrink-0"
+                              aria-label={isExpanded ? 'Collapse exercises' : 'Expand exercises'}
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="w-4 h-4" />
+                                : <ChevronRight className="w-4 h-4" />
+                              }
+                            </button>
+                          )}
+                        </div>
+                        {isExpanded && (
+                          <ul className="pb-2 px-3 space-y-1 pl-8">
+                            {exercises.map((ex, i) => (
+                              <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                <span className="font-medium text-foreground">{ex.name}</span>
+                                {ex.sets && ex.reps && (
+                                  <span>{ex.sets}×{ex.reps}</span>
+                                )}
+                                {ex.duration_sec && !ex.reps && (
+                                  <span>{ex.duration_sec}s</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
