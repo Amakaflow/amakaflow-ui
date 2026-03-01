@@ -1665,7 +1665,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <main id="main-content" data-assistant-target="main-content" className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
+      <div id="main-content" role="main" data-assistant-target="main-content" className={`container mx-auto px-4 py-8 ${currentView === 'workflow' && workout ? 'pb-32' : ''}`}>
         <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
         {/* Welcome Guide (shown on home view) */}
         {currentView === 'home' && (
@@ -2066,7 +2066,7 @@ export default function App() {
           />
         )}
         </Suspense>
-      </main>
+      </div>
 
       {/* Footer Stats (only in workflow) */}
       {currentView === 'workflow' && workout && (
