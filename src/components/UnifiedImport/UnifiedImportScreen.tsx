@@ -14,7 +14,7 @@ import { MapStep } from '../BulkImport/MapStep';
 import { BulkImportProvider } from '../../context/BulkImportContext';
 import { bulkImportApi, fileToBase64 } from '../../lib/bulk-import-api';
 import { saveWorkoutToHistory } from '../../lib/workout-history';
-import type { DetectedItem } from '../../types/bulk-import';
+import type { DetectedItem, ColumnMapping, DetectedPattern } from '../../types/bulk-import';
 import type {
   ImportTab,
   QueueItem,
@@ -37,6 +37,9 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
   const [phase, setPhase] = useState<Phase>('input');
   const [selectedBlocks, setSelectedBlocks] = useState<SelectedBlock[]>([]);
+  const [mappingColumns, setMappingColumns] = useState<ColumnMapping[]>([]);
+  const [mappingPatterns, setMappingPatterns] = useState<DetectedPattern[]>([]);
+  const [mappingLoading, setMappingLoading] = useState(false);
 
   const handleImport = async () => {
     setPhase('processing');
@@ -208,10 +211,16 @@ function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScre
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <h1 className="text-2xl font-bold mb-6">Match Columns</h1>
-        <MapStep userId={userId} />
-        <div className="mt-4">
-          <Button onClick={() => setPhase('results')}>Continue to Results</Button>
-        </div>
+        <MapStep
+          userId={userId}
+          columns={mappingColumns}
+          patterns={mappingPatterns}
+          loading={mappingLoading}
+          onApply={(_columns) => {
+            setMappingLoading(false);
+            setPhase('results');
+          }}
+        />
       </div>
     );
   }
