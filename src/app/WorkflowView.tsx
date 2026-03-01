@@ -40,7 +40,7 @@ import {
   Calendar,
   UnifiedWorkouts,
   MobileCompanion,
-  UnifiedImportScreen,
+  ImportScreen,
   HelpPage,
   ExerciseHistory,
   VolumeAnalytics,
@@ -1338,7 +1338,7 @@ export function WorkflowView({
         )}
 
         {currentView === 'import' && (
-          <UnifiedImportScreen
+          <ImportScreen
             userId={user.id}
             onDone={() => setCurrentView('workouts')}
             onEditWorkout={rawWorkout => {

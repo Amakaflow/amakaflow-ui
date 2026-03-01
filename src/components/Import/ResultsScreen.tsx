@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Pencil, Trash2, FileText, Image, Link, Layers, ChevronDown, ChevronUp } from 'lucide-react';
-import type { ProcessedItem, QueueItem } from '../../types/unified-import';
+import type { ProcessedItem, QueueItem } from '../../types/import';
 
 interface ResultsScreenProps {
   queueItems: QueueItem[];
@@ -43,7 +43,7 @@ export function ResultsScreen({
   };
 
   const doneItems = processedItems.filter(p => p.status === 'done');
-  const failedItems = processedItems.filter(p => p.status === 'failed');
+  const failedItems = processedItems.filter(p => p.status === 'failed' || p.status === 'error');
 
   return (
     <div className="space-y-6">
