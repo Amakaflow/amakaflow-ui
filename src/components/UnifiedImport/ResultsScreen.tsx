@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Pencil, Trash2, FileText, Image, Link, Layers } from 'lucide-react';
+import { Pencil, Trash2, FileText, Image, Link, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ProcessedItem, QueueItem } from '../../types/unified-import';
 
 interface ResultsScreenProps {
@@ -27,6 +28,20 @@ export function ResultsScreen({
   onEdit,
   onRemove,
 }: ResultsScreenProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   const doneItems = processedItems.filter(p => p.status === 'done');
   const failedItems = processedItems.filter(p => p.status === 'failed');
 
@@ -54,37 +69,67 @@ export function ResultsScreen({
         {queueItems.map(qi => {
           const processed = processedItems.find(p => p.queueId === qi.id);
           if (!processed || processed.status !== 'done') return null;
+          const isExpanded = expandedIds.has(qi.id);
           return (
             <Card key={qi.id}>
-              <CardContent className="flex items-center gap-4 p-4">
-                <SourceIcon type={qi.type} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {processed.workoutTitle ?? 'Untitled workout'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {processed.blockCount ?? 0} blocks · {processed.exerciseCount ?? 0} exercises
-                  </p>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <SourceIcon type={qi.type} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">
+                      {processed.workoutTitle ?? 'Untitled workout'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {processed.blockCount ?? 0} blocks · {processed.exerciseCount ?? 0} exercises
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleExpand(qi.id)}
+                      aria-label={isExpanded ? `Collapse ${processed.workoutTitle ?? 'workout'}` : `Expand ${processed.workoutTitle ?? 'workout'}`}
+                    >
+                      {isExpanded
+                        ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => onEdit(qi.id)}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(qi.id)}
+                      aria-label="Remove"
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() => onEdit(qi.id)}
-                  >
-                    <Pencil className="w-3 h-3" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRemove(qi.id)}
-                    aria-label="remove"
-                  >
-                    <Trash2 className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </div>
+                {isExpanded && (
+                  <div className="border-t pt-3 mt-3 space-y-1">
+                    {(processed.workout?.blocks ?? []).map((block: { id: string; label?: string; exercises?: unknown[] }, idx: number) => (
+                      <div key={block.id ?? idx} className="flex items-center gap-2 text-sm px-2 py-1 rounded bg-muted/30">
+                        <span className="font-medium">{block.label ?? `Block ${idx + 1}`}</span>
+                        {block.exercises?.length ? (
+                          <span className="text-muted-foreground text-xs">
+                            · {block.exercises.length} exercise{block.exercises.length !== 1 ? 's' : ''}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                    {(!processed.workout?.blocks || processed.workout.blocks.length === 0) && (
+                      <p className="text-xs text-muted-foreground italic px-2">No block details available</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

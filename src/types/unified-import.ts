@@ -7,12 +7,12 @@
  */
 
 /** Which tab the user has open on the import screen. */
-export type ImportTab = 'urls-media' | 'file' | 'integrations';
+export type ImportTab = 'urls-media' | 'file' | 'clip-queue' | 'integrations';
 
 /** A single item in the pre-import queue (before processing). */
 export interface QueueItem {
   id: string;              // stable local UUID (use crypto.randomUUID())
-  type: 'url' | 'image' | 'pdf' | 'text';
+  type: 'url' | 'image' | 'pdf' | 'text' | 'clip';
   label: string;           // display label (truncated URL, filename, etc.)
   raw: string | File;      // the actual payload
 }
