@@ -67,6 +67,16 @@ export default defineConfig({
       },
     },
 
+    // Accessibility regression tests - run on every PR alongside smoke
+    {
+      name: 'a11y',
+      testMatch: /.*\.smoke\.spec\.ts/,
+      grep: /@a11y/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+
     // Full regression - Chromium
     {
       name: 'chromium',
