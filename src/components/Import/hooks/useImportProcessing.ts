@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { bulkImportApi } from '../../../lib/bulk-import-api';
 import type { QueueItem, ProcessedItem } from '../../../types/import';
+import type { DetectedItem } from '../../../types/bulk-import';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,23 +32,22 @@ export interface ImportProcessingResult {
 /** Map a single raw DetectedItem to a ProcessedItem. */
 function mapDetectedToProcessed(
   queueId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  detected: any
+  detected: DetectedItem
 ): ProcessedItem {
   if (detected.errors?.length) {
     return {
       queueId,
       status: 'failed',
-      errorMessage: detected.errors[0] as string,
+      errorMessage: detected.errors[0],
     };
   }
 
   return {
     queueId,
     status: 'done',
-    workoutTitle: (detected.parsedTitle as string | undefined) ?? 'Untitled workout',
-    blockCount: (detected.parsedBlockCount as number | undefined) ?? 0,
-    exerciseCount: (detected.parsedExerciseCount as number | undefined) ?? 0,
+    workoutTitle: detected.parsedTitle ?? 'Untitled workout',
+    blockCount: detected.parsedBlockCount ?? 0,
+    exerciseCount: detected.parsedExerciseCount ?? 0,
     workout: detected.rawData,
   };
 }
@@ -73,8 +73,7 @@ export function useImportProcessing(): ImportProcessingResult {
     try {
       // We make up to two API calls (one for URLs, one for images/PDFs) then
       // combine the results, preserving the position→queueId mapping.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allDetected: any[] = [];
+      const allDetected: DetectedItem[] = [];
 
       if (urls.length > 0) {
         const response = await bulkImportApi.detect(userId, 'urls', urls);
@@ -115,7 +114,7 @@ export function useImportProcessing(): ImportProcessingResult {
     );
 
     try {
-      let detected: unknown;
+      let detected: DetectedItem | undefined;
 
       if (item.type === 'url') {
         const response = await bulkImportApi.detect(userId, 'urls', [item.raw as string]);

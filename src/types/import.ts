@@ -15,7 +15,7 @@ export type QueueItem =
   | { id: string; type: 'clip';  label: string; raw: string };
 
 /** Per-item processing state. */
-export type ItemStatus = 'pending' | 'detecting' | 'extracting' | 'done' | 'failed';
+export type ItemStatus = 'pending' | 'detecting' | 'extracting' | 'done' | 'failed' | 'error';
 
 export interface ProcessedItem {
   queueId: string;        // links back to QueueItem.id

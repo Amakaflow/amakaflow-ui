@@ -104,7 +104,7 @@ describe('useImportProcessing', () => {
   // ── Test 3 ─────────────────────────────────────────────────────────────────
 
   it('retry resets item to pending then updates with result', async () => {
-    // First, set up a failed processedItem by calling detect with a rejection
+    // First, set up an error processedItem by calling detect with a rejection
     mockDetect.mockRejectedValueOnce(new Error('Initial failure'));
 
     const { result } = renderHook(() => useImportProcessing());
@@ -121,14 +121,31 @@ describe('useImportProcessing', () => {
     // Verify it's in error state
     expect(result.current.processedItems[0].status).toBe('error');
 
-    // Now mock detect to succeed on retry
-    const detectedItem = makeDetectedItem({ parsedTitle: 'Retry Day', parsedExerciseCount: 3, parsedBlockCount: 1 });
-    mockDetect.mockResolvedValueOnce(makeDetectResponse([detectedItem]));
+    // Set up a deferred promise so we can inspect state mid-flight
+    let resolveRetry!: (val: ReturnType<typeof makeDetectResponse>) => void;
+    const retryPromise = new Promise<ReturnType<typeof makeDetectResponse>>(res => {
+      resolveRetry = res;
+    });
+    mockDetect.mockReturnValueOnce(retryPromise);
 
     const queueItem = { id: 'q-retry-1', type: 'url' as const, label: 'example.com', raw: 'https://example.com' };
 
+    // Start the retry but do not await — we want to inspect the pending state first
+    act(() => {
+      void result.current.retry('q-retry-1', 'user-1', queueItem);
+    });
+
+    // Flush the synchronous state update (the setProcessedItems to 'pending')
+    await act(async () => {});
+
+    // Assert the item is in pending state before the API resolves
+    expect(result.current.processedItems[0].status).toBe('pending');
+
+    // Now resolve the deferred promise and let the hook finish
+    const detectedItem = makeDetectedItem({ parsedTitle: 'Retry Day', parsedExerciseCount: 3, parsedBlockCount: 1 });
     await act(async () => {
-      await result.current.retry('q-retry-1', 'user-1', queueItem);
+      resolveRetry(makeDetectResponse([detectedItem]));
+      await retryPromise;
     });
 
     expect(result.current.processedItems).toHaveLength(1);
