@@ -37,7 +37,7 @@ No JSX. Hooks own state machines, API call orchestration, and side effects. They
 
 No API calls. No business logic. Components receive data and callbacks from a hook and render them. All state comes from a hook or is local UI state (`isOpen`, `isDragOver`).
 
-**Example:** `src/components/Import/ImportScreen.tsx` — 79 lines, calls only `useImportFlow`, renders the current phase.
+**Example:** `src/components/Import/ImportScreen.tsx` — thin shell, calls only `useImportFlow`, renders the current phase.
 
 ### `src/app/` — Global cross-cutting concerns
 
@@ -56,12 +56,14 @@ src/components/Import/
     useImportProcessing.ts  ← API calls, per-item status, retry
     useImportFlow.ts        ← phase state machine, orchestrates the two above
     __tests__/              ← renderHook() tests — no DOM, no ImportScreen render
-  ImportScreen.tsx          ← thin shell: calls useImportFlow, renders tabs (79 lines)
+  ImportScreen.tsx          ← thin shell: calls useImportFlow, renders tabs
   FileImportTab.tsx         ← presentation only: drag-drop zone, calls onFilesDetected
   ImportQueue.tsx           ← presentation only
   ProcessingView.tsx        ← presentation only
   ResultsScreen.tsx         ← presentation only
   BlockPicker.tsx           ← presentation only
+  ClipQueueTab.tsx          ← presentation only (placeholder)
+  IntegrationsTab.tsx       ← presentation only (placeholder)
   index.ts                  ← re-exports ImportScreen
 ```
 
@@ -88,9 +90,18 @@ expect(result.current.phase).toBe('results');
 3. Create `src/components/<Feature>/<Feature>.tsx` — thin shell, imports only `use<Feature>`
 4. Add one line to `src/app/router.tsx`:
    ```typescript
-   export const MyScreen = lazy(() => import('../components/MyFeature').then(m => ({ default: m.MyScreen })));
+   export const MyScreen = lazy(() =>
+     import('../components/MyFeature/MyScreen').then(m => ({ default: m.MyScreen }))
+   );
    ```
-5. Reference `MyScreen` in `src/app/WorkflowView.tsx`
+5. Add `'my-feature'` to the `View` union in `src/app/router.tsx` (lines 3–20).
+6. In `src/app/WorkflowView.tsx`, add a render block:
+   ```tsx
+   {currentView === 'my-feature' && (
+     <MyScreen userId={user.id} onDone={() => setCurrentView('home')} />
+   )}
+   ```
+   `Suspense` is already handled by `AppShell` — no changes needed there.
 
 ---
 
