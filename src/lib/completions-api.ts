@@ -19,7 +19,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-1',
     workoutName: 'Hyrox Session',
-    startedAt: '2026-02-20T08:30:00',
+    startedAt: '2026-02-20 08:30:00',
     durationSeconds: 4500,
     avgHeartRate: 158,
     maxHeartRate: 182,
@@ -32,7 +32,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-2',
     workoutName: 'Upper Body Strength',
-    startedAt: '2026-02-22T10:00:00',
+    startedAt: '2026-02-22 10:00:00',
     durationSeconds: 4200,
     avgHeartRate: 128,
     maxHeartRate: 155,
@@ -44,7 +44,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-3',
     workoutName: 'Lower Body Power',
-    startedAt: '2026-02-18T07:00:00',
+    startedAt: '2026-02-18 07:00:00',
     durationSeconds: 4800,
     avgHeartRate: 135,
     maxHeartRate: 162,
@@ -56,7 +56,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-4',
     workoutName: 'Morning Run',
-    startedAt: '2026-02-17T06:15:00',
+    startedAt: '2026-02-17 06:15:00',
     durationSeconds: 2700,
     avgHeartRate: 148,
     maxHeartRate: 168,
@@ -70,7 +70,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-5',
     workoutName: 'Push Day — PPL',
-    startedAt: '2026-02-15T09:30:00',
+    startedAt: '2026-02-15 09:30:00',
     durationSeconds: 4500,
     avgHeartRate: 122,
     maxHeartRate: 148,
@@ -82,7 +82,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-6',
     workoutName: 'Pull Day — PPL',
-    startedAt: '2026-02-13T10:00:00',
+    startedAt: '2026-02-13 10:00:00',
     durationSeconds: 4200,
     avgHeartRate: 130,
     maxHeartRate: 158,
@@ -94,7 +94,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-7',
     workoutName: 'HIIT Cardio Blast',
-    startedAt: '2026-02-11T07:30:00',
+    startedAt: '2026-02-11 07:30:00',
     durationSeconds: 2700,
     avgHeartRate: 168,
     maxHeartRate: 188,
@@ -106,7 +106,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-8',
     workoutName: 'Leg Day — PPL',
-    startedAt: '2026-02-08T09:00:00',
+    startedAt: '2026-02-08 09:00:00',
     durationSeconds: 5100,
     avgHeartRate: 138,
     maxHeartRate: 165,
@@ -118,7 +118,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-9',
     workoutName: 'Zone 2 Bike Ride',
-    startedAt: '2026-02-06T06:00:00',
+    startedAt: '2026-02-06 06:00:00',
     durationSeconds: 3900,
     avgHeartRate: 138,
     maxHeartRate: 150,
@@ -131,7 +131,7 @@ const DEMO_COMPLETIONS: WorkoutCompletion[] = [
   {
     id: 'comp-10',
     workoutName: 'Full Body Conditioning',
-    startedAt: '2026-02-04T08:30:00',
+    startedAt: '2026-02-04 08:30:00',
     durationSeconds: 4500,
     avgHeartRate: 142,
     maxHeartRate: 172,
