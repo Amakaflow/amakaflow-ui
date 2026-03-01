@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Button } from '../ui/button';
 import { Link, FileSpreadsheet, Plug } from 'lucide-react';
-import type { ImportTab } from '../../types/unified-import';
+import { ImportQueue } from './ImportQueue';
+import type { ImportTab, QueueItem } from '../../types/unified-import';
 
 interface UnifiedImportScreenProps {
   userId: string;
   onDone: () => void;
 }
 
-export function UnifiedImportScreen({ userId, onDone }: UnifiedImportScreenProps) {
+export function UnifiedImportScreen({ userId: _userId, onDone: _onDone }: UnifiedImportScreenProps) {
   const [activeTab, setActiveTab] = useState<ImportTab>('urls-media');
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+
+  const handleImport = () => {
+    // TODO: Task 6 — process queue
+    console.log('TODO: process queue', queue);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -37,7 +45,14 @@ export function UnifiedImportScreen({ userId, onDone }: UnifiedImportScreenProps
         </TabsList>
 
         <TabsContent value="urls-media">
-          <p className="text-muted-foreground">URLs &amp; Media — coming soon</p>
+          <ImportQueue queue={queue} onQueueChange={setQueue} />
+          {queue.length > 0 && (
+            <div className="mt-4">
+              <Button className="w-full" onClick={handleImport}>
+                Import {queue.length} item{queue.length !== 1 ? 's' : ''}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="file">

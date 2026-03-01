@@ -11,10 +11,9 @@ describe('UnifiedImportScreen', () => {
     expect(screen.getByRole('tab', { name: /integrations/i })).toBeInTheDocument();
   });
 
-  it('shows URLs & Media panel content by default', () => {
+  it('shows the URL input in the URLs & Media panel by default', () => {
     render(<UnifiedImportScreen userId="u1" onDone={vi.fn()} />);
-    // The placeholder content specific to this panel
-    expect(screen.getByText(/urls.*media.*coming soon/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/paste urls/i)).toBeInTheDocument();
   });
 
   it('switches to File tab panel when clicked', async () => {
