@@ -20,13 +20,15 @@ describe('UnifiedImportScreen', () => {
     const user = userEvent.setup();
     render(<UnifiedImportScreen userId="u1" onDone={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: /^file$/i }));
-    expect(screen.getByText(/file import.*coming soon/i)).toBeInTheDocument();
+    // FileImportTab renders a drop zone
+    expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
   });
 
   it('switches to Integrations tab panel when clicked', async () => {
     const user = userEvent.setup();
     render(<UnifiedImportScreen userId="u1" onDone={vi.fn()} />);
     await user.click(screen.getByRole('tab', { name: /integrations/i }));
-    expect(screen.getByText(/integrations.*coming soon/i)).toBeInTheDocument();
+    // IntegrationsTab renders integration tiles
+    expect(screen.getByText('Notion')).toBeInTheDocument();
   });
 });

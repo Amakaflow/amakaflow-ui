@@ -2,10 +2,17 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { Link, FileSpreadsheet, Plug } from 'lucide-react';
+import { toast } from 'sonner';
 import { ImportQueue } from './ImportQueue';
 import { ProcessingView } from './ProcessingView';
+import { ResultsScreen } from './ResultsScreen';
+import { BlockPicker } from './BlockPicker';
+import { FileImportTab } from './FileImportTab';
+import { IntegrationsTab } from './IntegrationsTab';
+import { MapStep } from '../BulkImport/MapStep';
 import { BulkImportProvider, useBulkImport } from '../../context/BulkImportContext';
 import { useBulkImportApi } from '../../hooks/useBulkImportApi';
+import { saveWorkoutToHistory } from '../../lib/workout-history';
 import type {
   ImportTab,
   QueueItem,
@@ -18,7 +25,7 @@ interface UnifiedImportScreenProps {
   onDone: () => void;
 }
 
-type Phase = 'input' | 'processing' | 'results' | 'block-picker';
+type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping';
 
 // Inner component has access to BulkImportContext
 function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
@@ -52,7 +59,7 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
       if (urls.length > 0) await detectFromUrls(urls);
       if (files.length > 0) await detectFromImages(files);
 
-      // Map detected items from context back to queue items by position
+      // Map detected items from context back to queue items by source index
       const detectedItems = state.detected.items;
       setProcessedItems(
         queue.map((qItem, idx) => {
@@ -77,7 +84,9 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
     } catch {
       setProcessedItems(prev =>
         prev.map(p =>
-          p.status !== 'done' ? { ...p, status: 'failed', errorMessage: 'Processing failed' } : p
+          p.status !== 'done'
+            ? { ...p, status: 'failed', errorMessage: 'Processing failed' }
+            : p
         )
       );
     }
@@ -85,10 +94,43 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
 
   const handleRetry = (queueId: string) => {
     setProcessedItems(prev =>
-      prev.map(p => (p.queueId === queueId ? { ...p, status: 'pending', errorMessage: undefined } : p))
+      prev.map(p =>
+        p.queueId === queueId ? { ...p, status: 'pending', errorMessage: undefined } : p
+      )
     );
-    // TODO: retry individual item
+    // TODO: retry individual item — re-trigger import for this single item
   };
+
+  const handleSaveAll = async () => {
+    const doneItems = processedItems.filter(p => p.status === 'done' && p.workout);
+    let saved = 0;
+    let failed = 0;
+
+    for (const item of doneItems) {
+      try {
+        // Use 'garmin' as device placeholder — workouts in the library are device-agnostic.
+        // Device-specific behaviour is resolved when exporting (future flow).
+        await saveWorkoutToHistory(userId, item.workout, 'garmin');
+        saved++;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (failed === 0) {
+      toast.success(`${saved} workout${saved !== 1 ? 's' : ''} saved to your library`);
+    } else {
+      toast.warning(`${saved} saved, ${failed} failed`);
+    }
+
+    onDone();
+  };
+
+  const handleRemoveResult = (queueId: string) => {
+    setProcessedItems(prev => prev.filter(p => p.queueId !== queueId));
+  };
+
+  // ── Phase: processing ──────────────────────────────────────────────────────
 
   if (phase === 'processing') {
     return (
@@ -102,6 +144,8 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
     );
   }
 
+  // ── Phase: results ─────────────────────────────────────────────────────────
+
   if (phase === 'results') {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -111,24 +155,57 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
             Review what was found. Save all or build a combined workout.
           </p>
         </div>
-        {/* ResultsScreen rendered in Task 7 */}
-        <pre className="text-xs text-muted-foreground">
-          {processedItems.length} items processed
-        </pre>
+        <ResultsScreen
+          queueItems={queue}
+          processedItems={processedItems}
+          onSaveAll={handleSaveAll}
+          onBuildOne={() => setPhase('block-picker')}
+          onEdit={(id) => console.log('TODO: open editor for', id)}
+          onRemove={handleRemoveResult}
+        />
       </div>
     );
   }
+
+  // ── Phase: block-picker ────────────────────────────────────────────────────
 
   if (phase === 'block-picker') {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* BlockPicker rendered in Task 8 */}
-        <p className="text-muted-foreground">Block picker — coming soon</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Build one workout</h1>
+          <p className="text-muted-foreground mt-1">
+            Choose the blocks you want, then edit and save.
+          </p>
+        </div>
+        <BlockPicker
+          queueItems={queue}
+          processedItems={processedItems}
+          selectedBlocks={selectedBlocks}
+          onSelectionChange={setSelectedBlocks}
+          onConfirm={() => console.log('TODO: open StructureWorkout editor with', selectedBlocks)}
+          onCancel={() => setPhase('results')}
+        />
       </div>
     );
   }
 
-  // phase === 'input'
+  // ── Phase: column-mapping (File tab) ──────────────────────────────────────
+
+  if (phase === 'column-mapping') {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <h1 className="text-2xl font-bold mb-6">Match Columns</h1>
+        <MapStep userId={userId} />
+        <div className="mt-4">
+          <Button onClick={() => setPhase('results')}>Continue to Results</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase: input ───────────────────────────────────────────────────────────
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-6">
@@ -166,11 +243,14 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
         </TabsContent>
 
         <TabsContent value="file">
-          <p className="text-muted-foreground">File import — coming soon</p>
+          <FileImportTab
+            userId={userId}
+            onFilesDetected={() => setPhase('column-mapping')}
+          />
         </TabsContent>
 
         <TabsContent value="integrations">
-          <p className="text-muted-foreground">Integrations — coming soon</p>
+          <IntegrationsTab />
         </TabsContent>
       </Tabs>
     </div>
