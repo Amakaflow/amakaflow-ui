@@ -89,6 +89,7 @@ export default function App() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   const [isEditingFromHistory, setIsEditingFromHistory] = useState(false);
   const [isCreatingFromScratch, setIsCreatingFromScratch] = useState(false);
+  const [isEditingFromImport, setIsEditingFromImport] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [bulkImportType, setBulkImportType] = useState<BulkInputType | undefined>(undefined);
@@ -1207,6 +1208,7 @@ export default function App() {
     setCurrentStep('add-sources');
     setIsEditingFromHistory(false);
     setIsCreatingFromScratch(false);
+    setIsEditingFromImport(false);
     setEditingWorkoutId(null);
     setWorkoutSaved(false);
   };
@@ -1770,6 +1772,7 @@ export default function App() {
             } : undefined}
             isEditingFromHistory={isEditingFromHistory}
             isCreatingFromScratch={isCreatingFromScratch}
+            hideExport={isEditingFromImport}
             loading={loading}
             selectedDevice={selectedDevice}
             onDeviceChange={setSelectedDevice}
@@ -2026,7 +2029,8 @@ export default function App() {
               setValidation(null);
               setExports(null);
               setSources([]);
-              setIsEditingFromHistory(false);
+              setIsEditingFromHistory(true);
+              setIsEditingFromImport(true);
               setEditingWorkoutId(null);
               setWorkoutSaved(false);
               setCurrentView('workflow');
