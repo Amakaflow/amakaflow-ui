@@ -24,12 +24,13 @@ import type {
 interface UnifiedImportScreenProps {
   userId: string;
   onDone: () => void;
+  onEditWorkout?: (workout: Record<string, unknown>) => void;
 }
 
 type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping';
 
 // Inner component has access to BulkImportContext
-function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
+function UnifiedImportInner({ userId, onDone, onEditWorkout }: UnifiedImportScreenProps) {
   const [activeTab, setActiveTab] = useState<ImportTab>('urls-media');
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
@@ -160,7 +161,10 @@ function UnifiedImportInner({ userId, onDone }: UnifiedImportScreenProps) {
           processedItems={processedItems}
           onSaveAll={handleSaveAll}
           onBuildOne={() => setPhase('block-picker')}
-          onEdit={(id) => console.log('TODO: open editor for', id)}
+          onEdit={(id) => {
+            const item = processedItems.find(p => p.queueId === id);
+            if (item?.workout && onEditWorkout) onEditWorkout(item.workout);
+          }}
           onRemove={handleRemoveResult}
         />
       </div>

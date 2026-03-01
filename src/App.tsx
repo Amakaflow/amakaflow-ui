@@ -2020,6 +2020,18 @@ export default function App() {
           <UnifiedImportScreen
             userId={user.id}
             onDone={() => setCurrentView('workouts')}
+            onEditWorkout={(rawWorkout) => {
+              const normalizedWorkout = normalizeWorkoutStructure(rawWorkout);
+              setWorkout(normalizedWorkout);
+              setValidation(null);
+              setExports(null);
+              setSources([]);
+              setIsEditingFromHistory(false);
+              setEditingWorkoutId(null);
+              setWorkoutSaved(false);
+              setCurrentView('workflow');
+              setCurrentStep('structure');
+            }}
           />
         )}
 
