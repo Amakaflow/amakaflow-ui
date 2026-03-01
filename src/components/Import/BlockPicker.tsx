@@ -13,7 +13,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ProcessedItem, QueueItem, SelectedBlock } from '../../types/unified-import';
+import type { ProcessedItem, QueueItem, SelectedBlock } from '../../types/import';
 
 interface BlockPickerProps {
   queueItems: QueueItem[];
