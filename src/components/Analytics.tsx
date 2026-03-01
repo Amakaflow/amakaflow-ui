@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { TrendingUp, Dumbbell, Clock, Target, Watch, Bike } from 'lucide-react';
 import { WorkoutHistoryItem, getWorkoutStats } from '../lib/workout-history';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 
 type Props = {
   user: {
@@ -176,7 +176,6 @@ export function Analytics({ user, history }: Props) {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -185,7 +184,8 @@ export function Analytics({ user, history }: Props) {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
