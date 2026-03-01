@@ -26,6 +26,8 @@ export interface ImportProcessingResult {
   retry: (queueId: string, userId: string, item: QueueItem) => Promise<void>;
   removeResult: (queueId: string) => void;
   clearResults: () => void;
+  /** Directly replace processedItems (used by column-mapping path to inject results). */
+  setItems: (items: ProcessedItem[]) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,5 +181,9 @@ export function useImportProcessing(): ImportProcessingResult {
     setProcessedItems([]);
   };
 
-  return { processedItems, detect, retry, removeResult, clearResults };
+  const setItems = (items: ProcessedItem[]): void => {
+    setProcessedItems(items);
+  };
+
+  return { processedItems, detect, retry, removeResult, clearResults, setItems };
 }
