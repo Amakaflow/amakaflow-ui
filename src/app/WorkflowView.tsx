@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -53,10 +52,10 @@ export function WorkflowView({
   setSelectedDevice,
   workoutHistoryList,
   refreshHistory,
-  onNavigate,
+  onNavigate: _onNavigate,
   currentView,
   setCurrentView,
-  stravaConnected,
+  stravaConnected: _stravaConnected,
 }: WorkflowViewProps) {
   const {
     workout, setWorkout, workoutSaved, setWorkoutSaved,
@@ -81,19 +80,9 @@ export function WorkflowView({
     selectedDevice,
     setSelectedDevice,
     refreshHistory,
-    onNavigate,
     currentView,
     setCurrentView,
-    stravaConnected,
   });
-
-  // Sync selectedDevice when user.selectedDevices changes
-  useEffect(() => {
-    if (user?.selectedDevices?.length > 0 && !user.selectedDevices.includes(selectedDevice)) {
-      setSelectedDevice(user.selectedDevices[0]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.selectedDevices]);
 
   return (
     <>

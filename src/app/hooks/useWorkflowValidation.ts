@@ -16,11 +16,9 @@ type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
 
 export interface UseWorkflowValidationProps {
   workout: WorkoutStructure | null;
-  userId: string;
   selectedDevice: DeviceId;
   user: AppUser;
   sources: Source[];
-  stravaConnected: boolean;
   editingWorkoutId: string | null;
   setWorkout: (w: WorkoutStructure) => void;
   setWorkoutSaved: (saved: boolean) => void;
@@ -40,11 +38,9 @@ export interface UseWorkflowValidationResult {
 
 export function useWorkflowValidation({
   workout,
-  userId: _userId,
   selectedDevice,
   user,
   sources,
-  stravaConnected: _stravaConnected,
   editingWorkoutId,
   setWorkout,
   setWorkoutSaved,

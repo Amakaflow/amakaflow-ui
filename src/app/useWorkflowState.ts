@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { applyWorkoutTypeDefaults } from '../lib/workoutTypeDefaults';
 import { useWorkflowGeneration } from './hooks/useWorkflowGeneration';
@@ -9,7 +9,6 @@ import type { ProcessedItem } from '../types/import';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
 import type { DeviceId } from '../lib/devices';
-import type React from 'react';
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
 
@@ -32,10 +31,8 @@ export interface UseWorkflowStateProps {
   selectedDevice: DeviceId;
   setSelectedDevice: (d: DeviceId) => void;
   refreshHistory: () => Promise<void>;
-  onNavigate: (view: View) => void;
   currentView: View;
   setCurrentView: (v: View) => void;
-  stravaConnected: boolean;
 }
 
 export function useWorkflowState({
@@ -43,10 +40,8 @@ export function useWorkflowState({
   selectedDevice,
   setSelectedDevice,
   refreshHistory,
-  onNavigate: _onNavigate,
   currentView,
   setCurrentView,
-  stravaConnected,
 }: UseWorkflowStateProps) {
   // ── Bridge state ────────────────────────────────────────────────────────────
   const [workout, setWorkout] = useState<WorkoutStructure | null>(null);
@@ -128,20 +123,15 @@ export function useWorkflowState({
     setSources: generation.setSources,
     setValidation,
     setExports,
-    setConfirmDialog: setConfirmDialog as React.Dispatch<React.SetStateAction<ConfirmDialogState>>,
     workout,
-    workoutSaved,
-    importProcessedItems,
     setImportProcessedItems,
   });
 
   const validationHook = useWorkflowValidation({
     workout,
-    userId: user.id,
     selectedDevice,
     user,
     sources: generation.sources,
-    stravaConnected,
     editingWorkoutId: editing.editingWorkoutId,
     setWorkout: (w) => setWorkout(w),
     setWorkoutSaved,
@@ -154,6 +144,14 @@ export function useWorkflowState({
   // Wire up the deferred reset callbacks now that hooks exist
   resetRefs.genSources = () => generation.setSources([]);
   resetRefs.editing = () => editing.reset();
+
+  // Sync selectedDevice when user.selectedDevices changes
+  useEffect(() => {
+    if (user?.selectedDevices?.length > 0 && !user.selectedDevices.includes(selectedDevice)) {
+      setSelectedDevice(user.selectedDevices[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.selectedDevices]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 

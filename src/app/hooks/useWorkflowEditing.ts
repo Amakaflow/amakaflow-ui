@@ -10,13 +10,6 @@ import type React from 'react';
 
 type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
 
-interface ConfirmDialogState {
-  open: boolean;
-  title: string;
-  description: string;
-  onConfirm: () => void;
-}
-
 export interface UseWorkflowEditingProps {
   userId: string;
   selectedDevice: DeviceId;
@@ -29,10 +22,7 @@ export interface UseWorkflowEditingProps {
   setSources: (sources: Source[]) => void;
   setValidation: (v: ValidationResponse | null) => void;
   setExports: (e: ExportFormats | null) => void;
-  setConfirmDialog: React.Dispatch<React.SetStateAction<ConfirmDialogState>>;
   workout: WorkoutStructure | null;
-  workoutSaved: boolean;
-  importProcessedItems: ProcessedItem[];
   setImportProcessedItems: React.Dispatch<React.SetStateAction<ProcessedItem[]>>;
 }
 
@@ -69,10 +59,7 @@ export function useWorkflowEditing({
   setSources,
   setValidation,
   setExports,
-  setConfirmDialog: _setConfirmDialog,
   workout,
-  workoutSaved: _workoutSaved,
-  importProcessedItems: _importProcessedItems,
   setImportProcessedItems,
 }: UseWorkflowEditingProps): UseWorkflowEditingResult {
   const [isEditingFromHistory, setIsEditingFromHistory] = useState(false);
