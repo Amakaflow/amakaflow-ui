@@ -7,12 +7,12 @@ export type ImportTab = 'urls-media' | 'file' | 'clip-queue' | 'integrations';
 export type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping';
 
 /** A single item in the pre-import queue (before processing). */
-export interface QueueItem {
-  id: string;             // stable local UUID (use crypto.randomUUID())
-  type: 'url' | 'image' | 'pdf' | 'text' | 'clip';
-  label: string;          // display label (truncated URL, filename, etc.)
-  raw: string | File;     // the actual payload
-}
+export type QueueItem =
+  | { id: string; type: 'url';   label: string; raw: string }
+  | { id: string; type: 'image'; label: string; raw: File   }
+  | { id: string; type: 'pdf';   label: string; raw: File   }
+  | { id: string; type: 'text';  label: string; raw: string }
+  | { id: string; type: 'clip';  label: string; raw: string };
 
 /** Per-item processing state. */
 export type ItemStatus = 'pending' | 'detecting' | 'extracting' | 'done' | 'failed';

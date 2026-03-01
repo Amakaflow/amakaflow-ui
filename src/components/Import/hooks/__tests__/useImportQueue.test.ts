@@ -29,6 +29,10 @@ describe('useImportQueue', () => {
       result.current.addUrls('https://a.com,https://b.com');
     });
     expect(result.current.queue).toHaveLength(2);
+    expect(result.current.queue[0].type).toBe('url');
+    expect(result.current.queue[0].raw).toBe('https://a.com');
+    expect(result.current.queue[1].type).toBe('url');
+    expect(result.current.queue[1].raw).toBe('https://b.com');
   });
 
   it('addUrls ignores blank lines', () => {
@@ -79,6 +83,22 @@ describe('useImportQueue', () => {
       result.current.clearQueue();
     });
     expect(result.current.queue).toHaveLength(0);
+  });
+
+  it('addFiles skips unsupported file types', () => {
+    const { result } = renderHook(() => useImportQueue());
+    const docxFile = new File(['content'], 'doc.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    act(() => {
+      result.current.addFiles([docxFile]);
+    });
+    expect(result.current.queue).toHaveLength(0);
+  });
+
+  it('removeItem with unknown id is a no-op', () => {
+    const { result } = renderHook(() => useImportQueue());
+    act(() => { result.current.addUrls('https://example.com'); });
+    act(() => { result.current.removeItem('does-not-exist'); });
+    expect(result.current.queue).toHaveLength(1);
   });
 
   it('toDetectPayload returns urls and base64 items', async () => {
