@@ -7,15 +7,18 @@ interface WorkoutFrequencyChartProps {
 }
 
 function computeWeeklyFrequency(history: WorkoutHistoryItem[]): Array<{ week: string; sessions: number }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // start of today
+
   return Array.from({ length: 8 }, (_, i) => {
-    const weekEnd = new Date();
-    weekEnd.setDate(weekEnd.getDate() - i * 7);
-    const weekStart = new Date(weekEnd);
-    weekStart.setDate(weekEnd.getDate() - 7);
+    const weekEnd = new Date(today);
+    weekEnd.setDate(today.getDate() - i * 7 + 7); // exclusive end (start of the day AFTER this week)
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - i * 7); // inclusive start (start of the first day of this week)
 
     const label = i === 0
       ? 'This wk'
-      : weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      : weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     const sessions = history.filter(item => {
       if (!item.createdAt) return false;
