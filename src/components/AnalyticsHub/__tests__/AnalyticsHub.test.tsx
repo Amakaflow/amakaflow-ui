@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AnalyticsHub } from '../AnalyticsHub';
+import { AnalyticsHub } from '../index';
+import type { AppUser } from '../../../app/useAppAuth';
 
 vi.mock('../../VolumeAnalytics', () => ({
   VolumeAnalytics: () => <div data-testid="volume-analytics">VolumeAnalytics</div>,
@@ -13,9 +14,15 @@ vi.mock('../OverviewTab', () => ({
   OverviewTab: () => <div data-testid="overview-tab">OverviewTab</div>,
 }));
 
-const mockUser = {
-  id: 'u1', name: 'Test User', email: 'test@test.com', subscription: 'free', mode: 'individual',
-} as any;
+const mockUser: AppUser = {
+  id: 'u1',
+  name: 'Test User',
+  email: 'test@test.com',
+  subscription: 'free',
+  workoutsThisWeek: 0,
+  selectedDevices: [],
+  mode: 'individual',
+};
 
 describe('AnalyticsHub', () => {
   it('renders all three tab triggers', () => {
