@@ -189,18 +189,7 @@ export function SortableBlock({
                     <GripVertical className="w-5 h-5" />
                   </div>
 
-                  {/* Collapse exercises toggle */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="p-0 h-auto hover:bg-transparent shrink-0"
-                    title={isCollapsed ? 'Expand exercises' : 'Collapse exercises'}
-                  >
-                    {isCollapsed ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
-                  </Button>
-
-                  {/* AMA-731: Block type selector */}
+                  {/* Block type selector — labeled so it's distinct from the collapse toggle */}
                   <Select
                     value={block.structure ?? ''}
                     onValueChange={(value) => {
@@ -208,8 +197,8 @@ export function SortableBlock({
                       onUpdateBlock({ structure: newStructure });
                     }}
                   >
-                    <SelectTrigger className={`shrink-0 w-auto h-7 text-xs gap-1 ${styles.badge} border-0`}>
-                      <SelectValue />
+                    <SelectTrigger className={`shrink-0 w-auto h-7 text-xs gap-1 ${styles.badge} border border-current/20 rounded-md`}>
+                      <SelectValue placeholder="Type" />
                     </SelectTrigger>
                     <SelectContent>
                       {STRUCTURE_TYPE_OPTIONS.map((opt) => (
@@ -234,6 +223,20 @@ export function SortableBlock({
                       ? <span className="text-xs text-muted-foreground shrink-0">{metric}</span>
                       : null;
                   })()}
+
+                  {/* Collapse toggle — far right, clearly separate from type selector */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="shrink-0 gap-1 text-xs h-7 text-muted-foreground hover:text-foreground"
+                    title={isCollapsed ? 'Expand exercises' : 'Collapse exercises'}
+                  >
+                    {isCollapsed
+                      ? <><ChevronDown className="w-3.5 h-3.5" /><span>Show</span></>
+                      : <><ChevronUp className="w-3.5 h-3.5" /><span>Hide</span></>
+                    }
+                  </Button>
 
                   {/* Configure button */}
                   {block.structure && (
