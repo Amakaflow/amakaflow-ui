@@ -14,6 +14,7 @@ import { PinterestBulkImportModal } from '../components/PinterestBulkImportModal
 import { ExportPage } from '../components/Export';
 import {
   Analytics,
+  AnalyticsHub,
   UserSettings,
   StravaEnhance,
   Calendar,
@@ -290,22 +291,9 @@ export function WorkflowView({
           <StravaEnhance onClose={() => setCurrentView('workflow')} />
         )}
 
-        {currentView === 'analytics' &&
-          (user ? (
-            <Analytics user={user} history={workoutHistoryList} />
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-muted-foreground">Please sign in to view analytics</p>
-            </div>
-          ))}
-
-        {currentView === 'exercise-history' && user && (
-          <div data-assistant-target="workout-history">
-            <ExerciseHistory user={user} />
-          </div>
+        {currentView === 'analytics' && user && (
+          <AnalyticsHub user={user} history={workoutHistoryList} />
         )}
-
-        {currentView === 'volume-analytics' && user && <VolumeAnalytics user={user} />}
 
         {currentView === 'team' && (
           <TeamSharing user={user} currentWorkout={workout} />
