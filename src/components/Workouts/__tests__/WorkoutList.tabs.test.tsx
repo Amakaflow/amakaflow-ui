@@ -204,7 +204,6 @@ describe('WorkoutList tabs', () => {
     // Assert - activity-history content should be visible
     expect(screen.getByTestId('activity-history')).toBeInTheDocument();
   });
-});
 
   it('clicking History tab loads completions', async () => {
     // Arrange
