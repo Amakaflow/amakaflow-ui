@@ -17,7 +17,8 @@ export type View =
   | 'volume-analytics'
   | 'program-detail'
   | 'programs'
-  | 'create-ai';
+  | 'create-ai'
+  | 'export-page';
 
 export const Analytics = lazy(() =>
   import('../components/Analytics').then(m => ({ default: m.Analytics }))

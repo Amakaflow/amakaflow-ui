@@ -211,6 +211,31 @@ export class WorkoutsPage {
   }
 
   // ---------------------------------------------------------------------------
+  // Export helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get the export button for a specific workout
+   */
+  getExportButton(workoutId: string): Locator {
+    return this.page.locator(`[data-testid="workout-export-${workoutId}"]`);
+  }
+
+  /**
+   * Click the export button for a specific workout to open the ExportDevicePicker popover
+   */
+  async clickExportButton(workoutId: string) {
+    await this.getExportButton(workoutId).click();
+  }
+
+  /**
+   * Get the export device picker button for a specific device
+   */
+  getExportDeviceButton(deviceId: string): Locator {
+    return this.page.locator(`[data-testid="export-picker-${deviceId}"]`);
+  }
+
+  // ---------------------------------------------------------------------------
   // Bulk selection helpers
   // ---------------------------------------------------------------------------
 

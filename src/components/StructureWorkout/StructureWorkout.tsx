@@ -1,18 +1,14 @@
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { GripVertical, Wand2, ShieldCheck, Edit2, Check, Move, Minimize2, Maximize2, Save, Download, Send, Info, Clock, Copy, Plus } from 'lucide-react';
+import { GripVertical, Edit2, Check, Move, Minimize2, Maximize2, Save, Copy, Plus, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Alert, AlertDescription } from '../ui/alert';
 import { ExerciseSearch } from '../ExerciseSearch';
 import { EditExerciseDialog } from '../EditExerciseDialog';
 import { EditBlockDialog } from '../EditBlockDialog';
 import { WorkoutSettingsDialog } from '../WorkoutSettingsDialog';
 import { AddBlockTypePicker } from '../AddBlockTypePicker';
 import { WarmupSuggestionStrip, CooldownSuggestionStrip, DefaultRestStrip } from '../WorkoutSuggestionStrips';
-import { DeviceId, getDevicesByIds, getDeviceById, getPrimaryExportDestinations } from '../../lib/devices';
 import { WorkoutStructure, Block } from '../../types/workout';
 import { generateId, getStructureDefaults, formatRestSecs } from '../../lib/workout-utils';
 import { useStructureWorkout } from './hooks/useStructureWorkout';
@@ -21,28 +17,20 @@ import { SortableBlock } from './SortableBlock';
 export interface StructureWorkoutProps {
   workout: WorkoutStructure;
   onWorkoutChange: (workout: WorkoutStructure) => void;
-  onAutoMap: () => void;
-  onValidate: () => void;
+  onExport?: (workout: WorkoutStructure) => void;
   onSave?: () => void | Promise<void>;
   isEditingFromHistory?: boolean;
   isCreatingFromScratch?: boolean;
   hideExport?: boolean;
   loading: boolean;
-  selectedDevice: DeviceId;
-  onDeviceChange: (device: DeviceId) => void;
-  userSelectedDevices: DeviceId[];
-  onNavigateToSettings?: () => void;
 }
 
 export function StructureWorkout(props: StructureWorkoutProps) {
   const {
-    workout, onWorkoutChange, onAutoMap, onValidate, onSave,
+    workout, onWorkoutChange, onExport, onSave,
     isEditingFromHistory = false, isCreatingFromScratch = false, hideExport = false,
-    loading, selectedDevice, onDeviceChange, userSelectedDevices,
+    loading,
   } = props;
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _availableDevices = getDevicesByIds(userSelectedDevices);
 
   const {
     workoutWithIds,
@@ -191,55 +179,19 @@ export function StructureWorkout(props: StructureWorkoutProps) {
 
         {!hideExport && <Card>
           <CardContent className="space-y-4 pt-6">
-            {!isEditingFromHistory && <div className="space-y-3">
-              <Label>Export Destination</Label>
-              <Select value={selectedDevice} onValueChange={(value) => onDeviceChange(value as DeviceId)}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select destination" /></SelectTrigger>
-                <SelectContent>
-                  {getPrimaryExportDestinations().map((device) => (
-                    <SelectItem key={device.id} value={device.id} disabled={device.exportMethod === 'coming_soon'}>
-                      <div className="flex items-center gap-2">
-                        <span>{device.icon}</span><span>{device.name}</span>
-                        {device.exportMethod === 'coming_soon' && <span className="text-xs text-muted-foreground ml-2">(Coming Soon)</span>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(() => {
-                const device = getDeviceById(selectedDevice);
-                if (!device) return null;
-                return (
-                  <Alert className="bg-muted/50">
-                    <Info className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
-                      {device.requiresMapping ? (<><strong>Requires exercise mapping.</strong> Your exercises will be matched to {device.name}'s exercise database for proper tracking on your device.</>) : (<><strong>Direct export.</strong> Your workout will be exported directly without exercise mapping.</>)}
-                      {device.setupInstructions && <span className="block mt-1 text-muted-foreground">{device.setupInstructions}</span>}
-                    </AlertDescription>
-                  </Alert>
-                );
-              })()}
-            </div>}
             <div className="flex gap-2 flex-wrap">
-              {(() => {
-                const device = getDeviceById(selectedDevice);
-                const needsMapping = device?.requiresMapping ?? true;
-                const isAvailable = device?.exportMethod !== 'coming_soon';
-                if (!isAvailable) {
-                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save to Library</Button>}<Button disabled className="gap-2 opacity-50"><Clock className="w-4 h-4" />{device?.name} Coming Soon</Button></>);
-                }
-                if (isEditingFromHistory) {
-                  // Library edit: only save back to the library, no export actions.
-                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save Changes</Button>}</>);
-                }
-                if (isCreatingFromScratch) {
-                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save Workout</Button>}{needsMapping && (<><Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2"><Wand2 className="w-4 h-4" />Re-Map & Export</Button><Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2"><ShieldCheck className="w-4 h-4" />Validate & Review</Button></>)}{!needsMapping && (<Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">{device?.exportMethod === 'file_download' ? <Download className="w-4 h-4" /> : <Send className="w-4 h-4" />}Export to {device?.name}</Button>)}</>);
-                }
-                if (needsMapping) {
-                  return (<><Button onClick={onAutoMap} disabled={loading} className="gap-2"><Wand2 className="w-4 h-4" />Auto-Map & Export</Button><Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2"><ShieldCheck className="w-4 h-4" />Validate & Review</Button>{onSave && <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2"><Save className="w-4 h-4" />Save Draft</Button>}</>);
-                }
-                return (<><Button onClick={onAutoMap} disabled={loading} className="gap-2">{device?.exportMethod === 'file_download' ? <Download className="w-4 h-4" /> : <Send className="w-4 h-4" />}Export to {device?.name}</Button>{onSave && <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2"><Save className="w-4 h-4" />Save Draft</Button>}</>);
-              })()}
+              {isEditingFromHistory ? (
+                onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save Changes</Button>
+              ) : (
+                <>
+                  {onSave && <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2"><Save className="w-4 h-4" />{isCreatingFromScratch ? 'Save Workout' : 'Save Draft'}</Button>}
+                  {onExport && (
+                    <Button onClick={() => onExport(workoutWithIds)} variant="default" className="gap-2">
+                      <Upload className="w-4 h-4" />Export
+                    </Button>
+                  )}
+                </>
+              )}
               {import.meta.env.DEV && (
                 <Button onClick={() => { navigator.clipboard.writeText(JSON.stringify(workoutWithIds, null, 2)); setJsonCopied(true); setTimeout(() => setJsonCopied(false), 2000); }} variant="outline" className="gap-2">
                   {jsonCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{jsonCopied ? 'Copied!' : 'Copy JSON'}
@@ -253,7 +205,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
           <ExerciseSearch
             onSelect={(exerciseName) => addExercise(addingToBlock, exerciseName, addingToSuperset?.supersetIdx)}
             onClose={() => { setShowExerciseSearch(false); setAddingToBlock(null); setAddingToSuperset(null); }}
-            device={selectedDevice}
+            device="garmin"
           />
         )}
 
