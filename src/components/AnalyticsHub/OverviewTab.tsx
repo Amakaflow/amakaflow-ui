@@ -6,6 +6,7 @@ import { TrendingUp, Flame, Clock, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   computeWeeklyHours,
+  computeWeeklySessionCount,
   computeMonthlyHours,
   computeStreak,
   computeTrainingSplit,
@@ -18,6 +19,7 @@ import type { AppUser } from '../../app/useAppAuth';
 import type { WorkoutHistoryItem } from '../../lib/workout-history';
 
 interface OverviewTabProps {
+  /** Reserved for future personalisation (units, locale). Not yet consumed. */
   user: AppUser;
   history: WorkoutHistoryItem[];
 }
@@ -26,8 +28,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
   const [chartMode, setChartMode] = useState<'sessions' | 'hours'>('sessions');
 
   const weeklyHours = computeWeeklyHours(history);
-  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7);
-  const sessionsThisWeek = history.filter(item => new Date(item.createdAt) >= weekStart).length;
+  const sessionsThisWeek = computeWeeklySessionCount(history);
   const streak = computeStreak(history);
   const delta = computeWeeklyDelta(history);
   const { strengthMinutes, cardioMinutes } = computeTrainingSplit(history);
@@ -46,7 +47,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
             <Clock className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold" data-testid="stat-weekly-hours">
+            <div className="text-2xl font-semibold" data-testid="stat-weekly-hours" aria-label={`This week: ${formatHours(weeklyHours)} training`}>
               {formatHours(weeklyHours)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">training</p>
@@ -59,7 +60,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
             <Calendar className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold" data-testid="stat-sessions">
+            <div className="text-2xl font-semibold" data-testid="stat-sessions" aria-label={`${sessionsThisWeek} sessions in the last 7 days`}>
               {sessionsThisWeek}
             </div>
             <p className="text-xs text-muted-foreground mt-1">last 7 days</p>
@@ -72,7 +73,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
             <Flame className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold" data-testid="stat-streak">
+            <div className="text-2xl font-semibold" data-testid="stat-streak" aria-label={`${streak}-day streak`}>
               {streak}d
             </div>
             <p className="text-xs text-muted-foreground mt-1">consecutive days</p>
@@ -88,6 +89,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
             <div
               className={`text-2xl font-semibold ${delta > 0 ? 'text-green-600 dark:text-green-400' : delta < 0 ? 'text-red-500' : ''}`}
               data-testid="stat-delta"
+              aria-label={delta === 0 ? 'Same as last week' : `${delta > 0 ? '+' : ''}${formatHours(Math.abs(delta))} compared to last week`}
             >
               {delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${formatHours(Math.abs(delta))}`}
             </div>

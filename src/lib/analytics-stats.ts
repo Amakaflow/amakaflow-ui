@@ -43,6 +43,15 @@ function getCutoff(days: number): Date {
   return d;
 }
 
+/** Number of workouts completed in the last 7 days. */
+export function computeWeeklySessionCount(history: WorkoutHistoryItem[]): number {
+  const cutoff = getCutoff(7);
+  return history.filter(item => {
+    const d = new Date(item.createdAt);
+    return !isNaN(d.getTime()) && d >= cutoff;
+  }).length;
+}
+
 export function computeWeeklyHours(history: WorkoutHistoryItem[]): number {
   const cutoff = getCutoff(7);
   const minutes = history

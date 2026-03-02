@@ -3,6 +3,7 @@ import {
   estimateWorkoutDuration,
   formatHours,
   computeWeeklyHours,
+  computeWeeklySessionCount,
   computeMonthlyHours,
   computeStreak,
   computeTrainingSplit,
@@ -80,6 +81,23 @@ describe('formatHours', () => {
   it('formats minutes only when < 1 hour', () => expect(formatHours(0.5)).toBe('30m'));
   it('formats hours and minutes', () => expect(formatHours(1.5)).toBe('1h 30m'));
   it('formats 0 as 0m', () => expect(formatHours(0)).toBe('0m'));
+});
+
+describe('computeWeeklySessionCount', () => {
+  it('returns 0 for empty history', () => {
+    expect(computeWeeklySessionCount([])).toBe(0);
+  });
+
+  it('counts workouts in the last 7 days', () => {
+    const history = [makeItem({ daysAgo: 0 }), makeItem({ daysAgo: 6 }), makeItem({ daysAgo: 8 })];
+    expect(computeWeeklySessionCount(history)).toBe(2);
+  });
+
+  it('excludes workouts with invalid dates', () => {
+    const invalid = makeItem({ daysAgo: 0 });
+    invalid.createdAt = 'not-a-date';
+    expect(computeWeeklySessionCount([invalid])).toBe(0);
+  });
 });
 
 describe('computeWeeklyHours', () => {
