@@ -650,6 +650,7 @@ export function WorkoutList({
                           onClick={() => handleEdit(workout)}
                           className="h-8 w-8 p-0"
                           aria-label="Edit workout"
+                          data-testid={`workout-edit-${workout.id}`}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -869,6 +870,7 @@ export function WorkoutList({
                             variant="outline"
                             onClick={() => handleEdit(workout)}
                             className="gap-2 h-9 font-medium"
+                            data-testid={`workout-edit-${workout.id}`}
                           >
                             <Edit className="w-4 h-4" />
                             Edit

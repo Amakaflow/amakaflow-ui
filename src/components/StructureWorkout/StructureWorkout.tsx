@@ -191,7 +191,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
 
         {!hideExport && <Card>
           <CardContent className="space-y-4 pt-6">
-            <div className="space-y-3">
+            {!isEditingFromHistory && <div className="space-y-3">
               <Label>Export Destination</Label>
               <Select value={selectedDevice} onValueChange={(value) => onDeviceChange(value as DeviceId)}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="Select destination" /></SelectTrigger>
@@ -219,7 +219,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
                   </Alert>
                 );
               })()}
-            </div>
+            </div>}
             <div className="flex gap-2 flex-wrap">
               {(() => {
                 const device = getDeviceById(selectedDevice);
@@ -228,8 +228,12 @@ export function StructureWorkout(props: StructureWorkoutProps) {
                 if (!isAvailable) {
                   return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save to Library</Button>}<Button disabled className="gap-2 opacity-50"><Clock className="w-4 h-4" />{device?.name} Coming Soon</Button></>);
                 }
-                if (isEditingFromHistory || isCreatingFromScratch) {
-                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />{isCreatingFromScratch ? 'Save Workout' : 'Save Changes'}</Button>}{isEditingFromHistory && needsMapping && (<><Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2"><Wand2 className="w-4 h-4" />Re-Map & Export</Button><Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2"><ShieldCheck className="w-4 h-4" />Validate & Review</Button></>)}{isEditingFromHistory && !needsMapping && (<Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">{device?.exportMethod === 'file_download' ? <Download className="w-4 h-4" /> : <Send className="w-4 h-4" />}Export to {device?.name}</Button>)}</>);
+                if (isEditingFromHistory) {
+                  // Library edit: only save back to the library, no export actions.
+                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save Changes</Button>}</>);
+                }
+                if (isCreatingFromScratch) {
+                  return (<>{onSave && <Button onClick={onSave} disabled={loading} className="gap-2"><Save className="w-4 h-4" />Save Workout</Button>}{needsMapping && (<><Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2"><Wand2 className="w-4 h-4" />Re-Map & Export</Button><Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2"><ShieldCheck className="w-4 h-4" />Validate & Review</Button></>)}{!needsMapping && (<Button onClick={onAutoMap} disabled={loading} variant="outline" className="gap-2">{device?.exportMethod === 'file_download' ? <Download className="w-4 h-4" /> : <Send className="w-4 h-4" />}Export to {device?.name}</Button>)}</>);
                 }
                 if (needsMapping) {
                   return (<><Button onClick={onAutoMap} disabled={loading} className="gap-2"><Wand2 className="w-4 h-4" />Auto-Map & Export</Button><Button onClick={onValidate} disabled={loading} variant="outline" className="gap-2"><ShieldCheck className="w-4 h-4" />Validate & Review</Button>{onSave && <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2"><Save className="w-4 h-4" />Save Draft</Button>}</>);
