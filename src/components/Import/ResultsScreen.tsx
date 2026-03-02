@@ -14,9 +14,10 @@ interface ResultsScreenProps {
   onRemove: (queueId: string) => void;
 }
 
-function SourceIcon({ type }: { type: QueueItem['type'] }) {
-  if (type === 'pdf') return <FileText className="w-5 h-5 text-muted-foreground" />;
-  if (type === 'image') return <Image className="w-5 h-5 text-muted-foreground" />;
+function SourceIcon({ sourceIcon, type }: { sourceIcon?: ProcessedItem['sourceIcon']; type?: QueueItem['type'] }) {
+  const resolved = sourceIcon ?? type;
+  if (resolved === 'pdf') return <FileText className="w-5 h-5 text-muted-foreground" />;
+  if (resolved === 'image') return <Image className="w-5 h-5 text-muted-foreground" />;
   return <Link className="w-5 h-5 text-muted-foreground" />;
 }
 
@@ -66,15 +67,14 @@ export function ResultsScreen({
 
       {/* Result cards */}
       <div className="space-y-3">
-        {queueItems.map(qi => {
-          const processed = processedItems.find(p => p.queueId === qi.id);
-          if (!processed || processed.status !== 'done') return null;
-          const isExpanded = expandedIds.has(qi.id);
+        {doneItems.map(processed => {
+          const qi = queueItems.find(q => q.id === processed.queueId);
+          const isExpanded = expandedIds.has(processed.queueId);
           return (
-            <Card key={qi.id}>
+            <Card key={processed.queueId}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <SourceIcon type={qi.type} />
+                  <SourceIcon sourceIcon={processed.sourceIcon} type={qi?.type} />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
                       {processed.workoutTitle ?? 'Untitled workout'}
@@ -87,7 +87,7 @@ export function ResultsScreen({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleExpand(qi.id)}
+                      onClick={() => toggleExpand(processed.queueId)}
                       aria-label={isExpanded ? `Collapse ${processed.workoutTitle ?? 'workout'}` : `Expand ${processed.workoutTitle ?? 'workout'}`}
                     >
                       {isExpanded
@@ -98,7 +98,7 @@ export function ResultsScreen({
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => onEdit(qi.id)}
+                      onClick={() => onEdit(processed.queueId)}
                     >
                       <Pencil className="w-3 h-3" />
                       Edit
@@ -106,7 +106,7 @@ export function ResultsScreen({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onRemove(qi.id)}
+                      onClick={() => onRemove(processed.queueId)}
                       aria-label="Remove"
                     >
                       <Trash2 className="w-4 h-4 text-muted-foreground" />
