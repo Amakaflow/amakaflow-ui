@@ -8,6 +8,9 @@
  *   - Select-all / deselect-all
  *   - Bulk delete: cancel and confirm paths
  *
+ * Tests work against real demo data — no API mocks.
+ * Workout IDs are discovered dynamically from the rendered DOM.
+ *
  * Tags: @smoke
  *
  * Usage:
@@ -18,41 +21,11 @@
 import { test, expect } from '@playwright/test';
 import { WorkoutsPage } from './pages/WorkoutsPage';
 
-// ---------------------------------------------------------------------------
-// Shared mock data
-// ---------------------------------------------------------------------------
-
-const MOCK_WORKOUTS = [
-  { id: 'wl-001', title: 'Morning HIIT Workout' },
-  { id: 'wl-002', title: 'Evening Strength Training' },
-  { id: 'wl-003', title: 'Weekend Long Run' },
-];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Install API mocks that every test in this file needs. */
-async function mockWorkoutsApi(page: import('@playwright/test').Page) {
-  await page.route('**/api/workouts**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ workouts: MOCK_WORKOUTS }),
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 test.describe('WorkoutList Smoke Tests @smoke', () => {
   let workoutsPage: WorkoutsPage;
 
   test.beforeEach(async ({ page }) => {
     workoutsPage = new WorkoutsPage(page);
-    await mockWorkoutsApi(page);
   });
 
   // -------------------------------------------------------------------------
@@ -60,22 +33,19 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
   // -------------------------------------------------------------------------
 
   test('WLSMOKE-1: view mode — compact is default, cards view changes layout', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
-    // Compact button should show as active (variant="default") out of the box.
-    // The cards button should be "outline" (not active).
     await expect(workoutsPage.viewModeCompact).toBeVisible();
     await expect(workoutsPage.viewModeCards).toBeVisible();
 
-    // Compact view: workout items are flat rows (space-y-1)
     const listContainer = page.locator('[data-assistant-target="library-results"]');
+
+    // Compact view: list has space-y-1 class
     await expect(listContainer).toHaveClass(/space-y-1/);
 
     // Switch to cards view
     await workoutsPage.switchToCardsView();
-
-    // Cards view: workout items are cards (space-y-2)
     await expect(listContainer).toHaveClass(/space-y-2/);
 
     // Switch back to compact
@@ -88,30 +58,28 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
   // -------------------------------------------------------------------------
 
   test('WLSMOKE-2: search — typing filters visible workouts', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
-    // All three workouts should be visible initially
     const initialCount = await workoutsPage.getWorkoutCount();
-    expect(initialCount).toBe(MOCK_WORKOUTS.length);
+    expect(initialCount, 'Demo should have at least one workout').toBeGreaterThan(0);
 
-    // Search for a term that matches only one workout
-    await workoutsPage.search('HIIT');
+    // Search for something that won't match any workout
+    await workoutsPage.search('xyzzy_no_match_12345');
     const filteredCount = await workoutsPage.getWorkoutCount();
     expect(filteredCount).toBeLessThan(initialCount);
 
-    // The HIIT workout should still be visible
-    await expect(workoutsPage.getWorkoutItem('wl-001')).toBeVisible();
-
-    // A non-matching workout should no longer be visible
-    await expect(workoutsPage.getWorkoutItem('wl-002')).not.toBeVisible();
+    // Clear search — all workouts should return
+    await workoutsPage.search('');
+    await page.waitForTimeout(400); // allow debounce to settle
+    const restoredCount = await workoutsPage.getWorkoutCount();
+    expect(restoredCount).toBe(initialCount);
   });
 
   test('WLSMOKE-3: search — term with no matches shows empty list', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
-    // Search for something that matches nothing
     await workoutsPage.search('xyzzy_no_match_ever');
 
     const count = await workoutsPage.getWorkoutCount();
@@ -123,32 +91,34 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
   // -------------------------------------------------------------------------
 
   test('WLSMOKE-4: selecting a workout checkbox enables the bulk-delete button', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
-    // Bulk-delete button should be disabled with nothing selected
+    const ids = await workoutsPage.getWorkoutIds();
+    expect(ids.length, 'Need at least one workout in demo data').toBeGreaterThan(0);
+
     const bulkDeleteBtn = page.locator('[data-testid="bulk-delete-button"]');
     await expect(bulkDeleteBtn).toBeDisabled();
 
-    // Select the first workout
-    await workoutsPage.checkWorkout('wl-001');
+    await workoutsPage.checkWorkout(ids[0]);
 
-    // Button should now be enabled
     await expect(bulkDeleteBtn).toBeEnabled();
     await expect(bulkDeleteBtn).toContainText('Delete selected (1)');
   });
 
   test('WLSMOKE-5: deselecting a checkbox disables the bulk-delete button again', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
+
+    const ids = await workoutsPage.getWorkoutIds();
+    expect(ids.length).toBeGreaterThan(0);
 
     const bulkDeleteBtn = page.locator('[data-testid="bulk-delete-button"]');
 
-    // Select then deselect
-    await workoutsPage.checkWorkout('wl-001');
+    await workoutsPage.checkWorkout(ids[0]);
     await expect(bulkDeleteBtn).toBeEnabled();
 
-    await workoutsPage.uncheckWorkout('wl-001');
+    await workoutsPage.uncheckWorkout(ids[0]);
     await expect(bulkDeleteBtn).toBeDisabled();
   });
 
@@ -157,8 +127,11 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
   // -------------------------------------------------------------------------
 
   test('WLSMOKE-6: select-all checks all workouts; clicking again deselects all', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
+
+    const ids = await workoutsPage.getWorkoutIds();
+    expect(ids.length).toBeGreaterThan(0);
 
     const bulkDeleteBtn = page.locator('[data-testid="bulk-delete-button"]');
 
@@ -166,21 +139,19 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
     await workoutsPage.clickSelectAll();
 
     // All individual checkboxes should now be checked
-    for (const workout of MOCK_WORKOUTS) {
-      const checkbox = page.locator(`[data-testid="workout-checkbox-${workout.id}"]`);
-      await expect(checkbox).toBeChecked();
+    for (const id of ids) {
+      await expect(page.locator(`[data-testid="workout-checkbox-${id}"]`)).toBeChecked();
     }
 
     // Bulk-delete button should reflect the total count
-    await expect(bulkDeleteBtn).toContainText(`Delete selected (${MOCK_WORKOUTS.length})`);
+    await expect(bulkDeleteBtn).toContainText(`Delete selected (${ids.length})`);
 
     // Click select-all again to deselect
     await workoutsPage.clickSelectAll();
 
     // All checkboxes should be unchecked
-    for (const workout of MOCK_WORKOUTS) {
-      const checkbox = page.locator(`[data-testid="workout-checkbox-${workout.id}"]`);
-      await expect(checkbox).not.toBeChecked();
+    for (const id of ids) {
+      await expect(page.locator(`[data-testid="workout-checkbox-${id}"]`)).not.toBeChecked();
     }
 
     await expect(bulkDeleteBtn).toBeDisabled();
@@ -191,69 +162,62 @@ test.describe('WorkoutList Smoke Tests @smoke', () => {
   // -------------------------------------------------------------------------
 
   test('WLSMOKE-7: bulk delete — cancel closes modal and preserves selection', async ({ page }) => {
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
-    // Select one workout and open the modal
-    await workoutsPage.checkWorkout('wl-001');
+    const ids = await workoutsPage.getWorkoutIds();
+    expect(ids.length).toBeGreaterThan(0);
+
+    const firstId = ids[0];
+
+    await workoutsPage.checkWorkout(firstId);
     await workoutsPage.openBulkDeleteModal();
 
-    // Modal should be visible
     await workoutsPage.waitForBulkDeleteModal();
     await expect(page.locator('[data-testid="bulk-delete-modal-title"]')).toContainText(
       'Delete 1 workout(s)?'
     );
 
-    // Cancel
     await workoutsPage.cancelBulkDelete();
     await workoutsPage.waitForBulkDeleteModalClosed();
 
-    // Selection should still be intact (checkbox remains checked)
-    const checkbox = page.locator('[data-testid="workout-checkbox-wl-001"]');
-    await expect(checkbox).toBeChecked();
-
-    // Workout should still be visible
-    await expect(workoutsPage.getWorkoutItem('wl-001')).toBeVisible();
+    // Selection should still be intact
+    await expect(page.locator(`[data-testid="workout-checkbox-${firstId}"]`)).toBeChecked();
+    await expect(workoutsPage.getWorkoutItem(firstId)).toBeVisible();
   });
 
   test('WLSMOKE-8: bulk delete — confirm removes workouts from the list', async ({ page }) => {
-    // Mock the delete API to succeed
-    let deleteApiCalled = false;
-    await page.route('**/api/workouts**', async (route) => {
+    // Intercept all DELETE requests so we don't permanently mutate demo data.
+    await page.route('**', async (route) => {
       if (route.request().method() === 'DELETE') {
-        deleteApiCalled = true;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ success: true }),
         });
       } else {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ workouts: MOCK_WORKOUTS }),
-        });
+        await route.continue();
       }
     });
 
-    await workoutsPage.goto('/workouts');
+    await workoutsPage.goto('/');
     await workoutsPage.waitForWorkoutsLoad();
 
+    const ids = await workoutsPage.getWorkoutIds();
+    expect(ids.length).toBeGreaterThan(0);
+
+    const targetId = ids[0];
     const initialCount = await workoutsPage.getWorkoutCount();
 
-    // Select one workout and open the bulk-delete modal
-    await workoutsPage.checkWorkout('wl-002');
+    await workoutsPage.checkWorkout(targetId);
     await workoutsPage.openBulkDeleteModal();
     await workoutsPage.waitForBulkDeleteModal();
 
-    // Confirm delete
     await workoutsPage.confirmBulkDelete();
     await workoutsPage.waitForBulkDeleteModalClosed();
 
-    // The deleted workout should no longer be visible
-    await expect(workoutsPage.getWorkoutItem('wl-002')).not.toBeVisible();
+    await expect(workoutsPage.getWorkoutItem(targetId)).not.toBeVisible();
 
-    // Overall count should have decreased
     const finalCount = await workoutsPage.getWorkoutCount();
     expect(finalCount).toBeLessThan(initialCount);
   });

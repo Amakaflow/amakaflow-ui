@@ -69,11 +69,13 @@ export class WorkoutsPage {
   }
 
   /**
-   * Navigate to the workouts page
+   * Navigate to the workouts page by clicking the "My Workouts" nav item.
    */
   async goto(path = '/') {
     await this.page.goto(path);
-    // Wait for either loading to finish or workouts to appear
+    await this.page.waitForLoadState('networkidle');
+    // Click "My Workouts" in the nav to switch to the workouts view
+    await this.page.locator('[data-assistant-target="nav-library"]').click();
     await this.page.waitForLoadState('networkidle');
   }
 
@@ -89,6 +91,21 @@ export class WorkoutsPage {
     
     // Then wait for workout list to be visible
     await this.workoutList.waitFor({ state: 'visible', timeout });
+  }
+
+  /**
+   * Get IDs of all currently rendered workout items by reading their data-testid attributes.
+   * Use this instead of hardcoded IDs so tests work against real demo data.
+   */
+  async getWorkoutIds(): Promise<string[]> {
+    const items = this.workoutList.locator('[data-testid^="workout-item-"]');
+    const count = await items.count();
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const attr = await items.nth(i).getAttribute('data-testid');
+      if (attr) ids.push(attr.replace('workout-item-', ''));
+    }
+    return ids;
   }
 
   /**
