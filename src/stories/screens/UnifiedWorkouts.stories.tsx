@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { http, HttpResponse } from 'msw';
-import { UnifiedWorkouts } from '../../components/UnifiedWorkouts';
+import { WorkoutList } from '../../components/Workouts/WorkoutList';
 
 const SAMPLE_WORKOUTS = [
   {
@@ -78,9 +78,9 @@ const SAMPLE_WORKOUTS = [
   },
 ];
 
-const meta: Meta<typeof UnifiedWorkouts> = {
-  title: 'Screens/UnifiedWorkouts',
-  component: UnifiedWorkouts,
+const meta: Meta<typeof WorkoutList> = {
+  title: 'Screens/WorkoutList',
+  component: WorkoutList,
   parameters: { layout: 'fullscreen' },
   args: {
     profileId: 'user_storybook',
@@ -92,7 +92,7 @@ const meta: Meta<typeof UnifiedWorkouts> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof UnifiedWorkouts>;
+type Story = StoryObj<typeof WorkoutList>;
 
 export const Default: Story = {
   name: 'With workouts',
