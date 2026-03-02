@@ -35,8 +35,8 @@ export const Calendar = lazy(() =>
   import('../components/Calendar').then(m => ({ default: m.Calendar }))
 );
 
-export const UnifiedWorkouts = lazy(() =>
-  import('../components/UnifiedWorkouts').then(m => ({ default: m.UnifiedWorkouts }))
+export const WorkoutList = lazy(() =>
+  import('../components/Workouts/WorkoutList').then(m => ({ default: m.WorkoutList }))
 );
 
 export const MobileCompanion = lazy(() =>

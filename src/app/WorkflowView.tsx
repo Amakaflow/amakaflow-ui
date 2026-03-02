@@ -16,7 +16,7 @@ import {
   UserSettings,
   StravaEnhance,
   Calendar,
-  UnifiedWorkouts,
+  WorkoutList,
   MobileCompanion,
   ImportScreen,
   HelpPage,
@@ -363,7 +363,7 @@ export function WorkflowView({
 
         {currentView === 'workouts' && (
           <div data-assistant-target="workout-list">
-            <UnifiedWorkouts
+            <WorkoutList
               profileId={user.id}
               onEditWorkout={item => {
                 handleEditFromHistory({
