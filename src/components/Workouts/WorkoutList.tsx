@@ -232,19 +232,33 @@ export function WorkoutList({
     <div className="space-y-4">
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          data-testid="bulk-delete-modal"
+        >
           <div className="bg-background p-6 rounded-xl shadow-xl w-[360px] border">
-            <h2 className="text-lg font-semibold mb-3">
+            <h2
+              className="text-lg font-semibold mb-3"
+              data-testid="bulk-delete-modal-title"
+            >
               Delete {pendingDeleteIds.length} workout(s)?
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
               This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={cancelBulkDelete}>
+              <Button
+                variant="outline"
+                onClick={cancelBulkDelete}
+                data-testid="bulk-delete-cancel"
+              >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={confirmBulkDelete}>
+              <Button
+                variant="destructive"
+                onClick={confirmBulkDelete}
+                data-testid="bulk-delete-confirm"
+              >
                 Delete
               </Button>
             </div>
@@ -269,6 +283,7 @@ export function WorkoutList({
               onChange={toggleSelectAll}
               aria-label="Select all workouts"
               className="w-4 h-4"
+              data-testid="select-all-checkbox"
             />
             <Button
               type="button"
@@ -277,6 +292,7 @@ export function WorkoutList({
               disabled={selectedIds.length === 0}
               onClick={() => handleBulkDeleteClick(selectedIds)}
               className="gap-2"
+              data-testid="bulk-delete-button"
             >
               Delete selected ({selectedIds.length})
             </Button>
@@ -536,6 +552,7 @@ export function WorkoutList({
                         onChange={() => toggleSelect(workout.id)}
                         aria-label="Select workout"
                         className="w-4 h-4 flex-shrink-0"
+                        data-testid={`workout-checkbox-${workout.id}`}
                       />
                       {/* Thumbnail for video workouts */}
                       {isVideo && workout.thumbnailUrl && (
@@ -737,6 +754,7 @@ export function WorkoutList({
                           onChange={() => toggleSelect(workout.id)}
                           aria-label="Select workout"
                           className="w-4 h-4 flex-shrink-0 mt-1"
+                          data-testid={`workout-checkbox-${workout.id}`}
                         />
                         {/* Thumbnail for video workouts */}
                         {isVideo && workout.thumbnailUrl && (
