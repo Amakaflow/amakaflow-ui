@@ -27,7 +27,7 @@ export function AnalyticsHub({ user, history }: AnalyticsHubProps) {
           <OverviewTab user={user} history={history} />
         </TabsContent>
         <TabsContent value="volume" className="mt-6">
-          <VolumeAnalytics user={user} />
+          <VolumeAnalytics user={user} history={history} />
         </TabsContent>
         <TabsContent value="exercise" className="mt-6">
           <ExerciseHistory user={user} />
