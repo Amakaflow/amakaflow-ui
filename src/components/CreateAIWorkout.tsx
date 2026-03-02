@@ -36,7 +36,11 @@ const EQUIPMENT_OPTIONS = [
   'Medicine Ball',
 ];
 
-export function CreateAIWorkout() {
+interface CreateAIWorkoutProps {
+  onNavigate?: (view: 'calendar') => void;
+}
+
+export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
@@ -72,7 +76,7 @@ export function CreateAIWorkout() {
 
   const handleAddToCalendar = () => {
     // Navigate to calendar view - the parent component handles this
-    window.location.hash = 'calendar';
+    onNavigate?.('calendar');
   };
 
   const toggleEquipment = (item: string) => {
@@ -184,7 +188,7 @@ export function CreateAIWorkout() {
             <p className="text-muted-foreground mt-2">Your workout has been added to the library.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button variant="outline" onClick={() => window.location.hash = 'calendar'}>
+            <Button variant="outline" onClick={() => onNavigate?.('calendar')}>
               <CalendarDays className="w-4 h-4 mr-2" />
               Add to Calendar
             </Button>
