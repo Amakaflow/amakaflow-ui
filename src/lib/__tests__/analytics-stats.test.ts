@@ -107,7 +107,7 @@ describe('computeMonthlyHours', () => {
   it('sums hours for current calendar month only', () => {
     const thisMonth = makeItem({ daysAgo: 0 });
     const lastMonth = makeItem({ daysAgo: 35 });
-    expect(computeMonthlyHours([thisMonth])).toBeGreaterThan(0);
+    expect(computeMonthlyHours([thisMonth])).toBeCloseTo(0.3); // 2 exercises × 3 sets × 3 min = 18 min = 0.3h
     expect(computeMonthlyHours([lastMonth])).toBe(0);
   });
 });

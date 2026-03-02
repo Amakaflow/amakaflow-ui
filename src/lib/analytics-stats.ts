@@ -1,27 +1,27 @@
 import type { WorkoutHistoryItem } from './workout-history';
 
+const MAX_STREAK_DAYS = 365;
+
+// CARDIO_TYPES covers both WorkoutType enum values and legacy API strings
+// that appear in workout_type but are not in the TypeScript union
 const CARDIO_TYPES = new Set(['cardio', 'hiit', 'cycling', 'running', 'yoga', 'swimming', 'rowing']);
+
+function estimateExerciseDuration(ex: { sets?: number | string | null; duration_sec?: number | null }): number {
+  if (ex.duration_sec) return ex.duration_sec / 60;
+  const sets = typeof ex.sets === 'number' ? ex.sets : parseInt(String(ex.sets ?? '3'), 10);
+  return (isNaN(sets) ? 3 : sets) * 3;
+}
 
 export function estimateWorkoutDuration(item: WorkoutHistoryItem): number {
   const blocks = item.workout?.blocks ?? [];
   let total = 0;
   for (const block of blocks) {
-    for (const ex of (block as any).exercises ?? []) {
-      if (ex.duration_sec) {
-        total += ex.duration_sec / 60;
-      } else {
-        const sets = typeof ex.sets === 'number' ? ex.sets : parseInt(String(ex.sets ?? '3'), 10);
-        total += (isNaN(sets) ? 3 : sets) * 3;
-      }
+    for (const ex of block.exercises ?? []) {
+      total += estimateExerciseDuration(ex);
     }
-    for (const ss of (block as any).supersets ?? []) {
+    for (const ss of block.supersets ?? []) {
       for (const ex of ss.exercises ?? []) {
-        if (ex.duration_sec) {
-          total += ex.duration_sec / 60;
-        } else {
-          const sets = typeof ex.sets === 'number' ? ex.sets : parseInt(String(ex.sets ?? '3'), 10);
-          total += (isNaN(sets) ? 3 : sets) * 3;
-        }
+        total += estimateExerciseDuration(ex);
       }
     }
   }
@@ -37,16 +37,19 @@ export function formatHours(hours: number): string {
   return `${h}h ${m}m`;
 }
 
-function isWithinDays(item: WorkoutHistoryItem, days: number): boolean {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const d = new Date(item.createdAt);
-  return !isNaN(d.getTime()) && d >= cutoff;
+function getCutoff(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d;
 }
 
 export function computeWeeklyHours(history: WorkoutHistoryItem[]): number {
+  const cutoff = getCutoff(7);
   const minutes = history
-    .filter(item => isWithinDays(item, 7))
+    .filter(item => {
+      const d = new Date(item.createdAt);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    })
     .reduce((sum, item) => sum + estimateWorkoutDuration(item), 0);
   return minutes / 60;
 }
@@ -70,15 +73,15 @@ export function computeStreak(history: WorkoutHistoryItem[]): number {
       .filter(item => !isNaN(new Date(item.createdAt).getTime()))
       .map(item => {
         const d = new Date(item.createdAt);
-        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        return d.toISOString().slice(0, 10);
       })
   );
   let streak = 0;
   const today = new Date();
-  for (let i = 0; i < 365; i++) {
+  for (let i = 0; i < MAX_STREAK_DAYS; i++) {
     const check = new Date(today);
     check.setDate(today.getDate() - i);
-    const key = `${check.getFullYear()}-${check.getMonth()}-${check.getDate()}`;
+    const key = check.toISOString().slice(0, 10);
     if (workoutDays.has(key)) {
       streak++;
     } else if (i === 0) {
@@ -94,12 +97,16 @@ export function computeTrainingSplit(
   history: WorkoutHistoryItem[],
   weeks = 4
 ): { strengthMinutes: number; cardioMinutes: number } {
-  const recent = history.filter(item => isWithinDays(item, weeks * 7));
+  const cutoff = getCutoff(weeks * 7);
+  const recent = history.filter(item => {
+    const d = new Date(item.createdAt);
+    return !isNaN(d.getTime()) && d >= cutoff;
+  });
   let strengthMinutes = 0;
   let cardioMinutes = 0;
   for (const item of recent) {
     const mins = estimateWorkoutDuration(item);
-    const type = (item.workout as any)?.workout_type ?? 'strength';
+    const type = item.workout?.workout_type ?? 'strength';
     if (CARDIO_TYPES.has(type)) {
       cardioMinutes += mins;
     } else {
@@ -110,6 +117,7 @@ export function computeTrainingSplit(
 }
 
 export function computeAverageWorkoutDuration(history: WorkoutHistoryItem[]): number {
+  // Assumes history is ordered most-recent-first (as returned by getWorkoutHistory)
   const recent = history.slice(0, 30);
   if (recent.length === 0) return 0;
   const total = recent.reduce((sum, item) => sum + estimateWorkoutDuration(item), 0);
@@ -120,8 +128,12 @@ export function computeWeeklyDelta(history: WorkoutHistoryItem[]): number {
   const now = new Date();
   const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
   const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+  const cutoff7 = getCutoff(7);
   const thisWeekMins = history
-    .filter(item => isWithinDays(item, 7))
+    .filter(item => {
+      const d = new Date(item.createdAt);
+      return !isNaN(d.getTime()) && d >= cutoff7;
+    })
     .reduce((s, i) => s + estimateWorkoutDuration(i), 0);
   const lastWeekMins = history
     .filter(item => {
@@ -148,9 +160,9 @@ export function computeWeeklyChartData(history: WorkoutHistoryItem[]): Array<{
       return !isNaN(d.getTime()) && d.toDateString() === date.toDateString();
     });
     const hours = dayItems.reduce((s, item) => s + estimateWorkoutDuration(item), 0) / 60;
-    const types = dayItems.map(item => (item.workout as any)?.workout_type ?? 'strength');
-    const hasCardio = types.some(t => CARDIO_TYPES.has(t));
-    const hasStrength = types.some(t => !CARDIO_TYPES.has(t));
+    const types = dayItems.map(item => item.workout?.workout_type ?? 'strength');
+    const hasCardio = types.some(t => t != null && CARDIO_TYPES.has(t));
+    const hasStrength = types.some(t => t == null || !CARDIO_TYPES.has(t));
     const type = hasCardio && hasStrength ? 'mixed' : hasCardio ? 'cardio' : 'strength';
     return { day: dayName, sessions: dayItems.length, hours: Math.round(hours * 10) / 10, type };
   });
