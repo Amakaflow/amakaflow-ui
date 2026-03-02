@@ -1,0 +1,86 @@
+name: Automatic Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - develop
+      - main
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_sticky_comment: true
+          claude_args: '--model claude-sonnet-4-6 --max-turns 10'
+          direct_prompt: |
+            You are a senior React/TypeScript engineer performing an automated code review.
+
+            Review ALL files changed in this pull request. Focus on:
+
+            1. **TypeScript correctness** — flag `any` types, missing types, unsafe casts
+            2. **React correctness** — hook rules (no hooks in loops/conditions), correct dependency arrays in useEffect/useCallback/useMemo, missing keys in lists
+            3. **Pattern consistency** — does the code follow existing patterns in the codebase? (check neighbouring files for conventions)
+            4. **Test coverage** — are new functions and logic paths tested?
+            5. **Security** — no dangerouslySetInnerHTML, no secrets in client code, no XSS vectors
+            6. **Performance** — unnecessary re-renders, missing memoization for expensive operations passed as props
+
+            Format your review exactly like this:
+
+            ## Automated Code Review
+
+            **Verdict:** ✅ Approved | ⚠️ Minor issues (non-blocking) | ❌ Changes required
+
+            ### Issues
+            <!-- Only include if there are issues. Format: `file.tsx:42` — **Severity** — description -->
+
+            ### Notes
+            <!-- Non-blocking observations, suggestions, or positive callouts -->
+
+            Rules:
+            - Be concise and direct. No padding.
+            - Reference exact file paths and line numbers.
+            - Only flag real problems — not style preferences or nitpicks.
+            - If the PR is clean, say so clearly.
+            - Severity levels: **Critical** (security/data loss), **Major** (bug/wrong behaviour), **Minor** (code quality).
+            - Only give ❌ if there are Critical or Major issues that must be fixed before merging.
+            - ⚠️ is for Minor issues that are worth noting but should not block the merge.
+
+      - name: Check verdict and fail if blocked
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+
+          # Wait a moment for the comment to be posted
+          sleep 5
+
+          # Find the review comment (sticky comment marker used by claude-code-action)
+          COMMENT=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
+            --jq '[.comments[] | select(.body | contains("## Automated Code Review"))] | last | .body // ""')
+
+          if [ -z "$COMMENT" ]; then
+            echo "No review comment found — assuming approved"
+            exit 0
+          fi
+
+          if echo "$COMMENT" | grep -q "❌ Changes required"; then
+            echo "::error::Claude review requires changes before this PR can merge. See the PR comment for details."
+            exit 1
+          fi
+
+          echo "Review passed (✅ Approved or ⚠️ Minor issues only)"
