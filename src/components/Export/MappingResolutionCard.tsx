@@ -40,6 +40,7 @@ export function MappingResolutionCard({
     <div className="border rounded-md">
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
       >
         <div className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />

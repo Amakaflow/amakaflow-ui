@@ -36,7 +36,7 @@ export function ExportPage({ initialWorkout, initialDevice, devices, onBack }: E
     if (initialWorkout) {
       addToQueue(initialWorkout);
     }
-    if (initialDevice && initialDevice !== 'garmin') {
+    if (initialDevice) {
       setDestination(initialDevice);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

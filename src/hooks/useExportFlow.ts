@@ -89,7 +89,9 @@ export function useExportFlow({ userId }: UseExportFlowProps): UseExportFlowRetu
 
   const resolveMapping = useCallback((exerciseName: string, garminName: string) => {
     setMappings(prev => ({ ...prev, [exerciseName]: garminName }));
-    apiSaveUserMapping(exerciseName, garminName).catch(() => {});
+    apiSaveUserMapping(exerciseName, garminName).catch((err) => {
+      console.warn('[useExportFlow] Failed to persist mapping:', err);
+    });
   }, []);
 
   const detectConflicts = useCallback(
@@ -99,8 +101,8 @@ export function useExportFlow({ userId }: UseExportFlowProps): UseExportFlowRetu
 
       const conflicts: ConflictItem[] = [];
       for (const block of workout.blocks || []) {
-        if (block.structure && COMPLEX_STRUCTURES.includes(block.structure as WorkoutStructureType)) {
-          const warning = STRUCTURE_WARNINGS[block.structure as string];
+        if (block.structure && COMPLEX_STRUCTURES.includes(block.structure)) {
+          const warning = STRUCTURE_WARNINGS[block.structure];
           if (warning) {
             conflicts.push({
               blockLabel: block.label,

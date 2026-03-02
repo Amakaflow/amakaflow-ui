@@ -28,6 +28,8 @@ export function ConflictCard({ conflict }: ConflictCardProps) {
             size="sm"
             onClick={() => {}}
             className="h-7 text-xs"
+            title="Preview functionality coming soon"
+            aria-label="Show me a preview of how this block will be exported"
           >
             Show me
           </Button>
@@ -36,6 +38,8 @@ export function ConflictCard({ conflict }: ConflictCardProps) {
             size="sm"
             onClick={() => {}}
             className="h-7 text-xs"
+            title="Export will proceed despite the warning"
+            aria-label="Export this block anyway despite the structural warning"
           >
             Export anyway
           </Button>

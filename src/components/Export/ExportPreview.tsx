@@ -13,7 +13,7 @@ function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
   return (
     <div className="space-y-3 text-sm">
       {(workout.blocks || []).map((block, i) => (
-        <div key={i} className="space-y-1">
+        <div key={block.id ?? block.label ?? i} className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="font-medium">{block.label}</span>
             {block.structure && (
@@ -22,7 +22,7 @@ function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
           </div>
           <div className="pl-3 space-y-0.5">
             {(block.exercises || []).map((ex, j) => (
-              <p key={j} className="text-muted-foreground text-xs">
+              <p key={ex.id ?? ex.name ?? j} className="text-muted-foreground text-xs">
                 {ex.name}
                 {ex.sets ? ` · ${ex.sets} sets` : ''}
                 {ex.reps ? ` × ${ex.reps}` : ''}
@@ -46,12 +46,12 @@ function DevicePreview({ workout, device }: { workout: WorkoutStructure; device:
           <span className="text-muted-foreground">{device?.icon} {device?.name}</span>
         </div>
         {(workout.blocks || []).map((block, i) => (
-          <div key={i}>
+          <div key={block.id ?? block.label ?? i}>
             <p className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
               {block.label} {block.structure ? `[${block.structure.toUpperCase()}]` : ''}
             </p>
             {(block.exercises || []).map((ex, j) => (
-              <p key={j} className="pl-2 text-xs">
+              <p key={ex.id ?? ex.name ?? j} className="pl-2 text-xs">
                 {ex.sets ? `${ex.sets}×` : ''}{ex.reps ? `${ex.reps} ` : ''}{ex.reps_range ? `${ex.reps_range} ` : ''}{ex.name}
               </p>
             ))}

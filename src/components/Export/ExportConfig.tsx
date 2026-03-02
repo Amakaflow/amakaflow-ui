@@ -16,7 +16,7 @@ import type { ConflictItem } from '../../hooks/useExportFlow';
 
 interface ExportConfigProps {
   devices: DeviceConfig[];
-  destination: DeviceId | null;
+  destination: DeviceId;
   onSetDestination: (id: DeviceId) => void;
   unresolvedMappings: Array<{
     exerciseId: string;
@@ -53,7 +53,7 @@ export function ExportConfig({
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Destination</Label>
           <Select
-            value={destination ?? undefined}
+            value={destination}
             onValueChange={v => onSetDestination(v as DeviceId)}
           >
             <SelectTrigger data-testid="export-destination-select">
@@ -75,8 +75,8 @@ export function ExportConfig({
         {conflicts.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs font-medium text-orange-600">Structure Warnings</Label>
-            {conflicts.map((c, i) => (
-              <ConflictCard key={i} conflict={c} />
+            {conflicts.map((c) => (
+              <ConflictCard key={`${c.blockLabel}-${c.structure}`} conflict={c} />
             ))}
           </div>
         )}
@@ -87,9 +87,9 @@ export function ExportConfig({
               Exercise Mapping ({unresolvedMappings.length} to resolve)
             </Label>
             <div className="space-y-1 max-h-64 overflow-y-auto">
-              {unresolvedMappings.map((item, i) => (
+              {unresolvedMappings.map((item) => (
                 <MappingResolutionCard
-                  key={i}
+                  key={item.exerciseId}
                   exerciseId={item.exerciseId}
                   exerciseName={item.exerciseName}
                   suggestions={item.suggestions}
