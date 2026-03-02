@@ -55,3 +55,27 @@ jobs:
             - Only flag real problems — not style preferences or nitpicks.
             - If the PR is clean, say so clearly.
             - Severity levels: **Critical** (security/data loss), **Major** (bug/wrong behaviour), **Minor** (code quality).
+
+      - name: Check verdict and fail if blocked
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Only enforce the gate for Joshua's PRs
+          if [[ "$PR_AUTHOR" != "openclawjoshua-eng" ]]; then
+            echo "PR author is '$PR_AUTHOR' (not openclawjoshua-eng) — review check passes automatically"
+            exit 0
+          fi
+
+          COMMENT=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
+            --jq '[.comments[] | select(.body | contains("## Automated Code Review"))] | last | .body // ""')
+
+          if echo "$COMMENT" | grep -q "❌ Changes required"; then
+            echo "::error::Claude review requires changes before this PR can merge."
+            exit 1
+          fi
+
+          echo "Review passed (verdict is not ❌)"
