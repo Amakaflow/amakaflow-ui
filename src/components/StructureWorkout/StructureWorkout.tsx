@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from '../ui/alert';
 import { ExerciseSearch } from '../ExerciseSearch';
 import { EditExerciseDialog } from '../EditExerciseDialog';
-import { EditBlockDialog, BlockUpdates } from '../EditBlockDialog';
+import { EditBlockDialog } from '../EditBlockDialog';
 import { WorkoutSettingsDialog } from '../WorkoutSettingsDialog';
 import { AddBlockTypePicker } from '../AddBlockTypePicker';
 import { WarmupSuggestionStrip, CooldownSuggestionStrip, DefaultRestStrip } from '../WorkoutSuggestionStrips';
 import { DeviceId, getDevicesByIds, getDeviceById, getPrimaryExportDestinations } from '../../lib/devices';
-import { WorkoutStructure, Exercise, Block } from '../../types/workout';
+import { WorkoutStructure, Block } from '../../types/workout';
 import { generateId, getStructureDefaults, formatRestSecs } from '../../lib/workout-utils';
 import { useStructureWorkout } from './hooks/useStructureWorkout';
 import { SortableBlock } from './SortableBlock';
@@ -32,19 +32,6 @@ export interface StructureWorkoutProps {
   onDeviceChange: (device: DeviceId) => void;
   userSelectedDevices: DeviceId[];
   onNavigateToSettings?: () => void;
-}
-
-// Thin helper — cloneWorkout is internal to hook; we only need it for the
-// EditBlockDialog inline save callback below. Keeping it here avoids importing
-// a private utility while staying zero-useState.
-function cloneBlock(b: Block): Block {
-  return {
-    ...b,
-    exercises: (b.exercises || []).map(ex => ({ ...ex })),
-    supersets: b.supersets
-      ? b.supersets.map(ss => ({ ...ss, exercises: (ss.exercises || []).map(ex => ({ ...ex })) }))
-      : undefined,
-  };
 }
 
 export function StructureWorkout(props: StructureWorkoutProps) {
@@ -83,6 +70,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
     updateBlock,
     deleteBlock,
     handleWorkoutSettingsSave,
+    handleBlockSave,
   } = useStructureWorkout({ workout, onWorkoutChange });
 
   const hasWarmupBlock = (workoutWithIds.blocks || []).some(b => b.structure === 'warmup');
@@ -287,28 +275,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
             open={editingBlockIdx !== null}
             block={workoutWithIds.blocks[editingBlockIdx]}
             workoutSettings={workoutWithIds.settings}
-            onSave={(updates: BlockUpdates) => {
-              const newBlocks = (workoutWithIds.blocks || []).map((b, i) => i === editingBlockIdx ? cloneBlock(b) : b);
-              const block = newBlocks[editingBlockIdx];
-              if (updates.label !== undefined) block.label = updates.label;
-              const updateAllExercises = (fn: (ex: Exercise) => void) => {
-                if (block.exercises) block.exercises.forEach(ex => { if (ex) fn(ex); });
-                if (block.supersets) block.supersets.forEach(ss => { if (ss.exercises) ss.exercises.forEach(ex => { if (ex) fn(ex); }); });
-              };
-              if (updates.restOverrideEnabled !== undefined) {
-                if (updates.restOverrideEnabled) {
-                  block.restOverride = { enabled: true, restType: updates.restType, restSec: updates.restSec };
-                  updateAllExercises(ex => { if (updates.restType !== undefined) ex.rest_type = updates.restType; if (updates.restSec !== undefined) ex.rest_sec = updates.restSec; });
-                } else {
-                  block.restOverride = undefined;
-                }
-              }
-              if (updates.sets !== undefined && updates.sets !== null) updateAllExercises(ex => { ex.sets = updates.sets!; });
-              if (updates.applyReps && updates.reps !== null) updateAllExercises(ex => { ex.reps = updates.reps; ex.reps_range = null; });
-              if (updates.applyRepsRange && updates.repsRange !== null) updateAllExercises(ex => { ex.reps_range = updates.repsRange || null; if (updates.repsRange) ex.reps = null; });
-              onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
-              setEditingBlockIdx(null);
-            }}
+            onSave={(updates) => handleBlockSave(editingBlockIdx!, updates)}
             onClose={() => setEditingBlockIdx(null)}
           />
         )}

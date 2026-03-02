@@ -12,6 +12,7 @@ import type {
   WorkoutSettings,
   WorkoutStructureType,
 } from '../../../types/workout';
+import type { BlockUpdates } from '../../EditBlockDialog';
 import {
   addIdsToWorkout,
   generateId,
@@ -391,6 +392,29 @@ export function useStructureWorkout({
     onWorkoutChange(newWorkout);
   };
 
+  const handleBlockSave = (blockIdx: number, updates: BlockUpdates) => {
+    const newBlocks = (workoutWithIds.blocks || []).map((b, i) => i === blockIdx ? cloneBlock(b) : b);
+    const block = newBlocks[blockIdx];
+    if (updates.label !== undefined) block.label = updates.label;
+    const updateAllExercises = (fn: (ex: Exercise) => void) => {
+      if (block.exercises) block.exercises.forEach(ex => { if (ex) fn(ex); });
+      if (block.supersets) block.supersets.forEach(ss => { if (ss.exercises) ss.exercises.forEach(ex => { if (ex) fn(ex); }); });
+    };
+    if (updates.restOverrideEnabled !== undefined) {
+      if (updates.restOverrideEnabled) {
+        block.restOverride = { enabled: true, restType: updates.restType, restSec: updates.restSec };
+        updateAllExercises(ex => { if (updates.restType !== undefined) ex.rest_type = updates.restType; if (updates.restSec !== undefined) ex.rest_sec = updates.restSec; });
+      } else {
+        block.restOverride = undefined;
+      }
+    }
+    if (updates.sets !== undefined && updates.sets !== null) updateAllExercises(ex => { ex.sets = updates.sets!; });
+    if (updates.applyReps && updates.reps !== null) updateAllExercises(ex => { ex.reps = updates.reps; ex.reps_range = null; });
+    if (updates.applyRepsRange && updates.repsRange !== null) updateAllExercises(ex => { ex.reps_range = updates.repsRange || null; if (updates.repsRange) ex.reps = null; });
+    onWorkoutChange({ ...workoutWithIds, blocks: newBlocks });
+    setEditingBlockIdx(null);
+  };
+
   const addWarmupBlock = () => {
     const newWorkout = cloneWorkout(workoutWithIds);
     const warmupBlock: Block = {
@@ -449,6 +473,7 @@ export function useStructureWorkout({
     updateBlock,
     deleteBlock,
     handleWorkoutSettingsSave,
+    handleBlockSave,
     addWarmupBlock,
   };
 }
