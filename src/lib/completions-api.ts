@@ -180,6 +180,7 @@ export interface WorkoutCompletion {
   distanceMeters?: number;
   steps?: number;
   source: string;
+  sourceWorkoutId?: string;
 }
 
 export interface WorkoutCompletionsResponse {
@@ -341,6 +342,7 @@ export async function fetchWorkoutCompletions(
       distanceMeters: c.distance_meters,
       steps: c.steps,
       source: c.source,
+      sourceWorkoutId: c.source_workout_id,
     })),
     total: data.total || 0,
   };

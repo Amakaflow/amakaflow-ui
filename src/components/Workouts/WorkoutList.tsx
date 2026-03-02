@@ -592,10 +592,6 @@ export function WorkoutList({
             <div data-assistant-target="library-results" className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
               {displayedWorkouts.map((workout) => {
                 const isVideo = workout._original.type === 'follow-along';
-                const hasSyncStatus =
-                  workout.syncStatus.garmin?.synced ||
-                  workout.syncStatus.apple?.synced ||
-                  workout.syncStatus.strava?.synced;
 
                 // Compact view
                 if (viewMode === 'compact') {
@@ -794,6 +790,50 @@ export function WorkoutList({
                           <CardTitle className="text-lg font-bold truncate text-foreground">
                             {workout.title}
                           </CardTitle>
+                          {/* Completion badge (AMA-891) */}
+                          {(() => {
+                            const workoutCompletions = completions.filter(
+                              c => c.sourceWorkoutId === workout.id || c.workoutName === workout.title
+                            );
+                            if (workoutCompletions.length > 0) {
+                              const lastCompletion = workoutCompletions[0];
+                              const lastDate = new Date(lastCompletion.startedAt);
+                              const formattedDate = lastDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                              });
+                              return (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>Done {workoutCompletions.length}× · Last {formattedDate}</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {/* Sync status badge (AMA-891) */}
+                          {(() => {
+                            const syncedDevices: string[] = [];
+                            if (workout.syncStatus.garmin?.synced) syncedDevices.push('Garmin');
+                            if (workout.syncStatus.apple?.synced) syncedDevices.push('Apple');
+                            if (workout.syncStatus.strava?.synced) syncedDevices.push('Strava');
+                            if (workout.syncStatus.ios?.synced) syncedDevices.push('iOS');
+                            
+                            if (syncedDevices.length > 0) {
+                              return (
+                                <div className="flex items-center gap-1 text-sm text-green-700 dark:text-green-400 font-medium">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>{syncedDevices[0]} ✓</span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <span>Not synced</span>
+                              </div>
+                            );
+                          })()}
                           <div className="flex flex-wrap items-center gap-3 text-sm">
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <Clock className="w-4 h-4" />
@@ -809,12 +849,6 @@ export function WorkoutList({
                             <Badge variant="outline" className="text-xs">
                               {CATEGORY_DISPLAY_NAMES[workout.category]}
                             </Badge>
-                            {hasSyncStatus && (
-                              <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium">
-                                <CheckCircle2 className="w-4 h-4" />
-                                Synced
-                              </div>
-                            )}
                           </div>
                           {/* Tags */}
                           {workout.tags.length > 0 && (
@@ -844,14 +878,25 @@ export function WorkoutList({
                               <Video className="w-3 h-3" />
                               Video
                             </Badge>
-                          ) : hasSyncStatus ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                              <CheckCircle2 className="w-3 h-3 mr-1.5" />
-                              Synced
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="font-medium">Draft</Badge>
-                          )}
+                          ) : (() => {
+                            const syncedDevices: string[] = [];
+                            if (workout.syncStatus.garmin?.synced) syncedDevices.push('Garmin');
+                            if (workout.syncStatus.apple?.synced) syncedDevices.push('Apple');
+                            if (workout.syncStatus.strava?.synced) syncedDevices.push('Strava');
+                            if (workout.syncStatus.ios?.synced) syncedDevices.push('iOS');
+                            
+                            if (syncedDevices.length > 0) {
+                              return (
+                                <Badge variant="default" className="bg-green-600 hover:bg-green-700 gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {syncedDevices[0]} ✓
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge variant="outline" className="font-medium">Not synced</Badge>
+                            );
+                          })()}
                         </div>
                       </div>
                     </CardHeader>

@@ -201,8 +201,11 @@ export function useWorkoutList({
     loadTags();
   }, [loadTags]);
 
-  // Load completions when Activity History is shown (AMA-196)
+  // Load completions for badges and Activity History (AMA-196, AMA-891)
   const loadCompletions = useCallback(async () => {
+    // Only load if not already loaded
+    if (completions.length > 0) return;
+    
     setCompletionsLoading(true);
     try {
       const result = await fetchWorkoutCompletions(50, 0);
@@ -213,7 +216,7 @@ export function useWorkoutList({
     } finally {
       setCompletionsLoading(false);
     }
-  }, []);
+  }, [completions.length]);
 
   const loadMoreCompletions = useCallback(async () => {
     if (completionsLoading) return;
@@ -233,6 +236,11 @@ export function useWorkoutList({
       loadCompletions();
     }
   }, [showActivityHistory, completions.length, loadCompletions]);
+
+  // Load completions on mount for badges (AMA-891)
+  useEffect(() => {
+    loadCompletions();
+  }, [loadCompletions]);
 
   // When ViewWorkout closes, open the pending edit if one was queued
   useEffect(() => {
