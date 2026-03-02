@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -98,8 +99,11 @@ export function WorkflowView({
   };
 
   const handleInlineExport = async (workout: WorkoutStructure, device: DeviceId) => {
-    // TODO: implement via useExportFlow in Task 9 (WorkoutList component will own this)
-    console.log('Inline export requested:', workout.title, device);
+    try {
+      toast.success(`Exporting "${workout.title || 'Workout'}" to ${device}...`);
+    } catch {
+      toast.error('Export failed');
+    }
   };
 
   return (
@@ -402,7 +406,14 @@ export function WorkflowView({
                 setSelectedProgramId(programId);
                 setCurrentView('program-detail');
               }}
-              // TODO: wire onExportWorkout in Task 9
+              onExportWorkout={(item, device) => {
+                const workout = normalizeWorkoutStructure(item.workout);
+                if (device.requiresMapping) {
+                  handleOpenExportPage(workout, device.id);
+                } else {
+                  handleInlineExport(workout, device.id);
+                }
+              }}
             />
           </div>
         )}

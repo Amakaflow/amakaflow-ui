@@ -5,7 +5,7 @@
  * This file owns only rendering.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dumbbell,
   Clock,
@@ -32,11 +32,16 @@ import {
   Tag,
   Settings2,
   Shuffle,
+  Upload,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { ExportDevicePicker } from '../Export';
+import type { DeviceConfig } from '../../lib/devices';
+import { getPrimaryExportDestinations } from '../../lib/devices';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,6 +97,65 @@ export interface WorkoutListProps {
   onDeleteWorkout: (id: string) => void;
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
+  onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+}
+
+// =============================================================================
+// Export Popover Button
+// =============================================================================
+
+interface ExportPopoverButtonProps {
+  workoutId: string;
+  historyItem: WorkoutHistoryItem;
+  onExportWorkout: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  size?: 'icon' | 'labeled';
+}
+
+function ExportPopoverButton({ workoutId, historyItem, onExportWorkout, size = 'labeled' }: ExportPopoverButtonProps) {
+  const [open, setOpen] = useState(false);
+  const devices = getPrimaryExportDestinations();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {size === 'icon' ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            aria-label="Export to device"
+            data-testid={`workout-export-${workoutId}`}
+          >
+            <Upload className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 h-9 font-medium"
+            data-testid={`workout-export-${workoutId}`}
+          >
+            <Upload className="w-4 h-4" />
+            Export to Device
+          </Button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="end">
+        <ExportDevicePicker
+          workoutId={workoutId}
+          devices={devices}
+          onInlineExport={(device) => {
+            onExportWorkout(historyItem, device);
+            setOpen(false);
+          }}
+          onOpenExportPage={(device) => {
+            onExportWorkout(historyItem, device);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // =============================================================================
@@ -105,6 +169,7 @@ export function WorkoutList({
   onDeleteWorkout,
   onBulkDeleteWorkouts,
   onViewProgram,
+  onExportWorkout,
 }: WorkoutListProps) {
   const {
     // State values
@@ -620,6 +685,14 @@ export function WorkoutList({
                           currentTags={workout.tags}
                           onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
                         />
+                        {onExportWorkout && !isVideo && (
+                          <ExportPopoverButton
+                            workoutId={workout.id}
+                            historyItem={workout._original.data as WorkoutHistoryItem}
+                            onExportWorkout={onExportWorkout}
+                            size="icon"
+                          />
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -895,6 +968,14 @@ export function WorkoutList({
                               <ExternalLink className="w-4 h-4" />
                               Open Video
                             </Button>
+                          )}
+                          {onExportWorkout && !isVideo && (
+                            <ExportPopoverButton
+                              workoutId={workout.id}
+                              historyItem={workout._original.data as WorkoutHistoryItem}
+                              onExportWorkout={onExportWorkout}
+                              size="labeled"
+                            />
                           )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
