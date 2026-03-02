@@ -7,9 +7,10 @@ import type { WorkoutStructure } from '../../types/workout';
 interface ExportPreviewProps {
   workout: WorkoutStructure | null;
   device: DeviceConfig | null;
+  mappings?: Record<string, string>;
 }
 
-function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
+function StructuralPreview({ workout, mappings }: { workout: WorkoutStructure; mappings: Record<string, string> }) {
   return (
     <div className="space-y-3 text-sm">
       {(workout.blocks || []).map((block, i) => (
@@ -21,15 +22,20 @@ function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
             )}
           </div>
           <div className="pl-3 space-y-0.5">
-            {(block.exercises || []).map((ex, j) => (
-              <p key={ex.id ?? ex.name ?? j} className="text-muted-foreground text-xs">
-                {ex.name}
-                {ex.sets ? ` · ${ex.sets} sets` : ''}
-                {ex.reps ? ` × ${ex.reps}` : ''}
-                {ex.reps_range ? ` × ${ex.reps_range}` : ''}
-                {ex.duration_sec ? ` · ${ex.duration_sec}s` : ''}
-              </p>
-            ))}
+            {(block.exercises || []).map((ex, j) => {
+              const displayName = mappings[ex.name] ?? ex.name;
+              const isMapped = displayName !== ex.name;
+              return (
+                <p key={ex.id ?? ex.name ?? j} className="text-muted-foreground text-xs">
+                  <span className={isMapped ? 'text-green-600 dark:text-green-400' : ''}>{displayName}</span>
+                  {isMapped && <span className="line-through ml-1 opacity-50">{ex.name}</span>}
+                  {ex.sets ? ` · ${ex.sets} sets` : ''}
+                  {ex.reps ? ` × ${ex.reps}` : ''}
+                  {ex.reps_range ? ` × ${ex.reps_range}` : ''}
+                  {ex.duration_sec ? ` · ${ex.duration_sec}s` : ''}
+                </p>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -37,7 +43,7 @@ function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
   );
 }
 
-function DevicePreview({ workout, device }: { workout: WorkoutStructure; device: DeviceConfig | null }) {
+function DevicePreview({ workout, device, mappings }: { workout: WorkoutStructure; device: DeviceConfig | null; mappings: Record<string, string> }) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border-2 border-muted p-3 bg-muted/20 font-mono text-xs space-y-2">
@@ -50,11 +56,14 @@ function DevicePreview({ workout, device }: { workout: WorkoutStructure; device:
             <p className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
               {block.label} {block.structure ? `[${block.structure.toUpperCase()}]` : ''}
             </p>
-            {(block.exercises || []).map((ex, j) => (
-              <p key={ex.id ?? ex.name ?? j} className="pl-2 text-xs">
-                {ex.sets ? `${ex.sets}×` : ''}{ex.reps ? `${ex.reps} ` : ''}{ex.reps_range ? `${ex.reps_range} ` : ''}{ex.name}
-              </p>
-            ))}
+            {(block.exercises || []).map((ex, j) => {
+              const displayName = mappings[ex.name] ?? ex.name;
+              return (
+                <p key={ex.id ?? ex.name ?? j} className="pl-2 text-xs">
+                  {ex.sets ? `${ex.sets}×` : ''}{ex.reps ? `${ex.reps} ` : ''}{ex.reps_range ? `${ex.reps_range} ` : ''}{displayName}
+                </p>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -63,7 +72,7 @@ function DevicePreview({ workout, device }: { workout: WorkoutStructure; device:
   );
 }
 
-function FormatPreview({ workout, device }: { workout: WorkoutStructure; device: DeviceConfig | null }) {
+function FormatPreview({ workout, device, mappings }: { workout: WorkoutStructure; device: DeviceConfig | null; mappings: Record<string, string> }) {
   const format = device?.format ?? 'JSON';
   const preview = JSON.stringify(
     {
@@ -72,7 +81,7 @@ function FormatPreview({ workout, device }: { workout: WorkoutStructure; device:
       blocks: (workout.blocks || []).map(b => ({
         label: b.label,
         structure: b.structure,
-        exercises: (b.exercises || []).map(e => e.name),
+        exercises: (b.exercises || []).map(e => mappings[e.name] ?? e.name),
       })),
     },
     null,
@@ -90,7 +99,7 @@ function FormatPreview({ workout, device }: { workout: WorkoutStructure; device:
   );
 }
 
-export function ExportPreview({ workout, device }: ExportPreviewProps) {
+export function ExportPreview({ workout, device, mappings = {} }: ExportPreviewProps) {
   if (!workout) {
     return (
       <Card className="h-full" data-testid="export-preview">
@@ -114,13 +123,13 @@ export function ExportPreview({ workout, device }: ExportPreviewProps) {
             <TabsTrigger value="format">Format</TabsTrigger>
           </TabsList>
           <TabsContent value="structural">
-            <StructuralPreview workout={workout} />
+            <StructuralPreview workout={workout} mappings={mappings} />
           </TabsContent>
           <TabsContent value="device">
-            <DevicePreview workout={workout} device={device} />
+            <DevicePreview workout={workout} device={device} mappings={mappings} />
           </TabsContent>
           <TabsContent value="format">
-            <FormatPreview workout={workout} device={device} />
+            <FormatPreview workout={workout} device={device} mappings={mappings} />
           </TabsContent>
         </Tabs>
       </CardContent>

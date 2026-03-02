@@ -6,6 +6,7 @@ import {
 } from '../lib/mapper-api';
 import { saveWorkoutToHistory } from '../lib/workout-history';
 import { getDeviceById } from '../lib/devices';
+import { isDemoMode } from '../lib/demo-mode';
 import type { WorkoutStructure, WorkoutStructureType } from '../types/workout';
 import type { DeviceId } from '../lib/devices';
 
@@ -138,9 +139,23 @@ export function useExportFlow({ userId }: UseExportFlowProps): UseExportFlowRetu
 
   const exportAll = useCallback(async () => {
     setLoading(true);
-    let failedCount = 0;
     const pending = queue.filter(item => item.status === 'pending');
     try {
+      if (isDemoMode) {
+        for (const item of pending) {
+          setQueue(prev =>
+            prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'exporting' } : q))
+          );
+          await new Promise(r => setTimeout(r, 1500));
+          setQueue(prev =>
+            prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'done' } : q))
+          );
+        }
+        toast.success(`Exported to ${getDeviceById(destination)?.name ?? destination}!`);
+        return;
+      }
+
+      let failedCount = 0;
       for (const item of pending) {
         setQueue(prev =>
           prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'exporting' } : q))
