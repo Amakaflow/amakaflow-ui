@@ -12,7 +12,6 @@ import type {
   WorkoutSettings,
   WorkoutStructureType,
 } from '../../../types/workout';
-import type { DeviceId } from '../../../lib/devices';
 import {
   addIdsToWorkout,
   generateId,
@@ -59,8 +58,6 @@ function cloneWorkout(w: WorkoutStructure): WorkoutStructure {
 export interface UseStructureWorkoutProps {
   workout: WorkoutStructure;
   onWorkoutChange: (w: WorkoutStructure) => void;
-  selectedDevice: DeviceId;
-  userSelectedDevices: DeviceId[];
 }
 
 export function useStructureWorkout({

@@ -54,8 +54,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -82,8 +80,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -137,8 +133,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -159,8 +153,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -182,8 +174,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -207,8 +197,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -231,8 +219,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -253,8 +239,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -274,8 +258,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -295,8 +277,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -336,8 +316,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -354,8 +332,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -377,8 +353,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -404,8 +378,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -430,8 +402,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -469,8 +439,6 @@ describe('useStructureWorkout', () => {
       useStructureWorkout({
         workout,
         onWorkoutChange,
-        selectedDevice: 'garmin',
-        userSelectedDevices: ['garmin'],
       })
     );
 
@@ -482,5 +450,142 @@ describe('useStructureWorkout', () => {
     const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
     expect(updated.blocks[0].supersets).toHaveLength(1);
     expect(updated.blocks[0].supersets![0].id).toBe('ss-2');
+  });
+
+  it('addExercise adds exercise to a block', () => {
+    const workout = makeWorkout();
+    const onWorkoutChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useStructureWorkout({
+        workout,
+        onWorkoutChange,
+      })
+    );
+
+    act(() => {
+      result.current.addExercise(0, 'Bench Press');
+    });
+
+    expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+    const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+    // makeWorkout starts with 2 exercises; addExercise appends a third
+    expect(updated.blocks[0].exercises).toHaveLength(3);
+    expect(updated.blocks[0].exercises[2].name).toBe('Bench Press');
+    expect(typeof updated.blocks[0].exercises[2].id).toBe('string');
+  });
+
+  it('addExercise adds exercise to a superset', () => {
+    const workout: WorkoutStructure = {
+      title: 'Test',
+      source: 'test',
+      blocks: [
+        {
+          id: 'block-1',
+          label: 'Block 1',
+          structure: 'superset',
+          exercises: [],
+          supersets: [
+            {
+              id: 'ss-1',
+              exercises: [
+                {
+                  id: 'ex-ss-1',
+                  name: 'Pull-up',
+                  sets: 3,
+                  reps: 8,
+                  reps_range: null,
+                  duration_sec: null,
+                  rest_sec: null,
+                  distance_m: null,
+                  distance_range: null,
+                  type: 'strength',
+                },
+              ],
+              rest_between_sec: 60,
+            },
+          ],
+        },
+      ],
+    };
+    const onWorkoutChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useStructureWorkout({
+        workout,
+        onWorkoutChange,
+      })
+    );
+
+    act(() => {
+      result.current.addExercise(0, 'Dip', 0);
+    });
+
+    expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+    const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+    // Superset 0 starts with 1 exercise; addExercise pushes a second
+    expect(updated.blocks[0].supersets![0].exercises).toHaveLength(2);
+    expect(updated.blocks[0].exercises.length).toBe(0); // no change to block-level exercises
+    const added = updated.blocks[0].supersets![0].exercises[1];
+    expect(added.name).toBe('Dip');
+    expect(typeof added.id).toBe('string');
+  });
+
+  it('addExercise handles block with supersets but no direct exercises (sparse-array insert)', () => {
+    // When a block has supersets but block.exercises is empty, the implementation
+    // inserts the new exercise at index 1 (creating a sparse array) so it renders
+    // AFTER the supersets in the UI, leaving index 0 intentionally undefined.
+    const workout: WorkoutStructure = {
+      title: 'Test',
+      source: 'test',
+      blocks: [
+        {
+          id: 'block-1',
+          label: 'Block 1',
+          structure: 'superset',
+          exercises: [],
+          supersets: [
+            {
+              id: 'ss-1',
+              exercises: [
+                {
+                  id: 'ex-ss-1',
+                  name: 'Pull-up',
+                  sets: 3,
+                  reps: 8,
+                  reps_range: null,
+                  duration_sec: null,
+                  rest_sec: null,
+                  distance_m: null,
+                  distance_range: null,
+                  type: 'strength',
+                },
+              ],
+              rest_between_sec: 60,
+            },
+          ],
+        },
+      ],
+    };
+    const onWorkoutChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useStructureWorkout({
+        workout,
+        onWorkoutChange,
+      })
+    );
+
+    act(() => {
+      result.current.addExercise(0, 'Cool-down Stretch');
+    });
+
+    expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+    const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+    // Implementation inserts at index 1 when hasSupersets && exercises.length === 0
+    expect(updated.blocks[0].exercises[1].name).toBe('Cool-down Stretch');
+    expect(typeof updated.blocks[0].exercises[1].id).toBe('string');
+    // Index 0 is undefined (sparse array)
+    expect(updated.blocks[0].exercises[0]).toBeUndefined();
   });
 });
