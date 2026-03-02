@@ -317,7 +317,7 @@ describe('useImportFlow', () => {
     const mockWorkout = { title: 'Test Workout' };
     const { result } = renderHook(() => useImportFlow(props));
     act(() => { result.current.handleBlockPickerConfirm(mockWorkout); });
-    expect(mockOnEditWorkout).toHaveBeenCalledWith(mockWorkout);
+    expect(mockOnEditWorkout).toHaveBeenCalledWith('', mockWorkout);
   });
 
   // ── Test 6 ─────────────────────────────────────────────────────────────────

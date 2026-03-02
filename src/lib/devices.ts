@@ -249,6 +249,9 @@ export const AVAILABLE_DEVICES: Device[] = [
   },
 ];
 
+// Alias for components that expect DeviceConfig name
+export type DeviceConfig = Device;
+
 export const getDeviceById = (id: DeviceId): Device | undefined => {
   return AVAILABLE_DEVICES.find(d => d.id === id);
 };
