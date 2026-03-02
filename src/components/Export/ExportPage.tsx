@@ -5,18 +5,18 @@ import { ExportQueue } from './ExportQueue';
 import { ExportConfig } from './ExportConfig';
 import { ExportPreview } from './ExportPreview';
 import { useExportFlow } from '../../hooks/useExportFlow';
-import type { DeviceId } from '../../lib/devices';
+import { getDeviceById } from '../../lib/devices';
+import type { DeviceConfig, DeviceId } from '../../lib/devices';
 import type { WorkoutStructure } from '../../types/workout';
-import type { AppUser } from '../../app/useAppAuth';
 
 interface ExportPageProps {
-  user: AppUser;
-  initialWorkout: WorkoutStructure;
-  initialDevice: DeviceId;
+  initialWorkout?: WorkoutStructure;
+  initialDevice?: DeviceId;
+  devices: DeviceConfig[];
   onBack: () => void;
 }
 
-export function ExportPage({ user, initialWorkout, initialDevice, onBack }: ExportPageProps) {
+export function ExportPage({ initialWorkout, initialDevice, devices, onBack }: ExportPageProps) {
   const {
     queue,
     destination,
@@ -27,18 +27,23 @@ export function ExportPage({ user, initialWorkout, initialDevice, onBack }: Expo
     resolveMapping,
     detectConflicts,
     exportAll,
-  } = useExportFlow({ userId: user.id });
+  } = useExportFlow({ userId: '' });
 
   const initialised = useRef(false);
   useEffect(() => {
     if (initialised.current) return;
     initialised.current = true;
-    addToQueue(initialWorkout);
-    if (initialDevice !== 'garmin') setDestination(initialDevice);
+    if (initialWorkout) {
+      addToQueue(initialWorkout);
+    }
+    if (initialDevice && initialDevice !== 'garmin') {
+      setDestination(initialDevice);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const firstWorkout = queue[0]?.workout ?? initialWorkout;
-  const conflicts = detectConflicts(firstWorkout, destination);
+  const firstWorkout = queue[0]?.workout ?? initialWorkout ?? null;
+  const conflicts = firstWorkout ? detectConflicts(firstWorkout, destination) : [];
+  const currentDevice = getDeviceById(destination) ?? null;
 
   return (
     <div className="space-y-4" data-testid="export-page">
@@ -50,20 +55,19 @@ export function ExportPage({ user, initialWorkout, initialDevice, onBack }: Expo
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <ExportQueue queue={queue} onRemove={removeFromQueue} />
         <ExportConfig
+          devices={devices}
           destination={destination}
-          onDestinationChange={setDestination}
+          onSetDestination={setDestination}
           conflicts={conflicts}
           unresolvedMappings={[]}
           onResolveMapping={resolveMapping}
           onExportAll={exportAll}
           loading={loading}
           queueSize={queue.length}
-          onShowPreview={() => {}}
         />
         <ExportPreview
           workout={firstWorkout}
-          destination={destination}
-          defaultTab="device"
+          device={currentDevice}
         />
       </div>
     </div>

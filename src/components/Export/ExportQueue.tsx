@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, AlertCircle, Clock, X } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle, Clock, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -13,7 +13,7 @@ const STATUS_ICONS = {
   pending: { Icon: Clock, className: 'text-muted-foreground' },
   exporting: { Icon: Loader2, className: 'text-blue-500 animate-spin' },
   done: { Icon: CheckCircle2, className: 'text-green-500' },
-  error: { Icon: AlertCircle, className: 'text-red-500' },
+  error: { Icon: XCircle, className: 'text-red-500' },
 } as const;
 
 export function ExportQueue({ queue, onRemove }: ExportQueueProps) {

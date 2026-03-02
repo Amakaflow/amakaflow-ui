@@ -11,35 +11,37 @@ import {
 } from '../ui/select';
 import { ConflictCard } from './ConflictCard';
 import { MappingResolutionCard } from './MappingResolutionCard';
-import { getPrimaryExportDestinations } from '../../lib/devices';
-import type { DeviceId } from '../../lib/devices';
+import type { DeviceConfig, DeviceId } from '../../lib/devices';
 import type { ConflictItem } from '../../hooks/useExportFlow';
-import type { ValidationResult } from '../../types/workout';
 
 interface ExportConfigProps {
-  destination: DeviceId;
-  onDestinationChange: (device: DeviceId) => void;
+  devices: DeviceConfig[];
+  destination: DeviceId | null;
+  onSetDestination: (id: DeviceId) => void;
+  unresolvedMappings: Array<{
+    exerciseId: string;
+    exerciseName: string;
+    suggestions: Array<{ name: string; confidence: number }>;
+  }>;
   conflicts: ConflictItem[];
-  unresolvedMappings: ValidationResult[];
-  onResolveMapping: (original: string, mapped: string) => void;
-  onExportAll: () => Promise<void>;
+  onResolveMapping: (exerciseId: string, mappedName: string) => void;
+  onExportAll: () => void;
   loading: boolean;
   queueSize: number;
-  onShowPreview: () => void;
 }
 
 export function ExportConfig({
+  devices,
   destination,
-  onDestinationChange,
+  onSetDestination,
   conflicts,
   unresolvedMappings,
   onResolveMapping,
   onExportAll,
   loading,
   queueSize,
-  onShowPreview,
 }: ExportConfigProps) {
-  const devices = getPrimaryExportDestinations().filter(d => d.exportMethod !== 'coming_soon');
+  const availableDevices = devices.filter(d => d.exportMethod !== 'coming_soon');
   const canExport = queueSize > 0 && !loading;
 
   return (
@@ -50,12 +52,15 @@ export function ExportConfig({
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Destination</Label>
-          <Select value={destination} onValueChange={v => onDestinationChange(v as DeviceId)}>
+          <Select
+            value={destination ?? undefined}
+            onValueChange={v => onSetDestination(v as DeviceId)}
+          >
             <SelectTrigger data-testid="export-destination-select">
               <SelectValue placeholder="Choose destination" />
             </SelectTrigger>
             <SelectContent>
-              {devices.map(d => (
+              {availableDevices.map(d => (
                 <SelectItem key={d.id} value={d.id}>
                   <div className="flex items-center gap-2">
                     <span>{d.icon}</span>
@@ -71,7 +76,7 @@ export function ExportConfig({
           <div className="space-y-2">
             <Label className="text-xs font-medium text-orange-600">Structure Warnings</Label>
             {conflicts.map((c, i) => (
-              <ConflictCard key={i} conflict={c} onShowPreview={onShowPreview} />
+              <ConflictCard key={i} conflict={c} />
             ))}
           </div>
         )}
@@ -82,8 +87,14 @@ export function ExportConfig({
               Exercise Mapping ({unresolvedMappings.length} to resolve)
             </Label>
             <div className="space-y-1 max-h-64 overflow-y-auto">
-              {unresolvedMappings.map((ex, i) => (
-                <MappingResolutionCard key={i} exercise={ex} onResolve={onResolveMapping} />
+              {unresolvedMappings.map((item, i) => (
+                <MappingResolutionCard
+                  key={i}
+                  exerciseId={item.exerciseId}
+                  exerciseName={item.exerciseName}
+                  suggestions={item.suggestions}
+                  onResolve={onResolveMapping}
+                />
               ))}
             </div>
           </div>

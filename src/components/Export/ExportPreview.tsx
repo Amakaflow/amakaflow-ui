@@ -1,14 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Badge } from '../ui/badge';
-import { getDeviceById } from '../../lib/devices';
-import type { DeviceId } from '../../lib/devices';
+import type { DeviceConfig } from '../../lib/devices';
 import type { WorkoutStructure } from '../../types/workout';
 
 interface ExportPreviewProps {
   workout: WorkoutStructure | null;
-  destination: DeviceId;
-  defaultTab?: 'structural' | 'device' | 'format';
+  device: DeviceConfig | null;
 }
 
 function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
@@ -39,8 +37,7 @@ function StructuralPreview({ workout }: { workout: WorkoutStructure }) {
   );
 }
 
-function DevicePreview({ workout, destination }: { workout: WorkoutStructure; destination: DeviceId }) {
-  const device = getDeviceById(destination);
+function DevicePreview({ workout, device }: { workout: WorkoutStructure; device: DeviceConfig | null }) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border-2 border-muted p-3 bg-muted/20 font-mono text-xs space-y-2">
@@ -61,13 +58,12 @@ function DevicePreview({ workout, destination }: { workout: WorkoutStructure; de
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">Simulated {device?.name ?? destination} display</p>
+      <p className="text-xs text-muted-foreground">Simulated {device?.name ?? 'device'} display</p>
     </div>
   );
 }
 
-function FormatPreview({ workout, destination }: { workout: WorkoutStructure; destination: DeviceId }) {
-  const device = getDeviceById(destination);
+function FormatPreview({ workout, device }: { workout: WorkoutStructure; device: DeviceConfig | null }) {
   const format = device?.format ?? 'JSON';
   const preview = JSON.stringify(
     {
@@ -94,10 +90,10 @@ function FormatPreview({ workout, destination }: { workout: WorkoutStructure; de
   );
 }
 
-export function ExportPreview({ workout, destination, defaultTab = 'device' }: ExportPreviewProps) {
+export function ExportPreview({ workout, device }: ExportPreviewProps) {
   if (!workout) {
     return (
-      <Card className="h-full">
+      <Card className="h-full" data-testid="export-preview">
         <CardContent className="flex items-center justify-center h-40">
           <p className="text-sm text-muted-foreground">Select a workout to preview</p>
         </CardContent>
@@ -111,7 +107,7 @@ export function ExportPreview({ workout, destination, defaultTab = 'device' }: E
         <CardTitle className="text-base">Preview</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue={defaultTab}>
+        <Tabs defaultValue="device">
           <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="structural">Structural</TabsTrigger>
             <TabsTrigger value="device">Device</TabsTrigger>
@@ -121,10 +117,10 @@ export function ExportPreview({ workout, destination, defaultTab = 'device' }: E
             <StructuralPreview workout={workout} />
           </TabsContent>
           <TabsContent value="device">
-            <DevicePreview workout={workout} destination={destination} />
+            <DevicePreview workout={workout} device={device} />
           </TabsContent>
           <TabsContent value="format">
-            <FormatPreview workout={workout} destination={destination} />
+            <FormatPreview workout={workout} device={device} />
           </TabsContent>
         </Tabs>
       </CardContent>
