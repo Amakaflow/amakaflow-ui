@@ -129,4 +129,31 @@ describe('useExportFlow', () => {
     act(() => { result.current.resolveMapping('Squat', 'Squat (Barbell)'); });
     expect(result.current.mappings['Squat']).toBe('Squat (Barbell)');
   });
+
+  it('exportAll marks failed items as error and shows error toast', async () => {
+    const { toast } = await import('sonner');
+    mockExportWorkoutToDevice
+      .mockResolvedValueOnce({ yaml: 'ok' })
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    const secondWorkout: WorkoutStructure = {
+      title: 'Workout 2',
+      blocks: [{ label: 'B', structure: 'regular', exercises: [] }],
+    };
+
+    const { result } = renderHook(() => useExportFlow({ userId: MOCK_USER_ID }));
+    act(() => {
+      result.current.addToQueue(SIMPLE_WORKOUT);
+      result.current.addToQueue(secondWorkout);
+    });
+
+    await act(async () => {
+      await result.current.exportAll();
+    });
+
+    const statuses = result.current.queue.map(q => q.status);
+    expect(statuses).toContain('done');
+    expect(statuses).toContain('error');
+    expect(toast.error).toHaveBeenCalled();
+  });
 });

@@ -123,8 +123,9 @@ export function useExportFlow({ userId }: UseExportFlowProps): UseExportFlowRetu
         const exportFormats = await exportWorkoutToDevice(workout, device, null);
         await saveWorkoutToHistory(uid, workout, device, exportFormats, [], undefined, undefined);
         toast.success(`Exported to ${getDeviceById(device)?.name ?? device}!`);
-      } catch (err: any) {
-        toast.error(`Export failed: ${err.message ?? 'Unknown error'}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        toast.error(`Export failed: ${message}`);
         throw err;
       } finally {
         setLoading(false);
@@ -135,33 +136,36 @@ export function useExportFlow({ userId }: UseExportFlowProps): UseExportFlowRetu
 
   const exportAll = useCallback(async () => {
     setLoading(true);
+    let failedCount = 0;
     const pending = queue.filter(item => item.status === 'pending');
-    for (const item of pending) {
-      setQueue(prev =>
-        prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'exporting' } : q))
-      );
-      try {
-        const exportFormats = await exportWorkoutToDevice(item.workout, destination, null);
-        await saveWorkoutToHistory(userId, item.workout, destination, exportFormats, [], undefined, undefined);
+    try {
+      for (const item of pending) {
         setQueue(prev =>
-          prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'done' } : q))
+          prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'exporting' } : q))
         );
-      } catch (err: any) {
-        setQueue(prev =>
-          prev.map(q =>
-            q.workoutId === item.workoutId
-              ? { ...q, status: 'error', error: err.message ?? 'Export failed' }
-              : q
-          )
-        );
+        try {
+          const exportFormats = await exportWorkoutToDevice(item.workout, destination, null);
+          await saveWorkoutToHistory(userId, item.workout, destination, exportFormats, [], undefined, undefined);
+          setQueue(prev =>
+            prev.map(q => (q.workoutId === item.workoutId ? { ...q, status: 'done' } : q))
+          );
+        } catch (err: unknown) {
+          failedCount++;
+          const message = err instanceof Error ? err.message : 'Export failed';
+          setQueue(prev =>
+            prev.map(q =>
+              q.workoutId === item.workoutId ? { ...q, status: 'error', error: message } : q
+            )
+          );
+        }
       }
-    }
-    setLoading(false);
-    const failed = queue.filter(q => q.status === 'error').length;
-    if (failed > 0) {
-      toast.error(`${failed} workout(s) failed to export`);
-    } else {
-      toast.success(`All workouts exported to ${getDeviceById(destination)?.name ?? destination}!`);
+      if (failedCount > 0) {
+        toast.error(`${failedCount} workout(s) failed to export`);
+      } else {
+        toast.success(`All workouts exported to ${getDeviceById(destination)?.name ?? destination}!`);
+      }
+    } finally {
+      setLoading(false);
     }
   }, [queue, destination, userId]);
 
