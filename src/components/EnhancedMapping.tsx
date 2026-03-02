@@ -54,7 +54,6 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
       onApplyMapping(result.original_name, selectedSuggestion);
       setIsDialogOpen(false);
       setSelectedSuggestion('');
-      // Note: Toast notification is handled in ValidateMap's handleApplyMapping
     }
   };
 
@@ -63,7 +62,6 @@ export function EnhancedMapping({ result, onApplyMapping, onAcceptMapping, isRec
       onApplyMapping(result.original_name, customMapping.trim());
       setIsDialogOpen(false);
       setCustomMapping('');
-      // Note: Toast notification is handled in ValidateMap's handleApplyMapping
     }
   };
 
