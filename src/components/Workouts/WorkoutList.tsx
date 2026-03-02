@@ -30,7 +30,6 @@ import {
   Activity,
   Star,
   Tag,
-  Settings2,
   Shuffle,
   Upload,
 } from 'lucide-react';
@@ -408,130 +407,36 @@ export function WorkoutList({
             data-testid="workout-search-input"
             className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
-          <select
-            aria-label="Filter by source"
-            value={sourceFilter}
-            onChange={(e) => {
-              setSourceFilter(e.target.value as 'all' | 'history' | 'video');
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All sources</option>
-            <option value="history">Workout History</option>
-            <option value="video">Follow Along</option>
-          </select>
-          <select
-            aria-label="Filter by platform"
-            value={platformFilter}
-            onChange={(e) => {
-              setPlatformFilter(e.target.value);
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All platforms</option>
-            {availablePlatforms.map((platform) => (
-              <option key={platform} value={platform}>
-                {platform === 'garmin' ? 'Garmin' :
-                 platform === 'apple' ? 'Apple Watch' :
-                 platform === 'strava' ? 'Strava' :
-                 platform === 'youtube' ? 'YouTube' :
-                 platform === 'instagram' ? 'Instagram' :
-                 platform === 'tiktok' ? 'TikTok' :
-                 platform === 'vimeo' ? 'Vimeo' :
-                 platform}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by category"
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All categories</option>
-            {availableCategories.map((category) => (
-              <option key={category} value={category}>
-                {CATEGORY_DISPLAY_NAMES[category as keyof typeof CATEGORY_DISPLAY_NAMES] || category}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by sync status"
-            value={syncFilter}
-            onChange={(e) => {
-              setSyncFilter(e.target.value as 'all' | 'synced' | 'not-synced');
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All sync status</option>
-            <option value="synced">Synced</option>
-            <option value="not-synced">Not synced</option>
-          </select>
-          {/* Tag filter dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          {/* Tag strip filter */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <Button
+              size="sm"
+              variant={tagFilter === null ? 'default' : 'outline'}
+              onClick={() => {
+                setTagFilter(null);
+                setPageIndex(0);
+              }}
+              className="shrink-0"
+              data-testid="tag-all"
+            >
+              All
+            </Button>
+            {availableTags.map((tag) => (
               <Button
-                variant="outline"
+                key={tag.id}
                 size="sm"
-                className={`h-8 gap-1.5 ${tagFilter.length > 0 ? 'border-primary text-primary' : ''}`}
+                variant={tagFilter === tag.name ? 'default' : 'outline'}
+                onClick={() => {
+                  setTagFilter(tag.name);
+                  setPageIndex(0);
+                }}
+                className="shrink-0"
+                data-testid={`tag-${tag.name}`}
               >
-                <Tag className="w-4 h-4" />
-                Tags
-                {tagFilter.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
-                    {tagFilter.length}
-                  </Badge>
-                )}
+                {tag.name}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Filter by Tags</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {availableTags.length === 0 ? (
-                <div className="px-2 py-3 text-center text-sm text-muted-foreground">
-                  No tags yet
-                </div>
-              ) : (
-                availableTags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag.id}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setTagFilter((prev) =>
-                        prev.includes(tag.name)
-                          ? prev.filter((t) => t !== tag.name)
-                          : [...prev, tag.name]
-                      );
-                      setPageIndex(0);
-                    }}
-                    className="gap-2"
-                  >
-                    <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        tagFilter.includes(tag.name) ? 'bg-primary border-primary' : ''
-                      }`}
-                    >
-                      {tagFilter.includes(tag.name) && (
-                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
-                      )}
-                    </div>
-                    <TagPill name={tag.name} color={tag.color} size="sm" />
-                  </DropdownMenuItem>
-                ))
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowTagManagement(true)}>
-                <Settings2 className="w-4 h-4 mr-2" />
-                Manage Tags
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            ))}
+          </div>
           <div className="h-4 border-l mx-1" /> {/* Divider */}
           <select
             aria-label="Sort by"
@@ -548,16 +453,12 @@ export function WorkoutList({
               </option>
             ))}
           </select>
-          {(sourceFilter !== 'all' || platformFilter !== 'all' || categoryFilter !== 'all' || syncFilter !== 'all' || tagFilter.length > 0 || searchQuery || sortOption !== 'recently-added') && (
+          {(tagFilter !== null || searchQuery || sortOption !== 'recently-added') && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                setSourceFilter('all');
-                setPlatformFilter('all');
-                setCategoryFilter('all');
-                setSyncFilter('all');
-                setTagFilter([]);
+                setTagFilter(null);
                 setSearchQuery('');
                 setSortOption('recently-added');
                 setPageIndex(0);

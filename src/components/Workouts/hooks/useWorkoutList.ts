@@ -149,7 +149,7 @@ export function useWorkoutList({
   const pendingEditRef = useRef<UnifiedWorkout | null>(null);
 
   // Tag state
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
 
@@ -314,9 +314,9 @@ export function useWorkoutList({
     }
 
     // Tag filter
-    if (tagFilter.length > 0) {
+    if (tagFilter) {
       filtered = filtered.filter((w) =>
-        tagFilter.some((tag) => w.tags.includes(tag))
+        w.tags.includes(tagFilter)
       );
     }
 
