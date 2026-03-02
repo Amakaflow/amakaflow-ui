@@ -5,7 +5,7 @@
  * The JSX shell (WorkoutList.tsx) imports this hook and owns only rendering.
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Watch,
   Bike,
@@ -58,11 +58,11 @@ export const getDeviceIcon = (device: string | undefined) => {
   switch (device) {
     case 'garmin':
     case 'apple':
-      return Watch({ className: 'w-4 h-4' });
+      return React.createElement(Watch, { className: 'w-4 h-4' });
     case 'zwift':
-      return Bike({ className: 'w-4 h-4' });
+      return React.createElement(Bike, { className: 'w-4 h-4' });
     default:
-      return Dumbbell({ className: 'w-4 h-4' });
+      return React.createElement(Dumbbell, { className: 'w-4 h-4' });
   }
 };
 
@@ -70,13 +70,13 @@ export const getSourceIcon = (workout: UnifiedWorkout) => {
   if (workout.sourceType === 'video') {
     switch (workout.videoPlatform) {
       case 'youtube':
-        return Youtube({ className: 'w-4 h-4 text-red-500' });
+        return React.createElement(Youtube, { className: 'w-4 h-4 text-red-500' });
       case 'instagram':
-        return Video({ className: 'w-4 h-4 text-pink-500' });
+        return React.createElement(Video, { className: 'w-4 h-4 text-pink-500' });
       case 'tiktok':
-        return Video({ className: 'w-4 h-4' });
+        return React.createElement(Video, { className: 'w-4 h-4' });
       default:
-        return Video({ className: 'w-4 h-4' });
+        return React.createElement(Video, { className: 'w-4 h-4' });
     }
   }
   return getDeviceIcon(workout.devicePlatform);
