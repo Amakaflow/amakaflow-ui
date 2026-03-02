@@ -160,6 +160,7 @@ export function useWorkoutList({
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
   const [completionsLoading, setCompletionsLoading] = useState(false);
+  const [completionsError, setCompletionsError] = useState<string | null>(null);
   const [completionsTotal, setCompletionsTotal] = useState(0);
   const [selectedCompletionId, setSelectedCompletionId] = useState<string | null>(null);
 
@@ -207,25 +208,29 @@ export function useWorkoutList({
     if (completions.length > 0) return;
     
     setCompletionsLoading(true);
+    setCompletionsError(null);
     try {
       const result = await fetchWorkoutCompletions(50, 0);
       setCompletions(result.completions);
       setCompletionsTotal(result.total);
     } catch (err) {
       console.error('[WorkoutList] Error loading completions:', err);
+      setCompletionsError('Failed to load workout completions. Please try again.');
     } finally {
       setCompletionsLoading(false);
     }
-  }, [completions.length]);
+  }, []);
 
   const loadMoreCompletions = useCallback(async () => {
     if (completionsLoading) return;
     setCompletionsLoading(true);
+    setCompletionsError(null);
     try {
       const result = await fetchWorkoutCompletions(50, completions.length);
       setCompletions((prev) => [...prev, ...result.completions]);
     } catch (err) {
       console.error('[WorkoutList] Error loading more completions:', err);
+      setCompletionsError('Failed to load more completions. Please try again.');
     } finally {
       setCompletionsLoading(false);
     }
@@ -237,10 +242,12 @@ export function useWorkoutList({
     }
   }, [showActivityHistory, completions.length, loadCompletions]);
 
-  // Load completions on mount for badges (AMA-891)
+  // Load completions on mount for badges (AMA-891) - only when in cards view
   useEffect(() => {
-    loadCompletions();
-  }, [loadCompletions]);
+    if (viewMode === 'cards') {
+      loadCompletions();
+    }
+  }, [loadCompletions, viewMode]);
 
   // When ViewWorkout closes, open the pending edit if one was queued
   useEffect(() => {
@@ -754,6 +761,7 @@ export function useWorkoutList({
     completions,
     setCompletions,
     completionsLoading,
+    completionsError,
     completionsTotal,
     selectedCompletionId,
     setSelectedCompletionId,

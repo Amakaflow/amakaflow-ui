@@ -82,6 +82,16 @@ import {
   getSourceLabel,
 } from './hooks/useWorkoutList';
 
+// Helper to get synced devices from sync status
+function getSyncedDevices(syncStatus: { garmin?: { synced?: boolean }; apple?: { synced?: boolean }; strava?: { synced?: boolean }; ios?: { synced?: boolean } }): string[] {
+  const devices: string[] = [];
+  if (syncStatus.garmin?.synced) devices.push('Garmin');
+  if (syncStatus.apple?.synced) devices.push('Apple');
+  if (syncStatus.strava?.synced) devices.push('Strava');
+  if (syncStatus.ios?.synced) devices.push('iOS');
+  return devices;
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -792,12 +802,20 @@ export function WorkoutList({
                           </CardTitle>
                           {/* Completion badge (AMA-891) */}
                           {(() => {
-                            const workoutCompletions = completions.filter(
+                            const workoutCompletions = completions?.filter(
                               c => c.sourceWorkoutId === workout.id || c.workoutName === workout.title
-                            );
+                            ) || [];
                             if (workoutCompletions.length > 0) {
                               const lastCompletion = workoutCompletions[0];
                               const lastDate = new Date(lastCompletion.startedAt);
+                              if (isNaN(lastDate.getTime())) {
+                                return (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>Done {workoutCompletions.length}×</span>
+                                  </div>
+                                );
+                              }
                               const formattedDate = lastDate.toLocaleDateString('en-US', {
                                 weekday: 'short',
                                 month: 'short',
@@ -814,11 +832,7 @@ export function WorkoutList({
                           })()}
                           {/* Sync status badge (AMA-891) */}
                           {(() => {
-                            const syncedDevices: string[] = [];
-                            if (workout.syncStatus.garmin?.synced) syncedDevices.push('Garmin');
-                            if (workout.syncStatus.apple?.synced) syncedDevices.push('Apple');
-                            if (workout.syncStatus.strava?.synced) syncedDevices.push('Strava');
-                            if (workout.syncStatus.ios?.synced) syncedDevices.push('iOS');
+                            const syncedDevices = getSyncedDevices(workout.syncStatus);
                             
                             if (syncedDevices.length > 0) {
                               return (
