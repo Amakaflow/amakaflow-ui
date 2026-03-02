@@ -461,7 +461,11 @@ export function WorkoutList({
       </div>
 
       {/* Tabs for Library, Programs, History */}
-      <Tabs defaultValue="library">
+      <Tabs defaultValue="library" onValueChange={(value) => {
+        if (value === 'history') {
+          loadCompletions();
+        }
+      }}>
         <TabsList>
           <TabsTrigger value="library">Library</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
