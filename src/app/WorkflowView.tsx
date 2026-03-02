@@ -1,16 +1,17 @@
+import React from 'react';
+import { toast } from 'sonner';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { AddSources } from '../components/AddSources';
 import { StructureWorkout } from '../components/StructureWorkout/StructureWorkout';
-import { ValidateMap } from '../components/ValidateMap';
-import { PublishExport } from '../components/PublishExport';
 import { TeamSharing } from '../components/TeamSharing';
 import { WelcomeGuide } from '../components/WelcomeGuide';
 import { HomeScreen } from '../components/Home/HomeScreen';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkoutTypeConfirmDialog } from '../components/WorkoutTypeConfirmDialog';
 import { PinterestBulkImportModal } from '../components/PinterestBulkImportModal';
+import { ExportPage } from '../components/Export';
 import {
   Analytics,
   UserSettings,
@@ -28,11 +29,14 @@ import {
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
-import type { DeviceId } from '../lib/devices';
+import type { DeviceId, DeviceConfig } from '../lib/devices';
+import { getPrimaryExportDestinations } from '../lib/devices';
+import { exportWorkoutToDevice } from '../lib/mapper-api';
 import { isDemoMode } from '../lib/demo-mode';
 import { setCurrentProfileId } from '../lib/workout-history';
 import { normalizeWorkoutStructure } from '../lib/api';
 import { useWorkflowState } from './useWorkflowState';
+import type { WorkoutStructure } from '../types/workout';
 
 export interface WorkflowViewProps {
   user: AppUser;
@@ -60,7 +64,7 @@ export function WorkflowView({
   const {
     workout, setWorkout, workoutSaved, setWorkoutSaved,
     currentStep, currentStepIndex, steps,
-    validation, exports, importProcessedItems, setImportProcessedItems,
+    exports, validation, importProcessedItems, setImportProcessedItems,
     confirmDialog, setConfirmDialog, workoutTypeDialog,
     sources, loading, generationProgress,
     showStravaEnhance, pinterestBulkModal, welcomeDismissed, buildTimestamp,
@@ -69,7 +73,6 @@ export function WorkflowView({
     handleGenerateStructure, handleCancelGeneration,
     handleLoadTemplate, handleCreateNew, handleStartNew, handleWelcomeDismiss,
     handlePinterestBulkImport, handlePinterestEditSingle, handlePinterestBulkClose,
-    handleAutoMap, handleValidate, handleReValidate, handleProcess,
     handleLoadFromHistory, handleEditFromHistory,
     handleSaveFromStructure, handleEditFromImport, handleBackToImport,
     handleWorkoutTypeConfirm, handleWorkoutTypeSkip,
@@ -83,6 +86,26 @@ export function WorkflowView({
     currentView,
     setCurrentView,
   });
+
+  const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
+  const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
+
+  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceConfig) => {
+    setExportingWorkout(workout);
+    setExportingDevice(device.id);
+    setCurrentView('export-page');
+  };
+
+  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceConfig) => {
+    try {
+      toast.info(`Exporting "${workout.title || 'Workout'}" to ${device.name}...`);
+      await exportWorkoutToDevice(workout, device.id);
+      toast.success(`Exported to ${device.name}!`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed';
+      toast.error(message);
+    }
+  };
 
   return (
     <>
@@ -103,7 +126,7 @@ export function WorkflowView({
                   ? 'Review and adjust your imported workout before saving'
                   : isEditingFromHistory
                   ? 'Edit your workout directly or re-validate if needed'
-                  : 'Ingest \u2192 Structure \u2192 Validate \u2192 Export'}
+                  : 'Ingest \u2192 Structure \u2192 Export'}
               </p>
             </div>
             {!isEditingFromHistory && (
@@ -243,8 +266,13 @@ export function WorkflowView({
                 setWorkout(updatedWorkout);
                 setWorkoutSaved(false);
               }}
-              onAutoMap={handleAutoMap}
-              onValidate={handleValidate}
+              onExport={!isEditingFromImport ? (w) => {
+                const devices = getPrimaryExportDestinations();
+                const preferred = user.selectedDevices?.[0]
+                  ? devices.find(d => d.id === user.selectedDevices[0])
+                  : devices[0];
+                handleOpenExportPage(w, preferred ?? devices[0]);
+              } : undefined}
               onSave={
                 isEditingFromHistory || isCreatingFromScratch
                   ? () => handleSaveFromStructure(exports, sources, validation)
@@ -254,42 +282,8 @@ export function WorkflowView({
               isCreatingFromScratch={isCreatingFromScratch}
               hideExport={isEditingFromImport}
               loading={loading}
-              selectedDevice={selectedDevice}
-              onDeviceChange={setSelectedDevice}
-              userSelectedDevices={user.selectedDevices}
-              onNavigateToSettings={() => {
-                checkUnsavedChanges(() => {
-                  clearWorkflowState();
-                  setCurrentView('settings');
-                });
-              }}
             />
           </div>
-        )}
-
-        {/* Step: validate */}
-        {currentView === 'workflow' && currentStep === 'validate' && validation && workout && (
-          <ValidateMap
-            validation={validation}
-            workout={workout}
-            onReValidate={handleReValidate}
-            onProcess={handleProcess}
-            loading={loading}
-            selectedDevice={selectedDevice}
-          />
-        )}
-
-        {/* Step: export */}
-        {currentView === 'workflow' && currentStep === 'export' && exports && (
-          <PublishExport
-            exports={exports}
-            validation={validation || undefined}
-            sources={sources.map(s => `${s.type}:${s.content}`)}
-            onStartNew={handleStartNew}
-            selectedDevice={selectedDevice}
-            userMode={user.mode}
-            workout={workout}
-          />
         )}
 
         {currentView === 'workflow' && showStravaEnhance && (
@@ -384,8 +378,29 @@ export function WorkflowView({
                 setSelectedProgramId(programId);
                 setCurrentView('program-detail');
               }}
+              onExportWorkout={(item, device) => {
+                const workout = normalizeWorkoutStructure(item.workout);
+                if (device.requiresMapping) {
+                  handleOpenExportPage(workout, device);
+                } else {
+                  handleInlineExport(workout, device);
+                }
+              }}
             />
           </div>
+        )}
+
+        {currentView === 'export-page' && exportingWorkout && (
+          <ExportPage
+            initialWorkout={exportingWorkout}
+            initialDevice={exportingDevice ?? undefined}
+            devices={getPrimaryExportDestinations()}
+            onBack={() => {
+              setCurrentView('workouts');
+              setExportingWorkout(null);
+              setExportingDevice(null);
+            }}
+          />
         )}
 
         {currentView === 'programs' && (
@@ -458,19 +473,6 @@ export function WorkflowView({
                   exercise(s)
                 </span>
               </div>
-              {validation && (
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-green-600">
-                    &#x2713; {validation.validated_exercises.length} validated
-                  </span>
-                  <span className="text-orange-600">
-                    &#x26A0; {validation.needs_review.length} review
-                  </span>
-                  <span className="text-red-600">
-                    &#x2717; {validation.unmapped_exercises.length} unmapped
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>

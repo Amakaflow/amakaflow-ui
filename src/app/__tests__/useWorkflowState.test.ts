@@ -5,7 +5,7 @@
  * and let the three domain hooks (useWorkflowGeneration, useWorkflowEditing,
  * useWorkflowValidation) run for real. This verifies the callback plumbing works end-to-end.
  */
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Stable mock references (hoisted so vi.mock factories can use them) ───────
@@ -408,37 +408,4 @@ describe('useWorkflowState (integration)', () => {
     });
   });
 
-  // ── 10. handleValidate → setValidation wiring ─────────────────────────────
-  describe('handleValidate → validation state', () => {
-    it('validation state is set with the API result after handleValidate', async () => {
-      mockGenerateWorkoutStructure.mockResolvedValueOnce(mockWorkout);
-      const { result } = await renderAndGenerate();
-
-      expect(result.current.workout).not.toBeNull();
-
-      await act(async () => {
-        await result.current.handleValidate();
-      });
-
-      await waitFor(() => {
-        expect(result.current.validation).not.toBeNull();
-      });
-
-      expect(result.current.validation?.can_proceed).toBe(true);
-      expect(result.current.validation?.validated_exercises).toEqual(
-        expect.arrayContaining([expect.objectContaining({ name: 'Push Up' })])
-      );
-    });
-
-    it('currentStep becomes "validate" after handleValidate succeeds', async () => {
-      mockGenerateWorkoutStructure.mockResolvedValueOnce(mockWorkout);
-      const { result } = await renderAndGenerate();
-
-      await act(async () => {
-        await result.current.handleValidate();
-      });
-
-      expect(result.current.currentStep).toBe('validate');
-    });
-  });
 });
