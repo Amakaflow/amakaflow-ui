@@ -1,5 +1,5 @@
 /**
- * Page Object for UnifiedWorkouts component.
+ * Page Object for WorkoutList component.
  *
  * Encapsulates selectors and common operations for workout delete testing.
  * Use this pattern for maintainable E2E tests.
@@ -17,13 +17,21 @@ export class WorkoutsPage {
 
   // Workout list
   readonly workoutList: Locator;
-  
-  // Delete confirmation dialog
+
+  // Delete confirmation dialog (single-workout delete via AlertDialog)
   readonly deleteDialog: Locator;
   readonly deleteDialogTitle: Locator;
   readonly deleteDialogDescription: Locator;
   readonly deleteDialogCancel: Locator;
   readonly deleteDialogConfirm: Locator;
+
+  // Bulk delete controls
+  readonly selectAllCheckbox: Locator;
+  readonly bulkDeleteButton: Locator;
+  readonly bulkDeleteModal: Locator;
+  readonly bulkDeleteModalTitle: Locator;
+  readonly bulkDeleteCancelButton: Locator;
+  readonly bulkDeleteConfirmButton: Locator;
 
   // Loading and empty states
   readonly loadingSpinner: Locator;
@@ -40,12 +48,20 @@ export class WorkoutsPage {
     // Workout list
     this.workoutList = page.locator('[data-assistant-target="library-results"]');
 
-    // Delete confirmation dialog
+    // Delete confirmation dialog (single-workout)
     this.deleteDialog = page.locator('[data-testid="delete-confirmation-dialog"]');
     this.deleteDialogTitle = page.locator('[data-testid="delete-confirmation-title"]');
     this.deleteDialogDescription = page.locator('[data-testid="delete-confirmation-description"]');
     this.deleteDialogCancel = page.locator('[data-testid="delete-confirmation-cancel"]');
     this.deleteDialogConfirm = page.locator('[data-testid="delete-confirmation-confirm"]');
+
+    // Bulk delete controls
+    this.selectAllCheckbox = page.locator('[data-testid="select-all-checkbox"]');
+    this.bulkDeleteButton = page.locator('[data-testid="bulk-delete-button"]');
+    this.bulkDeleteModal = page.locator('[data-testid="bulk-delete-modal"]');
+    this.bulkDeleteModalTitle = page.locator('[data-testid="bulk-delete-modal-title"]');
+    this.bulkDeleteCancelButton = page.locator('[data-testid="bulk-delete-cancel"]');
+    this.bulkDeleteConfirmButton = page.locator('[data-testid="bulk-delete-confirm"]');
 
     // Loading and empty states
     this.loadingSpinner = page.locator('.animate-spin').first();
@@ -161,5 +177,71 @@ export class WorkoutsPage {
    */
   async getWorkoutCount(): Promise<number> {
     return this.workoutList.locator('[data-testid^="workout-item-"]').count();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk selection helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check (select) an individual workout by ID
+   */
+  async checkWorkout(workoutId: string) {
+    const checkbox = this.page.locator(`[data-testid="workout-checkbox-${workoutId}"]`);
+    await checkbox.check();
+  }
+
+  /**
+   * Uncheck (deselect) an individual workout by ID
+   */
+  async uncheckWorkout(workoutId: string) {
+    const checkbox = this.page.locator(`[data-testid="workout-checkbox-${workoutId}"]`);
+    await checkbox.uncheck();
+  }
+
+  /**
+   * Click the select-all checkbox (toggles between all-selected and all-deselected)
+   */
+  async clickSelectAll() {
+    await this.selectAllCheckbox.click();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk delete modal helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Click the "Delete selected" button to open the bulk-delete confirmation modal
+   */
+  async openBulkDeleteModal() {
+    await this.bulkDeleteButton.click();
+  }
+
+  /**
+   * Wait for the bulk-delete confirmation modal to be visible
+   */
+  async waitForBulkDeleteModal(timeout = 5_000) {
+    await this.bulkDeleteModal.waitFor({ state: 'visible', timeout });
+  }
+
+  /**
+   * Wait for the bulk-delete confirmation modal to close
+   */
+  async waitForBulkDeleteModalClosed(timeout = 5_000) {
+    await this.bulkDeleteModal.waitFor({ state: 'hidden', timeout });
+  }
+
+  /**
+   * Click the Cancel button inside the bulk-delete modal
+   */
+  async cancelBulkDelete() {
+    await this.bulkDeleteCancelButton.click();
+  }
+
+  /**
+   * Click the Delete (confirm) button inside the bulk-delete modal
+   */
+  async confirmBulkDelete() {
+    await this.bulkDeleteConfirmButton.click();
   }
 }

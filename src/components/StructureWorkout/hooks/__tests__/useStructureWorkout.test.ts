@@ -588,4 +588,279 @@ describe('useStructureWorkout', () => {
     // Index 0 is undefined (sparse array)
     expect(updated.blocks[0].exercises[0]).toBeUndefined();
   });
+
+  // ── Drag and Drop ─────────────────────────────────────────────────────────
+  describe('drag and drop', () => {
+    it('handleDragStart sets activeDragItem for a block', () => {
+      const workout = makeWorkout();
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragStart({
+          active: {
+            id: 'block-1',
+            data: { current: { type: 'block', blockIdx: 0 } },
+          },
+        } as any);
+      });
+
+      expect(result.current.activeDragItem).toEqual({
+        type: 'block',
+        label: 'Block 1',
+      });
+    });
+
+    it('handleDragStart sets activeDragItem for an exercise', () => {
+      const workout = makeWorkout();
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragStart({
+          active: {
+            id: 'ex-1',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 0, supersetIdx: null } },
+          },
+        } as any);
+      });
+
+      expect(result.current.activeDragItem).toEqual({
+        type: 'exercise',
+        label: 'Squat',
+      });
+    });
+
+    it('handleDragEnd reorders blocks', () => {
+      // Workout with two blocks so we can reorder
+      const workout: WorkoutStructure = {
+        title: 'Two Blocks',
+        source: 'test',
+        blocks: [
+          {
+            id: 'block-1',
+            label: 'Block 1',
+            structure: 'regular',
+            exercises: [],
+          },
+          {
+            id: 'block-2',
+            label: 'Block 2',
+            structure: 'circuit',
+            exercises: [],
+          },
+        ],
+      };
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'block-1',
+            data: { current: { type: 'block', blockIdx: 0 } },
+          },
+          over: {
+            id: 'block-2',
+            data: { current: { type: 'block', blockIdx: 1 } },
+          },
+        } as any);
+      });
+
+      expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+      const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+      // block-1 moves to index 1, block-2 moves to index 0
+      expect(updated.blocks[0].id).toBe('block-2');
+      expect(updated.blocks[1].id).toBe('block-1');
+    });
+
+    it('handleDragEnd reorders exercises within a block', () => {
+      const workout = makeWorkout(); // block-1 has ex-1 (Squat) at 0, ex-2 (Deadlift) at 1
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'ex-1',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 0, supersetIdx: null } },
+          },
+          over: {
+            id: 'ex-2',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 1, supersetIdx: null } },
+          },
+        } as any);
+      });
+
+      expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+      const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+      // ex-1 (Squat) moved to index 1, ex-2 (Deadlift) moved to index 0
+      expect(updated.blocks[0].exercises[0].name).toBe('Deadlift');
+      expect(updated.blocks[0].exercises[1].name).toBe('Squat');
+    });
+
+    it('handleDragEnd reorders exercises within a superset', () => {
+      const workout: WorkoutStructure = {
+        title: 'Superset Workout',
+        source: 'test',
+        blocks: [
+          {
+            id: 'block-1',
+            label: 'Block 1',
+            structure: 'superset',
+            exercises: [],
+            supersets: [
+              {
+                id: 'ss-1',
+                exercises: [
+                  {
+                    id: 'ss-ex-1',
+                    name: 'Pull-up',
+                    sets: 3,
+                    reps: 8,
+                    reps_range: null,
+                    duration_sec: null,
+                    rest_sec: null,
+                    distance_m: null,
+                    distance_range: null,
+                    type: 'strength',
+                  },
+                  {
+                    id: 'ss-ex-2',
+                    name: 'Dip',
+                    sets: 3,
+                    reps: 10,
+                    reps_range: null,
+                    duration_sec: null,
+                    rest_sec: null,
+                    distance_m: null,
+                    distance_range: null,
+                    type: 'strength',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'ss-ex-1',
+            data: { current: { type: 'superset-exercise', blockIdx: 0, supersetIdx: 0, exerciseIdx: 0 } },
+          },
+          over: {
+            id: 'ss-ex-2',
+            data: { current: { type: 'superset-exercise', blockIdx: 0, supersetIdx: 0, exerciseIdx: 1 } },
+          },
+        } as any);
+      });
+
+      expect(onWorkoutChange).toHaveBeenCalledTimes(1);
+      const updated = onWorkoutChange.mock.calls[0][0] as WorkoutStructure;
+      // ss-ex-1 (Pull-up) moves to index 1, ss-ex-2 (Dip) moves to index 0
+      expect(updated.blocks[0].supersets![0].exercises[0].name).toBe('Dip');
+      expect(updated.blocks[0].supersets![0].exercises[1].name).toBe('Pull-up');
+    });
+
+    it('handleDragEnd is a no-op when active and over are the same', () => {
+      const workout = makeWorkout();
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'ex-1',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 0, supersetIdx: null } },
+          },
+          over: {
+            id: 'ex-1',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 0, supersetIdx: null } },
+          },
+        } as any);
+      });
+
+      expect(onWorkoutChange).not.toHaveBeenCalled();
+    });
+
+    it('handleDragEnd is a no-op when over is null', () => {
+      const workout = makeWorkout();
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'ex-1',
+            data: { current: { type: 'exercise', blockIdx: 0, exerciseIdx: 0, supersetIdx: null } },
+          },
+          over: null,
+        } as any);
+      });
+
+      expect(onWorkoutChange).not.toHaveBeenCalled();
+    });
+
+    it('handleDragEnd clears activeDragItem', () => {
+      const workout = makeWorkout();
+      const onWorkoutChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStructureWorkout({ workout, onWorkoutChange })
+      );
+
+      // First set an active drag item
+      act(() => {
+        result.current.handleDragStart({
+          active: {
+            id: 'block-1',
+            data: { current: { type: 'block', blockIdx: 0 } },
+          },
+        } as any);
+      });
+
+      expect(result.current.activeDragItem).not.toBeNull();
+
+      // End the drag (same id so no reorder, but activeDragItem must clear)
+      act(() => {
+        result.current.handleDragEnd({
+          active: {
+            id: 'block-1',
+            data: { current: { type: 'block', blockIdx: 0 } },
+          },
+          over: {
+            id: 'block-1',
+            data: { current: { type: 'block', blockIdx: 0 } },
+          },
+        } as any);
+      });
+
+      expect(result.current.activeDragItem).toBeNull();
+    });
+  });
 });
