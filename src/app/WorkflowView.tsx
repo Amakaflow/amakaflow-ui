@@ -252,7 +252,7 @@ export function WorkflowView({
               }
               isEditingFromHistory={isEditingFromHistory}
               isCreatingFromScratch={isCreatingFromScratch}
-              hideExport={isEditingFromImport || isEditingFromHistory}
+              hideExport={isEditingFromImport}
               loading={loading}
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
