@@ -71,6 +71,7 @@ See [`/docs/README.md`](./docs/README.md) for a complete documentation index.
 
 ## Quick Links
 
+- [Architecture Guide](./ARCHITECTURE.md)
 - [Quick Start Guide](./docs/getting-started/QUICK_START.md)
 - [Clerk Setup](./docs/auth/CLERK_SETUP.md)
 - [Supabase Setup](./docs/database/SUPABASE_SETUP.md)

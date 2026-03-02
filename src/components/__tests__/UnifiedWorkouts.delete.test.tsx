@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { UnifiedWorkouts } from '../UnifiedWorkouts';
+import { WorkoutList } from '../Workouts/WorkoutList';
 import type { UnifiedWorkout } from '../../types/unified-workout';
+
+// Mock lucide-react so icon components work as plain function calls in jsdom
+vi.mock('lucide-react', async () => {
+  const React = await import('react');
+  const icon = (props: Record<string, unknown>) =>
+    React.createElement('span', { 'data-testid': 'icon', ...props });
+  const handler = { get: (_: unknown, name: string) => name === '__esModule' ? true : icon };
+  return new Proxy({}, handler);
+});
 
 // Mock all dependencies comprehensively
 vi.mock('../../lib/unified-workouts', () => ({
@@ -53,7 +62,7 @@ vi.mock('sonner', () => ({
 import { fetchAllWorkouts } from '../../lib/unified-workouts';
 import { deleteWorkoutFromHistory } from '../../lib/workout-history';
 
-describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
+describe('WorkoutList - Delete Confirmation Flow', () => {
   const mockOnEditWorkout = vi.fn();
   const mockOnLoadWorkout = vi.fn();
   const mockOnDeleteWorkout = vi.fn();
@@ -106,7 +115,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
 
       // Act
       render(
-        <UnifiedWorkouts
+        <WorkoutList
           profileId="user-123"
           onEditWorkout={mockOnEditWorkout}
           onLoadWorkout={mockOnLoadWorkout}
@@ -120,7 +129,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click the delete button
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Assert - dialog should be visible
@@ -140,7 +149,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
 
       // Act
       render(
-        <UnifiedWorkouts
+        <WorkoutList
           profileId="user-123"
           onEditWorkout={mockOnEditWorkout}
           onLoadWorkout={mockOnLoadWorkout}
@@ -153,7 +162,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
         expect(screen.getByText('Test Workout 1')).toBeInTheDocument();
       });
 
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Assert - check both buttons exist
@@ -173,7 +182,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
 
       // Act
       render(
-        <UnifiedWorkouts
+        <WorkoutList
           profileId="user-123"
           onEditWorkout={mockOnEditWorkout}
           onLoadWorkout={mockOnLoadWorkout}
@@ -187,7 +196,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear
@@ -215,7 +224,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
 
       // Act
       render(
-        <UnifiedWorkouts
+        <WorkoutList
           profileId="user-123"
           onEditWorkout={mockOnEditWorkout}
           onLoadWorkout={mockOnLoadWorkout}
@@ -229,7 +238,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear
@@ -257,7 +266,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
 
       // Act
       render(
-        <UnifiedWorkouts
+        <WorkoutList
           profileId="user-456"
           onEditWorkout={mockOnEditWorkout}
           onLoadWorkout={mockOnLoadWorkout}
@@ -271,7 +280,7 @@ describe('UnifiedWorkouts - Delete Confirmation Flow', () => {
       });
 
       // Click delete button to open dialog
-      const deleteButtons = screen.getAllByTitle('Delete');
+      const deleteButtons = screen.getAllByRole('button', { name: 'Delete workout' });
       fireEvent.click(deleteButtons[0]);
 
       // Wait for dialog to appear

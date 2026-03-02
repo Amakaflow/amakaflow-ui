@@ -10,6 +10,7 @@ import { ProgramsHeader } from './ProgramsHeader';
 import { ProgramsFilterBar, type StatusFilter, type SortBy } from './ProgramsFilterBar';
 import { ProgramCard } from './ProgramCard';
 import { ProgramsEmptyState } from './ProgramsEmptyState';
+import { ProgramsAddMore } from './ProgramsAddMore';
 import { ProgramsLoadingSkeleton } from './ProgramsLoadingSkeleton';
 import { ProgramWizard } from '../ProgramWizard';
 import {
@@ -296,11 +297,7 @@ export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
               />
             ))}
           </div>
-          <div className="mt-8 flex justify-center">
-            <Button variant="outline" onClick={handleCreateProgram}>
-              Generate another program
-            </Button>
-          </div>
+          <ProgramsAddMore onCreateProgram={handleCreateProgram} />
         </>
       )}
 

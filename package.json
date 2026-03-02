@@ -71,8 +71,6 @@
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
-    "react-dnd": "*",
-    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.55.0",
     "react-markdown": "^10.1.0",
@@ -86,6 +84,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.48.0",
     "@storybook/addon-a11y": "^10.2.13",
     "@storybook/addon-docs": "^10.2.13",
@@ -105,6 +104,7 @@
     "msw-storybook-addon": "^2.0.6",
     "playwright": "^1.58.2",
     "storybook": "^10.2.13",
+    "typescript": "^5.9.3",
     "vite": "6.3.5",
     "vitest": "^4.0.10"
   },

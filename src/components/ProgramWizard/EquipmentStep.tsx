@@ -100,7 +100,7 @@ export function EquipmentStep() {
       {/* Validation hint when nothing selected */}
       {!state.equipmentPreset && !state.useCustomEquipment && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          Please select an equipment option to continue
+          Please choose an equipment option
         </p>
       )}
 
