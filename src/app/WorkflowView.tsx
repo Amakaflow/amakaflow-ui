@@ -386,6 +386,7 @@ export function WorkflowView({
                   handleInlineExport(workout, device);
                 }
               }}
+              onAddToCalendar={(_item) => setCurrentView('calendar')}
             />
           </div>
         )}
@@ -432,6 +433,7 @@ export function WorkflowView({
             initialProcessedItems={importProcessedItems.length > 0 ? importProcessedItems : undefined}
             onUpdateProcessedItems={setImportProcessedItems}
             onEditWorkout={handleEditFromImport}
+            onNavigate={(view) => setCurrentView(view as any)}
           />
         )}
 

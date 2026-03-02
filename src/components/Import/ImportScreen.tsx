@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
-import { Link, FileSpreadsheet, Bookmark, Plug } from 'lucide-react';
+import { Link, FileSpreadsheet, Bookmark, Plug, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { useImportFlow } from './hooks/useImportFlow';
 import { FileImportTab } from './FileImportTab';
 import { ImportQueue } from './ImportQueue';
@@ -18,15 +18,16 @@ interface ImportScreenProps {
   onEditWorkout: (queueId: string, w: Record<string, unknown>) => void;
   initialProcessedItems?: ProcessedItem[];
   onUpdateProcessedItems?: (items: ProcessedItem[]) => void;
+  onNavigate?: (view: string) => void;
 }
 const wrap = (children: ReactNode) => <div className="container mx-auto px-4 py-8 max-w-3xl">{children}</div>;
 
-export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems }: ImportScreenProps) {
+export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems, onNavigate }: ImportScreenProps) {
   const { phase, activeTab, setActiveTab, queue, addUrls, addFiles, removeQueueItem,
     processedItems, selectedBlocks, setSelectedBlocks, columnMappingState,
     handleImport, handleSaveAll, handleRetry, handleRemoveResult,
     handleFilesDetected, handleColumnMappingComplete, goToBlockPicker,
-    cancelBlockPicker, handleBlockPickerConfirm } = useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems });
+    cancelBlockPicker, handleBlockPickerConfirm } = useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems, onNavigate });
 
   const handleQueueChange = (next: QueueItem[]) => {
     queue.forEach(i => { if (!next.find(q => q.id === i.id)) removeQueueItem(i.id); });
@@ -60,6 +61,29 @@ export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedIt
   if (phase === 'column-mapping' && columnMappingState) return wrap(<><h1 className="text-2xl font-bold mb-6">Match Columns</h1>
     <MapStep userId={userId} columns={columnMappingState.columns} patterns={columnMappingState.patterns}
       loading={columnMappingState.loading} onApply={(cols) => { void handleColumnMappingComplete(cols); }} /></>);
+
+  if (phase === 'saved') return wrap(
+    <div className="text-center py-12 space-y-6">
+      <div className="flex justify-center">
+        <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+          <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-500" />
+        </div>
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold">Workout saved!</h2>
+        <p className="text-muted-foreground mt-2">Your workout has been added to the library.</p>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {onNavigate && (
+          <Button variant="outline" onClick={() => onNavigate('calendar')}>
+            <CalendarDays className="w-4 h-4 mr-2" />
+            Add to Calendar
+          </Button>
+        )}
+        <Button onClick={onDone}>Done</Button>
+      </div>
+    </div>
+  );
 
   return wrap(
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
