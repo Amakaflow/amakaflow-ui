@@ -2,7 +2,7 @@ import { ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { AddSources } from '../components/AddSources';
-import { StructureWorkout } from '../components/StructureWorkout';
+import { StructureWorkout } from '../components/StructureWorkout/StructureWorkout';
 import { ValidateMap } from '../components/ValidateMap';
 import { PublishExport } from '../components/PublishExport';
 import { TeamSharing } from '../components/TeamSharing';
