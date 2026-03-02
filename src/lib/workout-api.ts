@@ -8,6 +8,7 @@
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
 import { isDemoMode } from './demo-mode';
+import { generateAutoTags } from './auto-tags';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
@@ -49,6 +50,7 @@ export interface SaveWorkoutRequest {
   title?: string;
   description?: string;
   workout_id?: string; // Optional: for explicit updates to existing workouts
+  tags?: string[]; // Auto-generated + user tags
 }
 
 export interface GetWorkoutsParams {
@@ -91,15 +93,34 @@ async function workoutApiCall<T>(
  * Save a workout to Supabase via mapper API
  */
 export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<SavedWorkout> {
+  // Generate auto tags from workout content
+  const workoutData = request.workout_data;
+  const autoTags = workoutData ? generateAutoTags(workoutData) : [];
+  
+  // Get existing tags from workout_data (if any) and merge with auto tags
+  const existingTags = (workoutData as any)?.tags || [];
+  const mergedTags = Array.from(new Set([...autoTags, ...existingTags]));
+  
+  // Create updated request with merged tags
+  const updatedRequest: SaveWorkoutRequest = {
+    ...request,
+    tags: mergedTags,
+    // Also add tags to workout_data for storage
+    workout_data: {
+      ...workoutData,
+      tags: mergedTags,
+    },
+  };
+  
   if (isDemoMode) {
     console.log('[demo] saveWorkoutToAPI skipped');
-    return { id: 'demo-' + Date.now(), ...request, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
+    return { id: 'demo-' + Date.now(), ...updatedRequest, workout_data: updatedRequest.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
   }
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
     '/workouts/save',
     {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(updatedRequest),
     }
   );
 
