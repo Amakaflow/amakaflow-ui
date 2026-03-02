@@ -269,8 +269,13 @@ export function WorkflowView({
                 setWorkout(updatedWorkout);
                 setWorkoutSaved(false);
               }}
-              onAutoMap={handleAutoMap}
-              onValidate={handleValidate}
+              onExport={!isEditingFromImport ? (w) => {
+                const devices = getPrimaryExportDestinations();
+                const preferred = user.selectedDevices?.[0]
+                  ? devices.find(d => d.id === user.selectedDevices[0])
+                  : devices[0];
+                handleOpenExportPage(w, preferred ?? devices[0]);
+              } : undefined}
               onSave={
                 isEditingFromHistory || isCreatingFromScratch
                   ? () => handleSaveFromStructure(exports, sources, validation)
@@ -280,9 +285,6 @@ export function WorkflowView({
               isCreatingFromScratch={isCreatingFromScratch}
               hideExport={isEditingFromImport}
               loading={loading}
-              selectedDevice={selectedDevice}
-              onDeviceChange={setSelectedDevice}
-              userSelectedDevices={user.selectedDevices}
               onNavigateToSettings={() => {
                 checkUnsavedChanges(() => {
                   clearWorkflowState();
