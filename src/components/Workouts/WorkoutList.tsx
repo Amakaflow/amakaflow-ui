@@ -11,12 +11,10 @@ import {
   Clock,
   Watch,
   Bike,
-  Download,
   CheckCircle2,
   Eye,
   Trash2,
   ChevronRight,
-  ChevronDown,
   Edit,
   List,
   LayoutGrid,
@@ -25,8 +23,6 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
-  FileSpreadsheet,
-  FileText,
   Activity,
   Star,
   Tag,
@@ -749,52 +745,6 @@ export function WorkoutList({
                             <ExternalLink className="w-4 h-4" />
                           </Button>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              aria-label="Export workout"
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
-                              <FileSpreadsheet className="w-4 h-4 mr-2" />
-                              CSV (Strong/Hevy)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
-                              <FileSpreadsheet className="w-4 h-4 mr-2" />
-                              CSV (Extended)
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
-                              <Activity className="w-4 h-4 mr-2" />
-                              FIT (Garmin)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              TCX
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Text (TrainingPeaks)
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              JSON
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -977,53 +927,6 @@ export function WorkoutList({
                               size="labeled"
                             />
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-2 h-9 font-medium"
-                              >
-                                <Download className="w-4 h-4" />
-                                Export
-                                <ChevronDown className="w-3 h-3 ml-1" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
-                                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                                CSV (Strong/Hevy compatible)
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
-                                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                                CSV (Extended for spreadsheets)
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
-                                <Activity className="w-4 h-4 mr-2" />
-                                FIT (Garmin)
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                TCX
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                Text (TrainingPeaks)
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                JSON
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                PDF
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                         <Button
                           size="sm"
