@@ -1,3 +1,4 @@
+import React from 'react';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -11,6 +12,7 @@ import { HomeScreen } from '../components/Home/HomeScreen';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkoutTypeConfirmDialog } from '../components/WorkoutTypeConfirmDialog';
 import { PinterestBulkImportModal } from '../components/PinterestBulkImportModal';
+import { ExportPage } from '../components/Export';
 import {
   Analytics,
   UserSettings,
@@ -29,10 +31,12 @@ import {
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
 import type { DeviceId } from '../lib/devices';
+import { getPrimaryExportDestinations } from '../lib/devices';
 import { isDemoMode } from '../lib/demo-mode';
 import { setCurrentProfileId } from '../lib/workout-history';
 import { normalizeWorkoutStructure } from '../lib/api';
 import { useWorkflowState } from './useWorkflowState';
+import type { WorkoutStructure } from '../types/workout';
 
 export interface WorkflowViewProps {
   user: AppUser;
@@ -83,6 +87,20 @@ export function WorkflowView({
     currentView,
     setCurrentView,
   });
+
+  const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
+  const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
+
+  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceId) => {
+    setExportingWorkout(workout);
+    setExportingDevice(device);
+    setCurrentView('export-page');
+  };
+
+  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceId) => {
+    // TODO: implement via useExportFlow in Task 9 (WorkoutList component will own this)
+    console.log('Inline export requested:', workout.title, device);
+  };
 
   return (
     <>
@@ -384,8 +402,22 @@ export function WorkflowView({
                 setSelectedProgramId(programId);
                 setCurrentView('program-detail');
               }}
+              // TODO: wire onExportWorkout in Task 9
             />
           </div>
+        )}
+
+        {currentView === 'export-page' && exportingWorkout && (
+          <ExportPage
+            initialWorkout={exportingWorkout}
+            initialDevice={exportingDevice ?? undefined}
+            devices={getPrimaryExportDestinations()}
+            onBack={() => {
+              setCurrentView('workouts');
+              setExportingWorkout(null);
+              setExportingDevice(null);
+            }}
+          />
         )}
 
         {currentView === 'programs' && (
