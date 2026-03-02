@@ -24,6 +24,10 @@ export const Analytics = lazy(() =>
   import('../components/Analytics').then(m => ({ default: m.Analytics }))
 );
 
+export const AnalyticsHub = lazy(() =>
+  import('../components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub }))
+);
+
 export const UserSettings = lazy(() =>
   import('../components/UserSettings').then(m => ({ default: m.UserSettings }))
 );
