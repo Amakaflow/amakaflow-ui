@@ -9,7 +9,7 @@ import {
 } from '../lib/demo-scenario';
 
 // NOTE: Matches the View type defined in App.tsx
-type DemoView = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'exercise-history' | 'volume-analytics' | 'program-detail' | 'programs' | 'create-ai';
+type DemoView = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'program-detail' | 'programs' | 'create-ai';
 
 const VIEWS: { id: DemoView; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -17,11 +17,9 @@ const VIEWS: { id: DemoView; label: string }[] = [
   { id: 'workouts', label: 'Workouts' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'analytics', label: 'Analytics' },
-  { id: 'volume-analytics', label: 'Volume Analytics' },
   { id: 'programs', label: 'Programs' },
   { id: 'create-ai', label: 'AI Workout Creator' },
   { id: 'bulk-import', label: 'Bulk Import' },
-  { id: 'exercise-history', label: 'Exercise History' },
   { id: 'mobile-companion', label: 'Mobile Companion' },
   { id: 'team', label: 'Team Sharing' },
   { id: 'help', label: 'Help' },

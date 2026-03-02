@@ -20,7 +20,9 @@ import { VolumeBarChart } from './VolumeBarChart';
 import { BalanceIndicators } from './BalanceIndicators';
 import { MuscleGroupBreakdown } from './MuscleGroupBreakdown';
 import { ExerciseDrillDown } from './ExerciseDrillDown';
+import { WorkoutFrequencyChart } from './WorkoutFrequencyChart';
 import { useVolumeAnalytics } from '../../hooks/useProgressionApi';
+import type { WorkoutHistoryItem } from '../../lib/workout-history';
 
 interface VolumeAnalyticsProps {
   /** User context - reserved for future personalization features */
@@ -28,6 +30,7 @@ interface VolumeAnalyticsProps {
     id: string;
     name: string;
   };
+  history?: WorkoutHistoryItem[];
 }
 
 function EmptyState() {
@@ -51,7 +54,7 @@ function EmptyState() {
   );
 }
 
-export function VolumeAnalytics({ user: _user }: VolumeAnalyticsProps) {
+export function VolumeAnalytics({ user: _user, history = [] }: VolumeAnalyticsProps) {
   const [period, setPeriod] = useState<VolumePeriod>('weekly');
   const [drillDownMuscleGroup, setDrillDownMuscleGroup] = useState<string | null>(null);
   const [drillDownOpen, setDrillDownOpen] = useState(false);
@@ -93,6 +96,9 @@ export function VolumeAnalytics({ user: _user }: VolumeAnalyticsProps) {
 
   return (
     <div className="space-y-6" data-testid="volume-analytics-page">
+      {/* Workout Frequency Chart */}
+      <WorkoutFrequencyChart history={history} />
+
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
