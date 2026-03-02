@@ -7,7 +7,7 @@ import type { DeviceConfig } from '../../lib/devices';
 interface ExportDevicePickerProps {
   workoutId: string;
   devices: DeviceConfig[];
-  onInlineExport: (device: DeviceConfig) => void;
+  onInlineExport: (device: DeviceConfig) => Promise<void>;
   onOpenExportPage: (device: DeviceConfig) => void;
 }
 

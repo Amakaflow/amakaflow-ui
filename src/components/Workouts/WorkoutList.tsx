@@ -62,7 +62,7 @@ import {
 } from '../ui/dropdown-menu';
 
 import type { UnifiedWorkout } from '../../types/unified-workout';
-import { CATEGORY_DISPLAY_NAMES } from '../../types/unified-workout';
+import { CATEGORY_DISPLAY_NAMES, isHistoryWorkout } from '../../types/unified-workout';
 import type { SortOption } from '../../lib/workout-filters';
 import { SORT_OPTIONS } from '../../lib/workout-filters';
 import { saveWorkoutToAPI } from '../../lib/workout-api';
@@ -144,8 +144,8 @@ function ExportPopoverButton({ workoutId, historyItem, onExportWorkout, size = '
         <ExportDevicePicker
           workoutId={workoutId}
           devices={devices}
-          onInlineExport={(device) => {
-            onExportWorkout(historyItem, device);
+          onInlineExport={async (device) => {
+            await onExportWorkout(historyItem, device);
             setOpen(false);
           }}
           onOpenExportPage={(device) => {
@@ -685,10 +685,10 @@ export function WorkoutList({
                           currentTags={workout.tags}
                           onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
                         />
-                        {onExportWorkout && !isVideo && (
+                        {onExportWorkout && isHistoryWorkout(workout) && (
                           <ExportPopoverButton
                             workoutId={workout.id}
-                            historyItem={workout._original.data as WorkoutHistoryItem}
+                            historyItem={workout._original.data}
                             onExportWorkout={onExportWorkout}
                             size="icon"
                           />
@@ -969,10 +969,10 @@ export function WorkoutList({
                               Open Video
                             </Button>
                           )}
-                          {onExportWorkout && !isVideo && (
+                          {onExportWorkout && isHistoryWorkout(workout) && (
                             <ExportPopoverButton
                               workoutId={workout.id}
-                              historyItem={workout._original.data as WorkoutHistoryItem}
+                              historyItem={workout._original.data}
                               onExportWorkout={onExportWorkout}
                               size="labeled"
                             />

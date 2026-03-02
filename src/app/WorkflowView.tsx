@@ -31,8 +31,9 @@ import {
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
-import type { DeviceId } from '../lib/devices';
+import type { DeviceId, DeviceConfig } from '../lib/devices';
 import { getPrimaryExportDestinations } from '../lib/devices';
+import { exportWorkoutToDevice } from '../lib/mapper-api';
 import { isDemoMode } from '../lib/demo-mode';
 import { setCurrentProfileId } from '../lib/workout-history';
 import { normalizeWorkoutStructure } from '../lib/api';
@@ -92,17 +93,20 @@ export function WorkflowView({
   const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
   const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
 
-  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceId) => {
+  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceConfig) => {
     setExportingWorkout(workout);
-    setExportingDevice(device);
+    setExportingDevice(device.id);
     setCurrentView('export-page');
   };
 
-  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceId) => {
+  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceConfig) => {
     try {
-      toast.success(`Exporting "${workout.title || 'Workout'}" to ${device}...`);
-    } catch {
-      toast.error('Export failed');
+      toast.info(`Exporting "${workout.title || 'Workout'}" to ${device.name}...`);
+      await exportWorkoutToDevice(workout, device.id);
+      toast.success(`Exported to ${device.name}!`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed';
+      toast.error(message);
     }
   };
 
@@ -409,9 +413,9 @@ export function WorkflowView({
               onExportWorkout={(item, device) => {
                 const workout = normalizeWorkoutStructure(item.workout);
                 if (device.requiresMapping) {
-                  handleOpenExportPage(workout, device.id);
+                  handleOpenExportPage(workout, device);
                 } else {
-                  handleInlineExport(workout, device.id);
+                  handleInlineExport(workout, device);
                 }
               }}
             />
