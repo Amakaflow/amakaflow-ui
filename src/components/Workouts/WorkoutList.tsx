@@ -38,6 +38,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { ExportDevicePicker } from '../Export';
 import type { DeviceConfig } from '../../lib/devices';
 import { getPrimaryExportDestinations } from '../../lib/devices';
@@ -210,8 +211,6 @@ export function WorkoutList({
     setShowTagManagement,
     showMixWizard,
     setShowMixWizard,
-    showActivityHistory,
-    setShowActivityHistory,
     completions,
     completionsLoading,
     completionsTotal,
@@ -380,16 +379,6 @@ export function WorkoutList({
               <List className="w-4 h-4" />
               Compact
             </Button>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button
-              variant={showActivityHistory ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowActivityHistory(!showActivityHistory)}
-              className="gap-2"
-            >
-              <Activity className="w-4 h-4" />
-              Activity History
-            </Button>
           </div>
         </div>
 
@@ -471,28 +460,16 @@ export function WorkoutList({
         </div>
       </div>
 
-      {/* Activity History View (AMA-196) */}
-      {showActivityHistory ? (
-        <div className="pr-4 max-w-7xl mx-auto">
-          <ActivityHistory
-            completions={completions}
-            loading={completionsLoading}
-            onLoadMore={loadMoreCompletions}
-            hasMore={completions.length < completionsTotal}
-            onCompletionClick={setSelectedCompletionId}
-          />
-        </div>
-      ) : (
-        <>
-          {/* Programs Section */}
-          <ProgramsSection
-            profileId={profileId}
-            workouts={allWorkouts}
-            onLoadWorkout={handleLoadUnified}
-            onViewProgram={onViewProgram}
-          />
+      {/* Tabs for Library, Programs, History */}
+      <Tabs defaultValue="library">
+        <TabsList>
+          <TabsTrigger value="library">Library</TabsTrigger>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
 
-          {/* Workout List */}
+        {/* Library Tab - Workout cards */}
+        <TabsContent value="library">
           <ScrollArea className="h-[calc(100vh-280px)]">
             <div data-assistant-target="library-results" className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
               {displayedWorkouts.map((workout) => {
@@ -944,42 +921,63 @@ export function WorkoutList({
               })}
             </div>
           </ScrollArea>
-        </>
-      )}
 
-      {/* Pagination - hide when showing Activity History */}
-      {!showActivityHistory && (
-        <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
-          <div>
-            Showing {filteredWorkouts.length === 0 ? 0 : pageStart + 1} –{' '}
-            {Math.min(pageStart + PAGE_SIZE, filteredWorkouts.length)} of{' '}
-            {filteredWorkouts.length} workout{filteredWorkouts.length === 1 ? '' : 's'}
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
+            <div>
+              Showing {filteredWorkouts.length === 0 ? 0 : pageStart + 1} –{' '}
+              {Math.min(pageStart + PAGE_SIZE, filteredWorkouts.length)} of{' '}
+              {filteredWorkouts.length} workout{filteredWorkouts.length === 1 ? '' : 's'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex === 0}
+                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              >
+                Previous
+              </Button>
+              <span>
+                Page {currentPageIndex + 1} of {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex >= totalPages - 1}
+                onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPageIndex === 0}
-              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
-            >
-              Previous
-            </Button>
-            <span>
-              Page {currentPageIndex + 1} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPageIndex >= totalPages - 1}
-              onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
-            >
-              Next
-            </Button>
+        </TabsContent>
+
+        {/* Programs Tab */}
+        <TabsContent value="programs">
+          <ProgramsSection
+            profileId={profileId}
+            workouts={allWorkouts}
+            onLoadWorkout={handleLoadUnified}
+            onViewProgram={onViewProgram}
+          />
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history">
+          <div className="pr-4 max-w-7xl mx-auto" data-testid="activity-history">
+            <ActivityHistory
+              completions={completions}
+              loading={completionsLoading}
+              onLoadMore={loadMoreCompletions}
+              hasMore={completions.length < completionsTotal}
+              onCompletionClick={setSelectedCompletionId}
+            />
           </div>
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && handleDeleteCancel()}>
