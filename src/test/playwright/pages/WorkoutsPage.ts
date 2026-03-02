@@ -116,6 +116,20 @@ export class WorkoutsPage {
   }
 
   /**
+   * Get the edit button for a specific workout
+   */
+  getEditButton(workoutId: string): Locator {
+    return this.page.locator(`[data-testid="workout-edit-${workoutId}"]`);
+  }
+
+  /**
+   * Click the edit button for a specific workout
+   */
+  async clickEditButton(workoutId: string) {
+    await this.getEditButton(workoutId).click();
+  }
+
+  /**
    * Get the delete button for a specific workout
    */
   getDeleteButton(workoutId: string): Locator {
