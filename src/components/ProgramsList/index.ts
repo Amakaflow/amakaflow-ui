@@ -3,4 +3,5 @@ export { ProgramsHeader } from './ProgramsHeader';
 export { ProgramsFilterBar } from './ProgramsFilterBar';
 export { ProgramCard } from './ProgramCard';
 export { ProgramsEmptyState } from './ProgramsEmptyState';
+export { ProgramsAddMore } from './ProgramsAddMore';
 export { ProgramsLoadingSkeleton } from './ProgramsLoadingSkeleton';
