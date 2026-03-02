@@ -173,10 +173,10 @@ export function useWorkoutList({
       setAllWorkouts(result?.workouts ?? []);
 
       if (result?.errors && result.errors.length > 0) {
-        console.warn('[UnifiedWorkouts] Fetch errors:', result.errors);
+        console.warn('[WorkoutList] Fetch errors:', result.errors);
       }
     } catch (err) {
-      console.error('[UnifiedWorkouts] Error loading workouts:', err);
+      console.error('[WorkoutList] Error loading workouts:', err);
       setError('Failed to load workouts. Please try again.');
     } finally {
       setIsLoading(false);
@@ -193,7 +193,7 @@ export function useWorkoutList({
       const tags = await getUserTags(profileId);
       setAvailableTags(tags);
     } catch (err) {
-      console.error('[UnifiedWorkouts] Error loading tags:', err);
+      console.error('[WorkoutList] Error loading tags:', err);
     }
   }, [profileId]);
 
@@ -209,7 +209,7 @@ export function useWorkoutList({
       setCompletions(result.completions);
       setCompletionsTotal(result.total);
     } catch (err) {
-      console.error('[UnifiedWorkouts] Error loading completions:', err);
+      console.error('[WorkoutList] Error loading completions:', err);
     } finally {
       setCompletionsLoading(false);
     }
@@ -222,7 +222,7 @@ export function useWorkoutList({
       const result = await fetchWorkoutCompletions(50, completions.length);
       setCompletions((prev) => [...prev, ...result.completions]);
     } catch (err) {
-      console.error('[UnifiedWorkouts] Error loading more completions:', err);
+      console.error('[WorkoutList] Error loading more completions:', err);
     } finally {
       setCompletionsLoading(false);
     }

@@ -1,5 +1,5 @@
 /**
- * Page Object for UnifiedWorkouts component.
+ * Page Object for WorkoutList component.
  *
  * Encapsulates selectors and common operations for workout delete testing.
  * Use this pattern for maintainable E2E tests.
