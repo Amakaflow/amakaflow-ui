@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { http, HttpResponse } from 'msw';
-import { StructureWorkout } from '../../components/StructureWorkout';
+import { StructureWorkout } from '../../components/StructureWorkout/StructureWorkout';
 
 const MOCK_WORKOUT = {
   title: 'Upper Body Strength',
