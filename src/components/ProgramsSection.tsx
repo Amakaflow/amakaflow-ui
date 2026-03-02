@@ -41,6 +41,7 @@ interface ProgramsSectionProps {
   workouts: UnifiedWorkout[];
   onLoadWorkout: (workout: UnifiedWorkout) => void;
   onViewProgram?: (programId: string) => void;
+  onAddToCalendar?: (program: TrainingProgram) => void;
 }
 
 export function ProgramsSection({
@@ -48,6 +49,7 @@ export function ProgramsSection({
   workouts,
   onLoadWorkout,
   onViewProgram,
+  onAddToCalendar,
 }: ProgramsSectionProps) {
   const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
   const [trainingPrograms, setTrainingPrograms] = useState<TrainingProgram[]>([]);
@@ -257,6 +259,7 @@ export function ProgramsSection({
                   key={program.id}
                   program={program}
                   onView={() => onViewProgram?.(program.id)}
+                  onAddToCalendar={onAddToCalendar || (() => {})}
                 />
               ))}
             </div>
@@ -384,9 +387,10 @@ export function ProgramsSection({
 interface TrainingProgramCardProps {
   program: TrainingProgram;
   onView: () => void;
+  onAddToCalendar: (program: TrainingProgram) => void;
 }
 
-function TrainingProgramCard({ program, onView }: TrainingProgramCardProps) {
+function TrainingProgramCard({ program, onView, onAddToCalendar }: TrainingProgramCardProps) {
   const progress = Math.round(
     ((program.current_week - 1) / program.duration_weeks) * 100
   );
@@ -438,19 +442,32 @@ function TrainingProgramCard({ program, onView }: TrainingProgramCardProps) {
           </div>
         </div>
 
-        {/* View button */}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView();
-          }}
-          className="gap-1.5"
-        >
-          <Eye className="w-4 h-4" />
-          View
-        </Button>
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCalendar(program);
+            }}
+            className="gap-1.5"
+          >
+            <Calendar className="w-4 h-4" />
+            Add to Calendar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView();
+            }}
+            className="gap-1.5"
+          >
+            <Eye className="w-4 h-4" />
+            View Plan
+          </Button>
+        </div>
       </div>
     </Card>
   );
