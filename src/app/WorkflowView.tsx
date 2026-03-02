@@ -13,7 +13,6 @@ import { WorkoutTypeConfirmDialog } from '../components/WorkoutTypeConfirmDialog
 import { PinterestBulkImportModal } from '../components/PinterestBulkImportModal';
 import { ExportPage } from '../components/Export';
 import {
-  Analytics,
   AnalyticsHub,
   UserSettings,
   StravaEnhance,
@@ -22,8 +21,6 @@ import {
   MobileCompanion,
   ImportScreen,
   HelpPage,
-  ExerciseHistory,
-  VolumeAnalytics,
   ProgramDetail,
   ProgramsList,
   CreateAIWorkout,

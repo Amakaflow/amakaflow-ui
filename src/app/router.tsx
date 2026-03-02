@@ -13,16 +13,10 @@ export type View =
   | 'mobile-companion'
   | 'import'
   | 'help'
-  | 'exercise-history'
-  | 'volume-analytics'
   | 'program-detail'
   | 'programs'
   | 'create-ai'
   | 'export-page';
-
-export const Analytics = lazy(() =>
-  import('../components/Analytics').then(m => ({ default: m.Analytics }))
-);
 
 export const AnalyticsHub = lazy(() =>
   import('../components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub }))
@@ -54,14 +48,6 @@ export const ImportScreen = lazy(() =>
 
 export const HelpPage = lazy(() =>
   import('../components/help/HelpPage').then(m => ({ default: m.HelpPage }))
-);
-
-export const ExerciseHistory = lazy(() =>
-  import('../components/ExerciseHistory').then(m => ({ default: m.ExerciseHistory }))
-);
-
-export const VolumeAnalytics = lazy(() =>
-  import('../components/VolumeAnalytics').then(m => ({ default: m.VolumeAnalytics }))
 );
 
 export const ProgramDetail = lazy(() =>
