@@ -8,7 +8,7 @@ import type { View } from '../router';
 import type { DeviceId } from '../../lib/devices';
 import type React from 'react';
 
-type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
+type WorkflowStep = 'add-sources' | 'structure';
 
 export interface UseWorkflowEditingProps {
   userId: string;
@@ -87,7 +87,7 @@ export function useWorkflowEditing({
     setExports(historyItem.exports || null);
     setIsEditingFromHistory(true);
     setEditingWorkoutId(historyItem.id);
-    onStepChange('export');
+    onStepChange('structure');
     onViewChange('workflow');
     setWorkoutSaved(true);
     toast.success('Workout loaded');

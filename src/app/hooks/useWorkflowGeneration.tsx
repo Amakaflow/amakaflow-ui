@@ -13,7 +13,7 @@ import type { Source } from '../../components/AddSources';
 import type { View } from '../router';
 import type { DeviceId } from '../../lib/devices';
 
-type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
+type WorkflowStep = 'add-sources' | 'structure';
 
 interface PinterestBulkModalState {
   open: boolean;

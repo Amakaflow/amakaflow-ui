@@ -3,14 +3,14 @@ import { toast } from 'sonner';
 import { applyWorkoutTypeDefaults } from '../lib/workoutTypeDefaults';
 import { useWorkflowGeneration } from './hooks/useWorkflowGeneration';
 import { useWorkflowEditing } from './hooks/useWorkflowEditing';
-import { useWorkflowValidation } from './hooks/useWorkflowValidation';
 import type { WorkoutStructure, ValidationResponse, ExportFormats, WorkoutType } from '../types/workout';
+// Note: useWorkflowValidation removed — validation step is no longer part of the workflow
 import type { ProcessedItem } from '../types/import';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
 import type { DeviceId } from '../lib/devices';
 
-type WorkflowStep = 'add-sources' | 'structure' | 'validate' | 'export';
+type WorkflowStep = 'add-sources' | 'structure';
 
 interface ConfirmDialogState {
   open: boolean;
@@ -67,8 +67,6 @@ export function useWorkflowState({
   const steps: Array<{ id: WorkflowStep; label: string; number: number }> = [
     { id: 'add-sources', label: 'Add Sources', number: 1 },
     { id: 'structure', label: 'Structure Workout', number: 2 },
-    { id: 'validate', label: 'Validate & Map', number: 3 },
-    { id: 'export', label: 'Publish & Export', number: 4 },
   ];
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
@@ -125,20 +123,6 @@ export function useWorkflowState({
     setExports,
     workout,
     setImportProcessedItems,
-  });
-
-  const validationHook = useWorkflowValidation({
-    workout,
-    selectedDevice,
-    user,
-    sources: generation.sources,
-    editingWorkoutId: editing.editingWorkoutId,
-    setWorkout: (w) => setWorkout(w),
-    setWorkoutSaved,
-    setValidation,
-    setExports,
-    onStepChange: setCurrentStep,
-    refreshHistory,
   });
 
   // Wire up the deferred reset callbacks now that hooks exist
@@ -242,7 +226,7 @@ export function useWorkflowState({
     steps,
     // generation
     sources: generation.sources,
-    loading: generation.loading || validationHook.loading,
+    loading: generation.loading,
     generationProgress: generation.generationProgress,
     apiAvailable: generation.apiAvailable,
     showStravaEnhance: generation.showStravaEnhance,
@@ -273,11 +257,6 @@ export function useWorkflowState({
     handleEditFromImport: editing.handleEditFromImport,
     handleBackToImport: editing.handleBackToImport,
     resetEditingFlags: editing.reset,
-    // validation
-    handleAutoMap: validationHook.handleAutoMap,
-    handleValidate: validationHook.handleValidate,
-    handleReValidate: validationHook.handleReValidate,
-    handleProcess: validationHook.handleProcess,
     // composer handlers
     handleWorkoutTypeConfirm,
     handleWorkoutTypeSkip,

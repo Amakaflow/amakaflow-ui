@@ -5,8 +5,6 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { AddSources } from '../components/AddSources';
 import { StructureWorkout } from '../components/StructureWorkout/StructureWorkout';
-import { ValidateMap } from '../components/ValidateMap';
-import { PublishExport } from '../components/PublishExport';
 import { TeamSharing } from '../components/TeamSharing';
 import { WelcomeGuide } from '../components/WelcomeGuide';
 import { HomeScreen } from '../components/Home/HomeScreen';
@@ -66,7 +64,7 @@ export function WorkflowView({
   const {
     workout, setWorkout, workoutSaved, setWorkoutSaved,
     currentStep, currentStepIndex, steps,
-    validation, exports, importProcessedItems, setImportProcessedItems,
+    exports, validation, importProcessedItems, setImportProcessedItems,
     confirmDialog, setConfirmDialog, workoutTypeDialog,
     sources, loading, generationProgress,
     showStravaEnhance, pinterestBulkModal, welcomeDismissed, buildTimestamp,
@@ -75,7 +73,6 @@ export function WorkflowView({
     handleGenerateStructure, handleCancelGeneration,
     handleLoadTemplate, handleCreateNew, handleStartNew, handleWelcomeDismiss,
     handlePinterestBulkImport, handlePinterestEditSingle, handlePinterestBulkClose,
-    handleAutoMap, handleValidate, handleReValidate, handleProcess,
     handleLoadFromHistory, handleEditFromHistory,
     handleSaveFromStructure, handleEditFromImport, handleBackToImport,
     handleWorkoutTypeConfirm, handleWorkoutTypeSkip,
@@ -129,7 +126,7 @@ export function WorkflowView({
                   ? 'Review and adjust your imported workout before saving'
                   : isEditingFromHistory
                   ? 'Edit your workout directly or re-validate if needed'
-                  : 'Ingest \u2192 Structure \u2192 Validate \u2192 Export'}
+                  : 'Ingest \u2192 Structure \u2192 Export'}
               </p>
             </div>
             {!isEditingFromHistory && (
@@ -287,31 +284,6 @@ export function WorkflowView({
               loading={loading}
             />
           </div>
-        )}
-
-        {/* Step: validate */}
-        {currentView === 'workflow' && currentStep === 'validate' && validation && workout && (
-          <ValidateMap
-            validation={validation}
-            workout={workout}
-            onReValidate={handleReValidate}
-            onProcess={handleProcess}
-            loading={loading}
-            selectedDevice={selectedDevice}
-          />
-        )}
-
-        {/* Step: export */}
-        {currentView === 'workflow' && currentStep === 'export' && exports && (
-          <PublishExport
-            exports={exports}
-            validation={validation || undefined}
-            sources={sources.map(s => `${s.type}:${s.content}`)}
-            onStartNew={handleStartNew}
-            selectedDevice={selectedDevice}
-            userMode={user.mode}
-            workout={workout}
-          />
         )}
 
         {currentView === 'workflow' && showStravaEnhance && (
@@ -501,19 +473,6 @@ export function WorkflowView({
                   exercise(s)
                 </span>
               </div>
-              {validation && (
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-green-600">
-                    &#x2713; {validation.validated_exercises.length} validated
-                  </span>
-                  <span className="text-orange-600">
-                    &#x26A0; {validation.needs_review.length} review
-                  </span>
-                  <span className="text-red-600">
-                    &#x2717; {validation.unmapped_exercises.length} unmapped
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
