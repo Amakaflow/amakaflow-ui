@@ -285,12 +285,6 @@ export function WorkflowView({
               isCreatingFromScratch={isCreatingFromScratch}
               hideExport={isEditingFromImport}
               loading={loading}
-              onNavigateToSettings={() => {
-                checkUnsavedChanges(() => {
-                  clearWorkflowState();
-                  setCurrentView('settings');
-                });
-              }}
             />
           </div>
         )}

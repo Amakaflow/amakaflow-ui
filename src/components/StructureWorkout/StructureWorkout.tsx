@@ -23,7 +23,6 @@ export interface StructureWorkoutProps {
   isCreatingFromScratch?: boolean;
   hideExport?: boolean;
   loading: boolean;
-  onNavigateToSettings?: () => void;
 }
 
 export function StructureWorkout(props: StructureWorkoutProps) {
