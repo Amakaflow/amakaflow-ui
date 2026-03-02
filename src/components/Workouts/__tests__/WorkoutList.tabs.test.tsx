@@ -205,3 +205,38 @@ describe('WorkoutList tabs', () => {
     expect(screen.getByTestId('activity-history')).toBeInTheDocument();
   });
 });
+
+  it('clicking History tab loads completions', async () => {
+    // Arrange
+    const { fetchWorkoutCompletions } = await import('../../../lib/completions-api');
+    const mockWorkouts = [createMockWorkout('1')];
+    (fetchAllWorkouts as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      workouts: mockWorkouts,
+      errors: [],
+    });
+
+    // Act
+    render(
+      <WorkoutList
+        profileId="user-123"
+        onEditWorkout={mockOnEditWorkout}
+        onLoadWorkout={mockOnLoadWorkout}
+        onDeleteWorkout={mockOnDeleteWorkout}
+        onViewProgram={mockOnViewProgram}
+      />
+    );
+
+    // Wait for workouts to load
+    await waitFor(() => {
+      expect(screen.getByText('My Workouts')).toBeInTheDocument();
+    }, { timeout: 5000 });
+
+    // Click the History tab
+    const historyTab = screen.getByRole('tab', { name: /history/i });
+    fireEvent.click(historyTab);
+
+    // Assert - fetchWorkoutCompletions should have been called
+    await waitFor(() => {
+      expect(fetchWorkoutCompletions).toHaveBeenCalledWith(50, 0);
+    }, { timeout: 5000 });
+  });

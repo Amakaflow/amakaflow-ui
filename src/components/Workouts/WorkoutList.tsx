@@ -230,6 +230,7 @@ export function WorkoutList({
     // Callbacks / handlers
     loadWorkouts,
     loadTags,
+    loadCompletions,
     loadMoreCompletions,
     toggleSelect,
     toggleSelectAll,
