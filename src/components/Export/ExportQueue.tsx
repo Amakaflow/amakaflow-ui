@@ -7,6 +7,8 @@ import type { ExportQueueItem } from '../../hooks/useExportFlow';
 interface ExportQueueProps {
   queue: ExportQueueItem[];
   onRemove: (workoutId: string) => void;
+  selectedWorkoutId?: string | null;
+  onSelectWorkout?: (workoutId: string) => void;
 }
 
 const STATUS_ICONS = {
@@ -16,7 +18,7 @@ const STATUS_ICONS = {
   error: { Icon: XCircle, className: 'text-red-500' },
 } as const;
 
-export function ExportQueue({ queue, onRemove }: ExportQueueProps) {
+export function ExportQueue({ queue, onRemove, selectedWorkoutId, onSelectWorkout }: ExportQueueProps) {
   return (
     <Card className="h-full">
       <CardHeader className="pb-3">
@@ -33,11 +35,20 @@ export function ExportQueue({ queue, onRemove }: ExportQueueProps) {
         ) : (
           queue.map(item => {
             const { Icon, className } = STATUS_ICONS[item.status];
+            const isSelected = selectedWorkoutId === item.workoutId;
+            const isClickable = !!onSelectWorkout;
             return (
               <div
                 key={item.workoutId}
                 data-testid={`export-queue-item-${item.workoutId}`}
-                className="flex items-center gap-2 p-2 rounded-md border"
+                className={[
+                  'flex items-center gap-2 p-2 rounded-md border transition-colors',
+                  isClickable ? 'cursor-pointer hover:bg-muted/50' : '',
+                  isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : '',
+                ].join(' ')}
+                onClick={isClickable ? () => onSelectWorkout(item.workoutId) : undefined}
+                aria-selected={isClickable ? isSelected : undefined}
+                role={isClickable ? 'option' : undefined}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${className}`} />
                 <span className="flex-1 text-sm truncate">{item.workout.title}</span>
@@ -51,7 +62,7 @@ export function ExportQueue({ queue, onRemove }: ExportQueueProps) {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 shrink-0"
-                    onClick={() => onRemove(item.workoutId)}
+                    onClick={e => { e.stopPropagation(); onRemove(item.workoutId); }}
                     aria-label="Remove from queue"
                   >
                     <X className="w-3 h-3" />

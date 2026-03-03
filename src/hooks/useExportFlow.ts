@@ -22,6 +22,7 @@ export interface ConflictItem {
   structure: WorkoutStructureType;
   description: string;
   deviceWarning: string;
+  workoutTitle?: string;
 }
 
 interface UseExportFlowProps {

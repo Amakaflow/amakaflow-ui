@@ -63,6 +63,8 @@ export function ExportPage({ initialWorkout, initialWorkouts, initialDevice, dev
     isDemoMode ? DEMO_UNRESOLVED_MAPPINGS : []
   );
 
+  const [previewWorkoutId, setPreviewWorkoutId] = useState<string | null>(null);
+
   const initialised = useRef(false);
   useEffect(() => {
     if (initialised.current) return;
@@ -78,8 +80,28 @@ export function ExportPage({ initialWorkout, initialWorkouts, initialDevice, dev
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const firstWorkout = queue[0]?.workout ?? initialWorkout ?? null;
-  const conflicts = firstWorkout ? detectConflicts(firstWorkout, destination) : [];
+  // Reset preview selection if the selected workout is removed from the queue
+  useEffect(() => {
+    if (previewWorkoutId && !queue.find(i => i.workoutId === previewWorkoutId)) {
+      setPreviewWorkoutId(null);
+    }
+  }, [queue, previewWorkoutId]);
+
+  const isBatch = queue.length > 1;
+  const previewItem = isBatch
+    ? (queue.find(i => i.workoutId === previewWorkoutId) ?? queue[0])
+    : queue[0];
+  const previewWorkout = previewItem?.workout ?? initialWorkout ?? null;
+  const previewSubtitle = isBatch && previewItem ? `Previewing: ${previewItem.workout.title}` : undefined;
+
+  // Aggregate conflicts across all queued workouts
+  const allConflicts = queue.flatMap(item =>
+    detectConflicts(item.workout, destination).map(c => ({
+      ...c,
+      workoutTitle: isBatch ? item.workout.title : undefined,
+    }))
+  );
+
   const currentDevice = getDeviceById(destination) ?? null;
 
   const handleResolveMapping = (exerciseId: string, mappedName: string) => {
@@ -96,12 +118,17 @@ export function ExportPage({ initialWorkout, initialWorkouts, initialDevice, dev
       </Button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <ExportQueue queue={queue} onRemove={removeFromQueue} />
+        <ExportQueue
+          queue={queue}
+          onRemove={removeFromQueue}
+          selectedWorkoutId={isBatch ? (previewItem?.workoutId ?? null) : null}
+          onSelectWorkout={isBatch ? setPreviewWorkoutId : undefined}
+        />
         <ExportConfig
           devices={devices}
           destination={destination}
           onSetDestination={setDestination}
-          conflicts={conflicts}
+          conflicts={allConflicts}
           unresolvedMappings={unresolvedMappings}
           onResolveMapping={handleResolveMapping}
           onExportAll={exportAll}
@@ -109,9 +136,10 @@ export function ExportPage({ initialWorkout, initialWorkouts, initialDevice, dev
           queueSize={queue.length}
         />
         <ExportPreview
-          workout={firstWorkout}
+          workout={previewWorkout}
           device={currentDevice}
           mappings={mappings}
+          subtitle={previewSubtitle}
         />
       </div>
     </div>

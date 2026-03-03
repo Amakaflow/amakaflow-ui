@@ -8,6 +8,7 @@ interface ExportPreviewProps {
   workout: WorkoutStructure | null;
   device: DeviceConfig | null;
   mappings?: Record<string, string>;
+  subtitle?: string;
 }
 
 function StructuralPreview({ workout, mappings }: { workout: WorkoutStructure; mappings: Record<string, string> }) {
@@ -99,7 +100,7 @@ function FormatPreview({ workout, device, mappings }: { workout: WorkoutStructur
   );
 }
 
-export function ExportPreview({ workout, device, mappings = {} }: ExportPreviewProps) {
+export function ExportPreview({ workout, device, mappings = {}, subtitle }: ExportPreviewProps) {
   if (!workout) {
     return (
       <Card className="h-full" data-testid="export-preview">
@@ -114,6 +115,7 @@ export function ExportPreview({ workout, device, mappings = {} }: ExportPreviewP
     <Card className="h-full" data-testid="export-preview">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Preview</CardTitle>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="device">
