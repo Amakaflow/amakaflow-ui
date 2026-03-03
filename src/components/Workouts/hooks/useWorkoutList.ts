@@ -132,6 +132,26 @@ export function useWorkoutList({
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Select mode (for batch export and merge)
+  const [selectModeActive, setSelectModeActive] = useState(false);
+
+  const toggleSelectMode = useCallback(() => {
+    setSelectModeActive(prev => {
+      if (prev) setSelectedIds([]);  // clear selection when exiting
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelectId = useCallback((id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  // Merge flow phase
+  const [mergePhase, setMergePhase] = useState<'list' | 'block-picker'>('list');
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -360,7 +380,10 @@ export function useWorkoutList({
     }
   };
 
-  const clearSelection = () => setSelectedIds([]);
+  const clearSelection = useCallback(() => {
+    setSelectedIds([]);
+    setSelectModeActive(false);
+  }, []);
 
   // Delete handlers
   const handleBulkDeleteClick = (ids: string[]) => {
@@ -726,6 +749,10 @@ export function useWorkoutList({
     PAGE_SIZE,
     selectedIds,
     setSelectedIds,
+    selectModeActive,
+    setSelectModeActive,
+    mergePhase,
+    setMergePhase,
     showDeleteModal,
     setShowDeleteModal,
     pendingDeleteIds,
@@ -772,6 +799,8 @@ export function useWorkoutList({
     loadMoreCompletions,
     toggleSelect,
     toggleSelectAll,
+    toggleSelectMode,
+    toggleSelectId,
     clearSelection,
     handleBulkDeleteClick,
     confirmBulkDelete,
