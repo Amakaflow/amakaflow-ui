@@ -99,7 +99,7 @@ export interface WorkoutListProps {
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
-  onAddToCalendar?: (item: WorkoutHistoryItem) => void;
+  onNavigate?: (view: string) => void;
 }
 
 // =============================================================================
@@ -172,7 +172,7 @@ export function WorkoutList({
   onBulkDeleteWorkouts,
   onViewProgram,
   onExportWorkout,
-  onAddToCalendar,
+  onNavigate,
 }: WorkoutListProps) {
   const {
     // State values
@@ -982,6 +982,9 @@ export function WorkoutList({
             workouts={allWorkouts}
             onLoadWorkout={handleLoadUnified}
             onViewProgram={onViewProgram}
+            onAddToCalendar={() => {
+              if (onNavigate) onNavigate('calendar');
+            }}
           />
         </TabsContent>
 
