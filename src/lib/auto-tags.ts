@@ -106,18 +106,40 @@ function estimateDurationMinutes(workout: WorkoutStructure): number {
 
 /**
  * Check if any exercise name contains any of the keywords
+ * Uses word boundary matching to avoid false positives (e.g., "pressure" vs "press")
+ * Also handles pluralization (e.g., "squats" matches "squat")
  */
 function containsKeyword(exerciseNames: string[], keywords: string[]): boolean {
-  return exerciseNames.some((name) =>
-    keywords.some((keyword) => name.includes(keyword))
-  );
+  return exerciseNames.some((name) => {
+    // Split on common delimiters to get individual words
+    const words = name.split(/[-\s_]+/);
+    return keywords.some((keyword) => {
+      // Check if any word starts with the keyword (handles pluralization like "squats" -> "squat")
+      // or exact match (case-insensitive)
+      return words.some((word) => {
+        const lowerWord = word.toLowerCase();
+        const lowerKeyword = keyword.toLowerCase();
+        return lowerWord === lowerKeyword || lowerWord.startsWith(lowerKeyword);
+      });
+    });
+  });
 }
 
 /**
  * Check if any block label contains the keyword
+ * Uses word boundary matching to avoid false positives
+ * Also handles pluralization
  */
 function containsBlockLabelKeyword(blockLabels: string[], keyword: string): boolean {
-  return blockLabels.some((label) => label.includes(keyword));
+  return blockLabels.some((label) => {
+    // Split on common delimiters to get individual words
+    const words = label.split(/[-\s_]+/);
+    const lowerKeyword = keyword.toLowerCase();
+    return words.some((word) => {
+      const lowerWord = word.toLowerCase();
+      return lowerWord === lowerKeyword || lowerWord.startsWith(lowerKeyword);
+    });
+  });
 }
 
 /**

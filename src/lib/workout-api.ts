@@ -209,6 +209,20 @@ export async function updateWorkoutInAPI(
   workoutId: string,
   request: SaveWorkoutRequest
 ): Promise<SavedWorkout> {
+  // Generate auto-tags from workout content
+  const workoutData = request.workout_data as WorkoutStructure;
+  const autoTags = generateAutoTags(workoutData);
+
+  // Merge auto-tags with any existing tags passed in the request
+  const existingTags = request.tags || [];
+  const mergedTags = Array.from(new Set([...autoTags, ...existingTags]));
+
+  // Create the request body with merged tags
+  const requestWithTags = {
+    ...request,
+    tags: mergedTags,
+  };
+
   // Use the save endpoint with workout_id for explicit updates
   // The API will update the existing workout instead of creating a duplicate
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
@@ -216,7 +230,7 @@ export async function updateWorkoutInAPI(
     {
       method: 'POST',
       body: JSON.stringify({
-        ...request,
+        ...requestWithTags,
         workout_id: workoutId, // Pass workout ID for explicit update
       }),
     }
