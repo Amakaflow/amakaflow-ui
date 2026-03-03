@@ -34,6 +34,7 @@ import type { WorkoutCoreData } from '../../WorkoutEditor/WorkoutEditorCore';
 import type { UserTag } from '../../../types/unified-workout';
 import { fetchWorkoutCompletions, type WorkoutCompletion } from '../../../lib/completions-api';
 import { toast } from 'sonner';
+import type { SelectedBlock } from '../../../types/import';
 
 // =============================================================================
 // Module-level pure helpers (copied verbatim from UnifiedWorkouts.tsx)
@@ -151,6 +152,9 @@ export function useWorkoutList({
 
   // Merge flow phase
   const [mergePhase, setMergePhase] = useState<'list' | 'block-picker'>('list');
+
+  // Blocks selected in the merge BlockPicker
+  const [mergeSelectedBlocks, setMergeSelectedBlocks] = useState<SelectedBlock[]>([]);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
@@ -753,6 +757,8 @@ export function useWorkoutList({
     setSelectModeActive,
     mergePhase,
     setMergePhase,
+    mergeSelectedBlocks,
+    setMergeSelectedBlocks,
     showDeleteModal,
     setShowDeleteModal,
     pendingDeleteIds,

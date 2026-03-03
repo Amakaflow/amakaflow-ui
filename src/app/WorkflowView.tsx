@@ -379,6 +379,22 @@ export function WorkflowView({
                 setExportingDevice(null);
                 setCurrentView('export-page');
               }}
+              onMergeWorkouts={(merged) => {
+                const fakeHistoryItem = {
+                  id: 'merge-' + Date.now(),
+                  workout: { title: merged.title, blocks: merged.blocks },
+                  sources: [],
+                  device: user.selectedDevices?.[0] ?? selectedDevice,
+                  validation: null,
+                  exports: null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+                handleLoadFromHistory({
+                  ...fakeHistoryItem,
+                  workout: normalizeWorkoutStructure(fakeHistoryItem.workout as any),
+                } as any);
+              }}
               onNavigate={setCurrentView}
               onAddToCalendar={() => setCurrentView('calendar')}
             />

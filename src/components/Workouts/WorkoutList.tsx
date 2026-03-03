@@ -71,6 +71,8 @@ import { CATEGORY_DISPLAY_NAMES, isHistoryWorkout } from '../../types/unified-wo
 import type { SortOption } from '../../lib/workout-filters';
 import { SORT_OPTIONS } from '../../lib/workout-filters';
 import { saveWorkoutToAPI } from '../../lib/workout-api';
+import { BlockPicker } from '../Import/BlockPicker';
+import type { ProcessedItem } from '../../types/import';
 
 import { ViewWorkout } from '../ViewWorkout';
 import { WorkoutEditSheet } from '../WorkoutEditor/WorkoutEditSheet';
@@ -116,6 +118,8 @@ export interface WorkoutListProps {
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
   onBatchExport?: (items: WorkoutHistoryItem[]) => void;
   onNavigate?: (view: string) => void;
+  onAddToCalendar?: (workout: WorkoutHistoryItem) => void;
+  onMergeWorkouts?: (mergedWorkout: { title: string; blocks: unknown[] }) => void;
 }
 
 // =============================================================================
@@ -177,6 +181,37 @@ function ExportPopoverButton({ workoutId, historyItem, onExportWorkout, size = '
 }
 
 // =============================================================================
+// Merge helpers
+// =============================================================================
+
+/**
+ * Convert UnifiedWorkout[] to ProcessedItem[] for use with BlockPicker.
+ * Only history workouts have structured block data; follow-along items yield an
+ * empty blocks array which BlockPicker handles gracefully.
+ */
+function workoutsToProcessedItems(workouts: UnifiedWorkout[]): ProcessedItem[] {
+  return workouts.map(w => {
+    let blocks: unknown[] = [];
+    if (isHistoryWorkout(w)) {
+      const raw = w._original.data as any;
+      // workout.blocks is the canonical location; fall back to workout_data.blocks
+      const rawBlocks = raw?.workout?.blocks ?? raw?.workout_data?.blocks ?? [];
+      blocks = rawBlocks.map((block: any, i: number) => ({
+        ...block,
+        id: block.id ?? `${w.id}-block-${i}`,
+      }));
+    }
+    return {
+      queueId: w.id,
+      workoutTitle: w.title,
+      status: 'done' as const,
+      workout: { blocks },
+      blockCount: blocks.length,
+    };
+  });
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -190,6 +225,8 @@ export function WorkoutList({
   onExportWorkout,
   onBatchExport,
   onNavigate,
+  onAddToCalendar,
+  onMergeWorkouts,
 }: WorkoutListProps) {
   const {
     // State values
@@ -219,6 +256,8 @@ export function WorkoutList({
     setSelectModeActive,
     mergePhase,
     setMergePhase,
+    mergeSelectedBlocks,
+    setMergeSelectedBlocks,
     showDeleteModal,
     pendingDeleteIds,
     confirmDeleteId,
@@ -293,6 +332,46 @@ export function WorkoutList({
     onBatchExport(items);
     clearSelection();
   };
+
+  // Merge phase: render BlockPicker full-screen instead of the list
+  if (mergePhase === 'block-picker') {
+    const selectedWorkouts = allWorkouts.filter(w => selectedIds.includes(w.id));
+    const processedItems = workoutsToProcessedItems(selectedWorkouts);
+
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Merge workouts</h1>
+          <p className="text-muted-foreground mt-1">
+            Choose the blocks you want, then edit and save as a new workout.
+          </p>
+        </div>
+        <BlockPicker
+          queueItems={[]}
+          processedItems={processedItems}
+          selectedBlocks={mergeSelectedBlocks}
+          onSelectionChange={setMergeSelectedBlocks}
+          onCancel={() => {
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+          }}
+          onConfirm={() => {
+            const blocks = mergeSelectedBlocks.map(sel => {
+              const item = processedItems[sel.workoutIndex];
+              return (item?.workout as any)?.blocks?.[sel.blockIndex];
+            }).filter(Boolean);
+
+            if (onMergeWorkouts) {
+              onMergeWorkouts({ title: 'Merged Workout', blocks });
+            }
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+            clearSelection();
+          }}
+        />
+      </div>
+    );
+  }
 
   // Render loading state
   if (isLoading) {
