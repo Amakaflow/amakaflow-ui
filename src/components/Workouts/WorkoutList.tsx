@@ -82,6 +82,7 @@ import { WorkoutTagsEditor } from '../WorkoutTagsEditor';
 import { ActivityHistory } from '../ActivityHistory';
 import { CompletionDetailView } from '../CompletionDetailView';
 import { SyncStatusIndicator } from './UnifiedWorkoutCard';
+import { SelectActionBar } from './SelectActionBar';
 
 import type { WorkoutHistoryItem } from '../../lib/workout-history';
 import {
@@ -281,6 +282,11 @@ export function WorkoutList({
     onBulkDeleteWorkouts,
     onViewProgram,
   });
+
+  const handleBatchExport = () => {
+    // Full wiring in Task 6 — this stub will be replaced
+    console.log('Batch export:', selectedIds);
+  };
 
   // Render loading state
   if (isLoading) {
@@ -1191,6 +1197,16 @@ export function WorkoutList({
           loadWorkouts();
         }}
       />
+
+      {/* Select Mode Action Bar */}
+      {selectModeActive && (
+        <SelectActionBar
+          selectedCount={selectedIds.length}
+          onCancel={clearSelection}
+          onExport={handleBatchExport}
+          onMerge={() => setMergePhase('block-picker')}
+        />
+      )}
     </div>
   );
 }
