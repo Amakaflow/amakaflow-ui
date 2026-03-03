@@ -156,7 +156,10 @@ export function useWorkflowEditing({
       toast.success('Workout saved!');
       setWorkoutSaved(true);
       await refreshHistory();
-      if (isEditingFromHistory) {
+      if (isEditingFromImport) {
+        // Stay on the workflow view — WorkflowView shows a success screen
+        // based on workoutSaved + isEditingFromImport.
+      } else if (isEditingFromHistory) {
         onViewChange('workouts');
         setIsEditingFromHistory(false);
         setEditingWorkoutId(null);

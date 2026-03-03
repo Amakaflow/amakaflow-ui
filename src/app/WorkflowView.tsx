@@ -1,6 +1,6 @@
 import React from 'react';
 import { toast } from 'sonner';
-import { ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { AddSources } from '../components/AddSources';
@@ -115,14 +115,18 @@ export function WorkflowView({
             <div className="mb-6">
               <h1 className="text-2xl">
                 {isEditingFromImport
-                  ? 'Review Imported Workout'
+                  ? editingImportQueueId === 'ai-generated'
+                    ? 'AI Generated Workout'
+                    : 'Review Imported Workout'
                   : isEditingFromHistory
                   ? 'Edit Workout'
                   : 'Create Workout'}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {isEditingFromImport
-                  ? 'Review and adjust your imported workout before saving'
+                  ? editingImportQueueId === 'ai-generated'
+                    ? 'Review and adjust your generated workout before saving'
+                    : 'Review and adjust your imported workout before saving'
                   : isEditingFromHistory
                   ? 'Edit your workout directly or re-validate if needed'
                   : 'Ingest \u2192 Structure \u2192 Export'}
@@ -213,7 +217,7 @@ export function WorkflowView({
         )}
 
         {/* Back button (editing from history or import) */}
-        {currentView === 'workflow' && isEditingFromHistory && (
+        {currentView === 'workflow' && isEditingFromHistory && !(workoutSaved && isEditingFromImport) && (
           <Button
             variant="ghost"
             onClick={() => {
@@ -240,7 +244,11 @@ export function WorkflowView({
             className="mb-6"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            {isEditingFromImport ? 'Back to Import' : 'Back to History'}
+            {isEditingFromImport
+              ? editingImportQueueId === 'ai-generated'
+                ? 'Back to Create'
+                : 'Back to Import'
+              : 'Back to History'}
           </Button>
         )}
 
@@ -259,29 +267,64 @@ export function WorkflowView({
         {/* Step: structure */}
         {currentView === 'workflow' && currentStep === 'structure' && workout && (
           <div data-assistant-target="workout-log">
-            <StructureWorkout
-              workout={workout}
-              onWorkoutChange={updatedWorkout => {
-                setWorkout(updatedWorkout);
-                setWorkoutSaved(false);
-              }}
-              onExport={!isEditingFromImport ? (w) => {
-                const devices = getPrimaryExportDestinations();
-                const preferred = user.selectedDevices?.[0]
-                  ? devices.find(d => d.id === user.selectedDevices[0])
-                  : devices[0];
-                handleOpenExportPage(w, preferred ?? devices[0]);
-              } : undefined}
-              onSave={
-                isEditingFromHistory || isCreatingFromScratch
-                  ? () => handleSaveFromStructure(exports, sources, validation)
-                  : undefined
-              }
-              isEditingFromHistory={isEditingFromHistory}
-              isCreatingFromScratch={isCreatingFromScratch}
-              hideExport={isEditingFromImport}
-              loading={loading}
-            />
+            {workoutSaved && isEditingFromImport ? (
+              <div className="max-w-md mx-auto text-center py-16 space-y-6">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-green-600" />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">Workout Saved!</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    &ldquo;{workout.title}&rdquo; has been added to your library.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button
+                    onClick={() => {
+                      setCurrentView('workouts');
+                      resetEditingFlags();
+                    }}
+                  >
+                    View in Library
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCurrentView(editingImportQueueId === 'ai-generated' ? 'create-ai' : 'import');
+                      resetEditingFlags();
+                    }}
+                  >
+                    {editingImportQueueId === 'ai-generated' ? 'Generate Another' : 'Import Another'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <StructureWorkout
+                workout={workout}
+                onWorkoutChange={updatedWorkout => {
+                  setWorkout(updatedWorkout);
+                  setWorkoutSaved(false);
+                }}
+                onExport={!isEditingFromImport ? (w) => {
+                  const devices = getPrimaryExportDestinations();
+                  const preferred = user.selectedDevices?.[0]
+                    ? devices.find(d => d.id === user.selectedDevices[0])
+                    : devices[0];
+                  handleOpenExportPage(w, preferred ?? devices[0]);
+                } : undefined}
+                onSave={
+                  isEditingFromHistory || isCreatingFromScratch
+                    ? () => handleSaveFromStructure(exports, sources, validation)
+                    : undefined
+                }
+                isEditingFromHistory={isEditingFromHistory}
+                isCreatingFromScratch={isCreatingFromScratch}
+                hideExport={isEditingFromImport}
+                loading={loading}
+              />
+            )}
           </div>
         )}
 
