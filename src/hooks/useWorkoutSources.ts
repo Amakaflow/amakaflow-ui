@@ -31,7 +31,14 @@ interface UseWorkoutSourcesProps {
   userId: string;
 }
 
-export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSourceStatus[] {
+export interface UseWorkoutSourcesResult {
+  sources: WorkoutSourceStatus[];
+  /** True once all async data (connected calendars) has loaded. Consumers should
+   *  defer one-time seeding until ready is true. */
+  ready: boolean;
+}
+
+export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): UseWorkoutSourcesResult {
   const { calendars: connectedCalendars } = useConnectedCalendars({ userId });
 
   return useMemo(() => {
@@ -56,7 +63,7 @@ export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSo
         };
       }).filter((e): e is WorkoutSourceStatus => e !== null);
 
-      return [...base, ...calendarEntries];
+      return { sources: [...base, ...calendarEntries], ready: true };
     }
 
     // Real mode: base sources (non-calendar)
@@ -86,6 +93,10 @@ export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSo
         };
       }).filter((e): e is WorkoutSourceStatus => e !== null);
 
-    return [...base, ...calendarEntries];
+    return {
+      sources: [...base, ...calendarEntries],
+      // Ready once the API has responded (undefined = still loading)
+      ready: connectedCalendars !== undefined,
+    };
   }, [connectedCalendars]);
 }

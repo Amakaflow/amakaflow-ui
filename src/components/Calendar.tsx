@@ -101,17 +101,18 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
     syncCalendar
   } = useConnectedCalendars({ userId });
 
-  const workoutSources = useWorkoutSources({ userId });
+  const { sources: workoutSources, ready: sourcesReady } = useWorkoutSources({ userId });
 
   const initialisedRef = useRef(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  // Seed all sources as active on first mount only
+  // Seed all sources as active once, but only after async data (connected calendars) has loaded
   useEffect(() => {
     if (initialisedRef.current) return;
+    if (!sourcesReady) return;
     initialisedRef.current = true;
-    setActiveFilters(workoutSources.map(s => s.id));
-  }, [workoutSources]);
+    setActiveFilters(workoutSources.map(s => s.connectionId ?? s.id));
+  }, [workoutSources, sourcesReady]);
 
   // Force close dropdown when dialog opens
   useEffect(() => {
@@ -246,7 +247,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   const filteredEvents = typedEvents.filter(event => {
     if (activeFilters.length === 0) return true;
     return workoutSources
-      .filter(s => activeFilters.includes(s.id))
+      .filter(s => activeFilters.includes(s.connectionId ?? s.id))
       .some(s => {
         if (s.connectionId) {
           return event.source === 'connected_calendar' && event.connected_calendar_id === s.connectionId;
@@ -304,7 +305,8 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
                 </div>
                 <div className="space-y-2">
                   {workoutSources.map(source => {
-                    const isActive = activeFilters.includes(source.id);
+                    const filterId = source.connectionId ?? source.id;
+                    const isActive = activeFilters.includes(filterId);
                     const eventCount = typedEvents.filter(e => {
                       if (source.connectionId) {
                         return e.source === 'connected_calendar' && e.connected_calendar_id === source.connectionId;
@@ -313,16 +315,16 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
                     }).length;
 
                     return (
-                      <div key={source.id} className="flex items-center gap-2">
+                      <div key={filterId} className="flex items-center gap-2">
                         <Checkbox
-                          id={source.id}
+                          id={filterId}
                           checked={isActive}
                           onCheckedChange={(checked) => {
-                            if (checked) setActiveFilters([...activeFilters, source.id]);
-                            else setActiveFilters(activeFilters.filter(f => f !== source.id));
+                            if (checked) setActiveFilters([...activeFilters, filterId]);
+                            else setActiveFilters(activeFilters.filter(f => f !== filterId));
                           }}
                         />
-                        <label htmlFor={source.id} className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
+                        <label htmlFor={filterId} className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
                           <div className={`w-3 h-3 rounded-full ${source.color}`} />
                           <span className="flex items-center gap-1">
                             {source.icon} {source.label}
