@@ -5,6 +5,7 @@ import { MixPreviewWorkout, MixSource } from '../../types/workout-operations';
 import { WorkoutEditorInline } from '../WorkoutEditor/WorkoutEditorInline';
 import { WorkoutCoreData } from '../WorkoutEditor/WorkoutEditorCore';
 import { BlockData } from '../WorkoutEditor/primitives/BlockSection';
+import { isDemoMode } from '../../lib/demo-mode';
 
 interface MixPreviewStepProps {
   sources: MixSource[];
@@ -23,6 +24,35 @@ export function MixPreviewStep({ sources, title, onTitleChange, onPreviewReady }
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    if (isDemoMode) {
+      const blockCount = sources.reduce((n, s) => n + s.block_indices.length, 0);
+      const mockPreview: MixPreviewWorkout = {
+        id: 'demo-mix-preview',
+        title,
+        workout: {
+          title,
+          blocks: sources.flatMap((s, si) =>
+            s.block_indices.map((bi) => ({
+              label: `Block (source ${si + 1}, block ${bi + 1})`,
+              exercises: [
+                { name: 'Demo Exercise A', sets: 3, reps: '10' },
+                { name: 'Demo Exercise B', sets: 3, reps: '12' },
+              ],
+            }))
+          ),
+        },
+        exercise_count: blockCount * 2,
+        block_count: blockCount,
+      };
+      if (!cancelled) {
+        setPreview(mockPreview);
+        onPreviewReady(mockPreview);
+        setLoading(false);
+      }
+      return () => { cancelled = true; };
+    }
+
     mixWorkouts(sources, title)
       .then(res => {
         if (cancelled) return;
