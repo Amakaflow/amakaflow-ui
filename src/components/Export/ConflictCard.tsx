@@ -14,6 +14,11 @@ export function ConflictCard({ conflict }: ConflictCardProps) {
       <AlertTriangle className="h-4 w-4 text-orange-500" />
       <AlertDescription className="space-y-2">
         <div>
+          {conflict.workoutTitle && (
+            <p className="text-xs text-muted-foreground mb-1">
+              <Badge variant="secondary" className="text-xs font-normal">{conflict.workoutTitle}</Badge>
+            </p>
+          )}
           <p className="font-medium text-sm">
             <span className="font-bold">{conflict.blockLabel}</span>
             {' '}
