@@ -11,10 +11,12 @@ import {
   Clock,
   Watch,
   Bike,
+  Download,
   CheckCircle2,
   Eye,
   Trash2,
   ChevronRight,
+  ChevronDown,
   Edit,
   List,
   LayoutGrid,
@@ -23,18 +25,21 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  FileSpreadsheet,
+  FileText,
   Activity,
   Star,
   Tag,
-  Settings2,
   Shuffle,
   Upload,
+  CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { ExportDevicePicker } from '../Export';
 import type { DeviceConfig } from '../../lib/devices';
 import { getPrimaryExportDestinations } from '../../lib/devices';
@@ -82,7 +87,7 @@ import {
   getSourceLabel,
 } from './hooks/useWorkoutList';
 
-// Helper to get synced devices from sync status
+// Helper to get synced devices from sync status (AMA-891)
 function getSyncedDevices(syncStatus: { garmin?: { synced?: boolean }; apple?: { synced?: boolean }; strava?: { synced?: boolean }; ios?: { synced?: boolean } }): string[] {
   const devices: string[] = [];
   if (syncStatus.garmin?.synced) devices.push('Garmin');
@@ -104,6 +109,7 @@ export interface WorkoutListProps {
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  onNavigate?: (view: string) => void;
 }
 
 // =============================================================================
@@ -176,6 +182,7 @@ export function WorkoutList({
   onBulkDeleteWorkouts,
   onViewProgram,
   onExportWorkout,
+  onNavigate,
 }: WorkoutListProps) {
   const {
     // State values
@@ -217,8 +224,6 @@ export function WorkoutList({
     setShowTagManagement,
     showMixWizard,
     setShowMixWizard,
-    showActivityHistory,
-    setShowActivityHistory,
     completions,
     completionsLoading,
     completionsTotal,
@@ -238,6 +243,7 @@ export function WorkoutList({
     // Callbacks / handlers
     loadWorkouts,
     loadTags,
+    loadCompletions,
     loadMoreCompletions,
     toggleSelect,
     toggleSelectAll,
@@ -387,16 +393,6 @@ export function WorkoutList({
               <List className="w-4 h-4" />
               Compact
             </Button>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button
-              variant={showActivityHistory ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowActivityHistory(!showActivityHistory)}
-              className="gap-2"
-            >
-              <Activity className="w-4 h-4" />
-              Activity History
-            </Button>
           </div>
         </div>
 
@@ -414,130 +410,36 @@ export function WorkoutList({
             data-testid="workout-search-input"
             className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
-          <select
-            aria-label="Filter by source"
-            value={sourceFilter}
-            onChange={(e) => {
-              setSourceFilter(e.target.value as 'all' | 'history' | 'video');
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All sources</option>
-            <option value="history">Workout History</option>
-            <option value="video">Follow Along</option>
-          </select>
-          <select
-            aria-label="Filter by platform"
-            value={platformFilter}
-            onChange={(e) => {
-              setPlatformFilter(e.target.value);
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All platforms</option>
-            {availablePlatforms.map((platform) => (
-              <option key={platform} value={platform}>
-                {platform === 'garmin' ? 'Garmin' :
-                 platform === 'apple' ? 'Apple Watch' :
-                 platform === 'strava' ? 'Strava' :
-                 platform === 'youtube' ? 'YouTube' :
-                 platform === 'instagram' ? 'Instagram' :
-                 platform === 'tiktok' ? 'TikTok' :
-                 platform === 'vimeo' ? 'Vimeo' :
-                 platform}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by category"
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All categories</option>
-            {availableCategories.map((category) => (
-              <option key={category} value={category}>
-                {CATEGORY_DISPLAY_NAMES[category as keyof typeof CATEGORY_DISPLAY_NAMES] || category}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by sync status"
-            value={syncFilter}
-            onChange={(e) => {
-              setSyncFilter(e.target.value as 'all' | 'synced' | 'not-synced');
-              setPageIndex(0);
-            }}
-            className="h-8 rounded-md border px-2 text-sm bg-background"
-          >
-            <option value="all">All sync status</option>
-            <option value="synced">Synced</option>
-            <option value="not-synced">Not synced</option>
-          </select>
-          {/* Tag filter dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          {/* Tag strip filter */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <Button
+              size="sm"
+              variant={tagFilter === null ? 'default' : 'outline'}
+              onClick={() => {
+                setTagFilter(null);
+                setPageIndex(0);
+              }}
+              className="shrink-0"
+              data-testid="tag-all"
+            >
+              All
+            </Button>
+            {availableTags.map((tag) => (
               <Button
-                variant="outline"
+                key={tag.id}
                 size="sm"
-                className={`h-8 gap-1.5 ${tagFilter.length > 0 ? 'border-primary text-primary' : ''}`}
+                variant={tagFilter === tag.name ? 'default' : 'outline'}
+                onClick={() => {
+                  setTagFilter(tag.name);
+                  setPageIndex(0);
+                }}
+                className="shrink-0"
+                data-testid={`tag-${tag.name}`}
               >
-                <Tag className="w-4 h-4" />
-                Tags
-                {tagFilter.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
-                    {tagFilter.length}
-                  </Badge>
-                )}
+                {tag.name}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Filter by Tags</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {availableTags.length === 0 ? (
-                <div className="px-2 py-3 text-center text-sm text-muted-foreground">
-                  No tags yet
-                </div>
-              ) : (
-                availableTags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag.id}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setTagFilter((prev) =>
-                        prev.includes(tag.name)
-                          ? prev.filter((t) => t !== tag.name)
-                          : [...prev, tag.name]
-                      );
-                      setPageIndex(0);
-                    }}
-                    className="gap-2"
-                  >
-                    <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        tagFilter.includes(tag.name) ? 'bg-primary border-primary' : ''
-                      }`}
-                    >
-                      {tagFilter.includes(tag.name) && (
-                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
-                      )}
-                    </div>
-                    <TagPill name={tag.name} color={tag.color} size="sm" />
-                  </DropdownMenuItem>
-                ))
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowTagManagement(true)}>
-                <Settings2 className="w-4 h-4 mr-2" />
-                Manage Tags
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            ))}
+          </div>
           <div className="h-4 border-l mx-1" /> {/* Divider */}
           <select
             aria-label="Sort by"
@@ -554,16 +456,12 @@ export function WorkoutList({
               </option>
             ))}
           </select>
-          {(sourceFilter !== 'all' || platformFilter !== 'all' || categoryFilter !== 'all' || syncFilter !== 'all' || tagFilter.length > 0 || searchQuery || sortOption !== 'recently-added') && (
+          {(tagFilter !== null || searchQuery || sortOption !== 'recently-added') && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                setSourceFilter('all');
-                setPlatformFilter('all');
-                setCategoryFilter('all');
-                setSyncFilter('all');
-                setTagFilter([]);
+                setTagFilter(null);
                 setSearchQuery('');
                 setSortOption('recently-added');
                 setPageIndex(0);
@@ -576,33 +474,24 @@ export function WorkoutList({
         </div>
       </div>
 
-      {/* Activity History View (AMA-196) */}
-      {showActivityHistory ? (
-        <div className="pr-4 max-w-7xl mx-auto">
-          <ActivityHistory
-            completions={completions}
-            loading={completionsLoading}
-            onLoadMore={loadMoreCompletions}
-            hasMore={completions.length < completionsTotal}
-            onCompletionClick={setSelectedCompletionId}
-          />
-        </div>
-      ) : (
-        <>
-          {/* Programs Section */}
-          <ProgramsSection
-            profileId={profileId}
-            workouts={allWorkouts}
-            onLoadWorkout={handleLoadUnified}
-            onViewProgram={onViewProgram}
-          />
+      {/* Tabs for Library, Programs, History */}
+      <Tabs defaultValue="library" onValueChange={(value) => {
+        if (value === 'history') {
+          loadCompletions();
+        }
+      }}>
+        <TabsList>
+          <TabsTrigger value="library">Library</TabsTrigger>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
 
-          {/* Workout List */}
+        {/* Library Tab - Workout cards */}
+        <TabsContent value="library">
           <ScrollArea className="h-[calc(100vh-280px)]">
             <div data-assistant-target="library-results" className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
               {displayedWorkouts.map((workout) => {
                 const isVideo = workout._original.type === 'follow-along';
-
                 // Compact view
                 if (viewMode === 'compact') {
                   return (
@@ -751,6 +640,58 @@ export function WorkoutList({
                             <ExternalLink className="w-4 h-4" />
                           </Button>
                         )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              aria-label="Export workout"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              CSV (Strong/Hevy)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              CSV (Extended)
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
+                              <Activity className="w-4 h-4 mr-2" />
+                              FIT (Garmin)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              TCX
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Text (TrainingPeaks)
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              PDF
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {onAddToCalendar && (
+                          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={() => onAddToCalendar(workout._original)}>
+                            <CalendarDays className="w-4 h-4" />
+                            Add to Calendar
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -816,11 +757,7 @@ export function WorkoutList({
                                   </div>
                                 );
                               }
-                              const formattedDate = lastDate.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric'
-                              });
+                              const formattedDate = lastDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                               return (
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                   <CheckCircle2 className="w-4 h-4" />
@@ -833,7 +770,6 @@ export function WorkoutList({
                           {/* Sync status badge (AMA-891) */}
                           {(() => {
                             const syncedDevices = getSyncedDevices(workout.syncStatus);
-                            
                             if (syncedDevices.length > 0) {
                               return (
                                 <div className="flex items-center gap-1 text-sm text-green-700 dark:text-green-400 font-medium">
@@ -893,12 +829,7 @@ export function WorkoutList({
                               Video
                             </Badge>
                           ) : (() => {
-                            const syncedDevices: string[] = [];
-                            if (workout.syncStatus.garmin?.synced) syncedDevices.push('Garmin');
-                            if (workout.syncStatus.apple?.synced) syncedDevices.push('Apple');
-                            if (workout.syncStatus.strava?.synced) syncedDevices.push('Strava');
-                            if (workout.syncStatus.ios?.synced) syncedDevices.push('iOS');
-                            
+                            const syncedDevices = getSyncedDevices(workout.syncStatus);
                             if (syncedDevices.length > 0) {
                               return (
                                 <Badge variant="default" className="bg-green-600 hover:bg-green-700 gap-1">
@@ -986,6 +917,59 @@ export function WorkoutList({
                               size="labeled"
                             />
                           )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 h-9 font-medium"
+                              >
+                                <Download className="w-4 h-4" />
+                                Export
+                                <ChevronDown className="w-3 h-3 ml-1" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
+                                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                CSV (Strong/Hevy compatible)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
+                                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                CSV (Extended for spreadsheets)
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
+                                <Activity className="w-4 h-4 mr-2" />
+                                FIT (Garmin)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                TCX
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Text (TrainingPeaks)
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                JSON
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                PDF
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {onAddToCalendar && (
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => onAddToCalendar(workout._original)}>
+                              <CalendarDays className="w-4 h-4" />
+                              Add to Calendar
+                            </Button>
+                          )}
                         </div>
                         <Button
                           size="sm"
@@ -1005,42 +989,66 @@ export function WorkoutList({
               })}
             </div>
           </ScrollArea>
-        </>
-      )}
 
-      {/* Pagination - hide when showing Activity History */}
-      {!showActivityHistory && (
-        <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
-          <div>
-            Showing {filteredWorkouts.length === 0 ? 0 : pageStart + 1} –{' '}
-            {Math.min(pageStart + PAGE_SIZE, filteredWorkouts.length)} of{' '}
-            {filteredWorkouts.length} workout{filteredWorkouts.length === 1 ? '' : 's'}
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
+            <div>
+              Showing {filteredWorkouts.length === 0 ? 0 : pageStart + 1} –{' '}
+              {Math.min(pageStart + PAGE_SIZE, filteredWorkouts.length)} of{' '}
+              {filteredWorkouts.length} workout{filteredWorkouts.length === 1 ? '' : 's'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex === 0}
+                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              >
+                Previous
+              </Button>
+              <span>
+                Page {currentPageIndex + 1} of {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex >= totalPages - 1}
+                onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPageIndex === 0}
-              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
-            >
-              Previous
-            </Button>
-            <span>
-              Page {currentPageIndex + 1} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPageIndex >= totalPages - 1}
-              onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
-            >
-              Next
-            </Button>
+        </TabsContent>
+
+        {/* Programs Tab */}
+        <TabsContent value="programs">
+          <ProgramsSection
+            profileId={profileId}
+            workouts={allWorkouts}
+            onLoadWorkout={handleLoadUnified}
+            onViewProgram={onViewProgram}
+            onAddToCalendar={() => {
+              if (onNavigate) onNavigate('calendar');
+            }}
+          />
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history">
+          <div className="pr-4 max-w-7xl mx-auto" data-testid="activity-history">
+            <ActivityHistory
+              completions={completions}
+              loading={completionsLoading}
+              onLoadMore={loadMoreCompletions}
+              hasMore={completions.length < completionsTotal}
+              onCompletionClick={setSelectedCompletionId}
+            />
           </div>
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && handleDeleteCancel()}>

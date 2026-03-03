@@ -23,9 +23,10 @@ import type { TrainingProgram, ProgramStatus } from '../../types/training-progra
 interface ProgramsListProps {
   userId: string;
   onViewProgram: (programId: string) => void;
+  onAddToCalendar: (program: TrainingProgram) => void;
 }
 
-export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
+export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: ProgramsListProps) {
   // Data state
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -290,7 +291,8 @@ export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
                 key={program.id}
                 program={program}
                 loadingAction={loadingActions[program.id]}
-                onView={() => onViewProgram(program.id)}
+                onViewProgram={onViewProgram}
+                onAddToCalendar={onAddToCalendar}
                 onActivate={() => handleActivate(program.id)}
                 onPause={() => handlePause(program.id)}
                 onDelete={() => handleDelete(program.id)}
