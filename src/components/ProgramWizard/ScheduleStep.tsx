@@ -1,11 +1,11 @@
 'use client';
 
 import { useProgramWizard } from '@/context/ProgramWizardContext';
-import { SessionDuration, DayOfWeek, DAYS_OF_WEEK, DAY_LABELS } from '@/types/program-wizard';
+import { DayOfWeek, DAYS_OF_WEEK, DAY_LABELS } from '@/types/program-wizard';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/components/ui/utils';
 
-const sessionDurations: SessionDuration[] = [30, 45, 60, 90];
+const sessionDurations = [30, 45, 60, 90] as const;
 
 export function ScheduleStep() {
   const {
