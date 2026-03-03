@@ -508,7 +508,7 @@ function ExercisesTable({ intervals }: ExercisesTableProps) {
       <div className="flex items-center py-3 px-4 bg-muted/30 text-xs text-muted-foreground uppercase tracking-wider border-b">
         <div style={{ width: 48 }}></div>
         <div style={{ flex: 1 }}>Exercise</div>
-        <div style={{ width: 70 }} className="text-center">SET</div>
+        <div style={{ width: 70 }} className="text-center">Set #</div>
         <div style={{ width: 80 }} className="text-center">Reps</div>
         <div style={{ width: 70 }} className="text-center">TIME</div>
         <div style={{ width: 80 }} className="text-center">WEIGHT</div>
