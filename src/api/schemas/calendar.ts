@@ -11,7 +11,7 @@ export const WorkoutEventSchema = z.object({
   start_time: z.string().optional(),
   end_time: z.string().optional(),
   status: z.enum(['planned', 'completed']),
-  is_anchor: z.boolean(),
+  is_anchor: z.boolean().default(false),
   primary_muscle: z.string().optional(),
   intensity: z.number().optional(),
   connected_calendar_id: z.string().optional(),
