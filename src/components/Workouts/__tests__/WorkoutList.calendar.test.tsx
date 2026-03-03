@@ -47,8 +47,6 @@ const createMockUseWorkoutList = (workouts: any[]) => ({
   availableTags: [],
   showTagManagement: false,
   setShowTagManagement: vi.fn(),
-  showMixWizard: false,
-  setShowMixWizard: vi.fn(),
   showActivityHistory: false,
   setShowActivityHistory: vi.fn(),
   completions: [],
@@ -101,10 +99,6 @@ vi.mock('../ViewWorkout', () => ({
 
 vi.mock('../WorkoutEditor/WorkoutEditSheet', () => ({
   WorkoutEditSheet: vi.fn(() => null),
-}));
-
-vi.mock('../MixWizard/MixWizardModal', () => ({
-  MixWizardModal: vi.fn(() => null),
 }));
 
 vi.mock('../ProgramsSection', () => ({

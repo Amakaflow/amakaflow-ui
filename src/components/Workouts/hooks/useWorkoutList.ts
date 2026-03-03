@@ -177,9 +177,6 @@ export function useWorkoutList({
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
 
-  // Mix Workouts wizard state
-  const [showMixWizard, setShowMixWizard] = useState(false);
-
   // Activity History state (AMA-196)
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
   const [completionsLoading, setCompletionsLoading] = useState(false);
@@ -778,8 +775,6 @@ export function useWorkoutList({
     setAvailableTags,
     showTagManagement,
     setShowTagManagement,
-    showMixWizard,
-    setShowMixWizard,
     completions,
     setCompletions,
     completionsLoading,

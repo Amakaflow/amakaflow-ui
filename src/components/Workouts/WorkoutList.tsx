@@ -30,7 +30,6 @@ import {
   Activity,
   Star,
   Tag,
-  Shuffle,
   Upload,
   CalendarDays,
   CheckSquare,
@@ -70,13 +69,11 @@ import type { UnifiedWorkout } from '../../types/unified-workout';
 import { CATEGORY_DISPLAY_NAMES, isHistoryWorkout } from '../../types/unified-workout';
 import type { SortOption } from '../../lib/workout-filters';
 import { SORT_OPTIONS } from '../../lib/workout-filters';
-import { saveWorkoutToAPI } from '../../lib/workout-api';
 import { BlockPicker } from '../Import/BlockPicker';
 import type { ProcessedItem } from '../../types/import';
 
 import { ViewWorkout } from '../ViewWorkout';
 import { WorkoutEditSheet } from '../WorkoutEditor/WorkoutEditSheet';
-import { MixWizardModal } from '../MixWizard/MixWizardModal';
 import { ProgramsSection } from '../ProgramsSection';
 import { TagPill } from '../TagPill';
 import { TagManagementModal } from '../TagManagementModal';
@@ -272,8 +269,6 @@ export function WorkoutList({
     availableTags,
     showTagManagement,
     setShowTagManagement,
-    showMixWizard,
-    setShowMixWizard,
     completions,
     completionsLoading,
     completionsTotal,
@@ -1253,34 +1248,6 @@ export function WorkoutList({
         onClose={() => setShowTagManagement(false)}
         profileId={profileId}
         onTagsChange={loadTags}
-      />
-
-      {/* Mix Workouts FAB */}
-      <button
-        onClick={() => setShowMixWizard(true)}
-        className="fixed bottom-24 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
-        aria-label="Mix workouts"
-      >
-        <Shuffle className="w-5 h-5" />
-        <span className="text-sm font-medium hidden sm:inline">Mix</span>
-      </button>
-
-      {/* Mix Workouts Wizard */}
-      <MixWizardModal
-        open={showMixWizard}
-        workouts={allWorkouts}
-        onClose={() => setShowMixWizard(false)}
-        onSave={async (preview, title) => {
-          await saveWorkoutToAPI({
-            profile_id: profileId,
-            workout_data: preview.workout,
-            title,
-            sources: [],
-            device: 'web',
-          });
-          setShowMixWizard(false);
-          loadWorkouts();
-        }}
       />
 
       {/* Select Mode Action Bar */}

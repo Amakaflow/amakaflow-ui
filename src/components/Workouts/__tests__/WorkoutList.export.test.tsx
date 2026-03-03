@@ -154,8 +154,6 @@ vi.mock('../hooks/useWorkoutList', () => ({
     setShowActivityHistory: vi.fn(),
     showTagManagement: false,
     setShowTagManagement: vi.fn(),
-    showMixWizard: false,
-    setShowMixWizard: vi.fn(),
     completions: [],
     completionsLoading: false,
     completionsTotal: 0,
