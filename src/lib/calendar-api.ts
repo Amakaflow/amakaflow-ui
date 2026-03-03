@@ -131,24 +131,53 @@ class CalendarApiClient {
   // WORKOUT EVENTS
   // ==========================================
 
+  // Helper to validate date string is in YYYY-MM-DD format
+  private isValidDateString(dateStr: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  }
+
+  // Helper to parse date string to Date object with validation
+  private parseDate(dateStr: string): Date {
+    const date = new Date(dateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date: ${dateStr}`);
+    }
+    return date;
+  }
+
   // Helper to rebase demo events to match the requested week
   private rebaseEventsToWeek(events: WorkoutEvent[], start: string, end: string): WorkoutEvent[] {
     if (events.length === 0) return events;
     
-    // Parse the requested week start (Sunday)
-    const requestedStart = new Date(start + 'T00:00:00');
+    // Validate input date parameters
+    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
+      throw new Error('Invalid date parameters: start and end must be in YYYY-MM-DD format');
+    }
     
-    // Find the earliest date in the demo events
-    const dates = events.map((e) => e.date).sort();
-    const originDate = new Date(dates[0] + 'T00:00:00');
+    // Parse the requested week start (Sunday) with error handling
+    const requestedStart = this.parseDate(start);
+    
+    // Filter events to ensure they have valid date fields before processing
+    const validEvents = events.filter((e) => e.date && this.isValidDateString(e.date));
+    
+    if (validEvents.length === 0) return [];
+    
+    // Find the earliest date in the demo events (now safe - we filtered empty/invalid dates)
+    const dates = validEvents.map((e) => e.date).sort();
+    const originDate = this.parseDate(dates[0]);
     
     // Calculate offset to align demo events to the requested week
     const offsetMs = requestedStart.getTime() - originDate.getTime();
     const offsetDays = Math.round(offsetMs / (1000 * 60 * 60 * 24));
     
+    // Validate offset calculation didn't produce NaN
+    if (isNaN(offsetDays)) {
+      throw new Error('Failed to calculate date offset: invalid date arithmetic');
+    }
+    
     // Apply offset to all events
-    return events.map((e) => {
-      const d = new Date(e.date + 'T00:00:00');
+    return validEvents.map((e) => {
+      const d = this.parseDate(e.date);
       d.setDate(d.getDate() + offsetDays);
       const rebased = d.toISOString().slice(0, 10);
       return { ...e, date: rebased };
@@ -157,8 +186,12 @@ class CalendarApiClient {
 
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
     if (isDemoMode) {
+      // Filter out any invalid events from demo data and ensure proper typing
+      const validEvents: WorkoutEvent[] = DEMO_CALENDAR_EVENTS.filter(
+        (e): e is WorkoutEvent => e !== null && e !== undefined && typeof e.date === 'string'
+      );
       // Rebase demo events to match the requested week so calendar shows populated data
-      const rebasedEvents = this.rebaseEventsToWeek(DEMO_CALENDAR_EVENTS as unknown as WorkoutEvent[], start, end);
+      const rebasedEvents = this.rebaseEventsToWeek(validEvents, start, end);
       // Filter demo events by the requested date range to match production behavior
       return rebasedEvents.filter(
         (event: WorkoutEvent) => event.date >= start && event.date <= end
