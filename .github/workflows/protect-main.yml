@@ -9,15 +9,15 @@ jobs:
   check-source-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify source branch is develop, hotfix/*, or sync/*
+      - name: Verify source branch is develop or sync/*
         run: |
           HEAD="${{ github.head_ref }}"
-          if [[ "$HEAD" == "develop" || "$HEAD" == hotfix/* || "$HEAD" == sync/* ]]; then
+          if [[ "$HEAD" == "develop" || "$HEAD" == sync/* ]]; then
             echo "✅ '$HEAD' is allowed to merge into main."
           else
-            echo "::error::PRs into main must come from 'develop', 'hotfix/*', or 'sync/*'."
+            echo "::error::PRs into main must come from 'develop' or 'sync/*'."
             echo ""
-            echo "Source branch '$HEAD' is a feature branch."
-            echo "Merge it into 'develop' first, then cut a release from develop → main."
+            echo "Source branch '$HEAD' must not target main directly."
+            echo "Merge it into 'develop' first, then cut a release via develop → main."
             exit 1
           fi
