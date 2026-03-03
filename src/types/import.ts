@@ -4,7 +4,7 @@ import type { ColumnMapping, DetectedPattern } from './bulk-import';
 export type ImportTab = 'urls-media' | 'file' | 'clip-queue' | 'integrations';
 
 /** Which phase of the import workflow we're in. */
-export type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping';
+export type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping' | 'saved';
 
 /** A single item in the pre-import queue (before processing). */
 export type QueueItem =

@@ -245,19 +245,19 @@ describe('useImportFlow', () => {
 
   // ── Test 5 ─────────────────────────────────────────────────────────────────
 
-  it('handleSaveAll calls onDone after saving', async () => {
+  it('handleSaveAll transitions to saved phase after saving', async () => {
     const doneItem = makeProcessedItem({ queueId: 'q-1', workout: { title: 'Push Day', blocks: [] } });
     const processingMock = makeProcessingMock({ processedItems: [doneItem] });
     mockUseImportProcessing.mockReturnValue(processingMock);
 
-    const onDone = vi.fn();
-    const { result } = renderHook(() => useImportFlow({ ...defaultProps, onDone }));
+    const { result } = renderHook(() => useImportFlow(defaultProps));
 
     await act(async () => {
       await result.current.handleSaveAll();
     });
 
-    expect(onDone).toHaveBeenCalledOnce();
+    // Should transition to 'saved' phase instead of calling onDone directly
+    expect(result.current.phase).toBe('saved');
   });
 
   // ── Test: handleImport error handling ──────────────────────────────────────

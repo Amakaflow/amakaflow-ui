@@ -32,6 +32,7 @@ import {
   Tag,
   Shuffle,
   Upload,
+  CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -98,6 +99,7 @@ export interface WorkoutListProps {
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  onAddToCalendar?: (item: WorkoutHistoryItem) => void;
 }
 
 // =============================================================================
@@ -170,6 +172,7 @@ export function WorkoutList({
   onBulkDeleteWorkouts,
   onViewProgram,
   onExportWorkout,
+  onAddToCalendar,
 }: WorkoutListProps) {
   const {
     // State values
@@ -678,6 +681,12 @@ export function WorkoutList({
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        {onAddToCalendar && (
+                          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={() => onAddToCalendar(workout._original)}>
+                            <CalendarDays className="w-4 h-4" />
+                            Add to Calendar
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -907,6 +916,12 @@ export function WorkoutList({
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          {onAddToCalendar && (
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => onAddToCalendar(workout._original)}>
+                              <CalendarDays className="w-4 h-4" />
+                              Add to Calendar
+                            </Button>
+                          )}
                         </div>
                         <Button
                           size="sm"
