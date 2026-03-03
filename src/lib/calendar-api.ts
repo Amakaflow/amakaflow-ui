@@ -185,6 +185,11 @@ class CalendarApiClient {
   }
 
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
+    // Validate input date parameters upfront to fail fast
+    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
+      throw new Error('Invalid date parameters: start and end must be valid YYYY-MM-DD format date strings');
+    }
+
     if (isDemoMode) {
       // Filter out any invalid events from demo data and ensure proper typing
       const validEvents: WorkoutEvent[] = DEMO_CALENDAR_EVENTS.filter(
