@@ -6,6 +6,7 @@ import { useProgramWizard } from '@/context/ProgramWizardContext';
 import { FocusArea, FOCUS_AREA_LABELS } from '@/types/program-wizard';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/components/ui/utils';
 
 const focusAreas: FocusArea[] = [
@@ -49,17 +50,17 @@ export function PreferencesStep() {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-xl font-semibold text-foreground">
           Any preferences? (Optional)
         </h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Help us personalize your program further
         </p>
       </div>
 
       {/* Injuries/Limitations */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-foreground">
           Injuries or limitations
         </label>
         <Textarea
@@ -68,14 +69,14 @@ export function PreferencesStep() {
           placeholder="e.g., Lower back issues, shoulder impingement..."
           className="min-h-[80px]"
         />
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs text-muted-foreground">
           We&apos;ll avoid exercises that might aggravate these conditions
         </p>
       </div>
 
       {/* Focus Areas */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-foreground">
           Focus areas (optional emphasis)
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -89,8 +90,8 @@ export function PreferencesStep() {
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors',
                   isSelected
-                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary'
                 )}
               >
                 <div
@@ -98,12 +99,12 @@ export function PreferencesStep() {
                   className={cn(
                     'w-4 h-4 rounded flex items-center justify-center border flex-shrink-0',
                     isSelected
-                      ? 'border-white bg-white dark:border-zinc-900 dark:bg-zinc-900'
-                      : 'border-zinc-400 dark:border-zinc-500'
+                      ? 'border-transparent bg-white'
+                      : 'border-gray-300'
                   )}
                 >
                   {isSelected && (
-                    <svg className="w-3 h-3 text-zinc-900 dark:text-white" viewBox="0 0 12 12" fill="none">
+                    <svg className="w-3 h-3 text-primary" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
@@ -117,17 +118,16 @@ export function PreferencesStep() {
 
       {/* Exercises to Avoid */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-foreground">
           Exercises to avoid
         </label>
         <div className="flex gap-2">
-          <input
-            type="text"
+          <Input
             value={exerciseInput}
             onChange={(e) => setExerciseInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="e.g., Deadlift, Overhead press..."
-            className="flex-1 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600 dark:focus:ring-zinc-800"
+            className="flex-1"
           />
           <Button
             type="button"
@@ -144,13 +144,13 @@ export function PreferencesStep() {
             {state.avoidExercises.map((exercise) => (
               <span
                 key={exercise}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-100 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-sm text-muted-foreground"
               >
                 {exercise}
                 <button
                   type="button"
                   onClick={() => removeAvoidExercise(exercise)}
-                  className="p-0.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  className="p-0.5 rounded-full hover:bg-accent"
                 >
                   <X className="w-3 h-3" />
                 </button>

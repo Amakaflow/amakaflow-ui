@@ -79,9 +79,9 @@ function ProgramWizardContent({ userId, onClose, onComplete }: ProgramWizardCont
               <button
                 type="button"
                 onClick={goBack}
-                className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="p-1 rounded-md hover:bg-muted"
               >
-                <ArrowLeft className="w-5 h-5 text-zinc-500" />
+                <ArrowLeft className="w-5 h-5 text-muted-foreground" />
               </button>
             )}
             <DialogTitle className="text-lg font-semibold">
@@ -92,9 +92,9 @@ function ProgramWizardContent({ userId, onClose, onComplete }: ProgramWizardCont
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="p-1 rounded-md hover:bg-muted"
             >
-              <X className="w-5 h-5 text-zinc-500" />
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           )}
         </div>
@@ -119,7 +119,7 @@ function ProgramWizardContent({ userId, onClose, onComplete }: ProgramWizardCont
 
       {/* Footer Navigation */}
       {!isLastStep && !isGenerating && !isComplete && (
-        <div className="flex justify-between items-center px-6 pb-6 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="flex justify-between items-center px-6 pb-6 pt-2 border-t border-border">
           <Button
             variant="ghost"
             onClick={goBack}

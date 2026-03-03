@@ -19,10 +19,10 @@ export function ScheduleStep() {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-xl font-semibold text-foreground">
           Plan your schedule
         </h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Set your program duration and training frequency
         </p>
       </div>
@@ -30,10 +30,10 @@ export function ScheduleStep() {
       {/* Duration Weeks */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="text-sm font-medium text-foreground">
             Program Duration
           </label>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="text-sm font-semibold text-foreground">
             {state.durationWeeks} weeks
           </span>
         </div>
@@ -45,7 +45,7 @@ export function ScheduleStep() {
           step={1}
           className="w-full"
         />
-        <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="flex justify-between text-xs text-muted-foreground">
           <span>4 weeks</span>
           <span>52 weeks</span>
         </div>
@@ -54,10 +54,10 @@ export function ScheduleStep() {
       {/* Sessions Per Week */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="text-sm font-medium text-foreground">
             Sessions Per Week
           </label>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="text-sm font-semibold text-foreground">
             {state.sessionsPerWeek} {state.sessionsPerWeek === 1 ? 'session' : 'sessions'}
           </span>
         </div>
@@ -69,7 +69,7 @@ export function ScheduleStep() {
           step={1}
           className="w-full"
         />
-        <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="flex justify-between text-xs text-muted-foreground">
           <span>1 session</span>
           <span>7 sessions</span>
         </div>
@@ -77,7 +77,7 @@ export function ScheduleStep() {
 
       {/* Preferred Days */}
       <div className="space-y-4">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-foreground">
           Preferred Training Days
         </label>
         <div className="flex flex-wrap gap-2">
@@ -91,8 +91,8 @@ export function ScheduleStep() {
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                   isSelected
-                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary'
                 )}
               >
                 <div
@@ -100,12 +100,12 @@ export function ScheduleStep() {
                   className={cn(
                     'w-4 h-4 rounded flex items-center justify-center border',
                     isSelected
-                      ? 'border-white bg-white dark:border-zinc-900 dark:bg-zinc-900'
-                      : 'border-zinc-300 dark:border-zinc-600'
+                      ? 'border-transparent bg-white'
+                      : 'border-gray-300'
                   )}
                 >
                   {isSelected && (
-                    <svg className="w-3 h-3 text-zinc-900 dark:text-white" viewBox="0 0 12 12" fill="none">
+                    <svg className="w-3 h-3 text-primary" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
@@ -116,7 +116,7 @@ export function ScheduleStep() {
           })}
         </div>
         {state.preferredDays.length === 0 && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+          <p className="text-xs text-amber-600">
             Please select at least one training day
           </p>
         )}
@@ -124,7 +124,7 @@ export function ScheduleStep() {
 
       {/* Time Per Session */}
       <div className="space-y-4">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="text-sm font-medium text-foreground">
           Time Per Session
         </label>
         <div className="grid grid-cols-4 gap-2">
@@ -138,8 +138,8 @@ export function ScheduleStep() {
                 className={cn(
                   'px-3 py-3 rounded-lg border-2 text-sm font-medium transition-colors',
                   isSelected
-                    ? 'border-zinc-900 bg-zinc-50 text-zinc-900 dark:border-zinc-100 dark:bg-zinc-800 dark:text-zinc-100'
-                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600'
+                    ? 'border-primary bg-secondary text-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary'
                 )}
               >
                 {duration} min
