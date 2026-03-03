@@ -372,6 +372,7 @@ export function WorkflowView({
                 }
               }}
               onNavigate={setCurrentView}
+              onAddToCalendar={() => setCurrentView('calendar')}
             />
           </div>
         )}
