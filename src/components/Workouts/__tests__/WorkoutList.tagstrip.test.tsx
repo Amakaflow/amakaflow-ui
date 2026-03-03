@@ -65,8 +65,6 @@ const mockUseWorkoutList = {
   availableTags: mockAvailableTags,
   showTagManagement: false,
   setShowTagManagement: vi.fn(),
-  showMixWizard: false,
-  setShowMixWizard: vi.fn(),
   showActivityHistory: false,
   setShowActivityHistory: vi.fn(),
   completions: [],
@@ -85,7 +83,7 @@ const mockUseWorkoutList = {
   loadWorkouts: vi.fn(),
   loadTags: vi.fn(),
   loadMoreCompletions: vi.fn(),
-  toggleSelect: vi.fn(),
+  toggleSelectId: vi.fn(),
   toggleSelectAll: vi.fn(),
   handleBulkDeleteClick: vi.fn(),
   confirmBulkDelete: vi.fn(),
@@ -122,10 +120,6 @@ vi.mock('../ViewWorkout', () => ({
 
 vi.mock('../WorkoutEditor/WorkoutEditSheet', () => ({
   WorkoutEditSheet: vi.fn(() => null),
-}));
-
-vi.mock('../MixWizard/MixWizardModal', () => ({
-  MixWizardModal: vi.fn(() => null),
 }));
 
 vi.mock('../ProgramsSection', () => ({

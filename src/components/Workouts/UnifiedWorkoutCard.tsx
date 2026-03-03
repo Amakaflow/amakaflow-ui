@@ -331,12 +331,8 @@ export function UnifiedWorkoutCard({
                     {CATEGORY_DISPLAY_NAMES[workout.category]}
                   </Badge>
 
-                  {/* Source badge */}
-                  {workout.sourceType === 'device' && workout.devicePlatform && (
-                    <div className="flex items-center">
-                      {getDevicePlatformIcon(workout.devicePlatform)}
-                    </div>
-                  )}
+                  {/* Source badge — only show video platform; device-association badge removed
+                      (AMA-904: device was wrongly stamped at save time, not at export time) */}
                   {workout.sourceType === 'video' && workout.videoPlatform && !hasThumbnail && (
                     <div className="flex items-center">
                       {getVideoPlatformIcon(workout.videoPlatform)}
@@ -428,10 +424,21 @@ export function UnifiedWorkoutCard({
               <span>{getRelativeTime(workout.createdAt)}</span>
             </div>
 
-            {/* Sync status */}
-            <div className="mt-2">
-              <SyncStatusIndicator workout={workout} />
-            </div>
+            {/* Sync status — only show when workout has been genuinely exported/synced (AMA-904) */}
+            {workout.syncStatus && (
+              workout.syncStatus.garmin?.synced === true ||
+              workout.syncStatus.apple?.synced === true ||
+              workout.syncStatus.strava?.synced === true ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.garmin?.status ?? '') ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.apple?.status ?? '') ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.strava?.status ?? '') ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.ios?.status ?? '') ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.android?.status ?? '')
+            ) && (
+              <div className="mt-2">
+                <SyncStatusIndicator workout={workout} />
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

@@ -239,3 +239,4 @@ describe('WorkoutList tabs', () => {
       expect(fetchWorkoutCompletions).toHaveBeenCalledWith(50, 0);
     }, { timeout: 5000 });
   });
+});

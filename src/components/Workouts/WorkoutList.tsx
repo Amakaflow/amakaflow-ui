@@ -30,10 +30,13 @@ import {
   Activity,
   Star,
   Tag,
-  Shuffle,
   Upload,
   CalendarDays,
+  CheckSquare,
+  Square,
+  Check,
 } from 'lucide-react';
+import { cn } from '../ui/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -66,11 +69,11 @@ import type { UnifiedWorkout } from '../../types/unified-workout';
 import { CATEGORY_DISPLAY_NAMES, isHistoryWorkout } from '../../types/unified-workout';
 import type { SortOption } from '../../lib/workout-filters';
 import { SORT_OPTIONS } from '../../lib/workout-filters';
-import { saveWorkoutToAPI } from '../../lib/workout-api';
+import { BlockPicker } from '../Import/BlockPicker';
+import type { ProcessedItem } from '../../types/import';
 
 import { ViewWorkout } from '../ViewWorkout';
 import { WorkoutEditSheet } from '../WorkoutEditor/WorkoutEditSheet';
-import { MixWizardModal } from '../MixWizard/MixWizardModal';
 import { ProgramsSection } from '../ProgramsSection';
 import { TagPill } from '../TagPill';
 import { TagManagementModal } from '../TagManagementModal';
@@ -78,6 +81,7 @@ import { WorkoutTagsEditor } from '../WorkoutTagsEditor';
 import { ActivityHistory } from '../ActivityHistory';
 import { CompletionDetailView } from '../CompletionDetailView';
 import { SyncStatusIndicator } from './UnifiedWorkoutCard';
+import { SelectActionBar } from './SelectActionBar';
 
 import type { WorkoutHistoryItem } from '../../lib/workout-history';
 import {
@@ -109,7 +113,10 @@ export interface WorkoutListProps {
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  onBatchExport?: (items: WorkoutHistoryItem[]) => void;
   onNavigate?: (view: string) => void;
+  onAddToCalendar?: (workout: WorkoutHistoryItem) => void;
+  onMergeWorkouts?: (mergedWorkout: { title: string; blocks: unknown[] }) => void;
 }
 
 // =============================================================================
@@ -171,6 +178,37 @@ function ExportPopoverButton({ workoutId, historyItem, onExportWorkout, size = '
 }
 
 // =============================================================================
+// Merge helpers
+// =============================================================================
+
+/**
+ * Convert UnifiedWorkout[] to ProcessedItem[] for use with BlockPicker.
+ * Only history workouts have structured block data; follow-along items yield an
+ * empty blocks array which BlockPicker handles gracefully.
+ */
+function workoutsToProcessedItems(workouts: UnifiedWorkout[]): ProcessedItem[] {
+  return workouts.map(w => {
+    let blocks: unknown[] = [];
+    if (isHistoryWorkout(w)) {
+      const raw = w._original.data as any;
+      // workout.blocks is the canonical location; fall back to workout_data.blocks
+      const rawBlocks = raw?.workout?.blocks ?? raw?.workout_data?.blocks ?? [];
+      blocks = rawBlocks.map((block: any, i: number) => ({
+        ...block,
+        id: block.id ?? `${w.id}-block-${i}`,
+      }));
+    }
+    return {
+      queueId: w.id,
+      workoutTitle: w.title,
+      status: 'done' as const,
+      workout: { blocks },
+      blockCount: blocks.length,
+    };
+  });
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -182,7 +220,10 @@ export function WorkoutList({
   onBulkDeleteWorkouts,
   onViewProgram,
   onExportWorkout,
+  onBatchExport,
   onNavigate,
+  onAddToCalendar,
+  onMergeWorkouts,
 }: WorkoutListProps) {
   const {
     // State values
@@ -208,6 +249,12 @@ export function WorkoutList({
     setPageIndex,
     PAGE_SIZE,
     selectedIds,
+    selectModeActive,
+    setSelectModeActive,
+    mergePhase,
+    setMergePhase,
+    mergeSelectedBlocks,
+    setMergeSelectedBlocks,
     showDeleteModal,
     pendingDeleteIds,
     confirmDeleteId,
@@ -222,8 +269,6 @@ export function WorkoutList({
     availableTags,
     showTagManagement,
     setShowTagManagement,
-    showMixWizard,
-    setShowMixWizard,
     completions,
     completionsLoading,
     completionsTotal,
@@ -245,8 +290,10 @@ export function WorkoutList({
     loadTags,
     loadCompletions,
     loadMoreCompletions,
-    toggleSelect,
     toggleSelectAll,
+    toggleSelectMode,
+    toggleSelectId,
+    clearSelection,
     handleBulkDeleteClick,
     confirmBulkDelete,
     cancelBulkDelete,
@@ -270,6 +317,55 @@ export function WorkoutList({
     onBulkDeleteWorkouts,
     onViewProgram,
   });
+
+  const handleBatchExport = () => {
+    if (!onBatchExport) return;
+    const items = allWorkouts
+      .filter(w => selectedIds.includes(w.id) && isHistoryWorkout(w))
+      .map(w => w._original.data as WorkoutHistoryItem);
+    onBatchExport(items);
+    clearSelection();
+  };
+
+  // Merge phase: render BlockPicker full-screen instead of the list
+  if (mergePhase === 'block-picker') {
+    const selectedWorkouts = allWorkouts.filter(w => selectedIds.includes(w.id));
+    const processedItems = workoutsToProcessedItems(selectedWorkouts);
+
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Merge workouts</h1>
+          <p className="text-muted-foreground mt-1">
+            Choose the blocks you want, then edit and save as a new workout.
+          </p>
+        </div>
+        <BlockPicker
+          queueItems={[]}
+          processedItems={processedItems}
+          selectedBlocks={mergeSelectedBlocks}
+          onSelectionChange={setMergeSelectedBlocks}
+          onCancel={() => {
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+          }}
+          onConfirm={() => {
+            const blocks = mergeSelectedBlocks.map(sel => {
+              const item = processedItems[sel.workoutIndex];
+              return (item?.workout as any)?.blocks?.[sel.blockIndex];
+            }).filter(Boolean);
+
+            if (onMergeWorkouts) {
+              onMergeWorkouts({ title: 'Merged Workout', blocks });
+            }
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+            clearSelection();
+          }}
+        />
+      </div>
+    );
+  }
 
   // Render loading state
   if (isLoading) {
@@ -354,24 +450,38 @@ export function WorkoutList({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isAllSelected}
-              onChange={toggleSelectAll}
-              aria-label="Select all workouts"
-              className="w-4 h-4"
-              data-testid="select-all-checkbox"
-            />
+            {selectModeActive && (
+              <>
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all workouts"
+                  className="w-4 h-4"
+                  data-testid="select-all-checkbox"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => handleBulkDeleteClick(selectedIds)}
+                  className="gap-2"
+                  data-testid="bulk-delete-button"
+                >
+                  Delete selected ({selectedIds.length})
+                </Button>
+              </>
+            )}
             <Button
-              type="button"
-              variant="outline"
+              variant={selectModeActive ? 'default' : 'outline'}
               size="sm"
-              disabled={selectedIds.length === 0}
-              onClick={() => handleBulkDeleteClick(selectedIds)}
-              className="gap-2"
-              data-testid="bulk-delete-button"
+              onClick={toggleSelectMode}
+              className="gap-1.5"
+              data-testid="select-mode-toggle"
             >
-              Delete selected ({selectedIds.length})
+              {selectModeActive ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {selectModeActive ? 'Done' : 'Select'}
             </Button>
             <Button
               variant={viewMode === 'cards' ? 'default' : 'outline'}
@@ -502,14 +612,16 @@ export function WorkoutList({
                         selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40' : ''
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(workout.id)}
-                        onChange={() => toggleSelect(workout.id)}
-                        aria-label="Select workout"
-                        className="w-4 h-4 flex-shrink-0"
-                        data-testid={`workout-checkbox-${workout.id}`}
-                      />
+                      {selectModeActive && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(workout.id)}
+                          onChange={() => toggleSelectId(workout.id)}
+                          aria-label="Select workout"
+                          className="w-4 h-4 flex-shrink-0"
+                          data-testid={`workout-checkbox-${workout.id}`}
+                        />
+                      )}
                       {/* Thumbnail for video workouts */}
                       {isVideo && workout.thumbnailUrl && (
                         <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
@@ -710,8 +822,28 @@ export function WorkoutList({
 
                 // Card view
                 return (
+                  <div key={workout.id} className="relative">
+                    {selectModeActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectId(workout.id);
+                        }}
+                        className="absolute top-3 left-3 z-10"
+                        aria-label={selectedIds.includes(workout.id) ? 'Deselect workout' : 'Select workout'}
+                        data-testid={`workout-checkbox-${workout.id}`}
+                      >
+                        <div className={cn(
+                          'w-5 h-5 rounded border-2 flex items-center justify-center bg-background',
+                          selectedIds.includes(workout.id)
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground'
+                        )}>
+                          {selectedIds.includes(workout.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                        </div>
+                      </button>
+                    )}
                   <Card
-                    key={workout.id}
                     data-testid={`workout-item-${workout.id}`}
                     className={`hover:shadow-md transition-all border-border/50 bg-card ${
                       selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40 shadow-sm' : ''
@@ -719,14 +851,7 @@ export function WorkoutList({
                   >
                     <CardHeader className="pb-3 px-4 pt-4">
                       <div className="flex items-start justify-between gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(workout.id)}
-                          onChange={() => toggleSelect(workout.id)}
-                          aria-label="Select workout"
-                          className="w-4 h-4 flex-shrink-0 mt-1"
-                          data-testid={`workout-checkbox-${workout.id}`}
-                        />
+                        {/* inline checkbox replaced by overlay button in select mode */}
                         {/* Thumbnail for video workouts */}
                         {isVideo && workout.thumbnailUrl && (
                           <div className="w-24 h-16 rounded overflow-hidden flex-shrink-0 bg-muted">
@@ -985,6 +1110,7 @@ export function WorkoutList({
                       </div>
                     </CardContent>
                   </Card>
+                  </div>
                 );
               })}
             </div>
@@ -1123,33 +1249,15 @@ export function WorkoutList({
         onTagsChange={loadTags}
       />
 
-      {/* Mix Workouts FAB */}
-      <button
-        onClick={() => setShowMixWizard(true)}
-        className="fixed bottom-24 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
-        aria-label="Mix workouts"
-      >
-        <Shuffle className="w-5 h-5" />
-        <span className="text-sm font-medium hidden sm:inline">Mix</span>
-      </button>
-
-      {/* Mix Workouts Wizard */}
-      <MixWizardModal
-        open={showMixWizard}
-        workouts={allWorkouts}
-        onClose={() => setShowMixWizard(false)}
-        onSave={async (preview, title) => {
-          await saveWorkoutToAPI({
-            profile_id: profileId,
-            workout_data: preview.workout,
-            title,
-            sources: [],
-            device: 'web',
-          });
-          setShowMixWizard(false);
-          loadWorkouts();
-        }}
-      />
+      {/* Select Mode Action Bar */}
+      {selectModeActive && (
+        <SelectActionBar
+          selectedCount={selectedIds.length}
+          onCancel={clearSelection}
+          onExport={handleBatchExport}
+          onMerge={() => setMergePhase('block-picker')}
+        />
+      )}
     </div>
   );
 }

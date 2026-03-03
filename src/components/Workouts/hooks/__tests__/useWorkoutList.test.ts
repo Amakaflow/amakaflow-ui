@@ -45,22 +45,22 @@ describe('useWorkoutList', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
   });
 
-  it('toggleSelect adds id to selectedIds', () => {
+  it('toggleSelectId adds id to selectedIds', () => {
     const { result } = renderHook(() => useWorkoutList(defaultProps));
-    act(() => { result.current.toggleSelect('w-1'); });
+    act(() => { result.current.toggleSelectId('w-1'); });
     expect(result.current.selectedIds).toContain('w-1');
   });
 
-  it('toggleSelect removes already-selected id', () => {
+  it('toggleSelectId removes already-selected id', () => {
     const { result } = renderHook(() => useWorkoutList(defaultProps));
-    act(() => { result.current.toggleSelect('w-1'); });
-    act(() => { result.current.toggleSelect('w-1'); });
+    act(() => { result.current.toggleSelectId('w-1'); });
+    act(() => { result.current.toggleSelectId('w-1'); });
     expect(result.current.selectedIds).not.toContain('w-1');
   });
 
   it('clearSelection resets selectedIds to empty', () => {
     const { result } = renderHook(() => useWorkoutList(defaultProps));
-    act(() => { result.current.toggleSelect('w-1'); });
+    act(() => { result.current.toggleSelectId('w-1'); });
     act(() => { result.current.clearSelection(); });
     expect(result.current.selectedIds).toHaveLength(0);
   });

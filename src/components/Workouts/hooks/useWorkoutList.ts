@@ -34,6 +34,7 @@ import type { WorkoutCoreData } from '../../WorkoutEditor/WorkoutEditorCore';
 import type { UserTag } from '../../../types/unified-workout';
 import { fetchWorkoutCompletions, type WorkoutCompletion } from '../../../lib/completions-api';
 import { toast } from 'sonner';
+import type { SelectedBlock } from '../../../types/import';
 
 // =============================================================================
 // Module-level pure helpers (copied verbatim from UnifiedWorkouts.tsx)
@@ -132,6 +133,29 @@ export function useWorkoutList({
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Select mode (for batch export and merge)
+  const [selectModeActive, setSelectModeActive] = useState(false);
+
+  const toggleSelectMode = useCallback(() => {
+    setSelectModeActive(prev => {
+      if (prev) setSelectedIds([]);  // clear selection when exiting
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelectId = useCallback((id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  // Merge flow phase
+  const [mergePhase, setMergePhase] = useState<'list' | 'block-picker'>('list');
+
+  // Blocks selected in the merge BlockPicker
+  const [mergeSelectedBlocks, setMergeSelectedBlocks] = useState<SelectedBlock[]>([]);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -152,9 +176,6 @@ export function useWorkoutList({
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
-
-  // Mix Workouts wizard state
-  const [showMixWizard, setShowMixWizard] = useState(false);
 
   // Activity History state (AMA-196)
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
@@ -338,13 +359,6 @@ export function useWorkoutList({
   const pageStart = currentPageIndex * PAGE_SIZE;
   const displayedWorkouts = filteredWorkouts.slice(pageStart, pageStart + PAGE_SIZE);
 
-  // Selection handlers
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   const isAllSelected =
     displayedWorkouts.length > 0 &&
     displayedWorkouts.every((w) => selectedIds.includes(w.id));
@@ -360,7 +374,10 @@ export function useWorkoutList({
     }
   };
 
-  const clearSelection = () => setSelectedIds([]);
+  const clearSelection = useCallback(() => {
+    setSelectedIds([]);
+    setSelectModeActive(false);
+  }, []);
 
   // Delete handlers
   const handleBulkDeleteClick = (ids: string[]) => {
@@ -527,7 +544,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -575,7 +592,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -693,7 +710,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -726,6 +743,12 @@ export function useWorkoutList({
     PAGE_SIZE,
     selectedIds,
     setSelectedIds,
+    selectModeActive,
+    setSelectModeActive,
+    mergePhase,
+    setMergePhase,
+    mergeSelectedBlocks,
+    setMergeSelectedBlocks,
     showDeleteModal,
     setShowDeleteModal,
     pendingDeleteIds,
@@ -745,8 +768,6 @@ export function useWorkoutList({
     setAvailableTags,
     showTagManagement,
     setShowTagManagement,
-    showMixWizard,
-    setShowMixWizard,
     completions,
     setCompletions,
     completionsLoading,
@@ -770,8 +791,9 @@ export function useWorkoutList({
     loadTags,
     loadCompletions,
     loadMoreCompletions,
-    toggleSelect,
     toggleSelectAll,
+    toggleSelectMode,
+    toggleSelectId,
     clearSelection,
     handleBulkDeleteClick,
     confirmBulkDelete,
