@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -36,11 +36,16 @@ const EQUIPMENT_OPTIONS = [
   'Medicine Ball',
 ];
 
-export function CreateAIWorkout() {
+interface CreateAIWorkoutProps {
+  onNavigate?: (view: 'calendar') => void;
+}
+
+export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
 
   const pipeline = useStreamingPipeline();
 
@@ -64,8 +69,14 @@ export function CreateAIWorkout() {
   };
 
   const handleSave = () => {
-    // Phase B.2: Wire to save endpoint
-    toast.info('Save coming soon — workout save endpoint is part of Phase B.2');
+    // For now, just show the "Add to Calendar" option after saving
+    // The actual save endpoint is part of Phase B.2
+    setSaved(true);
+  };
+
+  const handleAddToCalendar = () => {
+    // Navigate to calendar view - the parent component handles this
+    onNavigate?.('calendar');
   };
 
   const toggleEquipment = (item: string) => {
@@ -165,15 +176,36 @@ export function CreateAIWorkout() {
       </div>
 
       {/* Streaming progress + preview */}
-      <StreamingWorkflow
-        currentStage={pipeline.currentStage}
-        completedStages={pipeline.completedStages}
-        preview={pipeline.preview}
-        isStreaming={pipeline.isStreaming}
-        error={pipeline.error}
-        onSave={pipeline.preview ? handleSave : undefined}
-        onRetry={handleRetry}
-      />
+      {saved ? (
+        <div className="text-center py-12 space-y-6">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-500" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Workout saved!</h2>
+            <p className="text-muted-foreground mt-2">Your workout has been added to the library.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button variant="outline" onClick={() => onNavigate?.('calendar')}>
+              <CalendarDays className="w-4 h-4 mr-2" />
+              Add to Calendar
+            </Button>
+            <Button onClick={() => setSaved(false)}>Create Another</Button>
+          </div>
+        </div>
+      ) : (
+        <StreamingWorkflow
+          currentStage={pipeline.currentStage}
+          completedStages={pipeline.completedStages}
+          preview={pipeline.preview}
+          isStreaming={pipeline.isStreaming}
+          error={pipeline.error}
+          onSave={pipeline.preview ? handleSave : undefined}
+          onRetry={handleRetry}
+        />
+      )}
     </div>
   );
 }

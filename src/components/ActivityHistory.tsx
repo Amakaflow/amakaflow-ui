@@ -108,7 +108,7 @@ function formatSteps(steps: number): string {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="activity-history">
       {[1, 2, 3].map((i) => (
         <Card key={i} className="animate-pulse">
           <CardContent className="p-4">
@@ -261,7 +261,7 @@ export function ActivityHistory({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="activity-history">
       {completions.map((completion) => (
         <CompletionCard
           key={completion.id}

@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarDays,
   Dumbbell,
+  FolderOpen,
   HelpCircle,
   Plus,
   Settings,
@@ -98,6 +99,16 @@ export function NavBar({
               >
                 <Dumbbell className="w-4 h-4" />
                 My Workouts
+              </Button>
+              <Button
+                variant={currentView === 'programs' ? 'default' : 'ghost'}
+                size="sm"
+                data-assistant-target="nav-programs"
+                onClick={() => onNavigate('programs')}
+                className="gap-2"
+              >
+                <FolderOpen className="w-4 h-4" />
+                Programs
               </Button>
               <Button
                 variant={currentView === 'analytics' ? 'default' : 'ghost'}

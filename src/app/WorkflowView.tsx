@@ -371,6 +371,7 @@ export function WorkflowView({
                   handleInlineExport(workout, device);
                 }
               }}
+              onNavigate={setCurrentView}
             />
           </div>
         )}
@@ -396,13 +397,14 @@ export function WorkflowView({
                 setSelectedProgramId(programId);
                 setCurrentView('program-detail');
               }}
+              onAddToCalendar={() => setCurrentView('calendar')}
             />
           </div>
         )}
 
         {currentView === 'create-ai' && (
           <div data-assistant-target="workout-preview">
-            <CreateAIWorkout />
+            <CreateAIWorkout onNavigate={(view) => setCurrentView(view)} />
           </div>
         )}
 
@@ -417,6 +419,7 @@ export function WorkflowView({
             initialProcessedItems={importProcessedItems.length > 0 ? importProcessedItems : undefined}
             onUpdateProcessedItems={setImportProcessedItems}
             onEditWorkout={handleEditFromImport}
+            onNavigate={(view: View) => setCurrentView(view)}
           />
         )}
 

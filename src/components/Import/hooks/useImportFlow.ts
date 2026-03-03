@@ -18,6 +18,8 @@ export interface UseImportFlowProps {
   initialProcessedItems?: ProcessedItem[];
   /** Called whenever processedItems changes while phase is 'results'. */
   onUpdateProcessedItems?: (items: ProcessedItem[]) => void;
+  /** Called to navigate to a different view (e.g., 'calendar'). */
+  onNavigate?: (view: string) => void;
 }
 
 export interface ImportFlowResult {
@@ -59,7 +61,7 @@ export interface ImportFlowResult {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems }: UseImportFlowProps): ImportFlowResult {
+export function useImportFlow({ userId, onDone, onEditWorkout, initialProcessedItems, onUpdateProcessedItems, onNavigate }: UseImportFlowProps): ImportFlowResult {
   const [phase, setPhase] = useState<Phase>('input');
   const [activeTab, setActiveTab] = useState<ImportTab>('urls-media');
   const [selectedBlocks, setSelectedBlocks] = useState<SelectedBlock[]>([]);
@@ -127,7 +129,8 @@ export function useImportFlow({ userId, onDone, onEditWorkout, initialProcessedI
 
   // ── handleSaveAll ─────────────────────────────────────────────────────────────
   //
-  // Save all done processedItems to workout history, then call onDone().
+  // Save all done processedItems to workout history, then show saved phase with
+  // "Add to Calendar" option before calling onDone().
 
   const handleSaveAll = async (): Promise<void> => {
     const doneItems = processing.processedItems.filter(
@@ -154,7 +157,8 @@ export function useImportFlow({ userId, onDone, onEditWorkout, initialProcessedI
       throw new Error(`Failed to save ${errors.length} of ${doneItems.length} workouts`);
     }
 
-    onDone();
+    // Show the saved phase with "Add to Calendar" option
+    setPhase('saved');
   };
 
   // ── handleRetry ───────────────────────────────────────────────────────────────

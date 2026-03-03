@@ -149,7 +149,7 @@ export function useWorkoutList({
   const pendingEditRef = useRef<UnifiedWorkout | null>(null);
 
   // Tag state
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<UserTag[]>([]);
   const [showTagManagement, setShowTagManagement] = useState(false);
 
@@ -157,7 +157,6 @@ export function useWorkoutList({
   const [showMixWizard, setShowMixWizard] = useState(false);
 
   // Activity History state (AMA-196)
-  const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
   const [completionsLoading, setCompletionsLoading] = useState(false);
   const [completionsError, setCompletionsError] = useState<string | null>(null);
@@ -204,9 +203,7 @@ export function useWorkoutList({
 
   // Load completions for badges and Activity History (AMA-196, AMA-891)
   const loadCompletions = useCallback(async () => {
-    // Only load if not already loaded
     if (completions.length > 0) return;
-    
     setCompletionsLoading(true);
     setCompletionsError(null);
     try {
@@ -219,7 +216,7 @@ export function useWorkoutList({
     } finally {
       setCompletionsLoading(false);
     }
-  }, []);
+  }, [completions.length]);
 
   const loadMoreCompletions = useCallback(async () => {
     if (completionsLoading) return;
@@ -235,12 +232,6 @@ export function useWorkoutList({
       setCompletionsLoading(false);
     }
   }, [completions.length, completionsLoading]);
-
-  useEffect(() => {
-    if (showActivityHistory && completions.length === 0) {
-      loadCompletions();
-    }
-  }, [showActivityHistory, completions.length, loadCompletions]);
 
   // Load completions on mount for badges (AMA-891) - only when in cards view
   useEffect(() => {
@@ -329,9 +320,9 @@ export function useWorkoutList({
     }
 
     // Tag filter
-    if (tagFilter.length > 0) {
+    if (tagFilter) {
       filtered = filtered.filter((w) =>
-        tagFilter.some((tag) => w.tags.includes(tag))
+        w.tags.includes(tagFilter)
       );
     }
 
@@ -756,8 +747,6 @@ export function useWorkoutList({
     setShowTagManagement,
     showMixWizard,
     setShowMixWizard,
-    showActivityHistory,
-    setShowActivityHistory,
     completions,
     setCompletions,
     completionsLoading,
