@@ -16,9 +16,13 @@ interface SelectBlocksStepProps {
 
 function getBlocks(workout: UnifiedWorkout): Array<{ label?: string; exerciseCount: number }> {
   if (!isHistoryWorkout(workout)) return [];
-  const data = workout._original.data as { workout_data?: { blocks?: Array<{ label?: string; exercises?: unknown[] }> } };
-  const blocks = data.workout_data?.blocks ?? [];
-  return blocks.map(b => ({ label: b.label, exerciseCount: (b.exercises ?? []).length }));
+  const data = workout._original.data as { workout?: { blocks?: Array<{ label?: string; exercises?: unknown[]; supersets?: Array<{ exercises?: unknown[] }> }> } };
+  const blocks = data.workout?.blocks ?? [];
+  return blocks.map(b => {
+    const directCount = (b.exercises ?? []).length;
+    const supersetCount = (b.supersets ?? []).reduce((n, ss) => n + (ss.exercises ?? []).length, 0);
+    return { label: b.label, exerciseCount: directCount + supersetCount };
+  });
 }
 
 export function SelectBlocksStep({ workouts, selectedWorkoutIds, selectedBlocks, onToggleBlock }: SelectBlocksStepProps) {

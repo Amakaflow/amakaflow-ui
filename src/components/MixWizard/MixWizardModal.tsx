@@ -65,7 +65,7 @@ export function MixWizardModal({ open, workouts, onClose, onSave }: MixWizardMod
       for (const wid of selectedWorkoutIds) {
         const w = workouts.find(x => x.id === wid);
         if (!w || !isHistoryWorkout(w)) continue;
-        const blocks = (w._original.data as { workout_data?: { blocks?: unknown[] } }).workout_data?.blocks ?? [];
+        const blocks = (w._original.data as { workout?: { blocks?: unknown[] } }).workout?.blocks ?? [];
         blocks.forEach((_, bi) => allBlocks.push({ workoutId: wid, blockIndex: bi }));
       }
       setSelectedBlocks(allBlocks);
