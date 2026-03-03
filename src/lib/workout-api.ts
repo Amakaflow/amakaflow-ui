@@ -8,6 +8,8 @@
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
 import { isDemoMode } from './demo-mode';
+import { generateAutoTags } from './auto-tags';
+import type { WorkoutStructure } from '../types/workout';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
@@ -49,6 +51,7 @@ export interface SaveWorkoutRequest {
   title?: string;
   description?: string;
   workout_id?: string; // Optional: for explicit updates to existing workouts
+  tags?: string[]; // Auto-generated + user tags, merged before saving
 }
 
 export interface GetWorkoutsParams {
@@ -91,15 +94,29 @@ async function workoutApiCall<T>(
  * Save a workout to Supabase via mapper API
  */
 export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<SavedWorkout> {
+  // Generate auto-tags from workout content
+  const workoutData = request.workout_data as WorkoutStructure;
+  const autoTags = generateAutoTags(workoutData);
+
+  // Merge auto-tags with any existing tags passed in the request
+  const existingTags = request.tags || [];
+  const mergedTags = Array.from(new Set([...autoTags, ...existingTags]));
+
+  // Create the request body with merged tags
+  const requestWithTags = {
+    ...request,
+    tags: mergedTags,
+  };
+
   if (isDemoMode) {
     console.log('[demo] saveWorkoutToAPI skipped');
-    return { id: 'demo-' + Date.now(), ...request, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
+    return { id: 'demo-' + Date.now(), ...requestWithTags, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
   }
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
     '/workouts/save',
     {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(requestWithTags),
     }
   );
 
@@ -192,6 +209,20 @@ export async function updateWorkoutInAPI(
   workoutId: string,
   request: SaveWorkoutRequest
 ): Promise<SavedWorkout> {
+  // Generate auto-tags from workout content
+  const workoutData = request.workout_data as WorkoutStructure;
+  const autoTags = generateAutoTags(workoutData);
+
+  // Merge auto-tags with any existing tags passed in the request
+  const existingTags = request.tags || [];
+  const mergedTags = Array.from(new Set([...autoTags, ...existingTags]));
+
+  // Create the request body with merged tags
+  const requestWithTags = {
+    ...request,
+    tags: mergedTags,
+  };
+
   // Use the save endpoint with workout_id for explicit updates
   // The API will update the existing workout instead of creating a duplicate
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
@@ -199,7 +230,7 @@ export async function updateWorkoutInAPI(
     {
       method: 'POST',
       body: JSON.stringify({
-        ...request,
+        ...requestWithTags,
         workout_id: workoutId, // Pass workout ID for explicit update
       }),
     }
