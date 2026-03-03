@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
@@ -103,10 +103,13 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
 
   const workoutSources = useWorkoutSources({ userId });
 
+  const initialisedRef = useRef(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  // Initialize active filters when workoutSources changes
+  // Seed all sources as active on first mount only
   useEffect(() => {
+    if (initialisedRef.current) return;
+    initialisedRef.current = true;
     setActiveFilters(workoutSources.map(s => s.id));
   }, [workoutSources]);
 
