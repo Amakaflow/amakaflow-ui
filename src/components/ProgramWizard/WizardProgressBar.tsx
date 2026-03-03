@@ -51,16 +51,16 @@ export function WizardProgressBar() {
                 <div
                   className={cn(
                     'absolute flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium transition-colors',
-                    isCompleted && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
-                    isActive && 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900',
-                    isPending && 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
+                    isCompleted && 'bg-primary text-primary-foreground',
+                    isActive && 'bg-primary text-primary-foreground',
+                    isPending && 'bg-muted text-muted-foreground'
                   )}
                 >
                   {index + 1}
                 </div>
                 {/* Checkmark overlay for completed steps */}
                 {isCompleted && (
-                  <Check className="w-3.5 h-3.5 text-white dark:text-zinc-900 absolute" />
+                  <Check className="w-3.5 h-3.5 text-primary-foreground absolute" />
                 )}
               </div>
 
@@ -68,8 +68,8 @@ export function WizardProgressBar() {
               <span
                 className={cn(
                   'text-sm font-medium whitespace-nowrap',
-                  (isCompleted || isActive) && 'text-zinc-900 dark:text-zinc-100',
-                  isPending && 'text-zinc-400 dark:text-zinc-500'
+                  (isCompleted || isActive) && 'text-foreground',
+                  isPending && 'text-muted-foreground'
                 )}
               >
                 {stepConfig[step]}
@@ -78,7 +78,7 @@ export function WizardProgressBar() {
 
             {/* Chevron separator (except for last step) */}
             {index < WIZARD_STEPS.length - 1 && (
-              <ChevronRight className="w-4 h-4 mx-1 text-zinc-300 dark:text-zinc-600 flex-shrink-0" />
+              <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground flex-shrink-0" />
             )}
           </div>
         );
