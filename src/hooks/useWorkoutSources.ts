@@ -45,7 +45,8 @@ export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSo
       }));
 
       const calendarEntries: WorkoutSourceStatus[] = DEMO_CONNECTED_CALENDARS.map(c => {
-        const registryEntry = WORKOUT_SOURCES.find(s => s.id === c.registryId)!;
+        const registryEntry = WORKOUT_SOURCES.find(s => s.id === c.registryId);
+        if (!registryEntry) return null;
         return {
           ...registryEntry,
           label: c.label,
@@ -53,7 +54,7 @@ export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSo
           connectionId: c.connectionId,
           workoutCount: c.workoutCount,
         };
-      });
+      }).filter((e): e is WorkoutSourceStatus => e !== null);
 
       return [...base, ...calendarEntries];
     }
@@ -73,15 +74,17 @@ export function useWorkoutSources({ userId }: UseWorkoutSourcesProps): WorkoutSo
           calType === 'runna' ? 'runna' :
           calType === 'apple' ? 'apple-calendar' :
           calType === 'google' ? 'google-calendar' :
-          'google-calendar';
-        const registryEntry = WORKOUT_SOURCES.find(s => s.id === registryId)!;
+          null;
+        if (!registryId) return null;
+        const registryEntry = WORKOUT_SOURCES.find(s => s.id === registryId);
+        if (!registryEntry) return null;
         return {
           ...registryEntry,
           label: cal.name,
           isConnected: true,
           connectionId: cal.id,
         };
-      });
+      }).filter((e): e is WorkoutSourceStatus => e !== null);
 
     return [...base, ...calendarEntries];
   }, [connectedCalendars]);
