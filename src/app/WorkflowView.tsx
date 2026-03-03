@@ -431,7 +431,12 @@ export function WorkflowView({
 
         {currentView === 'create-ai' && (
           <div data-assistant-target="workout-preview">
-            <CreateAIWorkout onNavigate={(view) => setCurrentView(view)} />
+            <CreateAIWorkout
+              onNavigate={(view) => setCurrentView(view)}
+              onWorkoutGenerated={(workout) =>
+                handleEditFromImport('ai-generated', workout as unknown as Record<string, unknown>)
+              }
+            />
           </div>
         )}
 
