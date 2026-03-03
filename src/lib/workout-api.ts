@@ -1,3 +1,4 @@
+// @migration: Use src/api/clients/mapper.ts for new call sites.
 /**
  * Workout API Client
  *
@@ -7,9 +8,9 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
-import { isDemoMode } from './demo-mode';
 import { generateAutoTags } from './auto-tags';
 import type { WorkoutStructure } from '../types/workout';
+import * as mapperClient from '../api/clients/mapper';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
@@ -94,70 +95,14 @@ async function workoutApiCall<T>(
  * Save a workout to Supabase via mapper API
  */
 export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<SavedWorkout> {
-  // Generate auto-tags from workout content
-  const workoutData = request.workout_data as WorkoutStructure;
-  const autoTags = generateAutoTags(workoutData);
-
-  // Merge auto-tags with any existing tags passed in the request
-  const existingTags = request.tags || [];
-  const mergedTags = Array.from(new Set([...autoTags, ...existingTags]));
-
-  // Create the request body with merged tags
-  const requestWithTags = {
-    ...request,
-    tags: mergedTags,
-  };
-
-  if (isDemoMode) {
-    console.log('[demo] saveWorkoutToAPI skipped');
-    return { id: 'demo-' + Date.now(), ...requestWithTags, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
-  }
-  const body = { ...requestWithTags, device: request.device ?? 'web' };
-  const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
-    '/workouts/save',
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }
-  );
-
-  if (!response.success) {
-    throw new Error(response.message || 'Failed to save workout');
-  }
-
-  // Fetch the saved workout to return full data
-  const workout = await getWorkoutFromAPI(response.workout_id, request.profile_id);
-  if (!workout) {
-    throw new Error('Workout saved but could not retrieve it');
-  }
-
-  return workout;
+  return mapperClient.saveWorkout(request as mapperClient.SaveWorkoutRequest) as Promise<SavedWorkout>;
 }
 
 /**
  * Get workouts for a user
  */
 export async function getWorkoutsFromAPI(params: GetWorkoutsParams): Promise<SavedWorkout[]> {
-  if (isDemoMode) return [];
-  const queryParams = new URLSearchParams({
-    profile_id: params.profile_id,
-  });
-
-  if (params.device) {
-    queryParams.append('device', params.device);
-  }
-  if (params.is_exported !== undefined) {
-    queryParams.append('is_exported', params.is_exported.toString());
-  }
-  if (params.limit) {
-    queryParams.append('limit', params.limit.toString());
-  }
-
-  const response = await workoutApiCall<{ success: boolean; workouts: SavedWorkout[]; count: number }>(
-    `/workouts?${queryParams.toString()}`
-  );
-
-  return response.workouts || [];
+  return mapperClient.getWorkouts(params) as Promise<SavedWorkout[]>;
 }
 
 /**
@@ -423,25 +368,7 @@ export async function getPrograms(
   profileId: string,
   includeInactive: boolean = false
 ): Promise<WorkoutProgram[]> {
-  if (isDemoMode) {
-    const { DEMO_PROGRAMS } = await import('./mock-data/demo-extended');
-    return DEMO_PROGRAMS;
-  }
-  try {
-    const queryParams = new URLSearchParams({
-      profile_id: profileId,
-      include_inactive: includeInactive.toString(),
-    });
-
-    const response = await workoutApiCall<{ success: boolean; programs: WorkoutProgram[]; count: number }>(
-      `/programs?${queryParams.toString()}`
-    );
-
-    return response.programs || [];
-  } catch (err) {
-    console.error('[getPrograms] Error:', err);
-    return [];
-  }
+  return mapperClient.getPrograms(profileId, includeInactive) as Promise<WorkoutProgram[]>;
 }
 
 /**
@@ -585,24 +512,7 @@ export interface UserTag {
  * Get all tags for a user
  */
 export async function getUserTags(profileId: string): Promise<UserTag[]> {
-  if (isDemoMode) {
-    const { DEMO_USER_TAGS } = await import('./mock-data/demo-extended');
-    return DEMO_USER_TAGS;
-  }
-  try {
-    const queryParams = new URLSearchParams({
-      profile_id: profileId,
-    });
-
-    const response = await workoutApiCall<{ success: boolean; tags: UserTag[]; count: number }>(
-      `/tags?${queryParams.toString()}`
-    );
-
-    return response.tags || [];
-  } catch (err) {
-    console.error('[getUserTags] Error:', err);
-    return [];
-  }
+  return mapperClient.getUserTags(profileId) as Promise<UserTag[]>;
 }
 
 /**

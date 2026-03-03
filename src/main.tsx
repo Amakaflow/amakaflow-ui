@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import { AppShell } from "./app/AppShell.tsx";
 import { ClerkWrapper } from "./components/ClerkWrapper.tsx";
+import { isDemoMode } from "./lib/demo-mode";
 import "./index.css";
 
 // Initialize Sentry for error tracking (AMA-225)
@@ -28,11 +29,21 @@ if (!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
   console.warn("⚠️ Some features may not work. Set VITE_CLERK_PUBLISHABLE_KEY in .env.local");
 }
 
+async function enableMocking() {
+  if (!isDemoMode) return;
+  const { worker } = await import('./api/mocks/browser');
+  return worker.start({ onUnhandledRequest: 'warn' });
+}
+
 // ClerkWrapper conditionally provides ClerkProvider or just renders App
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ClerkWrapper>
-      <AppShell />
-    </ClerkWrapper>
-  </StrictMode>
-);
+enableMocking()
+  .catch((err) => console.error('[MSW] Failed to start:', err))
+  .then(() => {
+    createRoot(document.getElementById("root")!).render(
+      <StrictMode>
+        <ClerkWrapper>
+          <AppShell />
+        </ClerkWrapper>
+      </StrictMode>
+    );
+  });

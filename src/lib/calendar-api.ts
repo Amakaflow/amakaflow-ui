@@ -1,15 +1,11 @@
+// @migration: Use src/api/clients/calendar.ts for new call sites.
 /**
  * Calendar API client
  * Connects to the calendar-api backend for workout events
  */
 
-import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
-import { isDemoMode } from './demo-mode';
-import { sampleCalendarEvents, mockConnectedCalendars } from './calendar-mock-data';
-
-// Use demo events as-is; they'll be rebased dynamically in getEvents based on the requested date range
-const DEMO_CALENDAR_EVENTS = sampleCalendarEvents;
+import * as calendarClient from '../api/clients/calendar';
 
 // Use centralized API config
 const API_BASE_URL = API_URLS.CALENDAR;
@@ -113,20 +109,6 @@ class CalendarApiClient {
     // No-op: user ID is now extracted from JWT on the backend
   }
 
-  private getHeaders(): HeadersInit {
-    return {
-      'Content-Type': 'application/json',
-    };
-  }
-
-  private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
-    return response.json();
-  }
-
   // ==========================================
   // WORKOUT EVENTS
   // ==========================================
@@ -145,108 +127,27 @@ class CalendarApiClient {
     return date;
   }
 
-  // Helper to rebase demo events to match the requested week
-  private rebaseEventsToWeek(events: WorkoutEvent[], start: string, end: string): WorkoutEvent[] {
-    if (events.length === 0) return events;
-    
-    // Validate input date parameters
-    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
-      throw new Error('Invalid date parameters: start and end must be in YYYY-MM-DD format');
-    }
-    
-    // Parse the requested week start (Sunday) with error handling
-    const requestedStart = this.parseDate(start);
-    
-    // Filter events to ensure they have valid date fields before processing
-    const validEvents = events.filter((e) => e.date && this.isValidDateString(e.date));
-    
-    if (validEvents.length === 0) return [];
-    
-    // Find the earliest date in the demo events (now safe - we filtered empty/invalid dates)
-    const dates = validEvents.map((e) => e.date).sort();
-    const originDate = this.parseDate(dates[0]);
-    
-    // Calculate offset to align demo events to the requested week
-    const offsetMs = requestedStart.getTime() - originDate.getTime();
-    const offsetDays = Math.round(offsetMs / (1000 * 60 * 60 * 24));
-    
-    // Validate offset calculation didn't produce NaN
-    if (isNaN(offsetDays)) {
-      throw new Error('Failed to calculate date offset: invalid date arithmetic');
-    }
-    
-    // Apply offset to all events
-    return validEvents.map((e) => {
-      const d = this.parseDate(e.date);
-      d.setDate(d.getDate() + offsetDays);
-      const rebased = d.toISOString().slice(0, 10);
-      return { ...e, date: rebased };
-    });
-  }
-
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
-    // Validate input date parameters upfront to fail fast
     if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
       throw new Error('Invalid date parameters: start and end must be valid YYYY-MM-DD format date strings');
     }
-
-    if (isDemoMode) {
-      // Filter out any invalid events from demo data and ensure proper typing
-      const validEvents: WorkoutEvent[] = DEMO_CALENDAR_EVENTS.filter(
-        (e): e is WorkoutEvent => e !== null && e !== undefined && typeof e.date === 'string'
-      );
-      // Rebase demo events to match the requested week so calendar shows populated data
-      const rebasedEvents = this.rebaseEventsToWeek(validEvents, start, end);
-      // Filter demo events by the requested date range to match production behavior
-      return rebasedEvents.filter(
-        (event: WorkoutEvent) => event.date >= start && event.date <= end
-      );
-    }
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar?start=${start}&end=${end}`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<WorkoutEvent[]>(response);
+    return calendarClient.getEvents(start, end);
   }
 
   async getEvent(eventId: string): Promise<WorkoutEvent> {
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/${eventId}`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.getEvent(eventId);
   }
 
   async createEvent(event: CreateWorkoutEvent): Promise<WorkoutEvent> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(event),
-    });
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.createEvent(event);
   }
 
   async updateEvent(eventId: string, event: UpdateWorkoutEvent): Promise<WorkoutEvent> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(event),
-    });
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.updateEvent(eventId, event);
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return; }
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
+    return calendarClient.deleteEvent(eventId);
   }
 
   // ==========================================
@@ -254,56 +155,19 @@ class CalendarApiClient {
   // ==========================================
 
   async getConnectedCalendars(): Promise<ConnectedCalendar[]> {
-    if (isDemoMode) return mockConnectedCalendars as any;
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/connected-calendars`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<ConnectedCalendar[]>(response);
+    return calendarClient.getConnectedCalendars();
   }
 
   async createConnectedCalendar(calendar: CreateConnectedCalendar): Promise<ConnectedCalendar> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(calendar),
-    });
-    return this.handleResponse<ConnectedCalendar>(response);
+    return calendarClient.createConnectedCalendar(calendar);
   }
 
   async deleteConnectedCalendar(calendarId: string): Promise<void> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return; }
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars/${calendarId}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
+    return calendarClient.deleteConnectedCalendar(calendarId);
   }
 
-  async syncConnectedCalendar(calendarId: string): Promise<{
-    success: boolean;
-    events_created: number;
-    events_updated: number;
-    total_events: number;
-  }> {
-    if (isDemoMode) { console.log('[demo] calendar write skipped'); return null as any; }
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/connected-calendars/${calendarId}/sync`,
-      {
-        method: 'POST',
-        headers: this.getHeaders(),
-      }
-    );
-    return this.handleResponse<{
-      success: boolean;
-      events_created: number;
-      events_updated: number;
-      total_events: number;
-    }>(response);
+  async syncConnectedCalendar(calendarId: string) {
+    return calendarClient.syncConnectedCalendar(calendarId);
   }
 }
 
