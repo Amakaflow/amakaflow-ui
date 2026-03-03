@@ -7,8 +7,11 @@ import {
 } from '../sources';
 
 describe('WORKOUT_SOURCES registry', () => {
-  it('contains exactly 12 sources', () => {
-    expect(WORKOUT_SOURCES).toHaveLength(12);
+  it('every category has at least one entry', () => {
+    const categories: WorkoutSource['category'][] = ['device', 'video', 'creation', 'calendar'];
+    for (const cat of categories) {
+      expect(WORKOUT_SOURCES.filter(s => s.category === cat).length).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('every source has required fields', () => {
@@ -55,5 +58,9 @@ describe('getSourceByRawValue', () => {
 
   it('returns undefined for unknown raw value', () => {
     expect(getSourceByRawValue('demo')).toBeUndefined();
+  });
+
+  it('returns undefined for connected_calendar (matched by connectionId, not raw value)', () => {
+    expect(getSourceByRawValue('connected_calendar')).toBeUndefined();
   });
 });

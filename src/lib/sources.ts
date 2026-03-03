@@ -5,7 +5,7 @@ export interface WorkoutSource {
   icon: string;            // emoji
   category: 'device' | 'video' | 'creation' | 'calendar';
   requiresConnection: boolean;
-  matchesSources: string[]; // raw `source` field values this entry covers
+  readonly matchesSources: readonly string[]; // raw `source` field values this entry covers
 }
 
 export const WORKOUT_SOURCES: WorkoutSource[] = [
@@ -23,7 +23,7 @@ export const WORKOUT_SOURCES: WorkoutSource[] = [
     id: 'strava',
     label: 'Strava',
     color: 'bg-orange-600',
-    icon: '🏃',
+    icon: '🟧',
     category: 'device',
     requiresConnection: true,
     matchesSources: ['strava'],
@@ -97,11 +97,11 @@ export const WORKOUT_SOURCES: WorkoutSource[] = [
   {
     id: 'runna',
     label: 'Runna',
-    color: 'bg-blue-500',
+    color: 'bg-teal-500',
     icon: '🏃',
     category: 'calendar',
     requiresConnection: true,
-    matchesSources: ['runna', 'connected_calendar'],
+    matchesSources: ['runna'],
   },
   {
     id: 'apple-calendar',
@@ -110,7 +110,7 @@ export const WORKOUT_SOURCES: WorkoutSource[] = [
     icon: '📅',
     category: 'calendar',
     requiresConnection: true,
-    matchesSources: ['apple_calendar', 'connected_calendar'],
+    matchesSources: ['apple_calendar'],
   },
   {
     id: 'google-calendar',
@@ -119,7 +119,7 @@ export const WORKOUT_SOURCES: WorkoutSource[] = [
     icon: '📆',
     category: 'calendar',
     requiresConnection: true,
-    matchesSources: ['google_calendar', 'connected_calendar'],
+    matchesSources: ['google_calendar'],
   },
 ];
 
