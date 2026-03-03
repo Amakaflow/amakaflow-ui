@@ -36,12 +36,14 @@ async function enableMocking() {
 }
 
 // ClerkWrapper conditionally provides ClerkProvider or just renders App
-enableMocking().then(() => {
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <ClerkWrapper>
-        <AppShell />
-      </ClerkWrapper>
-    </StrictMode>
-  );
-});
+enableMocking()
+  .catch((err) => console.error('[MSW] Failed to start:', err))
+  .then(() => {
+    createRoot(document.getElementById("root")!).render(
+      <StrictMode>
+        <ClerkWrapper>
+          <AppShell />
+        </ClerkWrapper>
+      </StrictMode>
+    );
+  });
