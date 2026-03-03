@@ -177,7 +177,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
           </Button>
         )}
 
-        {!hideExport && <Card>
+        {(!hideExport || onSave) && <Card>
           <CardContent className="space-y-4 pt-6">
             <div className="flex gap-2 flex-wrap">
               {isEditingFromHistory ? (
@@ -185,7 +185,7 @@ export function StructureWorkout(props: StructureWorkoutProps) {
               ) : (
                 <>
                   {onSave && <Button onClick={onSave} disabled={loading} variant="ghost" className="gap-2"><Save className="w-4 h-4" />{isCreatingFromScratch ? 'Save Workout' : 'Save Draft'}</Button>}
-                  {onExport && (
+                  {!hideExport && onExport && (
                     <Button onClick={() => onExport(workoutWithIds)} variant="default" className="gap-2">
                       <Upload className="w-4 h-4" />Export
                     </Button>
