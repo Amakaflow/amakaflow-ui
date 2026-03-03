@@ -22,6 +22,8 @@ import { Slider } from './ui/slider';
 import { StreamingWorkflow } from './StreamingWorkflow';
 import { useStreamingPipeline } from '../hooks/useStreamingPipeline';
 import { toast } from 'sonner';
+import { isDemoMode } from '../lib/demo-mode';
+import type { WorkoutStructure } from '../types/workout';
 
 const EQUIPMENT_OPTIONS = [
   'Barbell',
@@ -38,14 +40,16 @@ const EQUIPMENT_OPTIONS = [
 
 interface CreateAIWorkoutProps {
   onNavigate?: (view: 'calendar') => void;
+  onWorkoutGenerated?: (workout: WorkoutStructure) => void;
 }
 
-export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
+export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWorkoutProps) {
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+  const [isDemoGenerating, setIsDemoGenerating] = useState(false);
 
   const pipeline = useStreamingPipeline();
 
@@ -53,6 +57,15 @@ export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
     const trimmed = description.trim();
     if (!trimmed) {
       toast.error('Please describe the workout you want to create.');
+      return;
+    }
+
+    if (isDemoMode && onWorkoutGenerated) {
+      setIsDemoGenerating(true);
+      setTimeout(() => {
+        setIsDemoGenerating(false);
+        onWorkoutGenerated(buildMockWorkout(trimmed, difficulty, durationMinutes, selectedEquipment));
+      }, 1500);
       return;
     }
 
@@ -167,11 +180,11 @@ export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
         {/* Generate button */}
         <Button
           onClick={handleGenerate}
-          disabled={pipeline.isStreaming || !description.trim()}
+          disabled={pipeline.isStreaming || isDemoGenerating || !description.trim()}
           className="w-full gap-2"
         >
           <Sparkles className="w-4 h-4" />
-          {pipeline.isStreaming ? 'Generating...' : 'Generate Workout'}
+          {pipeline.isStreaming || isDemoGenerating ? 'Generating...' : 'Generate Workout'}
         </Button>
       </div>
 
@@ -208,4 +221,53 @@ export function CreateAIWorkout({ onNavigate }: CreateAIWorkoutProps) {
       )}
     </div>
   );
+}
+
+function buildMockWorkout(
+  description: string,
+  difficulty: string,
+  durationMinutes: number,
+  equipment: string[],
+): WorkoutStructure {
+  const title = description.length > 50
+    ? description.slice(0, 50).trim() + '…'
+    : description;
+
+  const numSets = difficulty === 'beginner' ? 3 : difficulty === 'advanced' ? 5 : 4;
+  const restSec = difficulty === 'beginner' ? 90 : difficulty === 'advanced' ? 60 : 75;
+  const eq = equipment.length > 0 ? equipment : ['Bodyweight'];
+
+  const makeExercise = (name: string, reps_range: string) => ({
+    id: `mock-${Math.random().toString(36).slice(2)}`,
+    name,
+    sets: numSets,
+    reps: null,
+    reps_range,
+    duration_sec: null,
+    rest_sec: null,
+    distance_m: null,
+    distance_range: null,
+    type: 'strength' as const,
+  });
+
+  const exercises = [
+    makeExercise(`${eq[0]} Squat`, '10-12'),
+    makeExercise(`${eq[0]} Press`, '8-10'),
+    makeExercise('Plank', `${durationMinutes > 45 ? 60 : 30}s`),
+    makeExercise(`${eq[eq.length - 1]} Row`, '10-12'),
+  ];
+
+  return {
+    title,
+    source: 'ai-generated',
+    blocks: [
+      {
+        label: 'Main Block',
+        structure: 'sets',
+        sets: numSets,
+        rest_between_sets_sec: restSec,
+        exercises,
+      },
+    ],
+  };
 }
