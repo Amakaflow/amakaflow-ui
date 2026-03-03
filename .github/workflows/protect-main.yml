@@ -1,19 +1,23 @@
-name: Protect Main
+name: Protect main branch
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  check-source:
+  check-source-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Require develop, hotfix/*, or sync/* source
+      - name: Verify source branch is develop, hotfix/*, or sync/*
         run: |
-          SOURCE="${{ github.head_ref }}"
-          if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* && "$SOURCE" != sync/* ]]; then
-            echo "::error::PRs to main must come from 'develop', 'hotfix/*', or 'sync/*'. Got: '$SOURCE'"
-            echo "Feature branches must merge into develop first, then develop → main."
+          HEAD="${{ github.head_ref }}"
+          if [[ "$HEAD" == "develop" || "$HEAD" == hotfix/* || "$HEAD" == sync/* ]]; then
+            echo "✅ '$HEAD' is allowed to merge into main."
+          else
+            echo "::error::PRs into main must come from 'develop', 'hotfix/*', or 'sync/*'."
+            echo ""
+            echo "Source branch '$HEAD' is a feature branch."
+            echo "Merge it into 'develop' first, then cut a release from develop → main."
             exit 1
           fi
-          echo "Source branch '$SOURCE' is allowed to merge into main."
