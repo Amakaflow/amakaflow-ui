@@ -1,2 +1,6 @@
-// Handlers are added here as each service is migrated.
-export const handlers: any[] = [];
+import { RequestHandler } from 'msw';
+import { mapperHandlers } from './mapper';
+
+export const handlers: RequestHandler[] = [
+  ...mapperHandlers,
+];
