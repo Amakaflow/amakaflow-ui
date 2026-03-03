@@ -8,29 +8,8 @@ import { API_URLS } from './config';
 import { isDemoMode } from './demo-mode';
 import { sampleCalendarEvents, mockConnectedCalendars } from './calendar-mock-data';
 
-// Rebase demo events to the current week so the calendar shows populated data
-function rebaseDemoEvents(events: typeof sampleCalendarEvents): typeof sampleCalendarEvents {
-  if (events.length === 0) return events;
-  // Find the earliest date in the sample data
-  const dates = events.map((e) => e.date).sort();
-  const originDate = new Date(dates[0] + 'T00:00:00');
-  // Anchor to the most recent Sunday (start of current week)
-  const today = new Date();
-  const daysSinceSunday = today.getDay(); // 0 = Sunday
-  const currentWeekSunday = new Date(today);
-  currentWeekSunday.setDate(today.getDate() - daysSinceSunday);
-  currentWeekSunday.setHours(0, 0, 0, 0);
-  const offsetMs = currentWeekSunday.getTime() - originDate.getTime();
-  const offsetDays = Math.round(offsetMs / (1000 * 60 * 60 * 24));
-  return events.map((e) => {
-    const d = new Date(e.date + 'T00:00:00');
-    d.setDate(d.getDate() + offsetDays);
-    const rebased = d.toISOString().slice(0, 10);
-    return { ...e, date: rebased };
-  });
-}
-
-const DEMO_CALENDAR_EVENTS = rebaseDemoEvents(sampleCalendarEvents);
+// Use demo events as-is; they'll be rebased dynamically in getEvents based on the requested date range
+const DEMO_CALENDAR_EVENTS = sampleCalendarEvents;
 
 // Use centralized API config
 const API_BASE_URL = API_URLS.CALENDAR;
@@ -152,8 +131,77 @@ class CalendarApiClient {
   // WORKOUT EVENTS
   // ==========================================
 
+  // Helper to validate date string is in YYYY-MM-DD format
+  private isValidDateString(dateStr: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  }
+
+  // Helper to parse date string to Date object with validation
+  private parseDate(dateStr: string): Date {
+    const date = new Date(dateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date: ${dateStr}`);
+    }
+    return date;
+  }
+
+  // Helper to rebase demo events to match the requested week
+  private rebaseEventsToWeek(events: WorkoutEvent[], start: string, end: string): WorkoutEvent[] {
+    if (events.length === 0) return events;
+    
+    // Validate input date parameters
+    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
+      throw new Error('Invalid date parameters: start and end must be in YYYY-MM-DD format');
+    }
+    
+    // Parse the requested week start (Sunday) with error handling
+    const requestedStart = this.parseDate(start);
+    
+    // Filter events to ensure they have valid date fields before processing
+    const validEvents = events.filter((e) => e.date && this.isValidDateString(e.date));
+    
+    if (validEvents.length === 0) return [];
+    
+    // Find the earliest date in the demo events (now safe - we filtered empty/invalid dates)
+    const dates = validEvents.map((e) => e.date).sort();
+    const originDate = this.parseDate(dates[0]);
+    
+    // Calculate offset to align demo events to the requested week
+    const offsetMs = requestedStart.getTime() - originDate.getTime();
+    const offsetDays = Math.round(offsetMs / (1000 * 60 * 60 * 24));
+    
+    // Validate offset calculation didn't produce NaN
+    if (isNaN(offsetDays)) {
+      throw new Error('Failed to calculate date offset: invalid date arithmetic');
+    }
+    
+    // Apply offset to all events
+    return validEvents.map((e) => {
+      const d = this.parseDate(e.date);
+      d.setDate(d.getDate() + offsetDays);
+      const rebased = d.toISOString().slice(0, 10);
+      return { ...e, date: rebased };
+    });
+  }
+
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
-    if (isDemoMode) return DEMO_CALENDAR_EVENTS as any;
+    // Validate input date parameters upfront to fail fast
+    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
+      throw new Error('Invalid date parameters: start and end must be valid YYYY-MM-DD format date strings');
+    }
+
+    if (isDemoMode) {
+      // Filter out any invalid events from demo data and ensure proper typing
+      const validEvents: WorkoutEvent[] = DEMO_CALENDAR_EVENTS.filter(
+        (e): e is WorkoutEvent => e !== null && e !== undefined && typeof e.date === 'string'
+      );
+      // Rebase demo events to match the requested week so calendar shows populated data
+      const rebasedEvents = this.rebaseEventsToWeek(validEvents, start, end);
+      // Filter demo events by the requested date range to match production behavior
+      return rebasedEvents.filter(
+        (event: WorkoutEvent) => event.date >= start && event.date <= end
+      );
+    }
     const response = await authenticatedFetch(
       `${this.baseUrl}/calendar?start=${start}&end=${end}`,
       { headers: this.getHeaders() }

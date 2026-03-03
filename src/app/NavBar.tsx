@@ -11,8 +11,6 @@ import {
   Plus,
   Settings,
   Sparkles,
-  TrendingUp,
-  Users,
 } from 'lucide-react';
 import { isDemoMode } from '../lib/demo-mode';
 import type { AppUser } from './useAppAuth';
@@ -121,34 +119,6 @@ export function NavBar({
               >
                 <BarChart3 className="w-4 h-4" />
                 Analytics
-              </Button>
-              <Button
-                variant={currentView === 'exercise-history' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-history"
-                onClick={() => onNavigate('exercise-history')}
-                className="gap-2"
-              >
-                <TrendingUp className="w-4 h-4" />
-                History
-              </Button>
-              <Button
-                variant={currentView === 'volume-analytics' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => onNavigate('volume-analytics')}
-                className="gap-2"
-              >
-                <Activity className="w-4 h-4" />
-                Volume
-              </Button>
-              <Button
-                variant={currentView === 'team' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => onNavigate('team')}
-                className="gap-2"
-              >
-                <Users className="w-4 h-4" />
-                Team
               </Button>
               {stravaConnected && (
                 <Button

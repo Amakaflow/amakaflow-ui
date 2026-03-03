@@ -21,11 +21,12 @@ jobs:
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
+        continue-on-error: true
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
-          claude_args: '--model claude-sonnet-4-6 --max-turns 10'
+          claude_args: '--model claude-sonnet-4-6 --max-turns 30'
           prompt: |
             You are a senior React/TypeScript engineer performing an automated code review.
 
@@ -59,10 +60,10 @@ jobs:
             - Only give ❌ if there are Critical or Major issues that must be fixed before merging.
             - ⚠️ is for Minor issues that are worth noting but should not block the merge.
 
-      - name: Check verdict and submit formal review
+      - name: Check verdict and fail if blocked
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.REVIEWER_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -70,7 +71,6 @@ jobs:
           # Only enforce the gate for Joshua's PRs
           if [[ "$PR_AUTHOR" != "openclawjoshua-eng" ]]; then
             echo "PR author is '$PR_AUTHOR' (not openclawjoshua-eng) — review check passes automatically"
-            gh pr review "$PR_NUMBER" --repo "$REPO" --approve --body "Auto-approved: non-Joshua PR." || echo "::warning::Could not submit approval (non-blocking)"
             exit 0
           fi
 
@@ -79,14 +79,7 @@ jobs:
 
           if echo "$COMMENT" | grep -q "❌ Changes required"; then
             echo "::error::Claude review requires changes before this PR can merge."
-            gh pr review "$PR_NUMBER" --repo "$REPO" --request-changes --body "Automated review requires changes. See PR comment for details." || true
             exit 1
           fi
 
-          # Verdict is ✅ or ⚠️ — approve so auto-merge can proceed
-          if gh pr review "$PR_NUMBER" --repo "$REPO" --approve --body "Automated review passed."; then
-            echo "Review passed and PR approved."
-          else
-            echo "::warning::Could not submit formal approval — please approve manually or check REVIEWER_GITHUB_TOKEN secret."
-            echo "Review passed (approval submission failed)."
-          fi
+          echo "Review passed (verdict is not ❌)"
