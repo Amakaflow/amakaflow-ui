@@ -6,6 +6,7 @@ on:
 
 jobs:
   auto-merge:
+    # Only bot/owner PRs, non-draft
     if: contains(fromJSON('["openclawjoshua-eng","supergeri"]'), github.event.pull_request.user.login) && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     permissions:
@@ -13,7 +14,20 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Skip if PR into main from non-develop/hotfix branch
+        id: gate
+        run: |
+          BASE="${{ github.base_ref }}"
+          HEAD="${{ github.head_ref }}"
+          if [[ "$BASE" == "main" && "$HEAD" != "develop" && "$HEAD" != hotfix/* ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⛔ Not enabling auto-merge: '$HEAD' → main is not allowed (use develop → main for releases)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Enable auto-merge
+        if: steps.gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
