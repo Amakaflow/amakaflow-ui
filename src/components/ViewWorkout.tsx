@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { X, Clock, Watch, Bike, Dumbbell, Copy, Check, Pencil } from 'lucide-react';
+import { X, Clock, Watch, Bike, Dumbbell, Copy, Check, Pencil, History } from 'lucide-react';
 import { WorkoutHistoryItem } from '../lib/workout-history';
 import { Block, Exercise } from '../types/workout';
 import { getStructureDisplayName } from '../lib/workout-utils';
@@ -435,6 +435,27 @@ export function ViewWorkout({ workout, onClose, onEdit }: Props) {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Export History (AMA-904) */}
+          {workout.exported_at && workout.exported_to_device && (
+            <div className="mt-6 pt-4 border-t border-border">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <History className="w-4 h-4" />
+                <span>
+                  Exported to{' '}
+                  <span className="font-medium text-foreground capitalize">
+                    {workout.exported_to_device}
+                  </span>
+                  {' · '}
+                  {new Date(workout.exported_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              </div>
             </div>
           )}
         </div>

@@ -33,6 +33,9 @@ export type WorkoutHistoryItem = {
     android?: SyncStatusEntry;
     garmin?: SyncStatusEntry;
   };
+  // AMA-904: Export tracking fields
+  exported_at?: string;
+  exported_to_device?: string;
 };
 
 const LEGACY_HISTORY_KEY = 'amakaflow_workout_history';
