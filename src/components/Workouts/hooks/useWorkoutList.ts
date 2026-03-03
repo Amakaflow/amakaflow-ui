@@ -157,7 +157,6 @@ export function useWorkoutList({
   const [showMixWizard, setShowMixWizard] = useState(false);
 
   // Activity History state (AMA-196)
-  const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [completions, setCompletions] = useState<WorkoutCompletion[]>([]);
   const [completionsLoading, setCompletionsLoading] = useState(false);
   const [completionsTotal, setCompletionsTotal] = useState(0);
@@ -228,11 +227,7 @@ export function useWorkoutList({
     }
   }, [completions.length, completionsLoading]);
 
-  useEffect(() => {
-    if (showActivityHistory && completions.length === 0) {
-      loadCompletions();
-    }
-  }, [showActivityHistory, completions.length, loadCompletions]);
+  
 
   // When ViewWorkout closes, open the pending edit if one was queued
   useEffect(() => {
@@ -741,8 +736,6 @@ export function useWorkoutList({
     setShowTagManagement,
     showMixWizard,
     setShowMixWizard,
-    showActivityHistory,
-    setShowActivityHistory,
     completions,
     setCompletions,
     completionsLoading,
