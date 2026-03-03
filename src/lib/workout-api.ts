@@ -1,3 +1,4 @@
+// @migration: Use src/api/clients/mapper.ts for new call sites.
 /**
  * Workout API Client
  *

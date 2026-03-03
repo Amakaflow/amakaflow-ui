@@ -1,3 +1,4 @@
+// @migration: Use src/api/clients/calendar.ts for new call sites.
 /**
  * Calendar API client
  * Connects to the calendar-api backend for workout events

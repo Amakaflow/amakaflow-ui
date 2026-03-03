@@ -28,6 +28,71 @@ vi.mock('../authenticated-fetch', () => ({
   createAuthenticatedFetch: vi.fn(),
 }));
 
+// Mock the new typed API clients so demo-mode tests are not broken by the
+// AMA-918 migration. In demo mode the old workout-api / calendar-api used
+// isDemoMode guards; now those guards are gone and the clients are called
+// directly. We mock them here so the tests get the expected demo values.
+vi.mock('../../api/clients/mapper', () => ({
+  getWorkouts: vi.fn(() => Promise.resolve([])),
+  saveWorkout: vi.fn(() => Promise.resolve({
+    id: 'demo-mock-id',
+    profile_id: 'demo-user-1',
+    workout_data: { title: 'Demo', blocks: [] },
+    sources: [],
+    device: 'web',
+    is_exported: false,
+    is_favorite: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })),
+  getWorkout: vi.fn(() => Promise.resolve(null)),
+  deleteWorkout: vi.fn(() => Promise.resolve(true)),
+  updateWorkoutExportStatus: vi.fn(() => Promise.resolve(true)),
+  toggleWorkoutFavorite: vi.fn(() => Promise.resolve(null)),
+  trackWorkoutUsage: vi.fn(() => Promise.resolve(null)),
+  updateWorkoutTags: vi.fn(() => Promise.resolve(null)),
+  getPrograms: vi.fn(() => Promise.resolve([])),
+  getProgram: vi.fn(() => Promise.resolve(null)),
+  createProgram: vi.fn(() => Promise.resolve(null)),
+  updateProgram: vi.fn(() => Promise.resolve(null)),
+  deleteProgram: vi.fn(() => Promise.resolve(false)),
+  getUserTags: vi.fn(() => Promise.resolve([])),
+  createUserTag: vi.fn(() => Promise.resolve(null)),
+  deleteUserTag: vi.fn(() => Promise.resolve(false)),
+}));
+
+vi.mock('../../api/clients/calendar', () => ({
+  getEvents: vi.fn(() => Promise.resolve([
+    {
+      id: 'anchor-long-run-nov23',
+      user_id: 'demo-user-1',
+      title: 'Long Run',
+      source: 'connected_calendar',
+      date: '2024-11-23',
+      status: 'planned',
+      is_anchor: true,
+    },
+  ])),
+  getEvent: vi.fn(() => Promise.resolve(null)),
+  createEvent: vi.fn(() => Promise.resolve(null)),
+  updateEvent: vi.fn(() => Promise.resolve(null)),
+  deleteEvent: vi.fn(() => Promise.resolve()),
+  getConnectedCalendars: vi.fn(() => Promise.resolve([
+    {
+      id: 'conn-cal-runna-1',
+      name: 'Runna – Subscribed',
+      type: 'runna',
+      integration_type: 'ics_url',
+      is_workout_calendar: true,
+      sync_status: 'active',
+      workouts_this_week: 3,
+    },
+  ])),
+  createConnectedCalendar: vi.fn(() => Promise.resolve(null)),
+  deleteConnectedCalendar: vi.fn(() => Promise.resolve()),
+  syncConnectedCalendar: vi.fn(() => Promise.resolve()),
+}));
+
 // Mock config so import.meta.env accesses inside it don't break in test env.
 vi.mock('../config', () => ({
   API_URLS: {
