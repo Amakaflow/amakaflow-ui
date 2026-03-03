@@ -86,6 +86,7 @@ export function WorkflowView({
   });
 
   const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
+  const [exportingWorkouts, setExportingWorkouts] = React.useState<WorkoutStructure[]>([]);
   const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
 
   const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceConfig) => {
@@ -371,20 +372,29 @@ export function WorkflowView({
                   handleInlineExport(workout, device);
                 }
               }}
+              onBatchExport={(items) => {
+                const workouts = items.map(item => normalizeWorkoutStructure(item.workout));
+                setExportingWorkouts(workouts);
+                setExportingWorkout(null);
+                setExportingDevice(null);
+                setCurrentView('export-page');
+              }}
               onNavigate={setCurrentView}
               onAddToCalendar={() => setCurrentView('calendar')}
             />
           </div>
         )}
 
-        {currentView === 'export-page' && exportingWorkout && (
+        {currentView === 'export-page' && (exportingWorkout || exportingWorkouts.length > 0) && (
           <ExportPage
-            initialWorkout={exportingWorkout}
+            initialWorkout={exportingWorkout ?? undefined}
+            initialWorkouts={exportingWorkouts.length > 0 ? exportingWorkouts : undefined}
             initialDevice={exportingDevice ?? undefined}
             devices={getPrimaryExportDestinations()}
             onBack={() => {
               setCurrentView('workouts');
               setExportingWorkout(null);
+              setExportingWorkouts([]);
               setExportingDevice(null);
             }}
           />

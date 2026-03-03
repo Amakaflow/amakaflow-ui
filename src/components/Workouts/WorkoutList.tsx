@@ -114,6 +114,7 @@ export interface WorkoutListProps {
   onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  onBatchExport?: (items: WorkoutHistoryItem[]) => void;
   onNavigate?: (view: string) => void;
 }
 
@@ -187,6 +188,7 @@ export function WorkoutList({
   onBulkDeleteWorkouts,
   onViewProgram,
   onExportWorkout,
+  onBatchExport,
   onNavigate,
 }: WorkoutListProps) {
   const {
@@ -284,8 +286,12 @@ export function WorkoutList({
   });
 
   const handleBatchExport = () => {
-    // Full wiring in Task 6 — this stub will be replaced
-    console.log('Batch export:', selectedIds);
+    if (!onBatchExport) return;
+    const items = allWorkouts
+      .filter(w => selectedIds.includes(w.id) && isHistoryWorkout(w))
+      .map(w => w._original.data as WorkoutHistoryItem);
+    onBatchExport(items);
+    clearSelection();
   };
 
   // Render loading state

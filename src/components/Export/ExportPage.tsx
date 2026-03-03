@@ -39,12 +39,13 @@ const DEMO_UNRESOLVED_MAPPINGS: UnresolvedMapping[] = [
 
 interface ExportPageProps {
   initialWorkout?: WorkoutStructure;
+  initialWorkouts?: WorkoutStructure[];  // new: batch entry
   initialDevice?: DeviceId;
   devices: DeviceConfig[];
   onBack: () => void;
 }
 
-export function ExportPage({ initialWorkout, initialDevice, devices, onBack }: ExportPageProps) {
+export function ExportPage({ initialWorkout, initialWorkouts, initialDevice, devices, onBack }: ExportPageProps) {
   const {
     queue,
     destination,
@@ -68,6 +69,9 @@ export function ExportPage({ initialWorkout, initialDevice, devices, onBack }: E
     initialised.current = true;
     if (initialWorkout) {
       addToQueue(initialWorkout);
+    }
+    if (initialWorkouts && initialWorkouts.length > 0) {
+      initialWorkouts.forEach(w => addToQueue(w));
     }
     if (initialDevice) {
       setDestination(initialDevice);
