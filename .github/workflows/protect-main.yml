@@ -8,11 +8,11 @@ jobs:
   check-source:
     runs-on: ubuntu-latest
     steps:
-      - name: Require develop or hotfix/* source
+      - name: Require develop, hotfix/*, or sync/* source
         run: |
           SOURCE="${{ github.head_ref }}"
-          if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* ]]; then
-            echo "::error::PRs to main must come from 'develop' or 'hotfix/*'. Got: '$SOURCE'"
+          if [[ "$SOURCE" != "develop" && "$SOURCE" != hotfix/* && "$SOURCE" != sync/* ]]; then
+            echo "::error::PRs to main must come from 'develop', 'hotfix/*', or 'sync/*'. Got: '$SOURCE'"
             echo "Feature branches must merge into develop first, then develop → main."
             exit 1
           fi
