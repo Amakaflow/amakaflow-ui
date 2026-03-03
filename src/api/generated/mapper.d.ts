@@ -6,11 +6,12 @@ export interface SavedWorkout {
   profile_id: string;
   workout_data: Record<string, unknown>;
   sources: string[];
-  device: string;
+  device?: string;
   exports?: Record<string, unknown>;
   validation?: Record<string, unknown>;
   title?: string;
   description?: string;
+  is_favorite?: boolean;
   is_exported: boolean;
   exported_at?: string;
   exported_to_device?: string;

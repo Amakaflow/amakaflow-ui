@@ -62,8 +62,12 @@ export const mapperHandlers = [
     return HttpResponse.json({ success: true, workout, message: 'Updated (demo)' });
   }),
 
-  http.patch(`${BASE}/workouts/:id/tags`, () => {
-    return HttpResponse.json({ success: true, workout: null, message: 'Updated (demo)' });
+  http.patch(`${BASE}/workouts/:id/tags`, async ({ request, params }) => {
+    const body = await request.json() as any;
+    const all = mockHistoryToSaved();
+    const base = all.find(w => w.id === params.id) || (all[0] ?? null);
+    const workout = base ? { ...base, id: params.id as string } : null;
+    return HttpResponse.json({ success: true, workout, message: 'Updated (demo)' });
   }),
 
   http.get(`${BASE}/programs`, () => {
@@ -89,7 +93,20 @@ export const mapperHandlers = [
 
   http.patch(`${BASE}/programs/:id`, async ({ request, params }) => {
     const body = await request.json() as any;
-    return HttpResponse.json({ success: true, program: { id: params.id, ...body }, message: 'Updated (demo)' });
+    const program: WorkoutProgram = {
+      id: params.id as string,
+      profile_id: 'demo-user-1',
+      name: body.name || 'Demo Program',
+      description: body.description,
+      color: body.color,
+      icon: body.icon,
+      current_day_index: body.current_day_index ?? 0,
+      is_active: body.is_active ?? true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      members: body.members,
+    };
+    return HttpResponse.json({ success: true, program, message: 'Updated (demo)' });
   }),
 
   http.delete(`${BASE}/programs/:id`, () => {
