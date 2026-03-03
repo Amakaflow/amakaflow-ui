@@ -33,7 +33,11 @@ import {
   Shuffle,
   Upload,
   CalendarDays,
+  CheckSquare,
+  Square,
+  Check,
 } from 'lucide-react';
+import { cn } from '../ui/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -361,24 +365,38 @@ export function WorkoutList({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isAllSelected}
-              onChange={toggleSelectAll}
-              aria-label="Select all workouts"
-              className="w-4 h-4"
-              data-testid="select-all-checkbox"
-            />
+            {selectModeActive && (
+              <>
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all workouts"
+                  className="w-4 h-4"
+                  data-testid="select-all-checkbox"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => handleBulkDeleteClick(selectedIds)}
+                  className="gap-2"
+                  data-testid="bulk-delete-button"
+                >
+                  Delete selected ({selectedIds.length})
+                </Button>
+              </>
+            )}
             <Button
-              type="button"
-              variant="outline"
+              variant={selectModeActive ? 'default' : 'outline'}
               size="sm"
-              disabled={selectedIds.length === 0}
-              onClick={() => handleBulkDeleteClick(selectedIds)}
-              className="gap-2"
-              data-testid="bulk-delete-button"
+              onClick={toggleSelectMode}
+              className="gap-1.5"
+              data-testid="select-mode-toggle"
             >
-              Delete selected ({selectedIds.length})
+              {selectModeActive ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {selectModeActive ? 'Done' : 'Select'}
             </Button>
             <Button
               variant={viewMode === 'cards' ? 'default' : 'outline'}
@@ -509,14 +527,16 @@ export function WorkoutList({
                         selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40' : ''
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(workout.id)}
-                        onChange={() => toggleSelect(workout.id)}
-                        aria-label="Select workout"
-                        className="w-4 h-4 flex-shrink-0"
-                        data-testid={`workout-checkbox-${workout.id}`}
-                      />
+                      {selectModeActive && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(workout.id)}
+                          onChange={() => toggleSelect(workout.id)}
+                          aria-label="Select workout"
+                          className="w-4 h-4 flex-shrink-0"
+                          data-testid={`workout-checkbox-${workout.id}`}
+                        />
+                      )}
                       {/* Thumbnail for video workouts */}
                       {isVideo && workout.thumbnailUrl && (
                         <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
@@ -717,8 +737,28 @@ export function WorkoutList({
 
                 // Card view
                 return (
+                  <div key={workout.id} className="relative">
+                    {selectModeActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectId(workout.id);
+                        }}
+                        className="absolute top-3 left-3 z-10"
+                        aria-label={selectedIds.includes(workout.id) ? 'Deselect workout' : 'Select workout'}
+                        data-testid={`workout-checkbox-${workout.id}`}
+                      >
+                        <div className={cn(
+                          'w-5 h-5 rounded border-2 flex items-center justify-center bg-background',
+                          selectedIds.includes(workout.id)
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground'
+                        )}>
+                          {selectedIds.includes(workout.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                        </div>
+                      </button>
+                    )}
                   <Card
-                    key={workout.id}
                     data-testid={`workout-item-${workout.id}`}
                     className={`hover:shadow-md transition-all border-border/50 bg-card ${
                       selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40 shadow-sm' : ''
@@ -726,14 +766,7 @@ export function WorkoutList({
                   >
                     <CardHeader className="pb-3 px-4 pt-4">
                       <div className="flex items-start justify-between gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(workout.id)}
-                          onChange={() => toggleSelect(workout.id)}
-                          aria-label="Select workout"
-                          className="w-4 h-4 flex-shrink-0 mt-1"
-                          data-testid={`workout-checkbox-${workout.id}`}
-                        />
+                        {/* inline checkbox replaced by overlay button in select mode */}
                         {/* Thumbnail for video workouts */}
                         {isVideo && workout.thumbnailUrl && (
                           <div className="w-24 h-16 rounded overflow-hidden flex-shrink-0 bg-muted">
@@ -992,6 +1025,7 @@ export function WorkoutList({
                       </div>
                     </CardContent>
                   </Card>
+                  </div>
                 );
               })}
             </div>
