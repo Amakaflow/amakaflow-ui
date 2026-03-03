@@ -1,3 +1,5 @@
+// @migration: Use src/api/clients/ingestor.ts for new call sites.
+// normalizeWorkoutStructure is re-exported from there too.
 import { WorkoutStructure, SourceType, Block, Superset, Exercise, BulkWorkoutResponse } from '../types/workout';
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
@@ -301,6 +303,7 @@ async function apiCall<T>(
 
 /**
  * Generate workout structure from sources
+ * @deprecated Use src/api/clients/ingestor.ts#generateWorkoutStructure for new call sites.
  */
 export async function generateWorkoutStructure(
   sources: Array<{ type: SourceType; content: string }>,
@@ -518,6 +521,7 @@ const HEALTH_CHECK_CACHE_DURATION = 5000;
 
 /**
  * Create an empty workout structure via API
+ * @deprecated Use src/api/clients/ingestor.ts#createEmptyWorkout for new call sites.
  */
 export async function createEmptyWorkout(): Promise<WorkoutStructure> {
   try {

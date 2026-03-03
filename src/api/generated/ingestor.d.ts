@@ -1,0 +1,37 @@
+// @generated — do not edit. Run npm run generate:types:ingestor to regenerate.
+
+export interface WorkoutStructureResponse {
+  title?: string;
+  source?: string;
+  blocks: Block[];
+  workout_type?: string;
+  workout_type_confidence?: number;
+}
+
+interface Block {
+  label?: string;
+  structure?: string | null;
+  exercises: Exercise[];
+  supersets?: Superset[];
+  sets?: number | null;
+  rounds?: number | null;
+  rest_between_sets_sec?: number | null;
+  rest_between_rounds_sec?: number | null;
+  time_cap_sec?: number | null;
+}
+
+interface Exercise {
+  name: string;
+  sets?: number | null;
+  reps?: number | null;
+  reps_range?: string | null;
+  duration_sec?: number | null;
+  rest_sec?: number | null;
+  distance_m?: number | null;
+  type?: string;
+}
+
+interface Superset {
+  exercises: Exercise[];
+  rest_between_sec?: number | null;
+}
