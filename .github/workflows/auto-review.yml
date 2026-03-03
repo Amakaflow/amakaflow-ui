@@ -21,11 +21,12 @@ jobs:
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
+        continue-on-error: true
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
-          claude_args: '--model claude-sonnet-4-6 --max-turns 10'
+          claude_args: '--model claude-sonnet-4-6 --max-turns 30'
           prompt: |
             You are a senior React/TypeScript engineer performing an automated code review.
 
