@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Sparkles, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
+import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import {
@@ -38,12 +39,22 @@ const EQUIPMENT_OPTIONS = [
   'Medicine Ball',
 ];
 
+const PRESET_PROMPTS = [
+  'Push Day',
+  'Pull Day',
+  'Leg Day',
+  'Full Body',
+  '30-min HIIT',
+  'Core & Abs',
+];
+
 interface CreateAIWorkoutProps {
   onNavigate?: (view: 'calendar') => void;
   onWorkoutGenerated?: (workout: WorkoutStructure) => void;
 }
 
 export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWorkoutProps) {
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
@@ -52,6 +63,7 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
   const [isDemoGenerating, setIsDemoGenerating] = useState(false);
 
   const pipeline = useStreamingPipeline();
+  const isDisabled = pipeline.isStreaming || isDemoGenerating;
 
   const handleGenerate = () => {
     const trimmed = description.trim();
@@ -64,12 +76,13 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
       setIsDemoGenerating(true);
       setTimeout(() => {
         setIsDemoGenerating(false);
-        onWorkoutGenerated(buildMockWorkout(trimmed, difficulty, durationMinutes, selectedEquipment));
+        onWorkoutGenerated(buildMockWorkout(title.trim() || trimmed, difficulty, durationMinutes, selectedEquipment));
       }, 1500);
       return;
     }
 
     const body: Record<string, unknown> = { description: trimmed };
+    if (title.trim()) body.title = title.trim();
     if (difficulty) body.difficulty = difficulty;
     if (durationMinutes) body.duration_minutes = durationMinutes;
     if (selectedEquipment.length > 0) body.equipment = selectedEquipment;
@@ -82,14 +95,7 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
   };
 
   const handleSave = () => {
-    // For now, just show the "Add to Calendar" option after saving
-    // The actual save endpoint is part of Phase B.2
     setSaved(true);
-  };
-
-  const handleAddToCalendar = () => {
-    // Navigate to calendar view - the parent component handles this
-    onNavigate?.('calendar');
   };
 
   const toggleEquipment = (item: string) => {
@@ -112,16 +118,41 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
 
       {/* Input form */}
       <div className="space-y-4 rounded-lg border bg-card p-4">
+        {/* Title */}
+        <div className="space-y-2">
+          <Label htmlFor="workout-title">Workout Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Input
+            id="workout-title"
+            placeholder="e.g., Monday Push Day"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={isDisabled}
+          />
+        </div>
+
         {/* Description */}
         <div className="space-y-2">
-          <Label htmlFor="workout-description">Workout Description</Label>
+          <Label htmlFor="workout-description">Describe Your Workout</Label>
+          {/* Preset prompts */}
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {PRESET_PROMPTS.map((preset) => (
+              <Badge
+                key={preset}
+                variant={description === preset ? 'default' : 'outline'}
+                className="cursor-pointer select-none"
+                onClick={() => !isDisabled && setDescription(preset)}
+              >
+                {preset}
+              </Badge>
+            ))}
+          </div>
           <Textarea
             id="workout-description"
             placeholder="e.g., Push day focusing on chest and shoulders, 4 exercises, intermediate level..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            disabled={pipeline.isStreaming}
+            disabled={isDisabled}
           />
         </div>
 
@@ -131,7 +162,7 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
           <Select
             value={difficulty}
             onValueChange={setDifficulty}
-            disabled={pipeline.isStreaming}
+            disabled={isDisabled}
           >
             <SelectTrigger>
               <SelectValue placeholder="Any difficulty" />
@@ -156,20 +187,20 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
             min={10}
             max={120}
             step={5}
-            disabled={pipeline.isStreaming}
+            disabled={isDisabled}
           />
         </div>
 
         {/* Equipment multi-select */}
         <div className="space-y-2">
-          <Label>Equipment (optional)</Label>
+          <Label>Equipment <span className="text-muted-foreground font-normal">(optional)</span></Label>
           <div className="flex flex-wrap gap-1.5">
             {EQUIPMENT_OPTIONS.map((item) => (
               <Badge
                 key={item}
                 variant={selectedEquipment.includes(item) ? 'default' : 'outline'}
                 className="cursor-pointer select-none"
-                onClick={() => !pipeline.isStreaming && toggleEquipment(item)}
+                onClick={() => !isDisabled && toggleEquipment(item)}
               >
                 {item}
               </Badge>
@@ -180,11 +211,11 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
         {/* Generate button */}
         <Button
           onClick={handleGenerate}
-          disabled={pipeline.isStreaming || isDemoGenerating || !description.trim()}
+          disabled={isDisabled || !description.trim()}
           className="w-full gap-2"
         >
           <Sparkles className="w-4 h-4" />
-          {pipeline.isStreaming || isDemoGenerating ? 'Generating...' : 'Generate Workout'}
+          {isDisabled ? 'Generating...' : 'Generate Workout'}
         </Button>
       </div>
 
@@ -224,14 +255,14 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
 }
 
 function buildMockWorkout(
-  description: string,
+  titleOrDescription: string,
   difficulty: string,
   durationMinutes: number,
   equipment: string[],
 ): WorkoutStructure {
-  const title = description.length > 50
-    ? description.slice(0, 50).trim() + '…'
-    : description;
+  const title = titleOrDescription.length > 50
+    ? titleOrDescription.slice(0, 50).trim() + '…'
+    : titleOrDescription;
 
   const numSets = difficulty === 'beginner' ? 3 : difficulty === 'advanced' ? 5 : 4;
   const restSec = difficulty === 'beginner' ? 90 : difficulty === 'advanced' ? 60 : 75;
