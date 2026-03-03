@@ -45,7 +45,7 @@ export interface SaveWorkoutRequest {
   profile_id: string;
   workout_data: any;
   sources: string[];
-  device: string;
+  device?: string;
   exports?: any;
   validation?: any;
   title?: string;
@@ -112,11 +112,12 @@ export async function saveWorkoutToAPI(request: SaveWorkoutRequest): Promise<Sav
     console.log('[demo] saveWorkoutToAPI skipped');
     return { id: 'demo-' + Date.now(), ...requestWithTags, workout_data: request.workout_data, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_exported: false, profile_id: 'demo-user-1' } as any;
   }
+  const body = { ...requestWithTags, device: request.device ?? 'web' };
   const response = await workoutApiCall<{ success: boolean; workout_id: string; message: string }>(
     '/workouts/save',
     {
       method: 'POST',
-      body: JSON.stringify(requestWithTags),
+      body: JSON.stringify(body),
     }
   );
 

@@ -354,7 +354,7 @@ export function useWorkflowGeneration({
           profile_id: profileId,
           workout_data: normalized,
           sources: [w.source || pinterestBulkModal.sourceUrl],
-          device: selectedDevice,
+          // device omitted — defaults to 'web' in saveWorkoutToAPI
           title: w.title,
         });
       } catch (error) {
