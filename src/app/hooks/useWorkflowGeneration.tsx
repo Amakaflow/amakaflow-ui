@@ -8,6 +8,7 @@ import {
 } from '../../lib/api';
 import { generateWorkoutStructure as generateWorkoutStructureMock } from '../../lib/mock-api';
 import { applyWorkoutTypeDefaults } from '../../lib/workoutTypeDefaults';
+import { isDemoMode } from '../../lib/demo-mode';
 import type { WorkoutStructure, WorkoutType } from '../../types/workout';
 import type { Source } from '../../components/AddSources';
 import type { View } from '../router';
@@ -93,8 +94,9 @@ export function useWorkflowGeneration({
   });
   const [buildTimestamp] = useState(() => new Date().toISOString());
 
-  // Check API availability on mount
+  // Check API availability on mount (skip in demo mode)
   useEffect(() => {
+    if (isDemoMode) { setApiAvailable(true); return; }
     let mounted = true;
     const checkHealth = async () => {
       try {
