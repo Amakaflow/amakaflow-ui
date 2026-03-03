@@ -110,6 +110,7 @@ export interface WorkoutListProps {
   onViewProgram?: (programId: string) => void;
   onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
   onNavigate?: (view: string) => void;
+  onAddToCalendar?: (workout: WorkoutHistoryItem) => void;
 }
 
 // =============================================================================
@@ -183,6 +184,7 @@ export function WorkoutList({
   onViewProgram,
   onExportWorkout,
   onNavigate,
+  onAddToCalendar,
 }: WorkoutListProps) {
   const {
     // State values
