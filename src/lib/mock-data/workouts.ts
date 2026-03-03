@@ -5,7 +5,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-1',
     workout: {
       title: 'Hyrox Session',
-      source: 'demo',
+      source: 'garmin',
       workout_type: 'hiit',
       workout_type_confidence: 0.95,
       blocks: [
@@ -89,7 +89,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['garmin'],
     device: 'garmin',
     createdAt: '2026-02-20T08:30:00Z',
     updatedAt: '2026-02-20T09:45:00Z',
@@ -100,7 +100,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-2',
     workout: {
       title: 'Upper Body Strength',
-      source: 'demo',
+      source: 'ai',
       workout_type: 'strength',
       workout_type_confidence: 0.98,
       blocks: [
@@ -174,7 +174,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['ai'],
     device: 'apple',
     createdAt: '2026-02-22T10:00:00Z',
     updatedAt: '2026-02-22T11:10:00Z',
@@ -184,7 +184,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-3',
     workout: {
       title: 'Lower Body Power',
-      source: 'demo',
+      source: 'garmin',
       workout_type: 'strength',
       workout_type_confidence: 0.97,
       blocks: [
@@ -268,7 +268,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['garmin'],
     device: 'garmin',
     createdAt: '2026-02-18T07:00:00Z',
     updatedAt: '2026-02-18T08:20:00Z',
@@ -279,7 +279,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-4',
     workout: {
       title: 'Morning Run',
-      source: 'demo',
+      source: 'strava',
       workout_type: 'cardio',
       workout_type_confidence: 0.99,
       blocks: [
@@ -304,7 +304,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['strava'],
     device: 'garmin',
     createdAt: '2026-02-17T06:15:00Z',
     updatedAt: '2026-02-17T07:00:00Z',
@@ -315,7 +315,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-5',
     workout: {
       title: 'Push Day — PPL',
-      source: 'demo',
+      source: 'ai',
       workout_type: 'strength',
       workout_type_confidence: 0.96,
       blocks: [
@@ -399,7 +399,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['ai'],
     device: 'apple',
     createdAt: '2026-02-15T09:30:00Z',
     updatedAt: '2026-02-15T10:45:00Z',
@@ -409,7 +409,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-6',
     workout: {
       title: 'Pull Day — PPL',
-      source: 'demo',
+      source: 'ai',
       workout_type: 'strength',
       workout_type_confidence: 0.97,
       blocks: [
@@ -481,7 +481,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['ai'],
     device: 'apple',
     createdAt: '2026-02-13T10:00:00Z',
     updatedAt: '2026-02-13T11:15:00Z',
@@ -491,7 +491,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-7',
     workout: {
       title: 'HIIT Cardio Blast',
-      source: 'demo',
+      source: 'youtube',
       workout_type: 'hiit',
       workout_type_confidence: 0.93,
       blocks: [
@@ -531,7 +531,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['youtube'],
     device: 'garmin',
     createdAt: '2026-02-11T07:30:00Z',
     updatedAt: '2026-02-11T08:15:00Z',
@@ -542,7 +542,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-8',
     workout: {
       title: 'Leg Day — PPL',
-      source: 'demo',
+      source: 'manual',
       workout_type: 'strength',
       workout_type_confidence: 0.98,
       blocks: [
@@ -602,7 +602,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['manual'],
     device: 'apple',
     createdAt: '2026-02-08T09:00:00Z',
     updatedAt: '2026-02-08T10:20:00Z',
@@ -612,7 +612,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-9',
     workout: {
       title: 'Zone 2 Bike Ride',
-      source: 'demo',
+      source: 'strava',
       workout_type: 'cardio',
       workout_type_confidence: 0.99,
       blocks: [
@@ -638,7 +638,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['strava'],
     device: 'garmin',
     createdAt: '2026-02-06T06:00:00Z',
     updatedAt: '2026-02-06T07:05:00Z',
@@ -649,7 +649,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     id: 'mock-workout-10',
     workout: {
       title: 'Full Body Conditioning',
-      source: 'demo',
+      source: 'instagram',
       workout_type: 'strength',
       workout_type_confidence: 0.91,
       blocks: [
@@ -732,7 +732,7 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
         },
       ],
     },
-    sources: ['demo'],
+    sources: ['instagram'],
     device: 'apple',
     createdAt: '2026-02-04T08:30:00Z',
     updatedAt: '2026-02-04T09:45:00Z',
