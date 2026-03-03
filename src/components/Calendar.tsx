@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
@@ -36,17 +36,11 @@ import { ConnectedCalendarsModal } from './calendar/ConnectedCalendarsModal';
 import { GymEventModal } from './calendar/GymEventModal';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isSameDay, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useCalendarEvents, useConnectedCalendars } from '../hooks/useCalendarApi';
+import { useWorkoutSources } from '../hooks/useWorkoutSources';
 import { toast } from 'sonner';
 
 type ViewMode = 'week' | 'month' | 'list';
 
-// Base workout source filters (non-connected calendars)
-const BASE_WORKOUT_FILTERS = [
-  { id: 'amaka', label: 'AmakaFlow', color: 'bg-purple-500', sources: ['amaka'], subscribed: false },
-  { id: 'class', label: 'Fitness Classes (Gym)', color: 'bg-green-500', sources: ['gym_class', 'gym_manual_sync'], subscribed: false },
-  { id: 'garmin', label: 'Garmin', color: 'bg-orange-500', sources: ['garmin'], subscribed: false },
-  { id: 'instagram', label: 'Social Media', color: 'bg-pink-500', sources: ['instagram', 'tiktok'], subscribed: false },
-];
 
 interface CalendarProps {
   userId: string;
@@ -107,33 +101,14 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
     syncCalendar
   } = useConnectedCalendars({ userId });
 
-  // Build dynamic workout filters from base filters + connected calendars
-  const connectedCalendarFilters = useMemo(() => 
-    (connectedCalendars || [])
-      .filter(cal => cal.is_workout_calendar)
-      .map(cal => ({
-        id: `connected-${cal.id}`,
-        label: cal.name,
-        color: cal.type === 'runna' ? 'bg-blue-500' : cal.type === 'apple' ? 'bg-gray-500' : 'bg-indigo-500',
-        sources: ['connected_calendar'],
-        connectedCalendarId: cal.id,
-        subscribed: true,
-        isConnectedCalendar: true
-      })),
-    [connectedCalendars]
-  );
-
-  const WORKOUT_FILTERS = useMemo(() => 
-    [...BASE_WORKOUT_FILTERS, ...connectedCalendarFilters],
-    [connectedCalendarFilters]
-  );
+  const workoutSources = useWorkoutSources({ userId });
 
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  // Initialize active filters when WORKOUT_FILTERS changes
+  // Initialize active filters when workoutSources changes
   useEffect(() => {
-    setActiveFilters(WORKOUT_FILTERS.map(f => f.id));
-  }, [WORKOUT_FILTERS]);
+    setActiveFilters(workoutSources.map(s => s.id));
+  }, [workoutSources]);
 
   // Force close dropdown when dialog opens
   useEffect(() => {
@@ -265,6 +240,18 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   // Cast events to CalendarEvent type for compatibility
   const typedEvents = events as unknown as CalendarEvent[];
 
+  const filteredEvents = typedEvents.filter(event => {
+    if (activeFilters.length === 0) return true;
+    return workoutSources
+      .filter(s => activeFilters.includes(s.id))
+      .some(s => {
+        if (s.connectionId) {
+          return event.source === 'connected_calendar' && event.connected_calendar_id === s.connectionId;
+        }
+        return s.matchesSources.includes(event.source);
+      });
+  });
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Sidebar */}
@@ -313,35 +300,49 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="space-y-2">
-                  {WORKOUT_FILTERS.map(filter => {
-                    const isActive = activeFilters.includes(filter.id);
-                    const filterEvents = typedEvents.filter(e => {
-                      if ((filter as any).isConnectedCalendar) {
-                        return e.source === 'connected_calendar' && e.connected_calendar_id === (filter as any).connectedCalendarId;
+                  {workoutSources.map(source => {
+                    const isActive = activeFilters.includes(source.id);
+                    const eventCount = typedEvents.filter(e => {
+                      if (source.connectionId) {
+                        return e.source === 'connected_calendar' && e.connected_calendar_id === source.connectionId;
                       }
-                      return filter.sources.includes(e.source);
-                    });
-                    
+                      return source.matchesSources.includes(e.source);
+                    }).length;
+
                     return (
-                      <div key={filter.id} className="flex items-center gap-2">
+                      <div key={source.id} className="flex items-center gap-2">
                         <Checkbox
-                          id={filter.id}
+                          id={source.id}
                           checked={isActive}
                           onCheckedChange={(checked) => {
-                            if (checked) setActiveFilters([...activeFilters, filter.id]);
-                            else setActiveFilters(activeFilters.filter(f => f !== filter.id));
+                            if (checked) setActiveFilters([...activeFilters, source.id]);
+                            else setActiveFilters(activeFilters.filter(f => f !== source.id));
                           }}
                         />
-                        <label htmlFor={filter.id} className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
-                          <div className={`w-3 h-3 rounded-full ${filter.color}`} />
+                        <label htmlFor={source.id} className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
+                          <div className={`w-3 h-3 rounded-full ${source.color}`} />
                           <span className="flex items-center gap-1">
-                            {filter.label}
-                            {filter.subscribed && <LinkIcon className="w-3 h-3 text-blue-600" />}
+                            {source.icon} {source.label}
+                            {source.connectionId && <LinkIcon className="w-3 h-3 text-blue-600" />}
                           </span>
-                          <span className="text-xs text-muted-foreground ml-auto">{filterEvents.length}</span>
+                          {source.isConnected ? (
+                            <span className="text-xs text-muted-foreground ml-auto">{eventCount}</span>
+                          ) : (
+                            <span
+                              className="text-xs text-blue-500 ml-auto cursor-pointer hover:underline"
+                              onClick={() => setShowConnectedCalendars(true)}
+                            >
+                              Connect
+                            </span>
+                          )}
                         </label>
-                        {(filter as any).isConnectedCalendar && (
-                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setShowConnectedCalendars(true)}>
+                        {source.connectionId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setShowConnectedCalendars(true)}
+                          >
                             <Settings className="w-3 h-3" />
                           </Button>
                         )}
@@ -404,13 +405,13 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
 
         <div className="flex-1 overflow-hidden">
           {viewMode === 'week' && (
-            <WeekView weekStart={weekStart} events={typedEvents} selectedDate={selectedDate} onEventClick={handleEventClick} onTimeSlotClick={handleCreateEvent} loading={loading} />
+            <WeekView weekStart={weekStart} events={filteredEvents} selectedDate={selectedDate} onEventClick={handleEventClick} onTimeSlotClick={handleCreateEvent} loading={loading} />
           )}
           {viewMode === 'month' && (
-            <MonthView currentDate={currentDate} events={typedEvents} onEventClick={handleEventClick} onDateClick={handleDateSelect} onCreateEvent={handleCreateEvent} />
+            <MonthView currentDate={currentDate} events={filteredEvents} onEventClick={handleEventClick} onDateClick={handleDateSelect} onCreateEvent={handleCreateEvent} />
           )}
           {viewMode === 'list' && (
-            <ListView events={typedEvents} onEventClick={handleEventClick} />
+            <ListView events={filteredEvents} onEventClick={handleEventClick} />
           )}
         </div>
       </div>
