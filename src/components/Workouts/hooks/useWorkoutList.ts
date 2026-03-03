@@ -359,13 +359,6 @@ export function useWorkoutList({
   const pageStart = currentPageIndex * PAGE_SIZE;
   const displayedWorkouts = filteredWorkouts.slice(pageStart, pageStart + PAGE_SIZE);
 
-  // Selection handlers
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   const isAllSelected =
     displayedWorkouts.length > 0 &&
     displayedWorkouts.every((w) => selectedIds.includes(w.id));
@@ -551,7 +544,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -599,7 +592,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -717,7 +710,7 @@ export function useWorkoutList({
           ],
         },
         sources: [followAlong.sourceUrl],
-        device: 'garmin',
+        device: 'web',
         createdAt: followAlong.createdAt,
         updatedAt: followAlong.updatedAt,
       };
@@ -798,7 +791,6 @@ export function useWorkoutList({
     loadTags,
     loadCompletions,
     loadMoreCompletions,
-    toggleSelect,
     toggleSelectAll,
     toggleSelectMode,
     toggleSelectId,

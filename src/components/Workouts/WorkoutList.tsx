@@ -290,7 +290,6 @@ export function WorkoutList({
     loadTags,
     loadCompletions,
     loadMoreCompletions,
-    toggleSelect,
     toggleSelectAll,
     toggleSelectMode,
     toggleSelectId,
@@ -617,7 +616,7 @@ export function WorkoutList({
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(workout.id)}
-                          onChange={() => toggleSelect(workout.id)}
+                          onChange={() => toggleSelectId(workout.id)}
                           aria-label="Select workout"
                           className="w-4 h-4 flex-shrink-0"
                           data-testid={`workout-checkbox-${workout.id}`}

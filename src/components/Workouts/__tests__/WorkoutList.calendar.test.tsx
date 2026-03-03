@@ -65,7 +65,7 @@ const createMockUseWorkoutList = (workouts: any[]) => ({
   loadWorkouts: vi.fn(),
   loadTags: vi.fn(),
   loadMoreCompletions: vi.fn(),
-  toggleSelect: vi.fn(),
+  toggleSelectId: vi.fn(),
   toggleSelectAll: vi.fn(),
   handleBulkDeleteClick: vi.fn(),
   confirmBulkDelete: vi.fn(),

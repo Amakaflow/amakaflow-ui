@@ -125,7 +125,7 @@ vi.mock('../hooks/useWorkoutList', () => ({
     selectedIds: [],
     showDeleteModal: false,
     loadWorkouts: vi.fn(),
-    toggleSelect: vi.fn(),
+    toggleSelectId: vi.fn(),
     toggleSelectAll: vi.fn(),
     handleBulkDeleteClick: vi.fn(),
     confirmBulkDelete: vi.fn(),
