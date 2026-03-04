@@ -1,5 +1,5 @@
 import { cn } from '../../../components/ui/utils';
-import type { PipelineStep } from '../store/runTypes';
+import type { PipelineStep, StepStatus } from '../store/runTypes';
 
 interface StepCardProps {
   step: PipelineStep;
@@ -7,7 +7,7 @@ interface StepCardProps {
   onClick: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<StepStatus, string> = {
   pending: 'border-muted-foreground/20 bg-muted/30',
   running: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 animate-pulse',
   success: 'border-green-400 bg-green-50 dark:bg-green-950/20',
@@ -16,7 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
   paused: 'border-blue-400 bg-blue-50 dark:bg-blue-950/20',
 };
 
-const STATUS_ICON: Record<string, string> = {
+const STATUS_ICON: Record<StepStatus, string> = {
   pending: '○',
   running: '●',
   success: '✓',
@@ -34,13 +34,13 @@ export function StepCard({ step, isSelected, onClick }: StepCardProps) {
       onClick={onClick}
       className={cn(
         'w-full text-left border rounded-md p-3 transition-colors',
-        STATUS_COLORS[step.status] ?? 'border-muted',
+        STATUS_COLORS[step.status],
         isSelected && 'ring-2 ring-primary ring-offset-1',
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-mono">{STATUS_ICON[step.status] ?? '?'}</span>
+          <span className="text-sm font-mono">{STATUS_ICON[step.status]}</span>
           <span className="text-sm font-medium">{step.label}</span>
           <span className="text-xs text-muted-foreground">{step.service}</span>
         </div>

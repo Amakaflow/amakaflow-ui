@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { RunHistory } from '../RunHistory';
 import { ServiceHealth } from '../ServiceHealth';
 import { StepCard } from '../StepCard';
@@ -141,6 +141,17 @@ describe('StepCard', () => {
     screen.getByText('Ingest').closest('button')?.click();
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it('shows error text for failed steps', () => {
+    render(
+      <StepCard
+        step={makeStep({ status: 'failed', error: 'Connection refused' })}
+        isSelected={false}
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Connection refused')).toBeTruthy();
+  });
 });
 
 describe('StepDetail', () => {
@@ -158,5 +169,39 @@ describe('StepDetail', () => {
   it('shows response status code', () => {
     render(<StepDetail step={makeStep({ response: { status: 200, body: { title: 'Test' } } })} />);
     expect(screen.getByText('200')).toBeTruthy();
+  });
+
+  it('shows schema errors when schema tab active', async () => {
+    const step = makeStep({
+      schemaValidation: { passed: false, errors: [{ path: 'title', message: 'Required' }] },
+    });
+    const { getByText } = render(<StepDetail step={step} />);
+    getByText('schema').click(); // click the Schema tab
+    await waitFor(() => {
+      expect(screen.getByText('title')).toBeTruthy();
+      expect(screen.getByText('Required')).toBeTruthy();
+    });
+  });
+
+  it('audit tab shows effective output when edited', async () => {
+    const step = makeStep({
+      edited: true,
+      apiOutput: { raw: true },
+      effectiveOutput: { edited: true },
+    });
+    const { getByText } = render(<StepDetail step={step} />);
+    getByText('audit').click();
+    await waitFor(() => {
+      expect(screen.getByText(/"raw": true/)).toBeTruthy();
+      expect(screen.getByText(/"edited": true/)).toBeTruthy();
+    });
+  });
+
+  it('audit tab shows "not edited" message when unedited', async () => {
+    const { getByText } = render(<StepDetail step={makeStep()} />);
+    getByText('audit').click();
+    await waitFor(() => {
+      expect(screen.getByText(/not edited/i)).toBeTruthy();
+    });
   });
 });

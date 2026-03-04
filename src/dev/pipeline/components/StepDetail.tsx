@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '../../../components/ui/utils';
 import type { PipelineStep } from '../store/runTypes';
 
@@ -18,6 +18,10 @@ function JsonView({ data }: { data: unknown }) {
 
 export function StepDetail({ step }: StepDetailProps) {
   const [activeTab, setActiveTab] = useState<Tab>('response');
+
+  useEffect(() => {
+    setActiveTab('response');
+  }, [step?.id]);
 
   if (!step) {
     return (
