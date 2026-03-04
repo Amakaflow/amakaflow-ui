@@ -112,6 +112,7 @@
     "@vitest/ui": "^4.0.10",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.2.0",
     "msw": "^2.12.10",
     "msw-storybook-addon": "^2.0.6",
