@@ -13,6 +13,16 @@ const FLOW_OPTIONS: { id: FlowId; label: string }[] = [
   { id: 'health-check', label: 'Health Check' },
 ];
 
+const FLOW_IDS = FLOW_OPTIONS.map(f => f.id);
+const RUN_MODES: RunMode[] = ['auto', 'step-through'];
+
+function isFlowId(v: string): v is FlowId {
+  return (FLOW_IDS as string[]).includes(v);
+}
+function isRunMode(v: string): v is RunMode {
+  return (RUN_MODES as string[]).includes(v);
+}
+
 interface PipelineCanvasProps {
   run: PipelineRun | null;
   isRunning: boolean;
@@ -55,7 +65,7 @@ export function PipelineCanvas({
       <div className="flex items-center gap-3 px-4 py-2 border-b flex-wrap">
         <select
           value={flowId}
-          onChange={e => setFlowId(e.target.value as FlowId)}
+          onChange={e => { if (isFlowId(e.target.value)) setFlowId(e.target.value); }}
           disabled={isRunning}
           className="text-sm border rounded px-2 py-1 bg-background"
         >
@@ -66,7 +76,7 @@ export function PipelineCanvas({
 
         <select
           value={runMode}
-          onChange={e => setRunMode(e.target.value as RunMode)}
+          onChange={e => { if (isRunMode(e.target.value)) setRunMode(e.target.value); }}
           disabled={isRunning}
           className="text-sm border rounded px-2 py-1 bg-background"
         >

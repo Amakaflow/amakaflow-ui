@@ -71,4 +71,22 @@ describe('PipelineCanvas', () => {
     // In raw mode, the run JSON should be visible
     expect(container.querySelector('pre')).not.toBeNull();
   });
+
+  it('shows StepEditForm when pausedStepId is set', () => {
+    const pausedStep = { id: 'step-paused', service: 'ingestor' as const, label: 'Ingest', status: 'paused' as const, edited: false };
+    const run = makeRun({ steps: [pausedStep] });
+    const onStepContinue = vi.fn();
+    render(
+      <PipelineCanvas
+        {...defaultProps}
+        run={run}
+        isRunning={true}
+        pausedStepId="step-paused"
+        onStepContinue={onStepContinue}
+      />,
+    );
+    // StepEditForm should be visible with Continue and Abort buttons
+    expect(screen.getByText('Continue →')).toBeTruthy();
+    expect(screen.getByText('Abort')).toBeTruthy();
+  });
 });
