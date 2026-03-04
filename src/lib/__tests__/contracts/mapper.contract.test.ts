@@ -1,28 +1,35 @@
-import { describe, it, expect } from 'vitest';
-import { SavedWorkoutSchema } from '../../../api/schemas/mapper';
-import { API_URLS } from '../../config';
+// src/lib/__tests__/contracts/mapper.contract.test.ts
+import { ValidationResponseSchema } from '../../../api/schemas/mapper';
+import { API_URLS } from '../../../lib/config';
 
-const BASE = API_URLS.MAPPER;
+const TEST_EXERCISES = ['bench press', 'overhead press', 'squat'];
 
-async function isApiAvailable(): Promise<boolean> {
+async function isMapperAvailable(): Promise<boolean> {
   try {
-    const r = await fetch(`${BASE}/health`, { signal: AbortSignal.timeout(2000) });
-    return r.ok;
-  } catch { return false; }
+    const res = await fetch(`${API_URLS.MAPPER}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 describe('mapper-api contract', () => {
-  it('GET /workouts returns array with valid SavedWorkout shapes', async () => {
-    if (!await isApiAvailable()) return;
-    const r = await fetch(`${BASE}/workouts?profile_id=contract-test-user`, {
-      headers: { 'x-test-user-id': 'contract-test-user' },
+  it('POST /validate returns a shape conforming to ValidationResponseSchema', async () => {
+    if (!await isMapperAvailable()) return;
+
+    const res = await fetch(`${API_URLS.MAPPER}/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-test-user-id': 'contract-test',
+      },
+      body: JSON.stringify({ exercises: TEST_EXERCISES }),
     });
-    expect(r.ok).toBe(true);
-    const data = await r.json();
-    expect(data).toHaveProperty('workouts');
-    expect(Array.isArray(data.workouts)).toBe(true);
-    for (const w of data.workouts) {
-      expect(() => SavedWorkoutSchema.parse(w)).not.toThrow();
-    }
+
+    expect(res.ok).toBe(true);
+    const data = await res.json();
+    expect(() => ValidationResponseSchema.parse(data)).not.toThrow();
   });
 });
