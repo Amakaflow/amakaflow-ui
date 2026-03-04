@@ -14,6 +14,24 @@ export interface paths {
       };
     };
   };
+  '/exercises/match': {
+    post: {
+      requestBody: {
+        content: {
+          'application/json': {
+            exercises: string[];
+          };
+        };
+      };
+      responses: {
+        200: {
+          content: {
+            'application/json': MapperValidationResponse;
+          };
+        };
+      };
+    };
+  };
 }
 
 // Pipeline-layer types (consumed by runIngestionPipeline via ValidationResponseSchema)

@@ -74,12 +74,12 @@ type _VerifyTag = z.infer<typeof UserTagSchema> extends UserTag ? true : never;
 
 // === Pipeline-layer schemas (minimal shapes for runIngestionPipeline) ===
 //
-// These validate the shape returned by POST /validate, which is the
+// These validate the shape returned by POST /exercises/match, which is the
 // lighter-weight pipeline contract (success/matches/unmapped) used by
 // runIngestionPipeline. Shapes match IngestionValidation in
 // src/api/pipelines/ingestion.ts.
 
-// A single exercise match result from the mapper /validate endpoint.
+// A single exercise match result from the mapper /exercises/match endpoint.
 export const ExerciseMatchSchema = z.object({
   original_name: z.string(),
   matched_name: z.string().nullable(),
@@ -87,7 +87,7 @@ export const ExerciseMatchSchema = z.object({
   garmin_id: z.string().nullable(),
 });
 
-// The full /validate response as consumed by the pipeline layer.
+// The full /exercises/match response as consumed by the pipeline layer.
 export const ValidationResponseSchema = z.object({
   success: z.boolean(),
   matches: z.array(ExerciseMatchSchema),
@@ -101,7 +101,7 @@ export const ValidationResponseSchema = z.object({
 // test still passes against the live API.
 import type { paths } from '../generated/mapper';
 type _MapperValidationResponse =
-  paths['/validate']['post']['responses'][200]['content']['application/json'];
+  paths['/exercises/match']['post']['responses'][200]['content']['application/json'];
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _VerifyValidationResponse = z.infer<typeof ValidationResponseSchema> extends _MapperValidationResponse
   ? true
