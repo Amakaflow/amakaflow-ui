@@ -108,7 +108,7 @@ describe('scenario: instagram-url', () => {
     expect(() => ValidationResponseSchema.parse(instagramScenario.mocks.mapper)).not.toThrow();
   });
 
-  it('produces workout with expected block and exercise counts', async () => {
+  it('produces workout matching expected output', async () => {
     server.use(
       http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(instagramScenario.mocks.ingestor)),
       http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(instagramScenario.mocks.mapper)),
@@ -117,14 +117,6 @@ describe('scenario: instagram-url', () => {
     expect(workout.blocks.length).toBe(instagramScenario.expectedOutput.blockCount);
     const totalExercises = workout.blocks.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0);
     expect(totalExercises).toBe(instagramScenario.expectedOutput.exerciseCount);
-  });
-
-  it('produces workout with correct title', async () => {
-    server.use(
-      http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(instagramScenario.mocks.ingestor)),
-      http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(instagramScenario.mocks.mapper)),
-    );
-    const { workout } = await runIngestionPipeline(instagramScenario.input.sources);
     expect(workout.title).toBe(instagramScenario.expectedOutput.title);
   });
 });
@@ -135,7 +127,7 @@ describe('scenario: file-upload', () => {
     expect(() => ValidationResponseSchema.parse(fileUploadScenario.mocks.mapper)).not.toThrow();
   });
 
-  it('produces workout with expected block and exercise counts', async () => {
+  it('produces workout matching expected output', async () => {
     server.use(
       http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(fileUploadScenario.mocks.ingestor)),
       http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(fileUploadScenario.mocks.mapper)),
@@ -144,14 +136,6 @@ describe('scenario: file-upload', () => {
     expect(workout.blocks.length).toBe(fileUploadScenario.expectedOutput.blockCount);
     const totalExercises = workout.blocks.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0);
     expect(totalExercises).toBe(fileUploadScenario.expectedOutput.exerciseCount);
-  });
-
-  it('produces workout with correct title', async () => {
-    server.use(
-      http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(fileUploadScenario.mocks.ingestor)),
-      http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(fileUploadScenario.mocks.mapper)),
-    );
-    const { workout } = await runIngestionPipeline(fileUploadScenario.input.sources);
     expect(workout.title).toBe(fileUploadScenario.expectedOutput.title);
   });
 });
