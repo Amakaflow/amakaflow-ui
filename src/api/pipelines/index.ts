@@ -16,3 +16,6 @@ export class PipelineError extends Error {
     this.detail = detail;
   }
 }
+
+export { runIngestionPipeline } from './ingestion';
+export type { IngestionResult } from './ingestion';
