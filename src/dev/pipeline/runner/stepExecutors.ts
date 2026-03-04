@@ -25,7 +25,7 @@ export async function executeIngest(workoutText: string): Promise<ExecuteResult>
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: request!.headers,
+      headers: request.headers,
       body: workoutText,
       signal: AbortSignal.timeout(30000),
     });
@@ -55,7 +55,7 @@ export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: request!.headers,
+      headers: request.headers,
       body: JSON.stringify(bodyPayload),
       signal: AbortSignal.timeout(15000),
     });
@@ -73,7 +73,7 @@ export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
   }
 }
 
-export async function executeHealthCheck(service: ServiceName, baseUrl: string): Promise<ExecuteResult> {
+export async function executeHealthCheck(_service: ServiceName, baseUrl: string): Promise<ExecuteResult> {
   const url = `${baseUrl}/health`;
   const request: PipelineStep['request'] = {
     url,
