@@ -93,3 +93,14 @@ export const ValidationResponseSchema = z.object({
   matches: z.array(ExerciseMatchSchema),
   unmapped: z.array(z.string()),
 });
+
+// Compile-time enforcement: if a developer regenerates src/api/generated/mapper.d.ts
+// and the Zod schema no longer matches, TypeScript will error here.
+// Fix: update ValidationResponseSchema to match the new generated type.
+import type { paths } from '../generated/mapper';
+type _MapperValidationResponse =
+  paths['/validate']['post']['responses'][200]['content']['application/json'];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _VerifyValidationResponse = z.infer<typeof ValidationResponseSchema> extends _MapperValidationResponse
+  ? true
+  : never;

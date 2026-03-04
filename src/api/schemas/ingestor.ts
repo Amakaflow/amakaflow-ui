@@ -71,3 +71,14 @@ export const WorkoutStructureSchema = z.object({
   workout_type: z.string().nullable().optional(),
   workout_type_confidence: z.number().min(0).max(1).nullable().optional(),
 }).passthrough();
+
+// Compile-time enforcement: if a developer regenerates src/api/generated/ingestor.d.ts
+// and the Zod schema no longer matches, TypeScript will error here.
+// Fix: update WorkoutStructureSchema to match the new generated type.
+import type { paths } from '../generated/ingestor';
+type _IngestorWorkoutResponse =
+  paths['/ingest/ai_workout']['post']['responses'][200]['content']['application/json'];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _VerifyWorkoutStructure = z.infer<typeof WorkoutStructureSchema> extends _IngestorWorkoutResponse
+  ? true
+  : never;
