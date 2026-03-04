@@ -1,5 +1,47 @@
-// @generated — do not edit. Run npm run generate:types:ingestor to regenerate.
+// @generated — do not edit by hand.
+// Regenerate with: npm run generate:types:ingestor (requires ingestor-api running locally)
 
+// openapi-typescript paths interface (used by _Verify type assertions in schemas/ingestor.ts)
+export interface paths {
+  '/ingest/ai_workout': {
+    post: {
+      responses: {
+        200: {
+          content: {
+            'application/json': IngestorWorkoutStructure;
+          };
+        };
+      };
+    };
+  };
+}
+
+// Pipeline-layer types (minimal fields consumed by runIngestionPipeline)
+export interface IngestorExercise {
+  name: string;
+  sets?: number | null;
+  reps?: number | null;
+  duration_sec?: number | null;
+  rest_sec?: number | null;
+  weight_kg?: number | null;
+  notes?: string | null;
+}
+
+export interface IngestorBlock {
+  label: string;
+  structure?: string | null;
+  exercises: IngestorExercise[];
+}
+
+export interface IngestorWorkoutStructure {
+  title: string;
+  blocks: IngestorBlock[];
+  source?: string;
+  workout_type?: string | null;
+  workout_type_confidence?: number | null;
+}
+
+// Full client-layer types (used by WorkoutStructureResponseSchema)
 export interface WorkoutStructureResponse {
   title?: string;
   source?: string;
