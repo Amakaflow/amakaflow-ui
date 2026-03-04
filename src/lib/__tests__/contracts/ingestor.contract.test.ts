@@ -16,8 +16,8 @@ async function isIngestorAvailable(): Promise<boolean> {
 }
 
 describe('ingestor-api contract', () => {
-  it('POST /ingest/ai_workout returns a shape conforming to WorkoutStructureSchema', async () => {
-    if (!await isIngestorAvailable()) return;
+  it('POST /ingest/ai_workout returns a shape conforming to WorkoutStructureSchema', async ({ skip }) => {
+    if (!await isIngestorAvailable()) skip();
 
     const res = await fetch(`${API_URLS.INGESTOR}/ingest/ai_workout`, {
       method: 'POST',
