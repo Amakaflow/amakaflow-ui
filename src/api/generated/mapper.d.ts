@@ -1,6 +1,36 @@
-// @generated — do not edit manually. Run: npm run generate:types:mapper
-// Hand-maintained until generate script runs against live backend.
+// @generated — do not edit by hand.
+// Regenerate with: npm run generate:types:mapper (requires mapper-api running locally)
 
+// openapi-typescript paths interface (used by _Verify type assertions in schemas/mapper.ts)
+export interface paths {
+  '/validate': {
+    post: {
+      responses: {
+        200: {
+          content: {
+            'application/json': MapperValidationResponse;
+          };
+        };
+      };
+    };
+  };
+}
+
+// Pipeline-layer types (consumed by runIngestionPipeline via ValidationResponseSchema)
+export interface MapperExerciseMatch {
+  original_name: string;
+  matched_name: string | null;
+  confidence: number;
+  garmin_id: string | null;
+}
+
+export interface MapperValidationResponse {
+  success: boolean;
+  matches: MapperExerciseMatch[];
+  unmapped: string[];
+}
+
+// Full client-layer types (used by SavedWorkoutSchema, WorkoutProgramSchema, UserTagSchema)
 export interface SavedWorkout {
   id: string;
   profile_id: string;

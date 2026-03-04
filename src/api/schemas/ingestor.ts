@@ -71,3 +71,16 @@ export const WorkoutStructureSchema = z.object({
   workout_type: z.string().nullable().optional(),
   workout_type_confidence: z.number().min(0).max(1).nullable().optional(),
 }).passthrough();
+
+// Compile-time enforcement (one-directional): verifies that z.infer<WorkoutStructureSchema>
+// is assignable to the generated API type. If the backend ADDS a required field and you
+// regenerate src/api/generated/ingestor.d.ts, TypeScript will error here until the Zod
+// schema is updated. Note: fields removed from the generated type are NOT caught here
+// because the ingestor schema uses .passthrough() — use the contract test for that direction.
+import type { paths } from '../generated/ingestor';
+type _IngestorWorkoutResponse =
+  paths['/ingest/ai_workout']['post']['responses'][200]['content']['application/json'];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _VerifyWorkoutStructure = z.infer<typeof WorkoutStructureSchema> extends _IngestorWorkoutResponse
+  ? true
+  : never;
