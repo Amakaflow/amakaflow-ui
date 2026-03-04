@@ -45,7 +45,7 @@ const renderNavBar = (overrides: Partial<{
 };
 
 describe('NavBar', () => {
-  it('renders the primary nav items', () => {
+  it('renders the 7 primary nav items', () => {
     renderNavBar();
 
     // The primary nav items: Import, Create with AI, Calendar, My Workouts, Programs, Analytics, Settings
