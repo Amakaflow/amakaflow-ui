@@ -45,7 +45,7 @@ export interface IngestionSource {
 /**
  * Runs the two-step ingestion pipeline:
  * 1. POST /ingest/ai_workout to the ingestor service to parse the workout
- * 2. POST /validate to the mapper service to validate exercise names
+ * 2. POST /exercises/match to the mapper service to validate exercise names
  *
  * Throws PipelineError('IngestorFailed') if the ingestor returns a non-OK response.
  * Throws PipelineError('UnmappedExercises') if any exercises cannot be mapped.
@@ -98,7 +98,7 @@ export async function runIngestionPipeline(
   // Step 3: Validate exercise names against the mapper service
   let validation: IngestionValidation;
   try {
-    const mapperResponse = await fetch(`${API_URLS.MAPPER}/validate`, {
+    const mapperResponse = await fetch(`${API_URLS.MAPPER}/exercises/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ exercises: exerciseNames }),

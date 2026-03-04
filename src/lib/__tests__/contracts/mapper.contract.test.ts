@@ -16,10 +16,10 @@ async function isMapperAvailable(): Promise<boolean> {
 }
 
 describe('mapper-api contract', () => {
-  it('POST /validate returns a shape conforming to ValidationResponseSchema', async ({ skip }) => {
+  it('POST /exercises/match returns a shape conforming to ValidationResponseSchema', async ({ skip }) => {
     if (!await isMapperAvailable()) skip();
 
-    const res = await fetch(`${API_URLS.MAPPER}/validate`, {
+    const res = await fetch(`${API_URLS.MAPPER}/exercises/match`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

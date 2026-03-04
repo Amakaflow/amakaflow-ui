@@ -47,7 +47,7 @@ function useIngestor(body = INGESTOR_RESPONSE) {
   server.use(http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(body)));
 }
 function useMapper(body = MAPPER_RESPONSE_OK) {
-  server.use(http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(body)));
+  server.use(http.post(`${API_URLS.MAPPER}/exercises/match`, () => HttpResponse.json(body)));
 }
 
 const TEST_SOURCE = { type: 'url', content: 'https://instagram.com/p/abc123' };
@@ -86,7 +86,7 @@ describe('runIngestionPipeline', () => {
 
   it('throws PipelineError with MapperFailed code when mapper returns 500', async () => {
     useIngestor();
-    server.use(http.post(`${API_URLS.MAPPER}/validate`, () =>
+    server.use(http.post(`${API_URLS.MAPPER}/exercises/match`, () =>
       HttpResponse.json({ detail: 'mapper server error' }, { status: 500 })
     ));
     const err = await runIngestionPipeline(TEST_SOURCE).catch((e) => e);
@@ -112,7 +112,7 @@ describe('scenario: instagram-url', () => {
   it('produces workout matching expected output', async () => {
     server.use(
       http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(instagramScenario.mocks.ingestor)),
-      http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(instagramScenario.mocks.mapper)),
+      http.post(`${API_URLS.MAPPER}/exercises/match`, () => HttpResponse.json(instagramScenario.mocks.mapper)),
     );
     const { workout } = await runIngestionPipeline(instagramScenario.input.sources[0]);
     expect(workout.blocks.length).toBe(instagramScenario.expectedOutput.blockCount);
@@ -131,7 +131,7 @@ describe('scenario: file-upload', () => {
   it('produces workout matching expected output', async () => {
     server.use(
       http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(fileUploadScenario.mocks.ingestor)),
-      http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(fileUploadScenario.mocks.mapper)),
+      http.post(`${API_URLS.MAPPER}/exercises/match`, () => HttpResponse.json(fileUploadScenario.mocks.mapper)),
     );
     const { workout } = await runIngestionPipeline(fileUploadScenario.input.sources[0]);
     expect(workout.blocks.length).toBe(fileUploadScenario.expectedOutput.blockCount);
