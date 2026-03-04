@@ -247,4 +247,23 @@ describe('StepEditForm', () => {
     fireEvent.change(textarea, { target: { value: '{"title": "Modified"}' } });
     await waitFor(() => expect(screen.getByText('modified')).toBeTruthy());
   });
+
+  it('does not call onContinue when JSON is invalid', () => {
+    const onContinue = vi.fn();
+    render(<StepEditForm step={step} onContinue={onContinue} onAbort={vi.fn()} />);
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'invalid json {' } });
+    screen.getByText('Continue →').click();
+    expect(onContinue).not.toHaveBeenCalled();
+  });
+
+  it('falls back to response.body when apiOutput is undefined', () => {
+    const stepWithResponse = makeStep({
+      apiOutput: undefined,
+      response: { status: 200, body: { fallback: true } },
+    });
+    render(<StepEditForm step={stepWithResponse} onContinue={vi.fn()} onAbort={vi.fn()} />);
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"fallback": true');
+  });
 });

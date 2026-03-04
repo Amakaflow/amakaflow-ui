@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { cn } from '../../../components/ui/utils';
 import type { PipelineStep } from '../store/runTypes';
 
@@ -9,9 +9,15 @@ interface StepEditFormProps {
 }
 
 export function StepEditForm({ step, onContinue, onAbort }: StepEditFormProps) {
-  const initialJson = JSON.stringify(step.apiOutput ?? step.response?.body, null, 2) ?? '';
-  const [json, setJson] = useState(initialJson);
+  const [json, setJson] = useState(
+    () => JSON.stringify(step.apiOutput ?? step.response?.body, null, 2) ?? ''
+  );
   const [parseError, setParseError] = useState<string | null>(null);
+
+  const initialJsonRef = useRef(
+    JSON.stringify(step.apiOutput ?? step.response?.body, null, 2) ?? ''
+  );
+  const isDirty = json !== initialJsonRef.current;
 
   function handleContinue() {
     try {
@@ -22,8 +28,6 @@ export function StepEditForm({ step, onContinue, onAbort }: StepEditFormProps) {
       setParseError((e as Error).message);
     }
   }
-
-  const isDirty = json !== initialJson;
 
   return (
     <div className="flex flex-col gap-3 p-4 border rounded-md bg-background">
