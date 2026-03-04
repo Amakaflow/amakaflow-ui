@@ -11,5 +11,6 @@
     }
   ],
   "source": "instagram",
-  "workout_type": "strength"
+  "workout_type": "strength",
+  "workout_type_confidence": 0.92
 }
