@@ -3,6 +3,7 @@
 export type PipelineErrorCode =
   | 'UnmappedExercises'
   | 'IngestorFailed'
+  | 'MapperFailed'
   | 'ExportFailed';
 
 export class PipelineError extends Error {
