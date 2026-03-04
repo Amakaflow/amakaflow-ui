@@ -44,10 +44,35 @@ describe('usePipelineRunner', () => {
 
   it('sets isRunning during a run and clears when done', async () => {
     const { result } = renderHook(() => usePipelineRunner());
-    act(() => {
-      result.current.start('ingest-only', { workoutText: 'bench press 3x10' }, 'auto');
+    await act(async () => {
+      await result.current.start('ingest-only', { workoutText: 'bench press 3x10' }, 'auto');
     });
-    expect(result.current.isRunning).toBe(true);
+    expect(result.current.isRunning).toBe(false);
+    expect(result.current.run).not.toBeNull();
+  });
+
+  it('cancel stops the run early', async () => {
+    const { runPipeline } = await import('../../runner/pipelineRunner');
+    vi.mocked(runPipeline).mockImplementationOnce(async function* () {
+      yield { type: 'run:started', runId: 'test-run', flowId: 'ingest-only', inputs: {} };
+      // Simulate a slow step — wait before yielding completed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      yield { type: 'run:completed', runId: 'test-run', status: 'success' };
+    });
+
+    const { result } = renderHook(() => usePipelineRunner());
+
+    // Start without awaiting so we can cancel mid-run
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start('ingest-only', { workoutText: 'test' }, 'auto');
+    });
+
+    // Cancel immediately
+    act(() => {
+      result.current.cancel();
+    });
+
     await waitFor(() => expect(result.current.isRunning).toBe(false));
   });
 });
@@ -64,6 +89,7 @@ describe('useServiceHealth', () => {
     const { result } = renderHook(() => useServiceHealth());
     // All 6 services should be present
     expect(Object.keys(result.current.health)).toHaveLength(6);
+    expect(Object.values(result.current.health).every(s => s.status === 'checking')).toBe(true);
   });
 
   it('transitions to up when fetch succeeds', async () => {

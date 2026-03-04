@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ServiceName } from '../store/runTypes';
 
 const SERVICE_URLS: Record<ServiceName, string> = {
@@ -25,7 +25,7 @@ export function useServiceHealth() {
     return initial;
   });
 
-  async function checkAll() {
+  const checkAll = useCallback(async () => {
     await Promise.all(
       (Object.entries(SERVICE_URLS) as [ServiceName, string][]).map(async ([name, url]) => {
         const start = Date.now();
@@ -34,7 +34,7 @@ export function useServiceHealth() {
           const latencyMs = Date.now() - start;
           setHealth(prev => ({
             ...prev,
-            [name]: { status: res.ok ? 'up' : 'down', latencyMs, checkedAt: Date.now() },
+            [name]: { status: res.ok ? 'up' : 'down', latencyMs, checkedAt: start + latencyMs },
           }));
         } catch {
           setHealth(prev => ({
@@ -44,13 +44,13 @@ export function useServiceHealth() {
         }
       }),
     );
-  }
+  }, []);
 
   useEffect(() => {
     checkAll();
     const interval = setInterval(checkAll, 30_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [checkAll]);
 
   return { health, refresh: checkAll };
 }

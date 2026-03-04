@@ -7,6 +7,7 @@ export function usePipelineRunner() {
   const [run, setRun] = useState<PipelineRun | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const cancelledRef = useRef(false);
+  const isRunningRef = useRef(false);
 
   const start = useCallback(async (
     flowId: FlowId,
@@ -14,6 +15,8 @@ export function usePipelineRunner() {
     mode: RunMode,
     onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>,
   ) => {
+    if (isRunningRef.current) return;
+    isRunningRef.current = true;
     cancelledRef.current = false;
     setIsRunning(true);
 
@@ -40,6 +43,7 @@ export function usePipelineRunner() {
       await saveRun(currentRun);
     }
 
+    isRunningRef.current = false;
     setIsRunning(false);
   }, []);
 
