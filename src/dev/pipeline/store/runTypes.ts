@@ -23,7 +23,7 @@ export interface PipelineStep {
   durationMs?: number;
   request?: {
     url: string;
-    method: string;
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
     headers: Record<string, string>;
     body: unknown;
   };
@@ -59,4 +59,4 @@ export type StepEvent =
   | { type: 'step:paused'; runId: string; stepId: string; step: PipelineStep }
   | { type: 'step:edited'; runId: string; stepId: string; effectiveOutput: unknown }
   | { type: 'run:completed'; runId: string; status: RunStatus }
-  | { type: 'run:cancelled'; runId: string };
+  | { type: 'run:cancelled'; runId: string; status: 'cancelled' };
