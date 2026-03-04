@@ -31,4 +31,20 @@ describe('PipelineError', () => {
     const err = new PipelineError('ExportFailed', { message: 'export failed' });
     expect(err.name).toBe('PipelineError');
   });
+
+  it('can be caught and identified via instanceof in a try/catch', () => {
+    let caught: unknown;
+    try {
+      throw new PipelineError('ExportFailed', { message: 'failed' });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(PipelineError);
+    expect(caught).toBeInstanceOf(Error);
+  });
+
+  it('falls back to code as message when detail.message is absent', () => {
+    const err = new PipelineError('IngestorFailed', { status: 503 });
+    expect(err.message).toBe('IngestorFailed');
+  });
 });
