@@ -16,6 +16,11 @@ function makeRun(id: string, startedAt = Date.now()): PipelineRun {
 }
 
 describe('runStore', () => {
+  beforeEach(async () => {
+    const existing = await getAllRuns();
+    await Promise.all(existing.map(r => deleteRun(r.id)));
+  });
+
   it('saves and retrieves a run', async () => {
     const run = makeRun('run-1');
     await saveRun(run);
@@ -38,6 +43,19 @@ describe('runStore', () => {
     const retrieved = await getRun('run-delete');
     expect(retrieved).toBeUndefined();
   });
+
+  it('trims to 100 runs max', async () => {
+    const runs = Array.from({ length: 101 }, (_, i) =>
+      makeRun(`trim-run-${i}`, i + 1),
+    );
+    for (const run of runs) {
+      await saveRun(run);
+    }
+    const stored = await getAllRuns();
+    expect(stored).toHaveLength(100);
+    // The oldest run (trim-run-0, startedAt=1) should have been trimmed
+    expect(stored.find(r => r.id === 'trim-run-0')).toBeUndefined();
+  }, 10_000); // longer timeout for 101 writes
 
   describe('applyEventToRun', () => {
     const base = makeRun('run-apply');
@@ -87,6 +105,12 @@ describe('runStore', () => {
       const updated = applyEventToRun(base, event);
       expect(updated.status).toBe('success');
       expect(updated.completedAt).toBeDefined();
+    });
+
+    it('returns run unchanged for unknown event type', () => {
+      const event = { type: 'unknown:event' as unknown as StepEvent['type'] } as StepEvent;
+      const result = applyEventToRun(base, event);
+      expect(result).toBe(base); // same reference — no-op
     });
   });
 });

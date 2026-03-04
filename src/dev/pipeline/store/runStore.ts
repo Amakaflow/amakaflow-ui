@@ -57,7 +57,7 @@ async function trimOldRuns(db: IDBPDatabase<PipelineDB>): Promise<void> {
   }
 }
 
-// Apply a StepEvent to mutate a PipelineRun in memory (for live updates)
+// Apply a StepEvent to a PipelineRun in memory, returning a new copy (pure function).
 export function applyEventToRun(run: PipelineRun, event: StepEvent): PipelineRun {
   switch (event.type) {
     case 'run:started':
