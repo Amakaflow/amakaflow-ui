@@ -42,7 +42,7 @@ export interface PipelineStep {
 export interface PipelineRun {
   id: string;
   flowId: FlowId;
-  label: string;
+  label?: string;
   mode: RunMode;
   status: RunStatus;
   startedAt: number;

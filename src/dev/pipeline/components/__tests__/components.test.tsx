@@ -75,4 +75,23 @@ describe('ServiceHealth', () => {
     render(<ServiceHealth />);
     expect(screen.getByText('12ms')).toBeTruthy();
   });
+
+  it('calls refresh when Refresh button is clicked', async () => {
+    const mockRefresh = vi.fn();
+    const { useServiceHealth } = await import('../../hooks/useServiceHealth');
+    vi.mocked(useServiceHealth).mockReturnValueOnce({
+      health: {
+        ingestor: { status: 'up', latencyMs: 12 },
+        mapper: { status: 'down' },
+        garmin: { status: 'checking' },
+        strava: { status: 'up', latencyMs: 45 },
+        calendar: { status: 'up', latencyMs: 8 },
+        chat: { status: 'up', latencyMs: 22 },
+      },
+      refresh: mockRefresh,
+    });
+    const { getByText } = render(<ServiceHealth />);
+    getByText('Refresh').click();
+    expect(mockRefresh).toHaveBeenCalledOnce();
+  });
 });

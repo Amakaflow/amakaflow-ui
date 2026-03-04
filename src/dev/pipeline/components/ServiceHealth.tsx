@@ -38,7 +38,7 @@ export function ServiceHealth() {
                 }
               />
               <span className="text-xs text-muted-foreground">{SERVICE_LABELS[name]}</span>
-              {status?.latencyMs !== undefined && (
+              {status?.status === 'up' && status.latencyMs !== undefined && (
                 <span className="text-xs text-muted-foreground/60">{status.latencyMs}ms</span>
               )}
             </div>
