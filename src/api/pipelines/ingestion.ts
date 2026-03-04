@@ -51,15 +51,10 @@ export interface IngestionSource {
  * Throws PipelineError('UnmappedExercises') if any exercises cannot be mapped.
  */
 export async function runIngestionPipeline(
-  sources: IngestionSource[],
+  source: IngestionSource,
   signal?: AbortSignal,
 ): Promise<IngestionResult> {
-  if (sources.length === 0) {
-    throw new PipelineError('IngestorFailed', { message: 'At least one source is required' });
-  }
-
-  // Step 1: Ingest — use the first source's content as the body
-  const source = sources[0];
+  // Step 1: Ingest — send the source's content as the body
   let workout: IngestionWorkout;
 
   try {
@@ -111,9 +106,9 @@ export async function runIngestionPipeline(
     });
 
     if (!mapperResponse.ok) {
-      const detail = await mapperResponse.json().catch(() => ({ detail: mapperResponse.statusText }));
+      const errorData: { detail?: unknown } = await mapperResponse.json().catch(() => ({ detail: mapperResponse.statusText }));
       throw new PipelineError('MapperFailed', {
-        message: (detail as any).detail ?? `Mapper returned ${mapperResponse.status}`,
+        message: String(errorData.detail ?? `Mapper returned ${mapperResponse.status}`),
         status: mapperResponse.status,
       });
     }
