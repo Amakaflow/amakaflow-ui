@@ -146,9 +146,9 @@ vi.mock('../calendar-mock-data', () => ({
 // ---------------------------------------------------------------------------
 
 describe('Mock Data Hub', () => {
-  it('MOCK_WORKOUT_HISTORY has 2 workouts with required fields', async () => {
+  it('MOCK_WORKOUT_HISTORY has workouts with required fields', async () => {
     const { MOCK_WORKOUT_HISTORY } = await import('../mock-data');
-    expect(MOCK_WORKOUT_HISTORY.length).toBeGreaterThanOrEqual(2);
+    expect(MOCK_WORKOUT_HISTORY).toHaveLength(10);
     expect(MOCK_WORKOUT_HISTORY[0]).toHaveProperty('id');
     expect(MOCK_WORKOUT_HISTORY[0]).toHaveProperty('workout');
     expect(MOCK_WORKOUT_HISTORY[0].workout).toHaveProperty('title');
