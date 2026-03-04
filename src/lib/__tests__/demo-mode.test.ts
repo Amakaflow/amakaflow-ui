@@ -146,9 +146,9 @@ vi.mock('../calendar-mock-data', () => ({
 // ---------------------------------------------------------------------------
 
 describe('Mock Data Hub', () => {
-  it('MOCK_WORKOUT_HISTORY has 2 workouts with required fields', async () => {
+  it('MOCK_WORKOUT_HISTORY has workouts with required fields', async () => {
     const { MOCK_WORKOUT_HISTORY } = await import('../mock-data');
-    expect(MOCK_WORKOUT_HISTORY).toHaveLength(2);
+    expect(MOCK_WORKOUT_HISTORY).toHaveLength(10);
     expect(MOCK_WORKOUT_HISTORY[0]).toHaveProperty('id');
     expect(MOCK_WORKOUT_HISTORY[0]).toHaveProperty('workout');
     expect(MOCK_WORKOUT_HISTORY[0].workout).toHaveProperty('title');
@@ -240,10 +240,11 @@ describe('workout-history demo intercept', () => {
     expect(result).toEqual(MOCK_WORKOUT_HISTORY);
   });
 
-  it('getWorkoutHistory result has 2 items', async () => {
+  it('getWorkoutHistory result has items (matches MOCK_WORKOUT_HISTORY length)', async () => {
     const { getWorkoutHistory } = await import('../workout-history');
+    const { MOCK_WORKOUT_HISTORY } = await import('../mock-data');
     const result = await getWorkoutHistory('test-user');
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(MOCK_WORKOUT_HISTORY.length);
   });
 
   it('saveWorkoutToHistory returns an empty object and does not throw in demo mode', async () => {

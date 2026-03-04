@@ -122,7 +122,7 @@ describe('useWorkflowEditing', () => {
 
   // --- New tests ---
 
-  it('handleLoadFromHistory: calls setWorkout, setValidation, setExports, setWorkoutSaved(true), onViewChange("workflow"), onStepChange("export"), sets isEditingFromHistory=true and editingWorkoutId', () => {
+  it('handleLoadFromHistory: calls setWorkout, setValidation, setExports, setWorkoutSaved(true), onViewChange("workflow"), onStepChange("structure"), sets isEditingFromHistory=true and editingWorkoutId', () => {
     const setWorkout = vi.fn();
     const setValidation = vi.fn();
     const setExports = vi.fn();
@@ -160,7 +160,7 @@ describe('useWorkflowEditing', () => {
     expect(setExports).toHaveBeenCalledWith({ yaml: 'yaml-content' });
     expect(setWorkoutSaved).toHaveBeenCalledWith(true);
     expect(onViewChange).toHaveBeenCalledWith('workflow');
-    expect(onStepChange).toHaveBeenCalledWith('export');
+    expect(onStepChange).toHaveBeenCalledWith('structure');
     expect(result.current.isEditingFromHistory).toBe(true);
     expect(result.current.editingWorkoutId).toBe('hist-42');
   });
