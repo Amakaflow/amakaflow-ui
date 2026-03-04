@@ -47,6 +47,10 @@ export default defineConfig({
     target: 'esnext',
     outDir: 'build',
     rollupOptions: {
+      input: {
+        main: 'index.html',
+        pipeline: 'pipeline.html',
+      },
       output: {
         manualChunks: {
           'vendor-recharts': ['recharts'],
