@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { runIngestionPipeline } from '../../../api/pipelines/ingestion';
 import { PipelineError } from '../../../api/pipelines';
+import { API_URLS } from '../../../lib/config';
 
 const INGESTOR_RESPONSE = {
   title: 'Push Day',
@@ -38,36 +39,26 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-// Helper URLs — must match the actual defaults from src/lib/config.ts
-const INGESTOR_URL = 'http://localhost:8004';
-const MAPPER_URL = 'http://localhost:8001';
-
 function useIngestor(body = INGESTOR_RESPONSE) {
-  server.use(http.post(`${INGESTOR_URL}/ingest/ai_workout`, () => HttpResponse.json(body)));
+  server.use(http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(body)));
 }
 function useMapper(body = MAPPER_RESPONSE_OK) {
-  server.use(http.post(`${MAPPER_URL}/validate`, () => HttpResponse.json(body)));
+  server.use(http.post(`${API_URLS.MAPPER}/validate`, () => HttpResponse.json(body)));
 }
 
 const TEST_SOURCES = [{ type: 'url', content: 'https://instagram.com/p/abc123' }];
 
 describe('runIngestionPipeline', () => {
-  it('returns workout and validation on success', async () => {
+  it('returns workout and validation with correct structure on success', async () => {
     useIngestor();
     useMapper();
-    const result = await runIngestionPipeline(TEST_SOURCES);
-    expect(result.workout.title).toBe('Push Day');
-    expect(result.workout.blocks).toHaveLength(1);
-    expect(result.validation.unmapped).toHaveLength(0);
-  });
-
-  it('workout has the expected block structure', async () => {
-    useIngestor();
-    useMapper();
-    const { workout } = await runIngestionPipeline(TEST_SOURCES);
+    const { workout, validation } = await runIngestionPipeline(TEST_SOURCES);
+    expect(workout.title).toBe('Push Day');
+    expect(workout.blocks).toHaveLength(1);
     expect(workout.blocks[0].label).toBe('Main Block');
     expect(workout.blocks[0].exercises).toHaveLength(2);
     expect(workout.blocks[0].exercises[0].name).toBe('bench press');
+    expect(validation.unmapped).toHaveLength(0);
   });
 
   it('throws PipelineError when exercises are unmapped', async () => {
@@ -85,7 +76,24 @@ describe('runIngestionPipeline', () => {
   });
 
   it('throws PipelineError when ingestor returns 500', async () => {
-    server.use(http.post(`${INGESTOR_URL}/ingest/ai_workout`, () => HttpResponse.json({ detail: 'server error' }, { status: 500 })));
+    server.use(http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json({ detail: 'server error' }, { status: 500 })));
     await expect(runIngestionPipeline(TEST_SOURCES)).rejects.toThrow(PipelineError);
+  });
+
+  it('throws PipelineError with MapperFailed code when mapper returns 500', async () => {
+    useIngestor();
+    server.use(http.post(`${API_URLS.MAPPER}/validate`, () =>
+      HttpResponse.json({ detail: 'mapper server error' }, { status: 500 })
+    ));
+    const err = await runIngestionPipeline(TEST_SOURCES).catch((e) => e);
+    expect(err).toBeInstanceOf(PipelineError);
+    expect(err.code).toBe('MapperFailed');
+  });
+
+  it('throws PipelineError when no sources are provided', async () => {
+    const err = await runIngestionPipeline([]).catch((e) => e);
+    expect(err).toBeInstanceOf(PipelineError);
+    expect(err.code).toBe('IngestorFailed');
+    expect(err.message).toContain('source');
   });
 });

@@ -54,6 +54,10 @@ export async function runIngestionPipeline(
   sources: IngestionSource[],
   signal?: AbortSignal,
 ): Promise<IngestionResult> {
+  if (sources.length === 0) {
+    throw new PipelineError('IngestorFailed', { message: 'At least one source is required' });
+  }
+
   // Step 1: Ingest — use the first source's content as the body
   const source = sources[0];
   let workout: IngestionWorkout;
@@ -97,14 +101,31 @@ export async function runIngestionPipeline(
   }
 
   // Step 3: Validate exercise names against the mapper service
-  const mapperResponse = await fetch(`${API_URLS.MAPPER}/validate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ exercises: exerciseNames }),
-    signal,
-  });
+  let validation: IngestionValidation;
+  try {
+    const mapperResponse = await fetch(`${API_URLS.MAPPER}/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exercises: exerciseNames }),
+      signal,
+    });
 
-  const validation: IngestionValidation = await mapperResponse.json();
+    if (!mapperResponse.ok) {
+      const detail = await mapperResponse.json().catch(() => ({ detail: mapperResponse.statusText }));
+      throw new PipelineError('MapperFailed', {
+        message: (detail as any).detail ?? `Mapper returned ${mapperResponse.status}`,
+        status: mapperResponse.status,
+      });
+    }
+
+    validation = await mapperResponse.json();
+  } catch (err) {
+    if (err instanceof PipelineError) throw err;
+    throw new PipelineError('MapperFailed', {
+      message: err instanceof Error ? err.message : 'Mapper request failed',
+      cause: err,
+    });
+  }
 
   // Step 4: Throw if any exercises could not be mapped
   if (validation.unmapped && validation.unmapped.length > 0) {
