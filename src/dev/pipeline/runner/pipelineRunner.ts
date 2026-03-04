@@ -1,4 +1,4 @@
-import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName } from '../store/runTypes';
+import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
 import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames } from './stepExecutors';
 import { API_URLS } from '../../../lib/config';
 
@@ -15,6 +15,60 @@ export interface PipelineRunnerOptions {
   onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>;
 }
 
+interface StepExecutorResult {
+  error?: string;
+  apiOutput?: unknown;
+  schemaValidation?: SchemaValidationResult;
+  request?: PipelineStep['request'];
+  response?: PipelineStep['response'];
+}
+
+async function* runStep(
+  runId: string,
+  stepId: string,
+  service: ServiceName,
+  label: string,
+  execute: () => Promise<StepExecutorResult>,
+  mode: RunMode,
+  onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>,
+): AsyncGenerator<StepEvent> {
+  yield { type: 'step:started', runId, stepId, service, label };
+
+  const result = await execute();
+  const step: PipelineStep = {
+    id: stepId,
+    service,
+    label,
+    status: result.error ? 'failed' : 'success',
+    request: result.request,
+    response: result.response,
+    schemaValidation: result.schemaValidation,
+    apiOutput: result.apiOutput,
+    effectiveOutput: result.apiOutput,
+    edited: false,
+  };
+
+  if (result.error) {
+    yield { type: 'step:failed', runId, stepId, error: result.error, step };
+    return;
+  }
+
+  if (mode === 'step-through' && onStepPaused) {
+    step.status = 'paused';
+    yield { type: 'step:paused', runId, stepId, step };
+    const effective = await onStepPaused(stepId, step);
+    if (effective !== step.apiOutput) {
+      step.edited = true;
+      step.editedAt = Date.now();
+      step.effectiveOutput = effective;
+      yield { type: 'step:edited', runId, stepId, effectiveOutput: effective };
+    }
+    step.status = 'success';
+  }
+
+  yield { type: 'step:completed', runId, stepId, step };
+}
+
 export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<StepEvent> {
   const { flowId, inputs, mode, onStepPaused } = opts;
   const runId = genId();
@@ -23,13 +77,39 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
 
   try {
     if (flowId === 'ingest-only') {
-      yield* runIngestStep(runId, inputs.workoutText as string, mode, onStepPaused);
+      const workoutText = inputs.workoutText;
+      if (typeof workoutText !== 'string') {
+        yield { type: 'run:completed', runId, status: 'failed' };
+        return;
+      }
+      for await (const event of runIngestStep(runId, workoutText, mode, onStepPaused)) {
+        yield event;
+        if (event.type === 'step:failed') {
+          yield { type: 'run:completed', runId, status: 'failed' };
+          return;
+        }
+      }
     } else if (flowId === 'map-only') {
-      const exercises = Array.isArray(inputs.exercises) ? inputs.exercises as string[] : [];
-      yield* runMapStep(runId, exercises, mode, onStepPaused);
+      const exercises = inputs.exercises;
+      if (!Array.isArray(exercises) || !exercises.every(e => typeof e === 'string')) {
+        yield { type: 'run:completed', runId, status: 'failed' };
+        return;
+      }
+      for await (const event of runMapStep(runId, exercises, mode, onStepPaused)) {
+        yield event;
+        if (event.type === 'step:failed') {
+          yield { type: 'run:completed', runId, status: 'failed' };
+          return;
+        }
+      }
     } else if (flowId === 'full-pipeline') {
+      const workoutText = inputs.workoutText;
+      if (typeof workoutText !== 'string') {
+        yield { type: 'run:completed', runId, status: 'failed' };
+        return;
+      }
       let ingestOutput: unknown;
-      for await (const event of runIngestStep(runId, inputs.workoutText as string, mode, onStepPaused)) {
+      for await (const event of runIngestStep(runId, workoutText, mode, onStepPaused)) {
         yield event;
         if (event.type === 'step:completed') ingestOutput = event.step.effectiveOutput;
         if (event.type === 'step:failed') {
@@ -46,103 +126,39 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
         }
       }
     } else if (flowId === 'health-check') {
+      // health-check intentionally continues after individual step failures
       yield* runHealthCheckSteps(runId);
+    } else {
+      // export-only flow not yet implemented
+      yield { type: 'run:completed', runId, status: 'failed' };
+      return;
     }
 
     yield { type: 'run:completed', runId, status: 'success' };
-  } catch {
+  } catch (err) {
+    console.error('[pipelineRunner] Unexpected error during pipeline run:', err);
     yield { type: 'run:completed', runId, status: 'failed' };
   }
 }
 
-async function* runIngestStep(
+function runIngestStep(
   runId: string,
   workoutText: string,
   mode: RunMode,
-  onStepPaused?: PipelineRunnerOptions['onStepPaused']
+  onStepPaused?: PipelineRunnerOptions['onStepPaused'],
 ): AsyncGenerator<StepEvent> {
   const stepId = genId();
-  const service: ServiceName = 'ingestor';
-  yield { type: 'step:started', runId, stepId, service, label: 'Ingest workout text' };
-
-  const result = await executeIngest(workoutText);
-  const step: PipelineStep = {
-    id: stepId,
-    service,
-    label: 'Ingest workout text',
-    status: result.error ? 'failed' : 'success',
-    request: result.request,
-    response: result.response,
-    schemaValidation: result.schemaValidation,
-    apiOutput: result.apiOutput,
-    effectiveOutput: result.apiOutput,
-    edited: false,
-  };
-
-  if (result.error) {
-    yield { type: 'step:failed', runId, stepId, error: result.error, step };
-    return;
-  }
-
-  if (mode === 'step-through' && onStepPaused) {
-    step.status = 'paused';
-    yield { type: 'step:paused', runId, stepId, step };
-    const effective = await onStepPaused(stepId, step);
-    if (effective !== step.apiOutput) {
-      step.edited = true;
-      step.editedAt = Date.now();
-      step.effectiveOutput = effective;
-      yield { type: 'step:edited', runId, stepId, effectiveOutput: effective };
-    }
-    step.status = 'success';
-  }
-
-  yield { type: 'step:completed', runId, stepId, step };
+  return runStep(runId, stepId, 'ingestor', 'Ingest workout text', () => executeIngest(workoutText), mode, onStepPaused);
 }
 
-async function* runMapStep(
+function runMapStep(
   runId: string,
   exercises: string[],
   mode: RunMode,
-  onStepPaused?: PipelineRunnerOptions['onStepPaused']
+  onStepPaused?: PipelineRunnerOptions['onStepPaused'],
 ): AsyncGenerator<StepEvent> {
   const stepId = genId();
-  const service: ServiceName = 'mapper';
-  yield { type: 'step:started', runId, stepId, service, label: 'Map exercises' };
-
-  const result = await executeMap(exercises);
-  const step: PipelineStep = {
-    id: stepId,
-    service,
-    label: 'Map exercises',
-    status: result.error ? 'failed' : 'success',
-    request: result.request,
-    response: result.response,
-    schemaValidation: result.schemaValidation,
-    apiOutput: result.apiOutput,
-    effectiveOutput: result.apiOutput,
-    edited: false,
-  };
-
-  if (result.error) {
-    yield { type: 'step:failed', runId, stepId, error: result.error, step };
-    return;
-  }
-
-  if (mode === 'step-through' && onStepPaused) {
-    step.status = 'paused';
-    yield { type: 'step:paused', runId, stepId, step };
-    const effective = await onStepPaused(stepId, step);
-    if (effective !== step.apiOutput) {
-      step.edited = true;
-      step.editedAt = Date.now();
-      step.effectiveOutput = effective;
-      yield { type: 'step:edited', runId, stepId, effectiveOutput: effective };
-    }
-    step.status = 'success';
-  }
-
-  yield { type: 'step:completed', runId, stepId, step };
+  return runStep(runId, stepId, 'mapper', 'Map exercises', () => executeMap(exercises), mode, onStepPaused);
 }
 
 async function* runHealthCheckSteps(runId: string): AsyncGenerator<StepEvent> {
