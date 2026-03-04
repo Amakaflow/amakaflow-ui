@@ -1,0 +1,54 @@
+{
+  "description": "File upload produces a structured workout with multiple blocks",
+  "input": {
+    "sources": [{ "type": "image", "content": "data:image/png;base64,abc123" }]
+  },
+  "mocks": {
+    "ingestor": {
+      "title": "Full Body Workout",
+      "blocks": [
+        {
+          "label": "Warm-up",
+          "structure": "warmup",
+          "exercises": [
+            { "name": "jumping jacks", "sets": 1, "reps": 20 }
+          ]
+        },
+        {
+          "label": "Main Block",
+          "structure": "regular",
+          "exercises": [
+            { "name": "squat", "sets": 3, "reps": 12 },
+            { "name": "deadlift", "sets": 3, "reps": 8 }
+          ]
+        },
+        {
+          "label": "Cool-down",
+          "structure": "cooldown",
+          "exercises": [
+            { "name": "stretching", "sets": 1, "reps": 60 }
+          ]
+        }
+      ],
+      "source": "image",
+      "workout_type": "strength",
+      "workout_type_confidence": 0.88
+    },
+    "mapper": {
+      "success": true,
+      "matches": [
+        { "original_name": "jumping jacks", "matched_name": "Jumping Jacks", "confidence": 0.99, "garmin_id": "jumping_jacks" },
+        { "original_name": "squat", "matched_name": "Squat", "confidence": 0.99, "garmin_id": "squat" },
+        { "original_name": "deadlift", "matched_name": "Deadlift", "confidence": 0.98, "garmin_id": "deadlift" },
+        { "original_name": "stretching", "matched_name": "Stretching", "confidence": 0.95, "garmin_id": "stretching" }
+      ],
+      "unmapped": []
+    }
+  },
+  "expectedOutput": {
+    "title": "Full Body Workout",
+    "blockCount": 3,
+    "exerciseCount": 4,
+    "unmapped": []
+  }
+}
