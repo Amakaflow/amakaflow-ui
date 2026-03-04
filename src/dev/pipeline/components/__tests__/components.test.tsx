@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { RunHistory } from '../RunHistory';
 import { ServiceHealth } from '../ServiceHealth';
 import { StepCard } from '../StepCard';
 import { StepDetail } from '../StepDetail';
+import { StepEditForm } from '../StepEditForm';
 import type { PipelineStep } from '../../store/runTypes';
 
 // Mock the hooks
@@ -203,5 +204,47 @@ describe('StepDetail', () => {
     await waitFor(() => {
       expect(screen.getByText(/not edited/i)).toBeTruthy();
     });
+  });
+});
+
+describe('StepEditForm', () => {
+  const step = makeStep({ apiOutput: { title: 'Test workout', blocks: [] } });
+
+  it('renders the API output as JSON in the textarea', () => {
+    render(<StepEditForm step={step} onContinue={vi.fn()} onAbort={vi.fn()} />);
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"title": "Test workout"');
+  });
+
+  it('calls onContinue with parsed JSON when Continue is clicked', async () => {
+    const onContinue = vi.fn();
+    render(<StepEditForm step={step} onContinue={onContinue} onAbort={vi.fn()} />);
+    screen.getByText('Continue →').click();
+    await waitFor(() => expect(onContinue).toHaveBeenCalledOnce());
+    expect(onContinue).toHaveBeenCalledWith({ title: 'Test workout', blocks: [] });
+  });
+
+  it('shows parse error when JSON is invalid', async () => {
+    render(<StepEditForm step={step} onContinue={vi.fn()} onAbort={vi.fn()} />);
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'invalid json {' } });
+    screen.getByText('Continue →').click();
+    await waitFor(() => {
+      expect(document.querySelector('.text-red-600') ?? document.querySelector('[class*="red"]')).not.toBeNull();
+    });
+  });
+
+  it('calls onAbort when Abort is clicked', () => {
+    const onAbort = vi.fn();
+    render(<StepEditForm step={step} onContinue={vi.fn()} onAbort={onAbort} />);
+    screen.getByText('Abort').click();
+    expect(onAbort).toHaveBeenCalledOnce();
+  });
+
+  it('shows "modified" badge when JSON is edited', async () => {
+    render(<StepEditForm step={step} onContinue={vi.fn()} onAbort={vi.fn()} />);
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '{"title": "Modified"}' } });
+    await waitFor(() => expect(screen.getByText('modified')).toBeTruthy());
   });
 });
