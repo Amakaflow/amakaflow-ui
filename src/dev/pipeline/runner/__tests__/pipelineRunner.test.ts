@@ -33,7 +33,7 @@ describe('runPipeline', () => {
       apiOutput: { title: 'Test', blocks: [{ label: 'B', exercises: [{ name: 'bench press' }] }] },
     });
     mockExecuteMap.mockResolvedValue({
-      request: { url: 'http://localhost:8001/validate', method: 'POST', headers: {}, body: {} },
+      request: { url: 'http://localhost:8001/exercises/match', method: 'POST', headers: {}, body: {} },
       response: { status: 200, body: { success: true, matches: [], unmapped: [] } },
       schemaValidation: { passed: true },
       apiOutput: { success: true, matches: [], unmapped: [] },

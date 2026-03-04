@@ -44,7 +44,7 @@ export async function executeIngest(workoutText: string): Promise<ExecuteResult>
 }
 
 export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
-  const url = `${API_URLS.MAPPER}/validate`;
+  const url = `${API_URLS.MAPPER}/exercises/match`;
   const bodyPayload = { exercises };
   const request: PipelineStep['request'] = {
     url,
