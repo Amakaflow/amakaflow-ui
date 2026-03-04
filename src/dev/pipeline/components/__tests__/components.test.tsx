@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { RunHistory } from '../RunHistory';
 import { ServiceHealth } from '../ServiceHealth';
+import { StepCard } from '../StepCard';
+import { StepDetail } from '../StepDetail';
+import type { PipelineStep } from '../../store/runTypes';
 
 // Mock the hooks
 vi.mock('../../hooks/useRunHistory', () => ({
@@ -93,5 +96,67 @@ describe('ServiceHealth', () => {
     const { getByText } = render(<ServiceHealth />);
     getByText('Refresh').click();
     expect(mockRefresh).toHaveBeenCalledOnce();
+  });
+});
+
+// Helper
+function makeStep(overrides: Partial<PipelineStep> = {}): PipelineStep {
+  return {
+    id: 'step-1',
+    service: 'ingestor',
+    label: 'Ingest',
+    status: 'success',
+    edited: false,
+    ...overrides,
+  };
+}
+
+describe('StepCard', () => {
+  it('renders step label and service', () => {
+    render(<StepCard step={makeStep()} isSelected={false} onClick={vi.fn()} />);
+    expect(screen.getByText('Ingest')).toBeTruthy();
+    expect(screen.getByText('ingestor')).toBeTruthy();
+    expect(screen.getByText('✓')).toBeTruthy();
+  });
+
+  it('shows "edited" badge when step is edited', () => {
+    render(<StepCard step={makeStep({ edited: true })} isSelected={false} onClick={vi.fn()} />);
+    expect(screen.getByText('edited')).toBeTruthy();
+  });
+
+  it('shows schema validation badge', () => {
+    render(
+      <StepCard
+        step={makeStep({ schemaValidation: { passed: false, errors: [{ path: 'title', message: 'Required' }] } })}
+        isSelected={false}
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/schema ✗/)).toBeTruthy();
+  });
+
+  it('calls onClick when clicked', () => {
+    const onClick = vi.fn();
+    render(<StepCard step={makeStep()} isSelected={false} onClick={onClick} />);
+    screen.getByText('Ingest').closest('button')?.click();
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe('StepDetail', () => {
+  it('renders empty state when no step', () => {
+    render(<StepDetail step={null} />);
+    expect(screen.getByText(/select a step/i)).toBeTruthy();
+  });
+
+  it('shows step header info', () => {
+    render(<StepDetail step={makeStep()} />);
+    expect(screen.getByText('Ingest')).toBeTruthy();
+    expect(screen.getByText('ingestor')).toBeTruthy();
+  });
+
+  it('shows response status code', () => {
+    render(<StepDetail step={makeStep({ response: { status: 200, body: { title: 'Test' } } })} />);
+    expect(screen.getByText('200')).toBeTruthy();
   });
 });
