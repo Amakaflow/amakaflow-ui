@@ -42,4 +42,14 @@ describe('service fixtures conform to Zod schemas', () => {
     expect(() => WorkoutStructureSchema.parse({ notATitle: true })).toThrow();
     expect(() => ValidationResponseSchema.parse({ success: 'yes' })).toThrow();
   });
+
+  it('Zod schemas reject constraint violations (confidence out of bounds)', () => {
+    expect(() =>
+      ValidationResponseSchema.parse({
+        success: true,
+        matches: [{ original_name: 'x', matched_name: 'X', confidence: 1.5, garmin_id: null }],
+        unmapped: [],
+      })
+    ).toThrow();
+  });
 });

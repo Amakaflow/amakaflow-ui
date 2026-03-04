@@ -69,5 +69,5 @@ export const WorkoutStructureSchema = z.object({
   blocks: z.array(IngestorBlockSchema).default([]),
   source: z.string().optional(),
   workout_type: z.string().nullable().optional(),
-  workout_type_confidence: z.number().nullable().optional(),
+  workout_type_confidence: z.number().min(0).max(1).nullable().optional(),
 }).passthrough();
