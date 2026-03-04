@@ -27,9 +27,11 @@ export const ValidationResponseSchema = z.object({
   unmapped: z.array(z.string()),
 });
 
-// Compile-time enforcement: if a developer regenerates src/api/generated/mapper.d.ts
-// and the Zod schema no longer matches, TypeScript will error here.
-// Fix: update ValidationResponseSchema to match the new generated type.
+// Compile-time enforcement (one-directional): verifies that z.infer<ValidationResponseSchema>
+// is assignable to the generated API type. If the backend ADDS a required field and you
+// regenerate src/api/generated/mapper.d.ts, TypeScript will error here until the Zod
+// schema is updated. If the backend REMOVES a field, regenerate and verify the contract
+// test still passes against the live API.
 import type { paths } from '../generated/mapper';
 type _MapperValidationResponse =
   paths['/validate']['post']['responses'][200]['content']['application/json'];

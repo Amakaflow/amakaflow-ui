@@ -21,9 +21,9 @@ export interface IngestionWorkout {
 
 export interface ValidationMatch {
   original_name: string;
-  matched_name: string;
+  matched_name: string | null;
   confidence: number;
-  garmin_id: string;
+  garmin_id: string | null;
 }
 
 export interface IngestionValidation {
