@@ -21,12 +21,11 @@ jobs:
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
-        continue-on-error: true
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
-          claude_args: '--model openai-codex/gpt-5.3-codex-spark --max-turns 30'
+          claude_args: '--model claude-sonnet-4-6 --max-turns 10'
           prompt: |
             You are a senior React/TypeScript engineer performing an automated code review.
 
@@ -83,7 +82,6 @@ jobs:
           if echo "$COMMENT" | grep -q "❌ Changes required"; then
             echo "::error::Claude review requires changes before this PR can merge."
 
-            # Notify David via Telegram so Joshua's PR doesn't get missed
             MSG=$(printf "🔴 Code review blocked PR #%s in %s\n\nPR: %s\n%s\n\nJoshua's PR needs fixes before auto-merge can proceed." "$PR_NUMBER" "$REPO" "$PR_TITLE" "$PR_URL")
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=7888191549" \
