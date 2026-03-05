@@ -85,8 +85,8 @@ export async function executeIngest(
 }
 
 export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
-  const url = `${API_URLS.MAPPER}/exercises/match`;
-  const bodyPayload = { exercises };
+  const url = `${API_URLS.MAPPER}/exercises/match/batch`;
+  const bodyPayload = { names: exercises };
   const request: PipelineStep['request'] = {
     url,
     method: 'POST',
