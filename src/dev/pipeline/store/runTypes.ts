@@ -8,6 +8,8 @@ export type FlowId = 'full-pipeline' | 'ingest-only' | 'map-only' | 'export-only
 
 export type RunMode = 'auto' | 'step-through';
 
+export type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';
+
 export interface SchemaValidationResult {
   passed: boolean;
   errors?: Array<{ path: string; message: string }>;
