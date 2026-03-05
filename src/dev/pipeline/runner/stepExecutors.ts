@@ -2,7 +2,7 @@ import { API_URLS } from '../../../lib/config';
 import { WorkoutStructureSchema } from '../../../api/schemas/ingestor';
 import { ValidationResponseSchema } from '../../../api/schemas/mapper';
 import { validateAgainstSchema } from './schemaValidator';
-import type { PipelineStep, ServiceName, SchemaValidationResult, InputType } from '../store/runTypes';
+import type { PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
 
 const TEST_USER_ID = 'observatory-test';
 
@@ -14,52 +14,73 @@ export interface ExecuteResult {
   error?: string;
 }
 
-export const INGEST_ENDPOINTS: Record<InputType, string> = {
-  text: '/ingest/ai_workout',
-  youtube: '/ingest/youtube',
-  instagram: '/ingest/instagram_reel',
-  tiktok: '/ingest/tiktok',
-  url: '/ingest/url',
+export type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';
+
+const INGEST_CONFIG: Record<InputType, {
+  path: string;
+  contentType: string;
+  body: (input: string) => string;
+}> = {
+  text: {
+    path: '/ingest/ai_workout',
+    contentType: 'text/plain',
+    body: (input: string) => input,
+  },
+  youtube: {
+    path: '/ingest/youtube',
+    contentType: 'application/json',
+    body: (url: string) => JSON.stringify({ url }),
+  },
+  instagram: {
+    path: '/ingest/instagram_reel',
+    contentType: 'application/json',
+    body: (url: string) => JSON.stringify({ url }),
+  },
+  tiktok: {
+    path: '/ingest/tiktok',
+    contentType: 'application/json',
+    body: (url: string) => JSON.stringify({ url }),
+  },
+  url: {
+    path: '/ingest/url',
+    contentType: 'application/json',
+    body: (url: string) => JSON.stringify({ url }),
+  },
 };
 
-export async function executeIngest(input: string, inputType: InputType = 'text'): Promise<ExecuteResult> {
-  const endpoint = INGEST_ENDPOINTS[inputType];
-  const url = `${API_URLS.INGESTOR}${endpoint}`;
-  
-  // YouTube and TikTok can take 30-60s
-  const timeoutMs = inputType === 'youtube' || inputType === 'tiktok' ? 60000 : 30000;
-  
-  const isTextInput = inputType === 'text';
-  const headers = {
-    'Content-Type': isTextInput ? 'text/plain' : 'application/json',
-    'x-test-user-id': TEST_USER_ID,
-  };
-  const body = isTextInput ? input : JSON.stringify({ url: input });
-  
+export async function executeIngest(
+  input: string,
+  inputType: InputType = 'text'
+): Promise<ExecuteResult> {
+  const config = INGEST_CONFIG[inputType];
+  const url = `${API_URLS.INGESTOR}${config.path}`;
   const request: PipelineStep['request'] = {
     url,
     method: 'POST',
-    headers,
-    body: isTextInput ? input : { url: input },
+    headers: { 'Content-Type': config.contentType, 'x-test-user-id': TEST_USER_ID },
+    body: config.body(input),
   };
+  // Use longer timeout for video platforms (YouTube, TikTok)
+  const timeout = inputType === 'youtube' || inputType === 'tiktok' ? 60000 : 30000;
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers,
-      body,
-      signal: AbortSignal.timeout(timeoutMs),
+      headers: request.headers,
+      body: config.body(input),
+      signal: AbortSignal.timeout(timeout),
     });
-    const responseBody = await res.json();
-    const schemaValidation = validateAgainstSchema(responseBody, WorkoutStructureSchema);
+    const body = await res.json();
+    const schemaValidation = validateAgainstSchema(body, WorkoutStructureSchema);
     return {
       request,
-      response: { status: res.status, body: responseBody },
+      response: { status: res.status, body },
       schemaValidation,
-      apiOutput: responseBody,
+      apiOutput: body,
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 
