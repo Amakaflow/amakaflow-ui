@@ -62,3 +62,20 @@ export type StepEvent =
   | { type: 'step:edited'; runId: string; stepId: string; effectiveOutput: unknown }
   | { type: 'run:completed'; runId: string; status: RunStatus }
   | { type: 'run:cancelled'; runId: string; status: 'cancelled' };
+
+export interface ParallelGroup {
+  type: 'parallel';
+  steps: string[];  // step IDs from registry
+}
+
+export type FlowStep = string | ParallelGroup;
+
+export interface FlowDefinition {
+  id: string;
+  label: string;
+  steps: FlowStep[];
+}
+
+export function isParallelGroup(step: FlowStep): step is ParallelGroup {
+  return typeof step === 'object' && step.type === 'parallel';
+}
