@@ -154,3 +154,37 @@ export function extractExerciseNames(workoutStructure: unknown): string[] {
   }
   return names;
 }
+
+export async function executeExport(
+  workoutStructure: unknown,
+  title: string
+): Promise<ExecuteResult> {
+  const url = `${API_URLS.MAPPER}/workout/sync/garmin`;
+  const bodyPayload = {
+    blocks_json: workoutStructure,
+    workout_title: title,
+  };
+  const request: PipelineStep['request'] = {
+    url,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-test-user-id': TEST_USER_ID },
+    body: bodyPayload,
+  };
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: request.headers,
+      body: JSON.stringify(bodyPayload),
+      signal: AbortSignal.timeout(30000),
+    });
+    const body = await res.json().catch(() => ({}));
+    return {
+      request,
+      response: { status: res.status, body },
+      apiOutput: body,
+      error: res.ok ? undefined : `HTTP ${res.status}`,
+    };
+  } catch (err) {
+    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+  }
+}

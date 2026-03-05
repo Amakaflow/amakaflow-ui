@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { executeIngest, type InputType } from '../stepExecutors';
-import { API_URLS } from '../../../lib/config';
+import { executeIngest, executeExport, type InputType } from '../stepExecutors';
 
 describe('executeIngest routing', () => {
   beforeEach(() => {
@@ -117,5 +116,61 @@ describe('executeIngest routing', () => {
     expect(mockFetch).toHaveBeenCalled();
     const fetchCall = mockFetch.mock.calls[0];
     expect(fetchCall?.[0]).toContain('/ingest/ai_workout');
+  });
+});
+
+describe('executeExport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls POST /workout/sync/garmin with blocks_json and workout_title', async () => {
+    const mockStructure = { blocks: [], title: 'Test Workout' };
+    const mockResponse = { success: true };
+    
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    } as unknown as Response);
+    
+    const result = await executeExport(mockStructure, 'Test Workout');
+    
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8001/workout/sync/garmin',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-test-user-id': 'observatory-test' },
+        body: JSON.stringify({
+          blocks_json: mockStructure,
+          workout_title: 'Test Workout',
+        }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(result.request?.url).toContain('/workout/sync/garmin');
+    expect(result.request?.body).toEqual({
+      blocks_json: mockStructure,
+      workout_title: 'Test Workout',
+    });
+    expect(result.response?.status).toBe(200);
+  });
+
+  it('returns error on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: 'Not Found' }),
+    } as unknown as Response);
+    
+    const result = await executeExport({}, 'Test');
+    expect(result.error).toBe('HTTP 404');
+  });
+
+  it('returns error on network failure', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
+    
+    const result = await executeExport({}, 'Test');
+    expect(result.error).toContain('Network error');
   });
 });
