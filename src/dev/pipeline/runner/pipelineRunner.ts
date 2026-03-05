@@ -1,4 +1,4 @@
-import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
+import type { FlowId, FlowDefinition, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
 import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames, executeExport, type InputType } from './stepExecutors';
 import { API_URLS } from '../../../lib/config';
 
@@ -9,7 +9,7 @@ function genId(): string {
 }
 
 export interface PipelineRunnerOptions {
-  flowId: FlowId;
+  flow: FlowDefinition;
   inputs: Record<string, unknown>;
   mode: RunMode;
   onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>;
@@ -70,10 +70,14 @@ async function* runStep(
 }
 
 export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<StepEvent> {
-  const { flowId, inputs, mode, onStepPaused } = opts;
+  const { flow, inputs, mode, onStepPaused } = opts;
   const runId = genId();
 
-  yield { type: 'run:started', runId, flowId, inputs };
+  yield { type: 'run:started', runId, flowId: flow.id, inputs };
+
+  // Backward compat: map new preset IDs to existing FlowId behavior
+  // Task 7 will replace this entire switch with dynamic execution
+  const flowId = flow.id as FlowId;
 
   try {
     const inputType = (inputs.inputType as InputType) || 'text';

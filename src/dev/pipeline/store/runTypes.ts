@@ -43,7 +43,7 @@ export interface PipelineStep {
 
 export interface PipelineRun {
   id: string;
-  flowId: FlowId;
+  flowId: string;
   label?: string;
   mode: RunMode;
   status: RunStatus;
@@ -54,7 +54,7 @@ export interface PipelineRun {
 }
 
 export type StepEvent =
-  | { type: 'run:started'; runId: string; flowId: FlowId; inputs: Record<string, unknown> }
+  | { type: 'run:started'; runId: string; flowId: string; inputs: Record<string, unknown> }
   | { type: 'step:started'; runId: string; stepId: string; service: ServiceName; label: string }
   | { type: 'step:completed'; runId: string; stepId: string; step: PipelineStep }
   | { type: 'step:failed'; runId: string; stepId: string; error: string; step: PipelineStep }

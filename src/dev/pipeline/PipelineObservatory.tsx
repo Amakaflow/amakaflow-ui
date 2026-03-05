@@ -5,7 +5,7 @@ import { PipelineCanvas } from './components/PipelineCanvas';
 import { StepDetail } from './components/StepDetail';
 import { usePipelineRunner } from './hooks/usePipelineRunner';
 import { useRunHistory } from './hooks/useRunHistory';
-import type { PipelineRun, PipelineStep, FlowId, RunMode } from './store/runTypes';
+import type { PipelineRun, PipelineStep, FlowDefinition, RunMode } from './store/runTypes';
 
 export function PipelineObservatory() {
   const { run, isRunning, start, cancel } = usePipelineRunner();
@@ -18,7 +18,7 @@ export function PipelineObservatory() {
   const stepResolverRef = useRef<((output: unknown) => void) | null>(null);
 
   const handleStart = useCallback(async (
-    flowId: FlowId,
+    flow: FlowDefinition,
     inputs: Record<string, unknown>,
     mode: RunMode,
   ) => {
@@ -34,7 +34,7 @@ export function PipelineObservatory() {
         }
       : undefined;
 
-    await start(flowId, inputs, mode, onStepPaused);
+    await start(flow, inputs, mode, onStepPaused);
     setPausedStepId(null);
     stepResolverRef.current = null;
     refreshHistory();

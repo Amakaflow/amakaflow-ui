@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { runPipeline } from '../runner/pipelineRunner';
 import { saveRun, applyEventToRun } from '../store/runStore';
-import type { PipelineRun, FlowId, RunMode, PipelineStep } from '../store/runTypes';
+import type { PipelineRun, FlowDefinition, RunMode, PipelineStep } from '../store/runTypes';
 
 export function usePipelineRunner() {
   const [run, setRun] = useState<PipelineRun | null>(null);
@@ -10,7 +10,7 @@ export function usePipelineRunner() {
   const isRunningRef = useRef(false);
 
   const start = useCallback(async (
-    flowId: FlowId,
+    flow: FlowDefinition,
     inputs: Record<string, unknown>,
     mode: RunMode,
     onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>,
@@ -22,8 +22,8 @@ export function usePipelineRunner() {
 
     const newRun: PipelineRun = {
       id: crypto.randomUUID(),
-      flowId,
-      label: flowId,
+      flowId: flow.id,
+      label: flow.label,
       mode,
       status: 'running',
       startedAt: Date.now(),
@@ -33,7 +33,7 @@ export function usePipelineRunner() {
     setRun(newRun);
     await saveRun(newRun);
 
-    const generator = runPipeline({ flowId, inputs, mode, onStepPaused });
+    const generator = runPipeline({ flow, inputs, mode, onStepPaused });
 
     let currentRun = newRun;
     for await (const event of generator) {
