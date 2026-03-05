@@ -2,7 +2,7 @@ import { API_URLS } from '../../../lib/config';
 import { WorkoutStructureSchema } from '../../../api/schemas/ingestor';
 import { ValidationResponseSchema } from '../../../api/schemas/mapper';
 import { validateAgainstSchema } from './schemaValidator';
-import type { PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
+import type { PipelineStep, ServiceName, SchemaValidationResult, InputType } from '../store/runTypes';
 
 const TEST_USER_ID = 'observatory-test';
 
@@ -14,28 +14,48 @@ export interface ExecuteResult {
   error?: string;
 }
 
-export async function executeIngest(workoutText: string): Promise<ExecuteResult> {
-  const url = `${API_URLS.INGESTOR}/ingest/ai_workout`;
+export const INGEST_ENDPOINTS: Record<InputType, string> = {
+  text: '/ingest/ai_workout',
+  youtube: '/ingest/youtube',
+  instagram: '/ingest/instagram_reel',
+  tiktok: '/ingest/tiktok',
+  url: '/ingest/url',
+};
+
+export async function executeIngest(input: string, inputType: InputType = 'text'): Promise<ExecuteResult> {
+  const endpoint = INGEST_ENDPOINTS[inputType];
+  const url = `${API_URLS.INGESTOR}${endpoint}`;
+  
+  // YouTube and TikTok can take 30-60s
+  const timeoutMs = inputType === 'youtube' || inputType === 'tiktok' ? 60000 : 30000;
+  
+  const isTextInput = inputType === 'text';
+  const headers = {
+    'Content-Type': isTextInput ? 'text/plain' : 'application/json',
+    'x-test-user-id': TEST_USER_ID,
+  };
+  const body = isTextInput ? input : JSON.stringify({ url: input });
+  
   const request: PipelineStep['request'] = {
     url,
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain', 'x-test-user-id': TEST_USER_ID },
-    body: workoutText,
+    headers,
+    body: isTextInput ? input : { url: input },
   };
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: request.headers,
-      body: workoutText,
-      signal: AbortSignal.timeout(30000),
+      headers,
+      body,
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    const body = await res.json();
-    const schemaValidation = validateAgainstSchema(body, WorkoutStructureSchema);
+    const responseBody = await res.json();
+    const schemaValidation = validateAgainstSchema(responseBody, WorkoutStructureSchema);
     return {
       request,
-      response: { status: res.status, body },
+      response: { status: res.status, body: responseBody },
       schemaValidation,
-      apiOutput: body,
+      apiOutput: responseBody,
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
