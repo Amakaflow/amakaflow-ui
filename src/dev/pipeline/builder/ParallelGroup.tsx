@@ -5,10 +5,10 @@ import type { ParallelGroup as ParallelGroupType } from '../store/runTypes';
 interface ParallelGroupProps {
   group: ParallelGroupType;
   activeStepId: string | null;
-  onRemoveBranch: (stepId: string) => void;
+  onRemoveGroup: () => void;
 }
 
-export function ParallelGroup({ group, activeStepId, onRemoveBranch }: ParallelGroupProps) {
+export function ParallelGroup({ group, activeStepId, onRemoveGroup }: ParallelGroupProps) {
   return (
     <div className="w-full">
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider text-center mb-1.5">
@@ -41,7 +41,7 @@ export function ParallelGroup({ group, activeStepId, onRemoveBranch }: ParallelG
               </div>
               <button
                 aria-label={`remove ${stepId}`}
-                onClick={() => onRemoveBranch(stepId)}
+                onClick={onRemoveGroup}
                 className="text-muted-foreground hover:text-foreground text-sm flex-shrink-0"
               >×</button>
             </div>

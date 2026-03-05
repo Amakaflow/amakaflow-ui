@@ -42,3 +42,16 @@ test('add parallel group button calls onAddParallelGroup', () => {
   fireEvent.click(screen.getByText('+ Add parallel group'));
   expect(onAdd).toHaveBeenCalled();
 });
+
+test('remove button inside parallel group removes entire group', () => {
+  const onRemove = vi.fn();
+  const stepsWithParallel: FlowStep[] = [
+    'ingest-youtube',
+    { type: 'parallel', steps: ['export-garmin', 'export-apple'] },
+  ];
+  render(<FlowCanvas steps={stepsWithParallel} activeStepId={null} onRemoveStep={onRemove} onAddParallelGroup={() => {}} />);
+  // There should be remove buttons for each branch in the group
+  const removeButtons = screen.getAllByRole('button', { name: /remove/i });
+  fireEvent.click(removeButtons[1]); // click remove on one branch (removes whole group)
+  expect(onRemove).toHaveBeenCalledWith(1); // index 1 = the parallel group
+});

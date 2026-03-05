@@ -14,12 +14,12 @@ export function FlowCanvas({ steps, activeStepId, onRemoveStep, onAddParallelGro
   return (
     <div className="flex flex-col items-center gap-0 w-full max-w-xl mx-auto py-4 px-4">
       {steps.map((step, index) => (
-        <div key={index} className="w-full flex flex-col items-center">
+        <div key={isParallelGroup(step) ? `group-${step.steps.join('-')}` : `step-${step}`} className="w-full flex flex-col items-center">
           {isParallelGroup(step) ? (
             <ParallelGroup
               group={step}
               activeStepId={activeStepId}
-              onRemoveBranch={() => onRemoveStep(index)}
+              onRemoveGroup={() => onRemoveStep(index)}
             />
           ) : (
             <SingleStep
