@@ -8,6 +8,7 @@ vi.mock('../stepExecutors', () => ({
   executeMap: vi.fn(),
   executeHealthCheck: vi.fn(),
   extractExerciseNames: vi.fn(),
+  executeExport: vi.fn(),
 }));
 
 async function collectEvents(gen: AsyncGenerator<StepEvent>): Promise<StepEvent[]> {
@@ -22,6 +23,7 @@ const mockExecuteIngest = vi.mocked(executors.executeIngest);
 const mockExecuteMap = vi.mocked(executors.executeMap);
 const mockExecuteHealthCheck = vi.mocked(executors.executeHealthCheck);
 const mockExtractExerciseNames = vi.mocked(executors.extractExerciseNames);
+const mockExecuteExport = vi.mocked(executors.executeExport);
 
 describe('runPipeline', () => {
   beforeEach(() => {
@@ -44,6 +46,11 @@ describe('runPipeline', () => {
       apiOutput: { status: 'ok' },
     });
     mockExtractExerciseNames.mockReturnValue(['bench press']);
+    mockExecuteExport.mockResolvedValue({
+      request: { url: 'http://localhost:8001/workout/sync/garmin', method: 'POST', headers: {}, body: {} },
+      response: { status: 200, body: { success: true } },
+      apiOutput: { success: true },
+    });
   });
 
   it('yields run:started and run:completed for ingest-only flow', async () => {
