@@ -3,6 +3,9 @@ name: Linear Status Sync
 on:
   pull_request:
     types: [opened, ready_for_review, reopened, closed]
+  push:
+    branches:
+      - develop
 
 jobs:
   sync-linear:
@@ -11,38 +14,58 @@ jobs:
       contents: read
 
     steps:
-      - name: Sync ticket state to Linear
+      - name: Determine ticket and target state
+        id: resolve
         env:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          BRANCH: ${{ github.head_ref }}
+          EVENT: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
           MERGED: ${{ github.event.pull_request.merged }}
+          PR_BRANCH: ${{ github.head_ref }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$EVENT" == "pull_request" ]]; then
+            TICKET_ID=$(echo "$PR_BRANCH" | grep -ioE 'AMA-[0-9]+' | head -1)
+            if [[ "$ACTION" == "opened" || "$ACTION" == "ready_for_review" || "$ACTION" == "reopened" ]]; then
+              TARGET_STATE="In Review"
+            elif [[ "$ACTION" == "closed" && "$MERGED" == "true" ]]; then
+              TARGET_STATE="Done"
+            elif [[ "$ACTION" == "closed" && "$MERGED" == "false" ]]; then
+              TARGET_STATE="In Progress"
+            else
+              echo "Action '$ACTION' not mapped — skipping"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif [[ "$EVENT" == "push" ]]; then
+            # On push to develop (squash merge), mark ticket Done via commit message
+            TICKET_ID=$(echo "$COMMIT_MSG" | grep -ioE 'AMA-[0-9]+' | head -1)
+            TARGET_STATE="Done"
+          fi
+
+          if [[ -z "$TICKET_ID" ]]; then
+            echo "No AMA-NNN found — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "ticket_id=$TICKET_ID" >> "$GITHUB_OUTPUT"
+          echo "target_state=$TARGET_STATE" >> "$GITHUB_OUTPUT"
+          echo "Ticket: $TICKET_ID | Target: $TARGET_STATE"
+
+      - name: Sync ticket state to Linear
+        if: steps.resolve.outputs.skip != 'true'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          TICKET_ID: ${{ steps.resolve.outputs.ticket_id }}
+          TARGET_STATE: ${{ steps.resolve.outputs.target_state }}
         run: |
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "LINEAR_API_KEY not set — skipping"
             exit 0
           fi
 
-          TICKET_ID=$(echo "$BRANCH" | grep -ioE 'AMA-[0-9]+' | head -1)
-          if [[ -z "$TICKET_ID" ]]; then
-            echo "No AMA-NNN in branch '$BRANCH' — skipping"
-            exit 0
-          fi
-
           TICKET_NUMBER=$(echo "$TICKET_ID" | grep -oE '[0-9]+')
-
-          if [[ "$ACTION" == "opened" || "$ACTION" == "ready_for_review" || "$ACTION" == "reopened" ]]; then
-            TARGET_STATE="In Review"
-          elif [[ "$ACTION" == "closed" && "$MERGED" == "true" ]]; then
-            TARGET_STATE="Done"
-          elif [[ "$ACTION" == "closed" && "$MERGED" == "false" ]]; then
-            TARGET_STATE="In Progress"
-          else
-            echo "Action '$ACTION' not mapped — skipping"
-            exit 0
-          fi
-
-          echo "Ticket: $TICKET_ID | Action: $ACTION | Target: $TARGET_STATE"
 
           ISSUE_QUERY=$(jq -n --argjson num "$TICKET_NUMBER" '{"query": "{ issues(filter: { number: { eq: \($num) }, team: { name: { eq: \"MyAmaka\" } } }) { nodes { id team { id } state { name } } } }"}')
           ISSUE_RESP=$(curl -s -w "\n%{http_code}" -X POST https://api.linear.app/graphql \
@@ -55,7 +78,6 @@ jobs:
 
           if [[ "$HTTP_CODE" != "200" ]]; then
             echo "Linear API returned HTTP $HTTP_CODE — skipping"
-            echo "Response: $ISSUE_BODY"
             exit 0
           fi
 
@@ -79,19 +101,12 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$STATES_QUERY")
 
-          HTTP_CODE=$(echo "$STATES_RESP" | tail -1)
           STATES_BODY=$(echo "$STATES_RESP" | head -n -1)
-
-          if [[ "$HTTP_CODE" != "200" ]]; then
-            echo "Linear API (states) returned HTTP $HTTP_CODE — skipping"
-            echo "Response: $STATES_BODY"
-            exit 0
-          fi
 
           STATE_UUID=$(echo "$STATES_BODY" | python3 -c "import sys,json; target=sys.argv[1]; d=json.load(sys.stdin); n=d.get('data',{}).get('workflowStates',{}).get('nodes',[]); m=[x for x in n if x['name']==target]; print(m[0]['id'] if m else '')" "$TARGET_STATE")
 
           if [[ -z "$STATE_UUID" ]]; then
-            echo "State '$TARGET_STATE' not found in Linear team states — skipping"
+            echo "State '$TARGET_STATE' not found — skipping"
             exit 0
           fi
 
@@ -101,15 +116,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$UPDATE")
 
-          HTTP_CODE=$(echo "$UPDATE_RESP" | tail -1)
           UPDATE_BODY=$(echo "$UPDATE_RESP" | head -n -1)
-
-          if [[ "$HTTP_CODE" != "200" ]]; then
-            echo "Linear API (update) returned HTTP $HTTP_CODE — skipping"
-            echo "Response: $UPDATE_BODY"
-            exit 0
-          fi
-
           SUCCESS=$(echo "$UPDATE_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('data',{}).get('issueUpdate',{}).get('success') else 'false')")
 
           if [[ "$SUCCESS" == "true" ]]; then
