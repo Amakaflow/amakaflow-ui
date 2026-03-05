@@ -64,7 +64,10 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
           REPO: ${{ github.repository }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
@@ -79,6 +82,18 @@ jobs:
 
           if echo "$COMMENT" | grep -q "❌ Changes required"; then
             echo "::error::Claude review requires changes before this PR can merge."
+
+            # Notify David via Telegram so Joshua's PR doesn't get missed
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=7888191549" \
+              --data-urlencode "text=🔴 Code review blocked PR #${PR_NUMBER} in ${REPO}
+
+PR: ${PR_TITLE}
+${PR_URL}
+
+Joshua's PR needs fixes before auto-merge can proceed." \
+              || true
+
             exit 1
           fi
 
