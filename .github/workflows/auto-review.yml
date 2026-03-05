@@ -84,14 +84,10 @@ jobs:
             echo "::error::Claude review requires changes before this PR can merge."
 
             # Notify David via Telegram so Joshua's PR doesn't get missed
+            MSG=$(printf "🔴 Code review blocked PR #%s in %s\n\nPR: %s\n%s\n\nJoshua's PR needs fixes before auto-merge can proceed." "$PR_NUMBER" "$REPO" "$PR_TITLE" "$PR_URL")
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=7888191549" \
-              --data-urlencode "text=🔴 Code review blocked PR #${PR_NUMBER} in ${REPO}
-
-PR: ${PR_TITLE}
-${PR_URL}
-
-Joshua's PR needs fixes before auto-merge can proceed." \
+              --data-urlencode "text=$MSG" \
               || true
 
             exit 1
