@@ -23,10 +23,10 @@ jobs:
         uses: anthropics/claude-code-action@v1
         continue-on-error: true
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
-          claude_args: '--model claude-sonnet-4-6 --max-turns 30'
+          claude_args: '--model openai-codex/gpt-5.3-codex-spark --max-turns 30'
           prompt: |
             You are a senior React/TypeScript engineer performing an automated code review.
 
