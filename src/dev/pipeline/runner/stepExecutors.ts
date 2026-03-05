@@ -2,7 +2,7 @@ import { API_URLS } from '../../../lib/config';
 import { WorkoutStructureSchema } from '../../../api/schemas/ingestor';
 import { ValidationResponseSchema } from '../../../api/schemas/mapper';
 import { validateAgainstSchema } from './schemaValidator';
-import type { PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
+import type { PipelineStep, ServiceName, SchemaValidationResult, InputType } from '../store/runTypes';
 
 const TEST_USER_ID = 'observatory-test';
 
@@ -13,8 +13,6 @@ export interface ExecuteResult {
   apiOutput: unknown;
   error?: string;
 }
-
-export type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';
 
 const INGEST_CONFIG: Record<InputType, {
   path: string;
@@ -54,11 +52,12 @@ export async function executeIngest(
 ): Promise<ExecuteResult> {
   const config = INGEST_CONFIG[inputType];
   const url = `${API_URLS.INGESTOR}${config.path}`;
+  const serializedBody = config.body(input);
   const request: PipelineStep['request'] = {
     url,
     method: 'POST',
     headers: { 'Content-Type': config.contentType, 'x-test-user-id': TEST_USER_ID },
-    body: config.body(input),
+    body: serializedBody,
   };
   // Use longer timeout for video platforms (YouTube, TikTok)
   const timeout = inputType === 'youtube' || inputType === 'tiktok' ? 60000 : 30000;
@@ -66,7 +65,7 @@ export async function executeIngest(
     const res = await fetch(url, {
       method: 'POST',
       headers: request.headers,
-      body: config.body(input),
+      body: serializedBody,
       signal: AbortSignal.timeout(timeout),
     });
     const body = await res.json();
@@ -110,7 +109,8 @@ export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 
@@ -132,7 +132,8 @@ export async function executeHealthCheck(_service: ServiceName, baseUrl: string)
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 
@@ -185,6 +186,7 @@ export async function executeExport(
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { executeIngest, executeExport, type InputType } from '../stepExecutors';
+import { executeIngest, executeExport } from '../stepExecutors';
 
 describe('executeIngest routing', () => {
   beforeEach(() => {

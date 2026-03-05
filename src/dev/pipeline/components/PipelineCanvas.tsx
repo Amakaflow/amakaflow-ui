@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { cn } from '../../../components/ui/utils';
 import { StepCard } from './StepCard';
 import { StepEditForm } from './StepEditForm';
-import type { PipelineRun, PipelineStep, FlowId, RunMode } from '../store/runTypes';
+import type { PipelineRun, PipelineStep, FlowId, RunMode, InputType } from '../store/runTypes';
 
 type ViewMode = 'steps' | 'raw';
-type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';
 
 const FLOW_OPTIONS: { id: FlowId; label: string }[] = [
   { id: 'full-pipeline', label: 'Full Pipeline' },
@@ -23,6 +22,7 @@ const INPUT_TYPE_OPTIONS: { id: InputType; label: string }[] = [
 ];
 
 const FLOW_IDS = FLOW_OPTIONS.map(f => f.id);
+const INPUT_TYPE_IDS = INPUT_TYPE_OPTIONS.map(o => o.id);
 const RUN_MODES: RunMode[] = ['auto', 'step-through'];
 
 function isFlowId(v: string): v is FlowId {
@@ -32,7 +32,7 @@ function isRunMode(v: string): v is RunMode {
   return (RUN_MODES as string[]).includes(v);
 }
 function isInputType(v: string): v is InputType {
-  return (INPUT_TYPE_OPTIONS.map(o => o.id) as string[]).includes(v);
+  return (INPUT_TYPE_IDS as string[]).includes(v);
 }
 
 function isValidUrl(s: string): boolean {

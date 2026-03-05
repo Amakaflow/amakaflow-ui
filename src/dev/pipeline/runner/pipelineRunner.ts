@@ -1,5 +1,5 @@
-import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
-import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames, executeExport, type InputType } from './stepExecutors';
+import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult, InputType } from '../store/runTypes';
+import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames, executeExport } from './stepExecutors';
 import { API_URLS } from '../../../lib/config';
 
 function genId(): string {
@@ -123,42 +123,23 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
         }
       }
       const exercises = extractExerciseNames(ingestOutput);
-      let mapOutput: unknown;
       for await (const event of runMapStep(runId, exercises, mode, onStepPaused)) {
         yield event;
-        if (event.type === 'step:completed') mapOutput = event.step.effectiveOutput;
         if (event.type === 'step:failed') {
           yield { type: 'run:completed', runId, status: 'failed' };
           return;
         }
       }
-      // Export step: use the workout structure from ingest (before mapping transforms it)
-      const workoutStructure = ingestOutput;
+      // Export step
       const title =
-        (workoutStructure as Record<string, unknown>)?.title as string ??
+        (ingestOutput as Record<string, unknown>)?.title as string ??
         'AI Generated Workout';
-
-      yield { type: 'step:started', runId, stepId: genId(), service: 'mapper', label: 'Export to Garmin' };
-      const exportResult = await executeExport(workoutStructure, title);
-      yield {
-        type: 'step:completed',
-        runId,
-        stepId: genId(),
-        step: {
-          id: '',
-          service: 'mapper',
-          label: 'Export to Garmin',
-          status: exportResult.error ? 'failed' : 'success',
-          request: exportResult.request,
-          response: exportResult.response,
-          apiOutput: exportResult.apiOutput,
-          effectiveOutput: exportResult.apiOutput,
-          edited: false,
-        },
-      };
-      if (exportResult.error) {
-        yield { type: 'run:completed', runId, status: 'failed' };
-        return;
+      for await (const event of runExportStep(runId, ingestOutput, title, mode, onStepPaused)) {
+        yield event;
+        if (event.type === 'step:failed') {
+          yield { type: 'run:completed', runId, status: 'failed' };
+          return;
+        }
       }
     } else if (flowId === 'health-check') {
       // health-check intentionally continues after individual step failures
@@ -196,6 +177,17 @@ function runMapStep(
 ): AsyncGenerator<StepEvent> {
   const stepId = genId();
   return runStep(runId, stepId, 'mapper', 'Map exercises', () => executeMap(exercises), mode, onStepPaused);
+}
+
+function runExportStep(
+  runId: string,
+  workoutStructure: unknown,
+  title: string,
+  mode: RunMode,
+  onStepPaused?: PipelineRunnerOptions['onStepPaused'],
+): AsyncGenerator<StepEvent> {
+  const stepId = genId();
+  return runStep(runId, stepId, 'garmin', 'Export to Garmin', () => executeExport(workoutStructure, title), mode, onStepPaused);
 }
 
 async function* runHealthCheckSteps(runId: string): AsyncGenerator<StepEvent> {
