@@ -1,0 +1,3 @@
+BRANCH: feature/AMA-951-multiple-ingest-types
+FILES: src/dev/pipeline/components/PipelineCanvas.tsx, src/dev/pipeline/runner/pipelineRunner.ts, src/dev/pipeline/runner/stepExecutors.ts, src/dev/pipeline/runner/__tests__/stepExecutors.test.ts
+SUMMARY: Implemented multiple ingest types (YouTube, Instagram, TikTok, URL, text) in Pipeline Observatory UI with input type selector, URL validation, and routing to appropriate endpoints

@@ -58,7 +58,7 @@ export async function executeIngest(
     url,
     method: 'POST',
     headers: { 'Content-Type': config.contentType, 'x-test-user-id': TEST_USER_ID },
-    body: input,
+    body: config.body(input),
   };
   // Use longer timeout for video platforms (YouTube, TikTok)
   const timeout = inputType === 'youtube' || inputType === 'tiktok' ? 60000 : 30000;
@@ -79,7 +79,8 @@ export async function executeIngest(
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 
