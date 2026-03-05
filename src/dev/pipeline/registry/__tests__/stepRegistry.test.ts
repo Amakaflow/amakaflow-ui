@@ -38,3 +38,9 @@ test('getStepsByGroup returns only steps of that group', () => {
   expect(ingestion.length).toBeGreaterThan(0);
   ingestion.forEach(s => expect(s.group).toBe('ingestion'));
 });
+
+test('all step registry keys match their id field', () => {
+  for (const [key, step] of Object.entries(STEP_REGISTRY)) {
+    expect(step.id).toBe(key);
+  }
+});

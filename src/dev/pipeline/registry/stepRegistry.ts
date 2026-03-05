@@ -56,7 +56,7 @@ export const STEP_REGISTRY: Record<string, StepDefinition> = {
   },
   'pull-runna': {
     id: 'pull-runna', label: 'Pull Runna Plan', service: 'ingestor',
-    mcpTool: 'pull_runna_plan', group: 'export', canParallelize: false,
+    mcpTool: 'pull_runna_plan', group: 'ingestion', canParallelize: false,
     icon: 'R', colorClass: 'bg-sky-950 text-sky-400',
   },
   'health-check': {
