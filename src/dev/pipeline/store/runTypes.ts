@@ -65,7 +65,7 @@ export type StepEvent =
 
 export interface ParallelGroup {
   type: 'parallel';
-  steps: string[];  // step IDs from registry
+  steps: string[];  // step identifiers
 }
 
 export type FlowStep = string | ParallelGroup;
