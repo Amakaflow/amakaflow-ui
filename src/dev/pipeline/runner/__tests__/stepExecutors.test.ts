@@ -190,7 +190,7 @@ describe('executeMap', () => {
     vi.unstubAllGlobals();
   });
 
-  it('calls POST /exercises/match/batch with names field', async () => {
+  it('calls POST /exercises/match with exercises field', async () => {
     const mockExercises = ['Bench Press', 'Squat', 'Deadlift'];
     const mockResponse = { matches: [] };
     
@@ -203,16 +203,16 @@ describe('executeMap', () => {
     const result = await executeMap(mockExercises);
     
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8001/exercises/match/batch',
+      'http://localhost:8001/exercises/match',
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-test-user-id': 'observatory-test' },
-        body: JSON.stringify({ names: mockExercises }),
+        body: JSON.stringify({ exercises: mockExercises }),
         signal: expect.any(AbortSignal),
       })
     );
-    expect(result.request?.url).toContain('/exercises/match/batch');
-    expect(result.request?.body).toEqual({ names: mockExercises });
+    expect(result.request?.url).toContain('/exercises/match');
+    expect(result.request?.body).toEqual({ exercises: mockExercises });
     expect(result.response?.status).toBe(200);
   });
 

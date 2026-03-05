@@ -85,8 +85,8 @@ export async function executeIngest(
 }
 
 export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
-  const url = `${API_URLS.MAPPER}/exercises/match/batch`;
-  const bodyPayload = { names: exercises };
+  const url = `${API_URLS.MAPPER}/exercises/match`;
+  const bodyPayload = { exercises };
   const request: PipelineStep['request'] = {
     url,
     method: 'POST',
@@ -110,7 +110,8 @@ export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 
