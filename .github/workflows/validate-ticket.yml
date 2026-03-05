@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions: {}
+
+concurrency:
+  group: validate-ticket-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-ticket:
     if: ${{ github.event.pull_request.user.login == 'openclawjoshua-eng' }}

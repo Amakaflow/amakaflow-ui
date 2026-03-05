@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+permissions: {}
+
+concurrency:
+  group: protect-main-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-source-branch:
     runs-on: ubuntu-latest

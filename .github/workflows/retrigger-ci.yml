@@ -5,6 +5,12 @@ on:
     workflows: ["CI", "PR CI (Impacted)", "Validate Linear Ticket", "Automatic Code Review"]
     types: [completed]
 
+permissions: {}
+
+concurrency:
+  group: retrigger-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   retry:
     if: |

@@ -7,6 +7,12 @@ on:
     branches:
       - develop
 
+permissions: {}
+
+concurrency:
+  group: linear-sync-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync-linear:
     runs-on: ubuntu-latest
