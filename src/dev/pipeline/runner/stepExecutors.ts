@@ -110,7 +110,8 @@ export async function executeMap(exercises: string[]): Promise<ExecuteResult> {
       error: res.ok ? undefined : `HTTP ${res.status}`,
     };
   } catch (err) {
-    return { request, response: undefined, apiOutput: undefined, error: String(err) };
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return { request, response: undefined, apiOutput: undefined, error: errorMessage };
   }
 }
 

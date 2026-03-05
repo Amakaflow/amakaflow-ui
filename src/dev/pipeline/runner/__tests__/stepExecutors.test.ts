@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { executeIngest, executeExport, type InputType } from '../stepExecutors';
+import { executeIngest, executeExport, executeMap, type InputType } from '../stepExecutors';
 
 describe('executeIngest routing', () => {
   beforeEach(() => {
@@ -121,7 +121,12 @@ describe('executeIngest routing', () => {
 
 describe('executeExport', () => {
   beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('calls POST /workout/sync/garmin with blocks_json and workout_title', async () => {
@@ -171,6 +176,61 @@ describe('executeExport', () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
     
     const result = await executeExport({}, 'Test');
+    expect(result.error).toContain('Network error');
+  });
+});
+
+describe('executeMap', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('calls POST /exercises/match with exercises field', async () => {
+    const mockExercises = ['Bench Press', 'Squat', 'Deadlift'];
+    const mockResponse = { matches: [] };
+    
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    } as unknown as Response);
+    
+    const result = await executeMap(mockExercises);
+    
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8001/exercises/match',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-test-user-id': 'observatory-test' },
+        body: JSON.stringify({ exercises: mockExercises }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(result.request?.url).toContain('/exercises/match');
+    expect(result.request?.body).toEqual({ exercises: mockExercises });
+    expect(result.response?.status).toBe(200);
+  });
+
+  it('returns error on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: 'Not Found' }),
+    } as unknown as Response);
+    
+    const result = await executeMap(['Bench Press']);
+    expect(result.error).toBe('HTTP 404');
+  });
+
+  it('returns error on network failure', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
+    
+    const result = await executeMap(['Bench Press']);
     expect(result.error).toContain('Network error');
   });
 });
