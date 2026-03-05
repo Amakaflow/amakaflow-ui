@@ -5,12 +5,21 @@ import { StepEditForm } from './StepEditForm';
 import type { PipelineRun, PipelineStep, FlowId, RunMode } from '../store/runTypes';
 
 type ViewMode = 'steps' | 'raw';
+type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';
 
 const FLOW_OPTIONS: { id: FlowId; label: string }[] = [
   { id: 'full-pipeline', label: 'Full Pipeline' },
   { id: 'ingest-only', label: 'Ingest Only' },
   { id: 'map-only', label: 'Map Only' },
   { id: 'health-check', label: 'Health Check' },
+];
+
+const INPUT_TYPE_OPTIONS: { id: InputType; label: string }[] = [
+  { id: 'text', label: 'Text' },
+  { id: 'youtube', label: 'YouTube' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'url', label: 'URL' },
 ];
 
 const FLOW_IDS = FLOW_OPTIONS.map(f => f.id);
@@ -21,6 +30,13 @@ function isFlowId(v: string): v is FlowId {
 }
 function isRunMode(v: string): v is RunMode {
   return (RUN_MODES as string[]).includes(v);
+}
+function isInputType(v: string): v is InputType {
+  return (INPUT_TYPE_OPTIONS.map(o => o.id) as string[]).includes(v);
+}
+
+function isValidUrl(s: string): boolean {
+  try { new URL(s); return true; } catch { return false; }
 }
 
 interface PipelineCanvasProps {
@@ -48,15 +64,36 @@ export function PipelineCanvas({
   const [viewMode, setViewMode] = useState<ViewMode>('steps');
   const [flowId, setFlowId] = useState<FlowId>('full-pipeline');
   const [runMode, setRunMode] = useState<RunMode>('auto');
+  const [inputType, setInputType] = useState<InputType>('text');
   const [workoutText, setWorkoutText] = useState('bench press 3x10, squat 3x5, overhead press 3x8');
+  const [urlInput, setUrlInput] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   function handleStart() {
+    // Validate URL if needed
+    if (inputType !== 'text') {
+      if (!urlInput.trim()) {
+        setUrlError('URL is required');
+        return;
+      }
+      if (!isValidUrl(urlInput)) {
+        setUrlError('Please enter a valid URL');
+        return;
+      }
+      setUrlError(null);
+    } else {
+      setUrlError(null);
+    }
+
     const inputs: Record<string, unknown> = flowId === 'map-only'
       ? { exercises: workoutText.split(',').map(s => s.trim()).filter(Boolean) }
-      : { workoutText };
+      : inputType === 'text'
+        ? { workoutText, inputType }
+        : { url: urlInput, inputType };
     onStart(flowId, inputs, runMode);
   }
 
+  const isUrlType = inputType !== 'text';
   const pausedStep = run?.steps.find(s => s.id === pausedStepId) ?? null;
 
   return (
@@ -121,12 +158,46 @@ export function PipelineCanvas({
       {/* Input */}
       {!isRunning && (
         <div className="px-4 py-2 border-b">
-          <textarea
-            value={workoutText}
-            onChange={e => setWorkoutText(e.target.value)}
-            placeholder={flowId === 'map-only' ? 'bench press, squat, overhead press' : 'bench press 3x10, squat 3x5...'}
-            className="w-full text-sm border rounded px-2 py-1.5 bg-background resize-none h-16 focus:outline-none focus:ring-1 focus:ring-primary"
-          />
+          {/* Input Type Selector */}
+          <div className="flex items-center gap-2 mb-2">
+            <select
+              value={inputType}
+              onChange={e => { if (isInputType(e.target.value)) setInputType(e.target.value); }}
+              disabled={isRunning || flowId === 'map-only'}
+              className="text-sm border rounded px-2 py-1 bg-background"
+            >
+              {INPUT_TYPE_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+
+            {isUrlType ? (
+              <input
+                type="text"
+                value={urlInput}
+                onChange={e => { setUrlInput(e.target.value); setUrlError(null); }}
+                placeholder="https://youtube.com/watch?v=..."
+                className={cn(
+                  'flex-1 text-sm border rounded px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary',
+                  urlError && 'border-destructive focus:ring-destructive'
+                )}
+              />
+            ) : (
+              <textarea
+                value={workoutText}
+                onChange={e => setWorkoutText(e.target.value)}
+                placeholder={flowId === 'map-only' ? 'bench press, squat, overhead press' : 'bench press 3x10, squat 3x5...'}
+                className="w-full text-sm border rounded px-2 py-1.5 bg-background resize-none h-16 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            )}
+          </div>
+
+          {/* URL Error Message */}
+          {urlError && (
+            <div className="text-sm text-destructive mt-1">
+              {urlError}
+            </div>
+          )}
         </div>
       )}
 

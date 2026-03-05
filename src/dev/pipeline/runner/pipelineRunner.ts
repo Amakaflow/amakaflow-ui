@@ -1,5 +1,5 @@
 import type { FlowId, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
-import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames } from './stepExecutors';
+import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames, type InputType } from './stepExecutors';
 import { API_URLS } from '../../../lib/config';
 
 function genId(): string {
@@ -76,13 +76,16 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
   yield { type: 'run:started', runId, flowId, inputs };
 
   try {
+    const inputType = (inputs.inputType as InputType) || 'text';
     if (flowId === 'ingest-only') {
-      const workoutText = inputs.workoutText;
-      if (typeof workoutText !== 'string') {
+      const workoutText = inputs.workoutText as string;
+      const url = inputs.url as string;
+      const input = inputType === 'text' ? workoutText : url;
+      if (typeof input !== 'string') {
         yield { type: 'run:completed', runId, status: 'failed' };
         return;
       }
-      for await (const event of runIngestStep(runId, workoutText, mode, onStepPaused)) {
+      for await (const event of runIngestStep(runId, input, inputType, mode, onStepPaused)) {
         yield event;
         if (event.type === 'step:failed') {
           yield { type: 'run:completed', runId, status: 'failed' };
@@ -103,13 +106,15 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
         }
       }
     } else if (flowId === 'full-pipeline') {
-      const workoutText = inputs.workoutText;
-      if (typeof workoutText !== 'string') {
+      const workoutText = inputs.workoutText as string;
+      const url = inputs.url as string;
+      const input = inputType === 'text' ? workoutText : url;
+      if (typeof input !== 'string') {
         yield { type: 'run:completed', runId, status: 'failed' };
         return;
       }
       let ingestOutput: unknown;
-      for await (const event of runIngestStep(runId, workoutText, mode, onStepPaused)) {
+      for await (const event of runIngestStep(runId, input, inputType, mode, onStepPaused)) {
         yield event;
         if (event.type === 'step:completed') ingestOutput = event.step.effectiveOutput;
         if (event.type === 'step:failed') {
@@ -143,12 +148,14 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
 
 function runIngestStep(
   runId: string,
-  workoutText: string,
+  input: string,
+  inputType: InputType,
   mode: RunMode,
   onStepPaused?: PipelineRunnerOptions['onStepPaused'],
 ): AsyncGenerator<StepEvent> {
   const stepId = genId();
-  return runStep(runId, stepId, 'ingestor', 'Ingest workout text', () => executeIngest(workoutText), mode, onStepPaused);
+  const label = inputType === 'text' ? 'Ingest workout text' : `Ingest ${inputType}`;
+  return runStep(runId, stepId, 'ingestor', label, () => executeIngest(input, inputType), mode, onStepPaused);
 }
 
 function runMapStep(
