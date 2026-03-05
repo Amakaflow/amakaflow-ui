@@ -6,6 +6,7 @@ test('renders all step groups', () => {
   expect(screen.getByText('Ingestion')).toBeInTheDocument();
   expect(screen.getByText('Mapping')).toBeInTheDocument();
   expect(screen.getByText('Export')).toBeInTheDocument();
+  expect(screen.getByText('Utilities')).toBeInTheDocument();
 });
 
 test('clicking a step calls onAddStep with step id', () => {
