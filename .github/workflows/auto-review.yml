@@ -7,6 +7,12 @@ on:
       - develop
       - main
 
+permissions: {}
+
+concurrency:
+  group: auto-review-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest

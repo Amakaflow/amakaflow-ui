@@ -6,6 +6,12 @@ on:
   pull_request_review_comment:
     types: [created]
 
+permissions: {}
+
+concurrency:
+  group: claude-comment-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   claude:
     if: >

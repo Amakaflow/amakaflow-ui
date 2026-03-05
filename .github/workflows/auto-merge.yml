@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
 
+permissions: {}
+
+concurrency:
+  group: auto-merge-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   auto-merge:
     if: contains(fromJSON('["openclawjoshua-eng","supergeri"]'), github.event.pull_request.user.login) && !github.event.pull_request.draft
