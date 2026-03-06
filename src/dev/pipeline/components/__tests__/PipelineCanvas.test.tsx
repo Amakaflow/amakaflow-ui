@@ -29,7 +29,7 @@ const defaultProps = {
 describe('PipelineCanvas', () => {
   it('shows empty state when no run', () => {
     render(<PipelineCanvas {...defaultProps} />);
-    expect(screen.getByText(/configure a flow/i)).toBeTruthy();
+    expect(screen.getByText('Garmin Full Pipeline')).toBeTruthy();
   });
 
   it('calls onStart with flowId and inputs when Run is clicked', () => {
@@ -37,8 +37,8 @@ describe('PipelineCanvas', () => {
     render(<PipelineCanvas {...defaultProps} onStart={onStart} />);
     screen.getByText('▶ Run').click();
     expect(onStart).toHaveBeenCalledOnce();
-    const [flowId, inputs, mode] = onStart.mock.calls[0];
-    expect(flowId).toBe('full-pipeline');
+    const [flow, inputs, mode] = onStart.mock.calls[0];
+    expect(flow).toMatchObject({ id: 'garmin-full' });
     expect(inputs).toHaveProperty('workoutText');
     expect(mode).toBe('auto');
   });

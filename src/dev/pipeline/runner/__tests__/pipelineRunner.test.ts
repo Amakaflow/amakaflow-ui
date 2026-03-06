@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runPipeline } from '../pipelineRunner';
 import type { StepEvent } from '../../store/runTypes';
 import * as executors from '../stepExecutors';
+import { getPreset } from '../../registry/presets';
 
 vi.mock('../stepExecutors', () => ({
   executeIngest: vi.fn(),
@@ -55,7 +56,7 @@ describe('runPipeline', () => {
 
   it('yields run:started and run:completed for ingest-only flow', async () => {
     const events = await collectEvents(
-      runPipeline({ flowId: 'ingest-only', inputs: { workoutText: 'bench press 3x10' }, mode: 'auto' })
+      runPipeline({ flow: getPreset('ingest-only')!, inputs: { workoutText: 'bench press 3x10' }, mode: 'auto' })
     );
     expect(events[0].type).toBe('run:started');
     expect(events.at(-1)!.type).toBe('run:completed');
@@ -63,7 +64,7 @@ describe('runPipeline', () => {
 
   it('yields step:started and step:completed for ingest-only', async () => {
     const events = await collectEvents(
-      runPipeline({ flowId: 'ingest-only', inputs: { workoutText: 'bench press' }, mode: 'auto' })
+      runPipeline({ flow: getPreset('ingest-only')!, inputs: { workoutText: 'bench press' }, mode: 'auto' })
     );
     const started = events.filter(e => e.type === 'step:started');
     const completed = events.filter(e => e.type === 'step:completed');
@@ -79,7 +80,7 @@ describe('runPipeline', () => {
       error: 'Network error',
     });
     const events = await collectEvents(
-      runPipeline({ flowId: 'ingest-only', inputs: { workoutText: 'bench press' }, mode: 'auto' })
+      runPipeline({ flow: getPreset('ingest-only')!, inputs: { workoutText: 'bench press' }, mode: 'auto' })
     );
     const failed = events.find(e => e.type === 'step:failed');
     expect(failed).toBeDefined();
@@ -91,7 +92,7 @@ describe('runPipeline', () => {
 
   it('full-pipeline flow yields ingestor and mapper steps', async () => {
     const events = await collectEvents(
-      runPipeline({ flowId: 'full-pipeline', inputs: { workoutText: 'bench press', exportTarget: 'garmin' }, mode: 'auto' })
+      runPipeline({ flow: { id: 'full-pipeline', label: 'Full Pipeline', steps: ['ingest-youtube', 'map-exercises', 'export-garmin'] }, inputs: { workoutText: 'bench press', exportTarget: 'garmin' }, mode: 'auto' })
     );
     const services = events
       .filter(e => e.type === 'step:started')
@@ -104,7 +105,7 @@ describe('runPipeline', () => {
   it('step-through mode yields step:paused and resumes', async () => {
     const onStepPaused = vi.fn().mockResolvedValue({ title: 'Test', blocks: [] });
     const events = await collectEvents(runPipeline({
-      flowId: 'ingest-only',
+      flow: getPreset('ingest-only')!,
       inputs: { workoutText: 'bench press 3x10' },
       mode: 'step-through',
       onStepPaused,
@@ -125,7 +126,7 @@ describe('runPipeline', () => {
     });
     const onStepPaused = vi.fn().mockResolvedValue(edited);
     const events = await collectEvents(runPipeline({
-      flowId: 'ingest-only',
+      flow: getPreset('ingest-only')!,
       inputs: { workoutText: 'bench press 3x10' },
       mode: 'step-through',
       onStepPaused,
@@ -136,7 +137,7 @@ describe('runPipeline', () => {
 
   it('health-check flow yields step:started for all 6 services', async () => {
     const events = await collectEvents(runPipeline({
-      flowId: 'health-check',
+      flow: { id: 'health-check', label: 'Health Check', steps: [] },
       inputs: {},
       mode: 'auto',
     }));
@@ -147,7 +148,7 @@ describe('runPipeline', () => {
   it('full-pipeline stops at ingest failure and skips map', async () => {
     mockExecuteIngest.mockResolvedValue({ error: 'ingest failed', request: undefined, response: undefined, apiOutput: undefined });
     const events = await collectEvents(runPipeline({
-      flowId: 'full-pipeline',
+      flow: { id: 'full-pipeline', label: 'Full Pipeline', steps: ['ingest-youtube', 'map-exercises', 'export-garmin'] },
       inputs: { workoutText: 'bench press 3x10' },
       mode: 'auto',
     }));
