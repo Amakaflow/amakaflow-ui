@@ -1,5 +1,7 @@
-import type { FlowId, FlowDefinition, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
+import type { FlowDefinition, RunMode, StepEvent, PipelineStep, ServiceName, SchemaValidationResult } from '../store/runTypes';
+import { isParallelGroup } from '../store/runTypes';
 import { executeIngest, executeMap, executeHealthCheck, extractExerciseNames, executeExport, type InputType } from './stepExecutors';
+import { getStep } from '../registry/stepRegistry';
 import { API_URLS } from '../../../lib/config';
 
 function genId(): string {
@@ -23,183 +25,81 @@ interface StepExecutorResult {
   response?: PipelineStep['response'];
 }
 
-async function* runStep(
-  runId: string,
+interface StepContext {
+  inputs: Record<string, unknown>;
+  ingestOutput?: unknown;
+  mapOutput?: unknown;
+}
+
+async function executeStepById(
   stepId: string,
-  service: ServiceName,
-  label: string,
-  execute: () => Promise<StepExecutorResult>,
-  mode: RunMode,
-  onStepPaused?: (stepId: string, step: PipelineStep) => Promise<unknown>,
-): AsyncGenerator<StepEvent> {
-  yield { type: 'step:started', runId, stepId, service, label };
+  context: StepContext,
+): Promise<{ service: ServiceName; label: string; result: StepExecutorResult }> {
+  const inputType = (context.inputs.inputType as InputType) ?? 'text';
+  const input = inputType === 'text'
+    ? (context.inputs.workoutText as string)
+    : (context.inputs.url as string);
 
-  const result = await execute();
-  const step: PipelineStep = {
-    id: stepId,
-    service,
-    label,
-    status: result.error ? 'failed' : 'success',
-    request: result.request,
-    response: result.response,
-    schemaValidation: result.schemaValidation,
-    apiOutput: result.apiOutput,
-    effectiveOutput: result.apiOutput,
-    edited: false,
-  };
-
-  if (result.error) {
-    yield { type: 'step:failed', runId, stepId, error: result.error, step };
-    return;
-  }
-
-  if (mode === 'step-through' && onStepPaused) {
-    step.status = 'paused';
-    yield { type: 'step:paused', runId, stepId, step };
-    const effective = await onStepPaused(stepId, step);
-    if (effective !== step.apiOutput) {
-      step.edited = true;
-      step.editedAt = Date.now();
-      step.effectiveOutput = effective;
-      yield { type: 'step:edited', runId, stepId, effectiveOutput: effective };
-    }
-    step.status = 'success';
-  }
-
-  yield { type: 'step:completed', runId, stepId, step };
-}
-
-export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<StepEvent> {
-  const { flow, inputs, mode, onStepPaused } = opts;
-  const runId = genId();
-
-  yield { type: 'run:started', runId, flowId: flow.id, inputs };
-
-  // Backward compat: map new preset IDs to existing FlowId behavior
-  // Task 7 will replace this entire switch with dynamic execution
-  const flowId = flow.id as FlowId;
-
-  try {
-    const inputType = (inputs.inputType as InputType) || 'text';
-    if (flowId === 'ingest-only') {
-      const workoutText = inputs.workoutText as string;
-      const url = inputs.url as string;
-      const input = inputType === 'text' ? workoutText : url;
-      if (typeof input !== 'string') {
-        yield { type: 'run:completed', runId, status: 'failed' };
-        return;
-      }
-      for await (const event of runIngestStep(runId, input, inputType, mode, onStepPaused)) {
-        yield event;
-        if (event.type === 'step:failed') {
-          yield { type: 'run:completed', runId, status: 'failed' };
-          return;
-        }
-      }
-    } else if (flowId === 'map-only') {
-      const exercises = inputs.exercises;
-      if (!Array.isArray(exercises) || !exercises.every(e => typeof e === 'string')) {
-        yield { type: 'run:completed', runId, status: 'failed' };
-        return;
-      }
-      for await (const event of runMapStep(runId, exercises, mode, onStepPaused)) {
-        yield event;
-        if (event.type === 'step:failed') {
-          yield { type: 'run:completed', runId, status: 'failed' };
-          return;
-        }
-      }
-    } else if (flowId === 'full-pipeline') {
-      const workoutText = inputs.workoutText as string;
-      const url = inputs.url as string;
-      const input = inputType === 'text' ? workoutText : url;
-      if (typeof input !== 'string') {
-        yield { type: 'run:completed', runId, status: 'failed' };
-        return;
-      }
-      let ingestOutput: unknown;
-      for await (const event of runIngestStep(runId, input, inputType, mode, onStepPaused)) {
-        yield event;
-        if (event.type === 'step:completed') ingestOutput = event.step.effectiveOutput;
-        if (event.type === 'step:failed') {
-          yield { type: 'run:completed', runId, status: 'failed' };
-          return;
-        }
-      }
-      const exercises = extractExerciseNames(ingestOutput);
-      let mapOutput: unknown;
-      for await (const event of runMapStep(runId, exercises, mode, onStepPaused)) {
-        yield event;
-        if (event.type === 'step:completed') mapOutput = event.step.effectiveOutput;
-        if (event.type === 'step:failed') {
-          yield { type: 'run:completed', runId, status: 'failed' };
-          return;
-        }
-      }
-      // Export step: use the workout structure from ingest (before mapping transforms it)
-      const workoutStructure = ingestOutput;
-      const title =
-        (workoutStructure as Record<string, unknown>)?.title as string ??
-        'AI Generated Workout';
-
-      yield { type: 'step:started', runId, stepId: genId(), service: 'mapper', label: 'Export to Garmin' };
-      const exportResult = await executeExport(workoutStructure, title);
-      yield {
-        type: 'step:completed',
-        runId,
-        stepId: genId(),
-        step: {
-          id: '',
-          service: 'mapper',
-          label: 'Export to Garmin',
-          status: exportResult.error ? 'failed' : 'success',
-          request: exportResult.request,
-          response: exportResult.response,
-          apiOutput: exportResult.apiOutput,
-          effectiveOutput: exportResult.apiOutput,
-          edited: false,
-        },
+  switch (stepId) {
+    case 'ingest-youtube':
+    case 'ingest-instagram':
+    case 'ingest-tiktok':
+    case 'ingest-text': {
+      const typeMap: Record<string, InputType> = {
+        'ingest-youtube': 'youtube',
+        'ingest-instagram': 'instagram',
+        'ingest-tiktok': 'tiktok',
+        'ingest-text': 'text',
       };
-      if (exportResult.error) {
-        yield { type: 'run:completed', runId, status: 'failed' };
-        return;
-      }
-    } else if (flowId === 'health-check') {
-      // health-check intentionally continues after individual step failures
-      yield* runHealthCheckSteps(runId);
-    } else {
-      // export-only flow not yet implemented
-      yield { type: 'run:completed', runId, status: 'failed' };
-      return;
+      const resolvedType = typeMap[stepId];
+      // Use workoutText for text type, url for media types; fall back to whichever is provided
+      const resolvedInput = resolvedType === 'text'
+        ? ((context.inputs.workoutText as string) ?? (context.inputs.url as string))
+        : ((context.inputs.url as string) ?? (context.inputs.workoutText as string));
+      const result = await executeIngest(resolvedInput, resolvedType);
+      return { service: 'ingestor', label: `Ingest ${resolvedType}`, result };
     }
-
-    yield { type: 'run:completed', runId, status: 'success' };
-  } catch (err) {
-    console.error('[pipelineRunner] Unexpected error during pipeline run:', err);
-    yield { type: 'run:completed', runId, status: 'failed' };
+    case 'map-exercises': {
+      const exercises = extractExerciseNames(context.ingestOutput);
+      const result = await executeMap(exercises);
+      return { service: 'mapper', label: 'Map exercises', result };
+    }
+    case 'export-garmin': {
+      const title = (context.ingestOutput as Record<string, unknown>)?.title as string ?? 'Workout';
+      const result = await executeExport(context.ingestOutput, title);
+      return { service: 'garmin', label: 'Export → Garmin', result };
+    }
+    case 'export-apple':
+      return {
+        service: 'mapper',
+        label: 'Export → Apple Health',
+        result: { apiOutput: { status: 'not_implemented' }, error: 'Apple Health export not yet implemented' },
+      };
+    case 'sync-strava':
+      return {
+        service: 'strava',
+        label: 'Sync → Strava',
+        result: { apiOutput: { status: 'not_implemented' }, error: 'Strava sync not yet implemented' },
+      };
+    case 'pull-runna':
+      return {
+        service: 'ingestor',
+        label: 'Pull Runna plan',
+        result: { apiOutput: { status: 'not_implemented' }, error: 'Runna pull not yet implemented' },
+      };
+    case 'health-check':
+      return {
+        service: 'ingestor',
+        label: 'Health Check',
+        result: await executeHealthCheck('ingestor', API_URLS.INGESTOR),
+      };
+    default:
+      return {
+        service: 'ingestor',
+        label: stepId,
+        result: { apiOutput: null, error: `Unknown step: ${stepId}` },
+      };
   }
-}
-
-function runIngestStep(
-  runId: string,
-  input: string,
-  inputType: InputType,
-  mode: RunMode,
-  onStepPaused?: PipelineRunnerOptions['onStepPaused'],
-): AsyncGenerator<StepEvent> {
-  const stepId = genId();
-  const label = inputType === 'text' ? 'Ingest workout text' : `Ingest ${inputType}`;
-  return runStep(runId, stepId, 'ingestor', label, () => executeIngest(input, inputType), mode, onStepPaused);
-}
-
-function runMapStep(
-  runId: string,
-  exercises: string[],
-  mode: RunMode,
-  onStepPaused?: PipelineRunnerOptions['onStepPaused'],
-): AsyncGenerator<StepEvent> {
-  const stepId = genId();
-  return runStep(runId, stepId, 'mapper', 'Map exercises', () => executeMap(exercises), mode, onStepPaused);
 }
 
 async function* runHealthCheckSteps(runId: string): AsyncGenerator<StepEvent> {
@@ -231,5 +131,133 @@ async function* runHealthCheckSteps(runId: string): AsyncGenerator<StepEvent> {
     } else {
       yield { type: 'step:completed', runId, stepId, step };
     }
+  }
+}
+
+export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<StepEvent> {
+  const { flow, inputs, mode, onStepPaused } = opts;
+  const runId = genId();
+
+  yield { type: 'run:started', runId, flowId: flow.id, inputs };
+
+  // Special case: health-check flow ID runs all service health checks regardless of steps array
+  if (flow.id === 'health-check') {
+    yield* runHealthCheckSteps(runId);
+    yield { type: 'run:completed', runId, status: 'success' };
+    return;
+  }
+
+  const context: StepContext = { inputs };
+
+  try {
+    for (const flowStep of flow.steps) {
+      if (isParallelGroup(flowStep)) {
+        // Run all parallel branches concurrently
+        const branchResults = await Promise.allSettled(
+          flowStep.steps.map(stepId => executeStepById(stepId, context))
+        );
+
+        for (let i = 0; i < flowStep.steps.length; i++) {
+          const stepId = flowStep.steps[i];
+          const settled = branchResults[i];
+
+          if (settled.status === 'rejected') {
+            const errStepId = genId();
+            const errStep: PipelineStep = {
+              id: errStepId,
+              service: 'ingestor',
+              label: stepId,
+              status: 'failed',
+              edited: false,
+            };
+            yield {
+              type: 'step:failed',
+              runId,
+              stepId: errStepId,
+              error: String(settled.reason),
+              step: errStep,
+            };
+          } else {
+            const { service, label, result } = settled.value;
+            const parallelStepId = genId();
+            const step: PipelineStep = {
+              id: parallelStepId,
+              service,
+              label,
+              status: result.error ? 'failed' : 'success',
+              request: result.request,
+              response: result.response,
+              schemaValidation: result.schemaValidation,
+              apiOutput: result.apiOutput,
+              effectiveOutput: result.apiOutput,
+              edited: false,
+            };
+            yield { type: 'step:started', runId, stepId: parallelStepId, service, label };
+            if (result.error) {
+              yield { type: 'step:failed', runId, stepId: parallelStepId, error: result.error, step };
+            } else {
+              yield { type: 'step:completed', runId, stepId: parallelStepId, step };
+            }
+          }
+        }
+        // Parallel step failures don't abort the run — continue to next flow step
+      } else {
+        // Sequential step
+        const stepDef = getStep(flowStep);
+        const service: ServiceName = stepDef?.service ?? 'ingestor';
+        const label = stepDef?.label ?? flowStep;
+        const stepId = genId();
+
+        yield { type: 'step:started', runId, stepId, service, label };
+
+        const { result } = await executeStepById(flowStep, context);
+
+        const step: PipelineStep = {
+          id: stepId,
+          service,
+          label,
+          status: result.error ? 'failed' : 'success',
+          request: result.request,
+          response: result.response,
+          schemaValidation: result.schemaValidation,
+          apiOutput: result.apiOutput,
+          effectiveOutput: result.apiOutput,
+          edited: false,
+        };
+
+        if (result.error) {
+          yield { type: 'step:failed', runId, stepId, error: result.error, step };
+          yield { type: 'run:completed', runId, status: 'failed' };
+          return;
+        }
+
+        if (mode === 'step-through' && onStepPaused) {
+          step.status = 'paused';
+          yield { type: 'step:paused', runId, stepId, step };
+          const effective = await onStepPaused(stepId, step);
+          if (effective !== step.apiOutput) {
+            step.edited = true;
+            step.editedAt = Date.now();
+            step.effectiveOutput = effective;
+            yield { type: 'step:edited', runId, stepId, effectiveOutput: effective };
+          }
+          step.status = 'success';
+        }
+
+        yield { type: 'step:completed', runId, stepId, step };
+
+        // Update context for downstream steps
+        if (flowStep.startsWith('ingest-') || flowStep === 'pull-runna') {
+          context.ingestOutput = step.effectiveOutput;
+        } else if (flowStep === 'map-exercises') {
+          context.mapOutput = step.effectiveOutput;
+        }
+      }
+    }
+
+    yield { type: 'run:completed', runId, status: 'success' };
+  } catch (err) {
+    console.error('[pipelineRunner] Unexpected error during pipeline run:', err);
+    yield { type: 'run:completed', runId, status: 'failed' };
   }
 }
