@@ -6,6 +6,7 @@ import { StepPalette } from '../builder/StepPalette';
 import { FlowCanvas } from '../builder/FlowCanvas';
 import { PRESETS, getPreset } from '../registry/presets';
 import { getStep } from '../registry/stepRegistry';
+import { getUserPresets, saveUserPreset } from '../registry/userPresets';
 import { isParallelGroup, type FlowDefinition, type FlowStep, type PipelineRun, type PipelineStep, type RunMode } from '../store/runTypes';
 
 
@@ -65,11 +66,26 @@ export function PipelineCanvas({
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [currentFlow, setCurrentFlow] = useState<FlowDefinition>(PRESETS[0]);
   const [presetId, setPresetId] = useState(PRESETS[0].id);
+  const [userPresets, setUserPresets] = useState<FlowDefinition[]>(() => {
+    try { return getUserPresets(); } catch { return []; }
+  });
 
   function handlePresetChange(id: string) {
-    const preset = getPreset(id);
+    const preset = getPreset(id) ?? userPresets.find(p => p.id === id);
     if (preset) { setCurrentFlow(preset); setPresetId(id); }
-    // user preset support will check userPresets in Task 9
+  }
+
+  function handleSavePreset() {
+    const name = window.prompt('Preset name?');
+    if (!name) return;
+    const preset: FlowDefinition = {
+      id: `user-${Date.now()}`,
+      label: name,
+      steps: currentFlow.steps,
+    };
+    saveUserPreset(preset);
+    setUserPresets(getUserPresets());
+    setPresetId(preset.id);
   }
 
   function handleAddStep(stepId: string) {
@@ -118,10 +134,28 @@ export function PipelineCanvas({
           disabled={isRunning}
           className="text-sm border rounded px-2 py-1 bg-background"
         >
-          {PRESETS.map(p => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
+          <optgroup label="Built-in">
+            {PRESETS.map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </optgroup>
+          {userPresets.length > 0 && (
+            <optgroup label="Saved">
+              {userPresets.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
+
+        <button
+          onClick={handleSavePreset}
+          disabled={isRunning}
+          title="Save current canvas as a new preset"
+          className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors"
+        >
+          Save preset
+        </button>
 
         <select
           value={runMode}
