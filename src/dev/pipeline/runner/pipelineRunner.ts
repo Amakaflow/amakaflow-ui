@@ -87,13 +87,8 @@ async function executeStepById(
         label: 'Pull Runna plan',
         result: { apiOutput: { status: 'not_implemented' }, error: 'Runna pull not yet implemented' },
       };
-    case 'health-check':
-      return {
-        service: 'ingestor',
-        label: 'Health Check',
-        result: await executeHealthCheck('ingestor', API_URLS.INGESTOR),
-      };
     default:
+      // Unknown step IDs should not appear in production flows — log for debugging
       return {
         service: 'ingestor',
         label: stepId,
@@ -152,7 +147,25 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
   try {
     for (const flowStep of flow.steps) {
       if (isParallelGroup(flowStep)) {
-        // Run all parallel branches concurrently
+        // Note: parallel group steps do not update context (ingestOutput/mapOutput).
+        // All parallel steps run with the same context snapshot from before the group.
+
+        // Emit step:started for all parallel branches before running
+        const parallelStepIds: string[] = [];
+        for (const stepId of flowStep.steps) {
+          const stepDef = getStep(stepId);
+          const parallelStepId = genId();
+          parallelStepIds.push(parallelStepId);
+          yield {
+            type: 'step:started',
+            runId,
+            stepId: parallelStepId,
+            service: stepDef?.service ?? 'ingestor',
+            label: stepDef?.label ?? stepId,
+          };
+        }
+
+        // Run all in parallel
         const branchResults = await Promise.allSettled(
           flowStep.steps.map(stepId => executeStepById(stepId, context))
         );
@@ -160,11 +173,11 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
         for (let i = 0; i < flowStep.steps.length; i++) {
           const stepId = flowStep.steps[i];
           const settled = branchResults[i];
+          const parallelStepId = parallelStepIds[i];
 
           if (settled.status === 'rejected') {
-            const errStepId = genId();
             const errStep: PipelineStep = {
-              id: errStepId,
+              id: parallelStepId,
               service: 'ingestor',
               label: stepId,
               status: 'failed',
@@ -173,13 +186,12 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
             yield {
               type: 'step:failed',
               runId,
-              stepId: errStepId,
+              stepId: parallelStepId,
               error: String(settled.reason),
               step: errStep,
             };
           } else {
             const { service, label, result } = settled.value;
-            const parallelStepId = genId();
             const step: PipelineStep = {
               id: parallelStepId,
               service,
@@ -192,7 +204,6 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
               effectiveOutput: result.apiOutput,
               edited: false,
             };
-            yield { type: 'step:started', runId, stepId: parallelStepId, service, label };
             if (result.error) {
               yield { type: 'step:failed', runId, stepId: parallelStepId, error: result.error, step };
             } else {
