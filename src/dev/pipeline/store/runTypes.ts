@@ -4,8 +4,6 @@ export type StepStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped
 
 export type RunStatus = 'running' | 'success' | 'failed' | 'cancelled' | 'paused';
 
-export type FlowId = 'full-pipeline' | 'ingest-only' | 'map-only' | 'export-only' | 'health-check';
-
 export type RunMode = 'auto' | 'step-through';
 
 export type InputType = 'text' | 'youtube' | 'instagram' | 'tiktok' | 'url';

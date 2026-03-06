@@ -121,7 +121,11 @@ describe('executeIngest routing', () => {
 
 describe('executeExport', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('calls POST /workout/sync/garmin with blocks_json and workout_title', async () => {
