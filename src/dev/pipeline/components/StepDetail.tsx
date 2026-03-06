@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '../../../components/ui/utils';
 import type { PipelineStep } from '../store/runTypes';
+import { STEP_REGISTRY } from '../registry/stepRegistry';
 
 interface StepDetailProps {
   step: PipelineStep | null;
@@ -39,6 +40,15 @@ export function StepDetail({ step }: StepDetailProps) {
       <div className="px-4 py-2 border-b">
         <div className="text-sm font-medium">{step.label}</div>
         <div className="text-xs text-muted-foreground">{step.service}</div>
+        {(() => {
+          const stepDef = Object.values(STEP_REGISTRY).find(s => s.label === step.label);
+          return stepDef ? (
+            <div className="mt-2 bg-blue-950/40 border border-blue-900 rounded-md px-3 py-1.5">
+              <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider mb-0.5">MCP Tool</div>
+              <div className="text-xs text-blue-300 font-mono">{stepDef.mcpTool}(…)</div>
+            </div>
+          ) : null;
+        })()}
         {step.request && (
           <div className="text-xs text-muted-foreground font-mono mt-1">
             {step.request.method} {step.request.url}
