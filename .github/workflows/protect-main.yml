@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify source branch is develop or sync/*
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          HEAD="${{ github.head_ref }}"
+          HEAD="$HEAD_REF"
           if [[ "$HEAD" == "develop" || "$HEAD" == sync/* ]]; then
             echo "✅ '$HEAD' is allowed to merge into main."
           else
