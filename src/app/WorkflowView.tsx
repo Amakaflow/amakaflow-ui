@@ -1,5 +1,4 @@
 import React from 'react';
-import { toast } from 'sonner';
 import { ChevronRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -29,7 +28,6 @@ import type { View } from './router';
 import type { AppUser } from './useAppAuth';
 import type { DeviceId, DeviceConfig } from '../lib/devices';
 import { getPrimaryExportDestinations } from '../lib/devices';
-import { exportWorkoutToDevice } from '../lib/mapper-api';
 import { isDemoMode } from '../lib/demo-mode';
 import { setCurrentProfileId } from '../lib/workout-history';
 import { normalizeWorkoutStructure } from '../lib/api';
@@ -76,6 +74,10 @@ export function WorkflowView({
     handleWorkoutTypeConfirm, handleWorkoutTypeSkip,
     handleBack, checkUnsavedChanges, clearWorkflowState,
     resetEditingFlags,
+    // Export state from validation hook
+    exportingWorkout, exportingWorkouts, exportingDevice,
+    handleOpenExportPage, handleInlineExport,
+    setExportingWorkout, setExportingWorkouts, setExportingDevice,
   } = useWorkflowState({
     user,
     selectedDevice,
@@ -84,27 +86,6 @@ export function WorkflowView({
     currentView,
     setCurrentView,
   });
-
-  const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
-  const [exportingWorkouts, setExportingWorkouts] = React.useState<WorkoutStructure[]>([]);
-  const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
-
-  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceConfig) => {
-    setExportingWorkout(workout);
-    setExportingDevice(device.id);
-    setCurrentView('export-page');
-  };
-
-  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceConfig) => {
-    try {
-      toast.info(`Exporting "${workout.title || 'Workout'}" to ${device.name}...`);
-      await exportWorkoutToDevice(workout, device.id);
-      toast.success(`Exported to ${device.name}!`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Export failed';
-      toast.error(message);
-    }
-  };
 
   return (
     <>

@@ -3,8 +3,8 @@ import { toast } from 'sonner';
 import { applyWorkoutTypeDefaults } from '../lib/workoutTypeDefaults';
 import { useWorkflowGeneration } from './hooks/useWorkflowGeneration';
 import { useWorkflowEditing } from './hooks/useWorkflowEditing';
-import type { WorkoutStructure, ValidationResponse, ExportFormats, WorkoutType } from '../types/workout';
-// Note: useWorkflowValidation removed — validation step is no longer part of the workflow
+import { useWorkflowValidation } from './hooks/useWorkflowValidation';
+import type { WorkoutStructure, WorkoutType } from '../types/workout';
 import type { ProcessedItem } from '../types/import';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
@@ -47,8 +47,7 @@ export function useWorkflowState({
   const [workout, setWorkout] = useState<WorkoutStructure | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('add-sources');
-  const [validation, setValidation] = useState<ValidationResponse | null>(null);
-  const [exports, setExports] = useState<ExportFormats | null>(null);
+  // Note: validation and exports are now owned by useWorkflowValidation hook
   const [importProcessedItems, setImportProcessedItems] = useState<ProcessedItem[]>([]);
 
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
@@ -71,16 +70,15 @@ export function useWorkflowState({
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
   // ── clearWorkflowState — uses a mutable ref object so hooks can be wired ──
-  const resetRefs = { genSources: () => {}, editing: () => {} };
+  const resetRefs = { genSources: () => {}, editing: () => {}, validation: () => {} };
 
   const clearWorkflowState = () => {
     setWorkout(null);
-    setValidation(null);
-    setExports(null);
     setCurrentStep('add-sources');
     setWorkoutSaved(false);
     resetRefs.genSources();
     resetRefs.editing();
+    resetRefs.validation();
   };
 
   // ── Domain hooks ────────────────────────────────────────────────────────────
@@ -102,8 +100,6 @@ export function useWorkflowState({
     onViewChange: setCurrentView,
     onClearWorkout: () => {
       setWorkout(null);
-      setValidation(null);
-      setExports(null);
     },
     onClearEditingFlags: () => editing.reset(),
     clearWorkflowState,
@@ -119,15 +115,35 @@ export function useWorkflowState({
     setWorkout,
     setWorkoutSaved,
     setSources: generation.setSources,
-    setValidation,
-    setExports,
+    // setValidation and setExports are now handled by useWorkflowValidation hook
+    // Pass no-ops to satisfy the interface - the validation hook manages its own state
+    setValidation: () => {},
+    setExports: () => {},
     workout,
     setImportProcessedItems,
+  });
+
+  // ── Validation hook ──────────────────────────────────────────────────────────
+  const validation = useWorkflowValidation({
+    workout,
+    userId: user.id,
+    selectedDevice,
+    setWorkout,
+    onStepChange: setCurrentStep,
+    setValidation: () => {}, // Validation state managed by hook internally
+    setExports: () => {},   // Exports state managed by hook internally
+    stravaConnected: false, // Will be passed from props in real usage
   });
 
   // Wire up the deferred reset callbacks now that hooks exist
   resetRefs.genSources = () => generation.setSources([]);
   resetRefs.editing = () => editing.reset();
+  resetRefs.validation = () => {
+    // Reset validation state through the hook
+    validation.setExportingWorkout(null);
+    validation.setExportingWorkouts([]);
+    validation.setExportingDevice(null);
+  };
 
   // Sync selectedDevice when user.selectedDevices changes
   useEffect(() => {
@@ -214,10 +230,9 @@ export function useWorkflowState({
     currentStep,
     setCurrentStep,
     currentStepIndex,
-    validation,
-    setValidation,
-    exports,
-    setExports,
+    // validation and exports now owned by useWorkflowValidation hook
+    validation: validation.validation,
+    exports: validation.exports,
     importProcessedItems,
     setImportProcessedItems,
     confirmDialog,
@@ -257,6 +272,15 @@ export function useWorkflowState({
     handleEditFromImport: editing.handleEditFromImport,
     handleBackToImport: editing.handleBackToImport,
     resetEditingFlags: editing.reset,
+    // validation (from useWorkflowValidation hook)
+    exportingWorkout: validation.exportingWorkout,
+    exportingWorkouts: validation.exportingWorkouts,
+    exportingDevice: validation.exportingDevice,
+    handleOpenExportPage: validation.handleOpenExportPage,
+    handleInlineExport: validation.handleInlineExport,
+    setExportingWorkout: validation.setExportingWorkout,
+    setExportingWorkouts: validation.setExportingWorkouts,
+    setExportingDevice: validation.setExportingDevice,
     // composer handlers
     handleWorkoutTypeConfirm,
     handleWorkoutTypeSkip,
