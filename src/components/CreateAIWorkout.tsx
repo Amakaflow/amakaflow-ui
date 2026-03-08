@@ -314,7 +314,7 @@ function convertPreviewToWorkoutStructure(
   const restSec = difficulty === 'beginner' ? 90 : difficulty === 'advanced' ? 60 : 75;
   
   // Convert PipelineExercise to Exercise format
-  const exercises = preview.workout.exercises.map((exercise, idx) => ({
+  const exercises = (preview.workout.exercises || []).map((exercise, idx) => ({
     id: `ai-${idx}-${Date.now()}`,
     name: exercise.name,
     sets: exercise.sets ?? numSets,
@@ -324,7 +324,8 @@ function convertPreviewToWorkoutStructure(
     rest_sec: null,
     distance_m: null,
     distance_range: null,
-    type: 'strength' as const,
+    type: ((exercise as any).type || 'strength') as any,
+    notes: exercise.notes || undefined,
   }));
   
   return {
