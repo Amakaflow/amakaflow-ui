@@ -5,8 +5,8 @@
  * then click Generate to see streaming pipeline progress and a workout preview.
  */
 
-import { useState } from 'react';
-import { Sparkles, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
@@ -25,6 +25,7 @@ import { useStreamingPipeline } from '../hooks/useStreamingPipeline';
 import { toast } from 'sonner';
 import { isDemoMode } from '../lib/demo-mode';
 import type { WorkoutStructure } from '../types/workout';
+import type { PipelinePreview } from '../types/pipeline';
 
 const EQUIPMENT_OPTIONS = [
   'Barbell',
@@ -59,11 +60,23 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
   const [difficulty, setDifficulty] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [saved, setSaved] = useState(false);
   const [isDemoGenerating, setIsDemoGenerating] = useState(false);
 
   const pipeline = useStreamingPipeline();
   const isDisabled = pipeline.isStreaming || isDemoGenerating;
+  
+  // Track previous streaming state to detect completion
+  const wasStreamingRef = useRef(false);
+  
+  // When streaming completes and we have a preview, open the editor with the generated workout
+  useEffect(() => {
+    // Detect transition from streaming to not streaming
+    if (wasStreamingRef.current && !pipeline.isStreaming && pipeline.preview && onWorkoutGenerated) {
+      const workout = convertPreviewToWorkoutStructure(pipeline.preview, difficulty, durationMinutes);
+      onWorkoutGenerated(workout);
+    }
+    wasStreamingRef.current = pipeline.isStreaming;
+  }, [pipeline.isStreaming, pipeline.preview, onWorkoutGenerated, difficulty, durationMinutes]);
 
   const handleGenerate = () => {
     const trimmed = description.trim();
@@ -95,7 +108,11 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
   };
 
   const handleSave = () => {
-    setSaved(true);
+    // Instead of showing success screen, open the workout in the editor
+    if (pipeline.preview && onWorkoutGenerated) {
+      const workout = convertPreviewToWorkoutStructure(pipeline.preview, difficulty, durationMinutes);
+      onWorkoutGenerated(workout);
+    }
   };
 
   const toggleEquipment = (item: string) => {
@@ -220,36 +237,15 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
       </div>
 
       {/* Streaming progress + preview */}
-      {saved ? (
-        <div className="text-center py-12 space-y-6">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-500" />
-            </div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">Workout saved!</h2>
-            <p className="text-muted-foreground mt-2">Your workout has been added to the library.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button variant="outline" onClick={() => onNavigate?.('calendar')}>
-              <CalendarDays className="w-4 h-4 mr-2" />
-              Add to Calendar
-            </Button>
-            <Button onClick={() => setSaved(false)}>Create Another</Button>
-          </div>
-        </div>
-      ) : (
-        <StreamingWorkflow
-          currentStage={pipeline.currentStage}
-          completedStages={pipeline.completedStages}
-          preview={pipeline.preview}
-          isStreaming={pipeline.isStreaming}
-          error={pipeline.error}
-          onSave={pipeline.preview ? handleSave : undefined}
-          onRetry={handleRetry}
-        />
-      )}
+      <StreamingWorkflow
+        currentStage={pipeline.currentStage}
+        completedStages={pipeline.completedStages}
+        preview={pipeline.preview}
+        isStreaming={pipeline.isStreaming}
+        error={pipeline.error}
+        onSave={pipeline.preview ? handleSave : undefined}
+        onRetry={handleRetry}
+      />
     </div>
   );
 }
@@ -288,6 +284,49 @@ function buildMockWorkout(
     makeExercise(`${eq[eq.length - 1]} Row`, '10-12'),
   ];
 
+  return {
+    title,
+    source: 'ai-generated',
+    blocks: [
+      {
+        label: 'Main Block',
+        structure: 'sets',
+        sets: numSets,
+        rest_between_sets_sec: restSec,
+        exercises,
+      },
+    ],
+  };
+}
+
+/**
+ * Convert PipelinePreview to WorkoutStructure for editing in StructureWorkout editor.
+ */
+function convertPreviewToWorkoutStructure(
+  preview: PipelinePreview,
+  difficulty: string,
+  durationMinutes: number
+): WorkoutStructure {
+  const title = preview.workout.name || 'AI Generated Workout';
+  
+  // Determine sets based on difficulty
+  const numSets = difficulty === 'beginner' ? 3 : difficulty === 'advanced' ? 5 : 4;
+  const restSec = difficulty === 'beginner' ? 90 : difficulty === 'advanced' ? 60 : 75;
+  
+  // Convert PipelineExercise to Exercise format
+  const exercises = preview.workout.exercises.map((exercise, idx) => ({
+    id: `ai-${idx}-${Date.now()}`,
+    name: exercise.name,
+    sets: exercise.sets ?? numSets,
+    reps: typeof exercise.reps === 'string' ? null : exercise.reps ?? null,
+    reps_range: typeof exercise.reps === 'string' ? exercise.reps : null,
+    duration_sec: null,
+    rest_sec: null,
+    distance_m: null,
+    distance_range: null,
+    type: 'strength' as const,
+  }));
+  
   return {
     title,
     source: 'ai-generated',
