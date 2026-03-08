@@ -4,7 +4,7 @@ import { ChevronRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { AddSources } from '../components/AddSources';
-import { StructureWorkout } from '../components/StructureWorkout/StructureWorkout';
+import { StructureWorkout } from '../components/StructureWorkout';
 import { TeamSharing } from '../components/TeamSharing';
 import { WelcomeGuide } from '../components/WelcomeGuide';
 import { HomeScreen } from '../components/Home/HomeScreen';
