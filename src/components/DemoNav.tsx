@@ -62,7 +62,8 @@ export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
         DEMO
       </button>
       {open && (
-        <div className="fixed bottom-16 right-4 z-50 bg-white border border-border rounded-xl shadow-2xl p-4 w-64">
+        <div className="fixed bottom-16 right-4 z-40 bg-white border border-border rounded-xl shadow-2xl p-4 w-64 pointer-events-none">
+          <div className="pointer-events-auto">
 
           {/* Import scenario picker */}
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -101,6 +102,7 @@ export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
               </button>
             ))}
           </div>
+        </div>
         </div>
       )}
     </>
