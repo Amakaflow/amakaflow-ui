@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { TrendingUp, Flame, Clock, Calendar } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import {
   computeWeeklyHours,
   computeWeeklySessionCount,
@@ -13,6 +13,7 @@ import {
   computeAverageWorkoutDuration,
   computeWeeklyDelta,
   computeWeeklyChartData,
+  computeDeviceDistribution,
   formatHours,
 } from '../../lib/analytics-stats';
 import type { AppUser } from '../../app/useAppAuth';
@@ -36,6 +37,7 @@ export function OverviewTab({ history }: OverviewTabProps) {
   const avgDuration = computeAverageWorkoutDuration(history);
   const monthlyHours = computeMonthlyHours(history);
   const chartData = computeWeeklyChartData(history);
+  const deviceData = computeDeviceDistribution(history);
 
   return (
     <div className="space-y-6">
@@ -162,11 +164,49 @@ export function OverviewTab({ history }: OverviewTabProps) {
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="day" />
-              <YAxis allowDecimals={chartMode === 'hours'} />
+              <YAxis
+                allowDecimals={chartMode === 'hours'}
+                {...(chartMode === 'sessions' ? { tickCount: 5, domain: [0, (max: number) => Math.max(Math.ceil(max), 1)] } : {})}
+              />
               <Tooltip formatter={(v: number) => chartMode === 'hours' ? `${v}h` : v} />
               <Bar dataKey={chartMode} fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Device distribution */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Device distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {deviceData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={deviceData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={70}
+                  fill="#8884d8"
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {deviceData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-muted-foreground" data-testid="device-empty">
+              No device data yet
+            </div>
+          )}
         </CardContent>
       </Card>
 

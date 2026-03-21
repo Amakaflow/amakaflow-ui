@@ -10,6 +10,7 @@ import {
   computeAverageWorkoutDuration,
   computeWeeklyDelta,
   computeWeeklyChartData,
+  computeDeviceDistribution,
 } from '../analytics-stats';
 import type { WorkoutHistoryItem } from '../workout-history';
 
@@ -242,5 +243,46 @@ describe('computeWeeklyChartData', () => {
     ];
     const data = computeWeeklyChartData(history);
     expect(data[6].type).toBe('mixed');
+  });
+});
+
+describe('computeDeviceDistribution', () => {
+  it('returns empty array for empty history', () => {
+    expect(computeDeviceDistribution([])).toEqual([]);
+  });
+
+  it('counts workouts per device with correct labels and colors', () => {
+    const history = [
+      makeItem({ daysAgo: 0 }), // device defaults to 'garmin'
+      makeItem({ daysAgo: 1 }),
+    ];
+    const result = computeDeviceDistribution(history);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ name: 'Garmin', value: 2, color: '#0ea5e9' });
+  });
+
+  it('returns entries for multiple devices', () => {
+    const garminItem = makeItem({ daysAgo: 0 });
+    const appleItem = makeItem({ daysAgo: 1 });
+    appleItem.device = 'apple' as any;
+    const result = computeDeviceDistribution([garminItem, appleItem]);
+    expect(result).toHaveLength(2);
+    const names = result.map(d => d.name);
+    expect(names).toContain('Garmin');
+    expect(names).toContain('Apple Watch');
+  });
+
+  it('excludes items with no device', () => {
+    const item = makeItem({ daysAgo: 0 });
+    item.device = '' as any;
+    expect(computeDeviceDistribution([item])).toEqual([]);
+  });
+
+  it('uses fallback label and color for unknown devices', () => {
+    const item = makeItem({ daysAgo: 0 });
+    item.device = 'fitbit' as any;
+    const result = computeDeviceDistribution([item]);
+    expect(result[0].name).toBe('fitbit');
+    expect(result[0].color).toBe('#94a3b8');
   });
 });

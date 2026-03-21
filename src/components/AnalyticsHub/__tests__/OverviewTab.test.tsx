@@ -8,9 +8,13 @@ vi.mock('recharts', () => ({
   BarChart: ({ children }: any) => <div>{children}</div>,
   Bar: () => null,
   XAxis: () => null,
-  YAxis: () => null,
+  YAxis: (props: any) => <div data-testid="y-axis" data-allow-decimals={String(props.allowDecimals)} />,
   CartesianGrid: () => null,
   Tooltip: () => null,
+  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
+  Pie: ({ children, nameKey }: any) => <div data-testid="pie" data-name-key={nameKey}>{children}</div>,
+  Cell: () => null,
+  Legend: () => <div data-testid="chart-legend" />,
 }));
 
 const mockUser = {
@@ -90,5 +94,35 @@ describe('OverviewTab', () => {
     render(<OverviewTab user={mockUser} history={[]} />);
     expect(screen.getByTestId('stat-weekly-hours')).toHaveTextContent('0m');
     expect(screen.getByTestId('stat-sessions')).toHaveTextContent('0');
+  });
+
+  it('renders device distribution section', () => {
+    render(<OverviewTab user={mockUser} history={[]} />);
+    expect(screen.getByText(/device distribution/i)).toBeInTheDocument();
+  });
+
+  it('shows empty state when no device data', () => {
+    render(<OverviewTab user={mockUser} history={[]} />);
+    expect(screen.getByTestId('device-empty')).toHaveTextContent('No device data yet');
+  });
+
+  it('renders pie chart with legend when device data exists', () => {
+    const items = [makeItem(0), makeItem(1)];
+    render(<OverviewTab user={mockUser} history={items} />);
+    expect(screen.getByTestId('pie-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('chart-legend')).toBeInTheDocument();
+  });
+
+  it('pie chart has nameKey set for legend labels', () => {
+    const items = [makeItem(0)];
+    render(<OverviewTab user={mockUser} history={items} />);
+    expect(screen.getByTestId('pie')).toHaveAttribute('data-name-key', 'name');
+  });
+
+  it('Y-axis disallows decimals in sessions mode', () => {
+    render(<OverviewTab user={mockUser} history={[makeItem(0)]} />);
+    const yAxes = screen.getAllByTestId('y-axis');
+    // The first y-axis is the weekly activity chart in sessions mode
+    expect(yAxes[0]).toHaveAttribute('data-allow-decimals', 'false');
   });
 });

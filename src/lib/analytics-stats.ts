@@ -153,6 +153,36 @@ export function computeWeeklyDelta(history: WorkoutHistoryItem[]): number {
   return (thisWeekMins - lastWeekMins) / 60;
 }
 
+const DEVICE_COLORS: Record<string, string> = {
+  garmin: '#0ea5e9',
+  apple: '#8b5cf6',
+  zwift: '#f97316',
+};
+
+const DEVICE_LABELS: Record<string, string> = {
+  garmin: 'Garmin',
+  apple: 'Apple Watch',
+  zwift: 'Zwift',
+};
+
+export type DeviceDistributionEntry = { name: string; value: number; color: string };
+
+/** Count workouts per device and return chart-ready data (non-zero only). */
+export function computeDeviceDistribution(history: WorkoutHistoryItem[]): DeviceDistributionEntry[] {
+  const counts: Record<string, number> = {};
+  for (const item of history) {
+    const dev = item.device;
+    if (dev) counts[dev] = (counts[dev] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .filter(([, v]) => v > 0)
+    .map(([key, value]) => ({
+      name: DEVICE_LABELS[key] ?? key,
+      value,
+      color: DEVICE_COLORS[key] ?? '#94a3b8',
+    }));
+}
+
 export function computeWeeklyChartData(history: WorkoutHistoryItem[]): Array<{
   day: string;
   sessions: number;
