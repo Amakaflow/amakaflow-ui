@@ -64,6 +64,41 @@ export interface ConflictWarning {
   suggestion?: string;
 }
 
+/** View layer toggle */
+export type ViewLayer = 'planned' | 'actuals';
+
+// --- AMA-1118 Conflict detection types ---
+
+/** Conflict type returned by POST /planning/detect-conflicts */
+export type ConflictType =
+  | 'pre_fatigue'
+  | 'consecutive_hard'
+  | 'same_muscle_group'
+  | 'overload'
+  | 'no_recovery';
+
+/** Conflict severity */
+export type ConflictSeverity = 'warning' | 'critical';
+
+/** A suggested fix action */
+export interface SuggestedFix {
+  label: string;
+  action: 'move' | 'downgrade' | 'keep';
+  sessionId?: string;
+  targetDate?: string;
+  targetIntensity?: string;
+}
+
+/** A detected scheduling conflict (AMA-1118) */
+export interface SchedulingConflict {
+  type: ConflictType;
+  severity: ConflictSeverity;
+  message: string;
+  affectedSessionIds: string[];
+  affectedDates: string[];
+  suggestedFixes: SuggestedFix[];
+}
+
 export interface WeekState {
   days: DayState[];
   weekLabel: string; // "17 - 23 Mar 2026"
@@ -73,4 +108,46 @@ export interface WeekState {
   generated: boolean;
   /** Conflict warnings from the energy planner */
   conflicts: ConflictWarning[];
+}
+
+// --- Plan Preview types (AMA-1128) ---
+
+/** The kind of change the AI proposes */
+export type ProposedChangeKind = 'new' | 'moved' | 'removed';
+
+/** A single proposed session change */
+export interface ProposedSession {
+  /** Unique id for this proposal */
+  id: string;
+  /** Underlying session (new or existing) */
+  session: TrainingSession;
+  /** What kind of change this is */
+  kind: ProposedChangeKind;
+  /** AI rationale for the change */
+  rationale: string;
+  /** For moved sessions: original day index */
+  fromDayIndex?: number;
+  /** Target day index in the week */
+  toDayIndex: number;
+}
+
+/** Summary of a proposed plan */
+export interface PlanSummaryData {
+  added: number;
+  moved: number;
+  removed: number;
+  totalWeeklyVolume: string; // e.g. "6h 30min"
+  hardDaysUsed: number;
+  hardDaysCap: number;
+  warnings: string[];
+}
+
+/** The full proposed plan preview state */
+export interface PlanPreviewState {
+  /** Whether the preview overlay is showing */
+  active: boolean;
+  /** All proposed changes */
+  proposals: ProposedSession[];
+  /** Summary stats */
+  summary: PlanSummaryData;
 }

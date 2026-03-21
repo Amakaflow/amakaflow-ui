@@ -1,9 +1,10 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { AlertTriangle } from 'lucide-react';
-import type { DayState, ViewLayer } from './types';
+import type { DayState, ViewLayer, SchedulingConflict } from './types';
 import { ReadinessPill } from './ReadinessPill';
 import { SessionCard } from './SessionCard';
+import { ConflictIndicator } from './ConflictIndicator';
 
 interface DayColumnProps {
   day: DayState;
@@ -13,6 +14,10 @@ interface DayColumnProps {
   viewLayer: ViewLayer;
   isToday: boolean;
   isDropTarget: boolean;
+  /** AMA-1118: detailed conflicts for this day */
+  conflicts?: SchedulingConflict[];
+  /** AMA-1118: callback when conflict indicator is clicked */
+  onConflictClick?: () => void;
 }
 
 export function DayColumn({
@@ -23,6 +28,8 @@ export function DayColumn({
   viewLayer,
   isToday,
   isDropTarget,
+  conflicts = [],
+  onConflictClick,
 }: DayColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `day-${dayIndex}`,
@@ -58,9 +65,14 @@ export function DayColumn({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {day.hasConflict && (
+          {conflicts.length > 0 ? (
+            <ConflictIndicator
+              conflicts={conflicts}
+              onClick={onConflictClick}
+            />
+          ) : day.hasConflict ? (
             <AlertTriangle className="h-4 w-4 text-yellow-400" data-testid="conflict-badge" />
-          )}
+          ) : null}
           <ReadinessPill score={day.readinessScore} tier={day.readinessTier} />
         </div>
       </div>
