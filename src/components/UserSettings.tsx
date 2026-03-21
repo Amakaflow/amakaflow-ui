@@ -40,6 +40,7 @@ import {
 } from '../lib/voice-api';
 import { DeletionPreview, getDeletionPreview, deleteAccountData } from '../lib/account-api';
 import { ClearDataModal } from './settings/ClearDataModal';
+import { ApiKeySettings } from './settings/ApiKeySettings';
 import { DeviceId } from '../lib/devices';
 import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
@@ -800,6 +801,9 @@ Block: Warm-Up
                   </div>
                 </CardContent>
               </Card>
+
+              {/* BYOK: Bring Your Own API Key (AMA-1135) */}
+              <ApiKeySettings />
             </div>
           )}
 
