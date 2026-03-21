@@ -172,6 +172,31 @@ describe('Mock Data Hub', () => {
     }
   });
 
+  it('MOCK_WORKOUT_HISTORY dates are relative to today (AMA-855)', async () => {
+    const { MOCK_WORKOUT_HISTORY } = await import('../mock-data');
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    // At least 2 workouts should fall within the last 7 days
+    const recentCount = MOCK_WORKOUT_HISTORY.filter(item => {
+      const d = new Date(item.createdAt).getTime();
+      return now - d < sevenDaysMs;
+    }).length;
+    expect(recentCount).toBeGreaterThanOrEqual(2);
+
+    // No workout should be more than 30 days old
+    for (const item of MOCK_WORKOUT_HISTORY) {
+      const age = now - new Date(item.createdAt).getTime();
+      expect(age).toBeLessThan(30 * 24 * 60 * 60 * 1000);
+    }
+
+    // The most recent workout should be within the last 24 hours
+    const mostRecent = Math.max(
+      ...MOCK_WORKOUT_HISTORY.map(item => new Date(item.createdAt).getTime())
+    );
+    expect(now - mostRecent).toBeLessThan(25 * 60 * 60 * 1000);
+  });
+
   it('MOCK_PROGRAMS has 3 programs with required fields', async () => {
     const { MOCK_PROGRAMS } = await import('../mock-data');
     expect(MOCK_PROGRAMS).toHaveLength(3);

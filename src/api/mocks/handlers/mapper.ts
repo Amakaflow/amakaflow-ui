@@ -14,6 +14,9 @@ function mockHistoryToSaved(): SavedWorkout[] {
     device: item.device || 'garmin',
     title: item.workout?.title,
     is_exported: false,
+    is_favorite: false,
+    synced_to_strava: item.syncedToStrava ?? false,
+    strava_activity_id: item.stravaActivityId,
     created_at: item.createdAt || new Date().toISOString(),
     updated_at: item.updatedAt || new Date().toISOString(),
   }));
