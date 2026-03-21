@@ -68,11 +68,12 @@ type Props = {
   onAccountDeleted?: () => void;
   onUserUpdate?: (updates: { selectedDevices?: DeviceId[], address?: string, city?: string, state?: string, zipCode?: string }) => void;
   onNavigateToMobileCompanion?: () => void;
+  onNavigateToConnections?: () => void;
 };
 
 type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps';
 
-export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion }: Props) {
+export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections }: Props) {
   const { user: clerkUser } = useClerkUser();
   const { signOut } = useClerkAuth();
   const [name, setName] = useState(user.name);
@@ -1773,6 +1774,20 @@ Block: Warm-Up
                   )}
                   <Separator />
                   <LinkedAccounts onAccountsChange={onAccountsChange} />
+                </CardContent>
+              </Card>
+
+              {/* Platform Connections link */}
+              <Card className="cursor-pointer hover:border-primary/50 transition-all" onClick={() => onNavigateToConnections?.()}>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Link2 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-medium">Platform Connections</span>
+                    <p className="text-sm text-muted-foreground">Connect Stryd, Garmin, and Strava</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </CardContent>
               </Card>
             </div>
