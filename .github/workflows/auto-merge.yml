@@ -1,26 +1,51 @@
 name: Auto Merge
 
 on:
-  pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+  # Trigger after Factory review completes (not on PR open)
+  workflow_run:
+    workflows: ["Droid Auto Review"]
+    types: [completed]
 
 permissions: {}
 
 concurrency:
-  group: auto-merge-${{ github.ref }}
+  group: auto-merge-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   auto-merge:
-    if: contains(fromJSON('["openclawjoshua-eng","supergeri"]'), github.event.pull_request.user.login) && !github.event.pull_request.draft
+    # Only run if Factory review succeeded and PR is from an approved author
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Enable auto-merge
+      - name: Get PR number
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+          PR_NUMBER=$(gh api repos/${{ github.repository }}/commits/${{ github.event.workflow_run.head_sha }}/pulls \
+            --jq '.[0].number // empty')
+          PR_AUTHOR=$(gh api repos/${{ github.repository }}/commits/${{ github.event.workflow_run.head_sha }}/pulls \
+            --jq '.[0].user.login // empty')
+          PR_DRAFT=$(gh api repos/${{ github.repository }}/commits/${{ github.event.workflow_run.head_sha }}/pulls \
+            --jq '.[0].draft // false')
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "author=$PR_AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "draft=$PR_DRAFT" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        if: >-
+          steps.pr.outputs.number != '' &&
+          steps.pr.outputs.draft != 'true' &&
+          contains(fromJSON('["openclawjoshua-eng","supergeri"]'), steps.pr.outputs.author)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge --auto --squash "${{ steps.pr.outputs.number }}" \
+            --repo "${{ github.repository }}"
