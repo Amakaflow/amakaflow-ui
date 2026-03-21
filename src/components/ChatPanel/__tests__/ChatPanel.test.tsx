@@ -154,6 +154,22 @@ describe('ChatPanel', () => {
     expect(panel).toHaveAttribute('aria-modal', 'false');
   });
 
+  // Z-index stacking (regression guard for PR #263 collision fix)
+  describe('z-index stacking', () => {
+    it('FAB uses z-[60] so it floats above z-50 panels', () => {
+      render(<ChatPanel />);
+      const fab = screen.getByTestId('chat-trigger-button');
+      expect(fab.className).toContain('z-[60]');
+    });
+
+    it('desktop panel uses z-[60]', () => {
+      mockState.isOpen = true;
+      render(<ChatPanel />);
+      const panel = screen.getByTestId('chat-panel');
+      expect(panel.className).toContain('z-[60]');
+    });
+  });
+
   // Responsive behavior (AMA-522)
   describe('responsive behavior', () => {
     it('positions FAB bottom-left on desktop', () => {

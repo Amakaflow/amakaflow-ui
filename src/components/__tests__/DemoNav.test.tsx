@@ -52,6 +52,13 @@ describe('DemoNav', () => {
     expect(screen.queryByText('Jump to screen')).not.toBeInTheDocument();
   });
 
+  it('renders the DEMO button with z-[51] to stay above z-50 panels but below z-[60] overlays', () => {
+    render(<DemoNav {...defaultProps} />);
+    const button = screen.getByText('DEMO');
+    expect(button.className).toContain('z-[51]');
+    expect(button.className).not.toContain('z-[60]');
+  });
+
   it('does not render when demo mode is disabled', async () => {
     // Override the mock for this test
     const mod = await import('../../lib/demo-mode');
