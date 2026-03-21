@@ -8,6 +8,7 @@ import {
   Dumbbell,
   FolderOpen,
   HelpCircle,
+  LayoutDashboard,
   Plus,
   Settings,
   Sparkles,
@@ -62,6 +63,16 @@ export function NavBar({
             </div>
 
             <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
+              <Button
+                variant={currentView === 'dashboard' ? 'default' : 'ghost'}
+                size="sm"
+                data-assistant-target="nav-dashboard"
+                onClick={() => onNavigate('dashboard')}
+                className="gap-2"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Button>
               <Button
                 variant={(currentView === 'workflow' || currentView === 'import') ? 'default' : 'ghost'}
                 size="sm"

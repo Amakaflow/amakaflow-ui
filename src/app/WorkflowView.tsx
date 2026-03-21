@@ -24,6 +24,7 @@ import {
   CreateAIWorkout,
   ConnectionsPage,
   CoachChat,
+  SyncDashboardPage,
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
@@ -348,6 +349,10 @@ export function WorkflowView({
 
         {currentView === 'connections' && (
           <ConnectionsPage onBack={() => setCurrentView('settings')} />
+        )}
+
+        {currentView === 'dashboard' && (
+          <SyncDashboardPage />
         )}
 
         {currentView === 'coach' && (
