@@ -154,7 +154,7 @@ export function Analytics({ user, history }: Props) {
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
-                <YAxis allowDecimals={false} />
+                <YAxis allowDecimals={false} tickCount={5} domain={[0, (max: number) => Math.max(Math.ceil(max), 1)]} />
                 <Tooltip />
                 <Bar dataKey="workouts" fill="#0ea5e9" />
               </BarChart>
@@ -179,6 +179,7 @@ export function Analytics({ user, history }: Props) {
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    nameKey="name"
                   >
                     {deviceData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -207,7 +208,7 @@ export function Analytics({ user, history }: Props) {
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="week" />
-              <YAxis allowDecimals={false} />
+              <YAxis allowDecimals={false} tickCount={5} domain={[0, (max: number) => Math.max(Math.ceil(max), 1)]} />
               <Tooltip />
               <Line type="monotone" dataKey="workouts" stroke="#8b5cf6" strokeWidth={2} />
             </LineChart>
