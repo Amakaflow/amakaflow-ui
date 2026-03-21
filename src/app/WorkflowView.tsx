@@ -23,6 +23,7 @@ import {
   ProgramsList,
   CreateAIWorkout,
   ConnectionsPage,
+  CoachChat,
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
@@ -338,6 +339,7 @@ export function WorkflowView({
               }}
               onNavigateToMobileCompanion={() => setCurrentView('mobile-companion')}
               onNavigateToConnections={() => setCurrentView('connections')}
+              onNavigateToCoach={() => setCurrentView('coach')}
             />
           </div>
         )}
@@ -346,6 +348,12 @@ export function WorkflowView({
 
         {currentView === 'connections' && (
           <ConnectionsPage onBack={() => setCurrentView('settings')} />
+        )}
+
+        {currentView === 'coach' && (
+          <div className="h-[calc(100vh-4rem)]">
+            <CoachChat />
+          </div>
         )}
 
         {currentView === 'strava-enhance' && (

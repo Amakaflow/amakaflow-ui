@@ -69,11 +69,12 @@ type Props = {
   onUserUpdate?: (updates: { selectedDevices?: DeviceId[], address?: string, city?: string, state?: string, zipCode?: string }) => void;
   onNavigateToMobileCompanion?: () => void;
   onNavigateToConnections?: () => void;
+  onNavigateToCoach?: () => void;
 };
 
 type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps';
 
-export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections }: Props) {
+export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections, onNavigateToCoach }: Props) {
   const { user: clerkUser } = useClerkUser();
   const { signOut } = useClerkAuth();
   const [name, setName] = useState(user.name);
@@ -1786,6 +1787,20 @@ Block: Warm-Up
                   <div className="flex-1">
                     <span className="font-medium">Platform Connections</span>
                     <p className="text-sm text-muted-foreground">Connect Stryd, Garmin, and Strava</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+
+              {/* AI Coach link (AMA-1131) */}
+              <Card className="cursor-pointer hover:border-primary/50 transition-all" onClick={() => onNavigateToCoach?.()}>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center">
+                    <span className="text-lg font-bold bg-gradient-to-br from-violet-500 to-purple-600 bg-clip-text text-transparent">A</span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-medium">Coach Amaka</span>
+                    <p className="text-sm text-muted-foreground">AI training coach with workout memory</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </CardContent>
