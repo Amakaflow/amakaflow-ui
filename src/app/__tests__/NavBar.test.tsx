@@ -58,6 +58,13 @@ describe('NavBar', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
+  it('has hidden md:block classes to hide on mobile and show on desktop', () => {
+    const { container } = renderNavBar();
+    const wrapper = container.firstChild as HTMLElement;
+    expect(wrapper.className).toContain('hidden');
+    expect(wrapper.className).toContain('md:block');
+  });
+
   it('does NOT render History, Volume, or Team as top-level nav items', () => {
     renderNavBar();
 

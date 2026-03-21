@@ -9,6 +9,7 @@ import { BuildBadge } from '../components/BuildBadge';
 import { DevSystemStatus } from '../components/DevSystemStatus';
 import { ChatPanel } from '../components/ChatPanel';
 import { DemoNav } from '../components/DemoNav';
+import { BottomNav } from '../components/BottomNav';
 import { useAppAuth } from './useAppAuth';
 import { useWorkoutHistory } from './useWorkoutHistory';
 import { NavBar } from './NavBar';
@@ -79,22 +80,25 @@ export function AppShell() {
           hasClerk={hasClerk}
           onNavigate={navigate}
         />
-        <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
-          <WorkflowView
-            user={user}
-            selectedDevice={selectedDevice}
-            setSelectedDevice={setSelectedDevice}
-            workoutHistoryList={workoutHistoryList}
-            refreshHistory={refreshHistory}
-            onNavigate={navigate}
-            currentView={currentView}
-            setCurrentView={setCurrentView}
-            stravaConnected={stravaConnected}
-          />
-        </Suspense>
+        <div className="pb-16 md:pb-0">
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
+            <WorkflowView
+              user={user}
+              selectedDevice={selectedDevice}
+              setSelectedDevice={setSelectedDevice}
+              workoutHistoryList={workoutHistoryList}
+              refreshHistory={refreshHistory}
+              onNavigate={navigate}
+              currentView={currentView}
+              setCurrentView={setCurrentView}
+              stravaConnected={stravaConnected}
+            />
+          </Suspense>
+        </div>
         <BuildBadge />
         <DevSystemStatus />
         <ChatPanel />
+        <BottomNav currentView={currentView} onNavigate={navigate} />
         <DemoNav />
       </ChatAwareLayout>
     </ChatProvider>
