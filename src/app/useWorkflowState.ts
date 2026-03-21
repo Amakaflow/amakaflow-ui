@@ -3,8 +3,8 @@ import { toast } from 'sonner';
 import { applyWorkoutTypeDefaults } from '../lib/workoutTypeDefaults';
 import { useWorkflowGeneration } from './hooks/useWorkflowGeneration';
 import { useWorkflowEditing } from './hooks/useWorkflowEditing';
-import type { WorkoutStructure, ValidationResponse, ExportFormats, WorkoutType } from '../types/workout';
-// Note: useWorkflowValidation removed — validation step is no longer part of the workflow
+import { useWorkflowValidation } from './hooks/useWorkflowValidation';
+import type { WorkoutStructure, WorkoutType } from '../types/workout';
 import type { ProcessedItem } from '../types/import';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
@@ -47,9 +47,14 @@ export function useWorkflowState({
   const [workout, setWorkout] = useState<WorkoutStructure | null>(null);
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('add-sources');
-  const [validation, setValidation] = useState<ValidationResponse | null>(null);
-  const [exports, setExports] = useState<ExportFormats | null>(null);
   const [importProcessedItems, setImportProcessedItems] = useState<ProcessedItem[]>([]);
+
+  // ── Validation & Export hook ──────────────────────────────────────────────
+  const validationHook = useWorkflowValidation({
+    selectedDevice,
+    setCurrentView,
+  });
+  const { validation, setValidation, exports, setExports } = validationHook;
 
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
     open: false,
@@ -79,6 +84,7 @@ export function useWorkflowState({
     setExports(null);
     setCurrentStep('add-sources');
     setWorkoutSaved(false);
+    validationHook.resetExportState();
     resetRefs.genSources();
     resetRefs.editing();
   };
@@ -257,6 +263,14 @@ export function useWorkflowState({
     handleEditFromImport: editing.handleEditFromImport,
     handleBackToImport: editing.handleBackToImport,
     resetEditingFlags: editing.reset,
+    // validation & export
+    exportingWorkout: validationHook.exportingWorkout,
+    exportingWorkouts: validationHook.exportingWorkouts,
+    exportingDevice: validationHook.exportingDevice,
+    handleOpenExportPage: validationHook.handleOpenExportPage,
+    handleInlineExport: validationHook.handleInlineExport,
+    handleBatchExport: validationHook.handleBatchExport,
+    handleExportBack: validationHook.handleExportBack,
     // composer handlers
     handleWorkoutTypeConfirm,
     handleWorkoutTypeSkip,
