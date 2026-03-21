@@ -3,5 +3,8 @@ export { DayColumn } from './DayColumn';
 export { SessionCard } from './SessionCard';
 export { ReadinessPill } from './ReadinessPill';
 export { AdherenceSummary } from './AdherenceSummary';
+export { ConflictWarningBanner } from './ConflictWarningBanner';
+export { MissedSessionPrompt } from './MissedSessionPrompt';
+export { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
 export { useWeekState } from './hooks/useWeekState';
 export type * from './types';

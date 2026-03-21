@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -9,21 +9,27 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Sparkles, Loader2 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { DayColumn } from './DayColumn';
 import { AdherenceSummary } from './AdherenceSummary';
+import { ConflictWarningBanner } from './ConflictWarningBanner';
+import { MissedSessionPrompt } from './MissedSessionPrompt';
+import { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
 import { useWeekState } from './hooks/useWeekState';
-import type { TrainingSession } from './types';
+import type { TrainingSession, ConflictWarning } from './types';
 
 export function TrainingWeekView() {
   const {
     weekState,
     viewLayer,
     expandedSessionId,
+    isGenerating,
     moveSession,
     toggleExpand,
     toggleViewLayer,
+    generateWeek,
+    dismissMissedSession,
   } = useWeekState();
 
   const [activeSession, setActiveSession] = useState<{
@@ -32,6 +38,15 @@ export function TrainingWeekView() {
   } | null>(null);
 
   const [dropWarning, setDropWarning] = useState<string | null>(null);
+  const [visibleConflicts, setVisibleConflicts] = useState<ConflictWarning[]>([]);
+  const [dismissedDowngrade, setDismissedDowngrade] = useState(false);
+
+  // Sync conflicts when weekState changes (e.g. after generate)
+  useEffect(() => {
+    if (weekState.conflicts.length > 0) {
+      setVisibleConflicts(weekState.conflicts);
+    }
+  }, [weekState.conflicts]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -96,6 +111,20 @@ export function TrainingWeekView() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Collect missed sessions across all days
+  const missedSessions = weekState.days.flatMap(d =>
+    d.sessions.filter(s => s.status === 'missed'),
+  );
+
+  // Find days with low readiness that have hard sessions
+  const lowReadinessDays = weekState.days.filter(
+    d => d.readinessScore < 40 && d.sessions.some(s => s.intensity === 'hard'),
+  );
+
+  const handleDismissConflict = useCallback((index: number) => {
+    setVisibleConflicts(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
     <div data-testid="training-week-view" className="flex flex-col gap-4 p-4 md:p-6 h-full">
       {/* Top bar */}
@@ -117,6 +146,21 @@ export function TrainingWeekView() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Generate my week button -- AMA-1115 */}
+          <button
+            data-testid="generate-week-btn"
+            onClick={generateWeek}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {isGenerating ? 'Generating...' : 'Generate my week'}
+          </button>
+
           {/* Plan vs Actual toggle */}
           <div className="flex items-center gap-2" data-testid="plan-actual-toggle">
             <span className={`text-sm font-medium ${viewLayer === 'planned' ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -138,6 +182,34 @@ export function TrainingWeekView() {
         completed={weekState.completedCount}
         total={weekState.totalPlanned}
       />
+
+      {/* Conflict warnings -- AMA-1115 */}
+      <ConflictWarningBanner
+        conflicts={visibleConflicts}
+        onDismiss={handleDismissConflict}
+      />
+
+      {/* Missed session prompts -- AMA-1115 */}
+      {missedSessions.map(session => (
+        <MissedSessionPrompt
+          key={session.id}
+          session={session}
+          onReschedule={(id) => {
+            // In production this would call POST /planning/rebalance
+            dismissMissedSession(id);
+          }}
+          onSkip={(id) => dismissMissedSession(id)}
+        />
+      ))}
+
+      {/* Readiness-based downgrade prompt -- AMA-1115 */}
+      {!dismissedDowngrade && lowReadinessDays.length > 0 && (
+        <ReadinessDowngradePrompt
+          day={lowReadinessDays[0]}
+          onAcceptDowngrade={() => setDismissedDowngrade(true)}
+          onDismiss={() => setDismissedDowngrade(true)}
+        />
+      )}
 
       {/* Drop warning toast */}
       {dropWarning && (

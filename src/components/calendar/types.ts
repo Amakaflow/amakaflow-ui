@@ -32,7 +32,7 @@ export interface TrainingSession {
   source: SessionSource;
   duration: number; // minutes
   intensity: Intensity;
-  status: 'planned' | 'completed' | 'skipped';
+  status: 'planned' | 'completed' | 'skipped' | 'missed';
   /** Whether this session is locked (external source) */
   locked: boolean;
   /** Steps for expanded view */
@@ -57,9 +57,20 @@ export interface DayState {
   hasConflict: boolean;
 }
 
+/** Conflict warning from the planner */
+export interface ConflictWarning {
+  date: Date;
+  message: string;
+  suggestion?: string;
+}
+
 export interface WeekState {
   days: DayState[];
   weekLabel: string; // "17 - 23 Mar 2026"
   completedCount: number;
   totalPlanned: number;
+  /** Whether the week has been generated via the planner */
+  generated: boolean;
+  /** Conflict warnings from the energy planner */
+  conflicts: ConflictWarning[];
 }
