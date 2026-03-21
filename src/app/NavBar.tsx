@@ -32,7 +32,7 @@ export function NavBar({
   onNavigate,
 }: NavBarProps) {
   return (
-    <div className="border-b bg-card">
+    <div className="hidden md:block border-b bg-card">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6 min-w-0">
