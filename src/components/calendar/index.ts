@@ -9,7 +9,10 @@ export { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
 export { PlanPreviewOverlay } from './PlanPreviewOverlay';
 export { ProposedSessionCard } from './ProposedSessionCard';
 export { PlanSummary } from './PlanSummary';
+<<<<<<< HEAD
 export { ConflictIndicator } from './ConflictIndicator';
 export { ConflictDetailPanel } from './ConflictDetailPanel';
+=======
+>>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
 export { useWeekState } from './hooks/useWeekState';
 export type * from './types';
