@@ -25,7 +25,7 @@ const TABS: NavTab[] = [
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'settings', label: 'More', icon: Menu, matchViews: ['settings', 'help', 'programs', 'strava-enhance', 'mobile-companion', 'team', 'program-detail', 'export-page'] },
+  { id: 'settings', label: 'More', icon: Menu, matchViews: ['settings', 'help', 'programs', 'strava-enhance', 'mobile-companion', 'team', 'program-detail', 'export-page', 'connections'] },
 ];
 
 function isActive(tab: NavTab, currentView: View): boolean {

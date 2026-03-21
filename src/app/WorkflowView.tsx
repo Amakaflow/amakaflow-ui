@@ -22,6 +22,7 @@ import {
   ProgramDetail,
   ProgramsList,
   CreateAIWorkout,
+  ConnectionsPage,
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
@@ -336,11 +337,16 @@ export function WorkflowView({
                 }
               }}
               onNavigateToMobileCompanion={() => setCurrentView('mobile-companion')}
+              onNavigateToConnections={() => setCurrentView('connections')}
             />
           </div>
         )}
 
         {currentView === 'help' && <HelpPage onBack={() => setCurrentView('home')} />}
+
+        {currentView === 'connections' && (
+          <ConnectionsPage onBack={() => setCurrentView('settings')} />
+        )}
 
         {currentView === 'strava-enhance' && (
           <StravaEnhance onClose={() => setCurrentView('workflow')} />
