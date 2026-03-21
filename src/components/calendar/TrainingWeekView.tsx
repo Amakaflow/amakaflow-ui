@@ -16,6 +16,7 @@ import { AdherenceSummary } from './AdherenceSummary';
 import { ConflictWarningBanner } from './ConflictWarningBanner';
 import { MissedSessionPrompt } from './MissedSessionPrompt';
 import { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
+import { PlanPreviewOverlay } from './PlanPreviewOverlay';
 import { useWeekState } from './hooks/useWeekState';
 import type { TrainingSession, ConflictWarning } from './types';
 
@@ -30,6 +31,12 @@ export function TrainingWeekView() {
     toggleViewLayer,
     generateWeek,
     dismissMissedSession,
+    planPreview,
+    applyPlan,
+    cancelPlan,
+    adjustPlan,
+    updateProposalDuration,
+    updateProposalIntensity,
   } = useWeekState();
 
   const [activeSession, setActiveSession] = useState<{
@@ -229,45 +236,57 @@ export function TrainingWeekView() {
       )}
 
       {/* Week grid */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-2 overflow-x-auto pb-2 flex-1 min-h-0">
-          {weekState.days.map((day, i) => {
-            const dayDate = new Date(day.date);
-            dayDate.setHours(0, 0, 0, 0);
-            const isToday = dayDate.getTime() === today.getTime();
+      <div className="relative flex-1 min-h-0">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-2 overflow-x-auto pb-2 h-full">
+            {weekState.days.map((day, i) => {
+              const dayDate = new Date(day.date);
+              dayDate.setHours(0, 0, 0, 0);
+              const isToday = dayDate.getTime() === today.getTime();
 
-            return (
-              <DayColumn
-                key={i}
-                day={day}
-                dayIndex={i}
-                expandedSessionId={expandedSessionId}
-                onToggleExpand={toggleExpand}
-                viewLayer={viewLayer}
-                isToday={isToday}
-                isDropTarget={false}
-              />
-            );
-          })}
-        </div>
+              return (
+                <DayColumn
+                  key={i}
+                  day={day}
+                  dayIndex={i}
+                  expandedSessionId={expandedSessionId}
+                  onToggleExpand={toggleExpand}
+                  viewLayer={viewLayer}
+                  isToday={isToday}
+                  isDropTarget={false}
+                />
+              );
+            })}
+          </div>
 
-        {/* Drag overlay */}
-        <DragOverlay>
-          {activeSession ? (
-            <div className="rounded-lg border-l-4 border-l-primary bg-card p-3 shadow-xl opacity-90 max-w-[200px]">
-              <span className="text-sm font-medium">{activeSession.session.title}</span>
-              <div className="text-xs text-muted-foreground mt-1">
-                {activeSession.session.duration}min - {activeSession.session.source}
+          {/* Drag overlay */}
+          <DragOverlay>
+            {activeSession ? (
+              <div className="rounded-lg border-l-4 border-l-primary bg-card p-3 shadow-xl opacity-90 max-w-[200px]">
+                <span className="text-sm font-medium">{activeSession.session.title}</span>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {activeSession.session.duration}min - {activeSession.session.source}
+                </div>
               </div>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+
+        {/* Plan preview overlay (AMA-1128) */}
+        <PlanPreviewOverlay
+          preview={planPreview}
+          onApply={applyPlan}
+          onCancel={cancelPlan}
+          onAdjust={adjustPlan}
+          onDurationChange={updateProposalDuration}
+          onIntensityChange={updateProposalIntensity}
+        />
+      </div>
 
       {/* Source legend */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1 border-t border-border">

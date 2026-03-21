@@ -6,5 +6,8 @@ export { AdherenceSummary } from './AdherenceSummary';
 export { ConflictWarningBanner } from './ConflictWarningBanner';
 export { MissedSessionPrompt } from './MissedSessionPrompt';
 export { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
+export { PlanPreviewOverlay } from './PlanPreviewOverlay';
+export { ProposedSessionCard } from './ProposedSessionCard';
+export { PlanSummary } from './PlanSummary';
 export { useWeekState } from './hooks/useWeekState';
 export type * from './types';
