@@ -19,6 +19,7 @@ export type View =
   | 'export-page'
   | 'connections'
   | 'coach'
+  | 'training-preferences'
   | 'dashboard';
 
 export const AnalyticsHub = lazy(() =>
@@ -76,3 +77,10 @@ export const CoachChat = lazy(() =>
 export const SyncDashboardPage = lazy(() =>
   import('../components/SyncDashboard').then(m => ({ default: m.SyncDashboard }))
 );
+<<<<<<< HEAD
+=======
+
+export const TrainingPreferencesPage = lazy(() =>
+  import('../components/TrainingPreferences').then(m => ({ default: m.TrainingPreferencesPage }))
+);
+>>>>>>> 2eddc3c (feat: add training preferences settings page (AMA-1129))
