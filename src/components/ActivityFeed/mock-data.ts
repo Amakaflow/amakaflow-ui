@@ -1,0 +1,103 @@
+/**
+ * Mock data for ActivityFeed demo mode (AMA-1124).
+ */
+
+import type { PendingAction } from './types';
+
+const now = new Date();
+const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+export const MOCK_ACTIONS: PendingAction[] = [
+  {
+    id: 'act-001',
+    user_id: 'demo-user-1',
+    agent: 'strava_enricher',
+    action_type: 'enrich_title',
+    payload: { activity_id: 'strava-123', new_title: 'Morning Easy Run - Recovery' },
+    status: 'approved',
+    approval_path: 'auto',
+    rationale: 'Added descriptive title based on Strava activity type and heart rate data.',
+    reversible: true,
+    snapshot: { old_title: 'Morning Activity' },
+    created_at: hourAgo.toISOString(),
+    applied_at: hourAgo.toISOString(),
+    undone_at: null,
+  },
+  {
+    id: 'act-002',
+    user_id: 'demo-user-1',
+    agent: 'scheduler',
+    action_type: 'restructure_week',
+    payload: { week_start: '2026-03-23', changes: ['Swap Tuesday/Thursday sessions'] },
+    status: 'pending',
+    approval_path: 'user_required',
+    rationale: 'Your acute:chronic ratio is 1.4 (above 1.3 threshold). Recommending moving Thursday tempo to Tuesday to spread load.',
+    reversible: true,
+    snapshot: null,
+    created_at: twoHoursAgo.toISOString(),
+    applied_at: null,
+    undone_at: null,
+  },
+  {
+    id: 'act-003',
+    user_id: 'demo-user-1',
+    agent: 'garmin_pusher',
+    action_type: 'push_to_garmin',
+    payload: { workout_id: 'w-456', device: 'Forerunner 265' },
+    status: 'approved',
+    approval_path: 'auto',
+    rationale: 'Pushed structured interval workout to your Garmin Forerunner 265.',
+    reversible: true,
+    snapshot: { garmin_workout_id: 'gw-789' },
+    created_at: twoHoursAgo.toISOString(),
+    applied_at: twoHoursAgo.toISOString(),
+    undone_at: null,
+  },
+  {
+    id: 'act-004',
+    user_id: 'demo-user-1',
+    agent: 'stryd_sync',
+    action_type: 'add_hr_zone',
+    payload: { session_id: 's-101', zone: 'Z2', avg_hr: 142 },
+    status: 'approved',
+    approval_path: 'auto',
+    rationale: 'Added heart rate zone data (Z2, avg 142bpm) from Stryd power file.',
+    reversible: true,
+    snapshot: { previous_zone: null },
+    created_at: yesterday.toISOString(),
+    applied_at: yesterday.toISOString(),
+    undone_at: null,
+  },
+  {
+    id: 'act-005',
+    user_id: 'demo-user-1',
+    agent: 'scheduler',
+    action_type: 'delete_session',
+    payload: { session_id: 's-202', reason: 'duplicate' },
+    status: 'rejected',
+    approval_path: 'user_required',
+    rationale: 'Detected a duplicate easy run session on Wednesday. Recommending removal.',
+    reversible: false,
+    snapshot: null,
+    created_at: yesterday.toISOString(),
+    applied_at: null,
+    undone_at: null,
+  },
+  {
+    id: 'act-006',
+    user_id: 'demo-user-1',
+    agent: 'scheduler',
+    action_type: 'reschedule_session',
+    payload: { session_id: 's-303', from_date: '2026-03-20', to_date: '2026-03-21' },
+    status: 'undone',
+    approval_path: 'auto',
+    rationale: 'Moved Friday long run to Saturday due to low readiness score (35/100).',
+    reversible: true,
+    snapshot: { original_date: '2026-03-20' },
+    created_at: yesterday.toISOString(),
+    applied_at: yesterday.toISOString(),
+    undone_at: new Date(yesterday.getTime() + 60 * 60 * 1000).toISOString(),
+  },
+];
