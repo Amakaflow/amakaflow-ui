@@ -1,5 +1,3 @@
-import React from 'react';
-import { toast } from 'sonner';
 import { ChevronRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -27,14 +25,12 @@ import {
 } from './router';
 import type { View } from './router';
 import type { AppUser } from './useAppAuth';
-import type { DeviceId, DeviceConfig } from '../lib/devices';
+import type { DeviceId } from '../lib/devices';
 import { getPrimaryExportDestinations } from '../lib/devices';
-import { exportWorkoutToDevice } from '../lib/mapper-api';
 import { isDemoMode } from '../lib/demo-mode';
 import { setCurrentProfileId } from '../lib/workout-history';
 import { normalizeWorkoutStructure } from '../lib/api';
 import { useWorkflowState } from './useWorkflowState';
-import type { WorkoutStructure } from '../types/workout';
 
 export interface WorkflowViewProps {
   user: AppUser;
@@ -74,8 +70,9 @@ export function WorkflowView({
     handleLoadFromHistory, handleEditFromHistory,
     handleSaveFromStructure, handleEditFromImport, handleBackToImport,
     handleWorkoutTypeConfirm, handleWorkoutTypeSkip,
-    handleBack, checkUnsavedChanges, clearWorkflowState,
-    resetEditingFlags,
+    handleBack, resetEditingFlags,
+    exportingWorkout, exportingWorkouts, exportingDevice,
+    handleOpenExportPage, handleInlineExport, handleBatchExport, handleExportBack,
   } = useWorkflowState({
     user,
     selectedDevice,
@@ -84,27 +81,6 @@ export function WorkflowView({
     currentView,
     setCurrentView,
   });
-
-  const [exportingWorkout, setExportingWorkout] = React.useState<WorkoutStructure | null>(null);
-  const [exportingWorkouts, setExportingWorkouts] = React.useState<WorkoutStructure[]>([]);
-  const [exportingDevice, setExportingDevice] = React.useState<DeviceId | null>(null);
-
-  const handleOpenExportPage = (workout: WorkoutStructure, device: DeviceConfig) => {
-    setExportingWorkout(workout);
-    setExportingDevice(device.id);
-    setCurrentView('export-page');
-  };
-
-  const handleInlineExport = async (workout: WorkoutStructure, device: DeviceConfig) => {
-    try {
-      toast.info(`Exporting "${workout.title || 'Workout'}" to ${device.name}...`);
-      await exportWorkoutToDevice(workout, device.id);
-      toast.success(`Exported to ${device.name}!`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Export failed';
-      toast.error(message);
-    }
-  };
 
   return (
     <>
@@ -408,19 +384,16 @@ export function WorkflowView({
                 setCurrentView('program-detail');
               }}
               onExportWorkout={(item, device) => {
-                const workout = normalizeWorkoutStructure(item.workout);
+                const w = normalizeWorkoutStructure(item.workout);
                 if (device.requiresMapping) {
-                  handleOpenExportPage(workout, device);
+                  handleOpenExportPage(w, device);
                 } else {
-                  handleInlineExport(workout, device);
+                  handleInlineExport(w, device);
                 }
               }}
               onBatchExport={(items) => {
                 const workouts = items.map(item => normalizeWorkoutStructure(item.workout));
-                setExportingWorkouts(workouts);
-                setExportingWorkout(null);
-                setExportingDevice(null);
-                setCurrentView('export-page');
+                handleBatchExport(workouts);
               }}
               onMergeWorkouts={(merged) => {
                 const fakeHistoryItem = {
@@ -450,12 +423,7 @@ export function WorkflowView({
             initialWorkouts={exportingWorkouts.length > 0 ? exportingWorkouts : undefined}
             initialDevice={exportingDevice ?? undefined}
             devices={getPrimaryExportDestinations()}
-            onBack={() => {
-              setCurrentView('workouts');
-              setExportingWorkout(null);
-              setExportingWorkouts([]);
-              setExportingDevice(null);
-            }}
+            onBack={handleExportBack}
           />
         )}
 
@@ -476,8 +444,8 @@ export function WorkflowView({
           <div data-assistant-target="workout-preview">
             <CreateAIWorkout
               onNavigate={(view) => setCurrentView(view)}
-              onWorkoutGenerated={(workout) =>
-                handleEditFromImport('ai-generated', workout as unknown as Record<string, unknown>)
+              onWorkoutGenerated={(w) =>
+                handleEditFromImport('ai-generated', w as unknown as Record<string, unknown>)
               }
             />
           </div>
