@@ -1,5 +1,17 @@
 import { WorkoutHistoryItem } from '../workout-history';
 
+/**
+ * Returns an ISO date string for `n` days before now, at the given hour (UTC).
+ * Using relative dates ensures analytics ("This Week", streak, etc.) always
+ * show meaningful data regardless of when the app is opened.
+ */
+function daysAgo(n: number, hour = 8): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
 export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
   {
     id: 'mock-workout-1',
@@ -91,8 +103,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['garmin'],
     device: 'garmin',
-    createdAt: '2026-02-20T08:30:00Z',
-    updatedAt: '2026-02-20T09:45:00Z',
+    createdAt: daysAgo(1, 8),
+    updatedAt: daysAgo(1, 9),
     syncedToStrava: true,
     stravaActivityId: 'strava-mock-1',
   },
@@ -176,8 +188,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['ai'],
     device: 'apple',
-    createdAt: '2026-02-22T10:00:00Z',
-    updatedAt: '2026-02-22T11:10:00Z',
+    createdAt: daysAgo(0, 10),
+    updatedAt: daysAgo(0, 11),
     syncedToStrava: false,
   },
   {
@@ -270,8 +282,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['garmin'],
     device: 'garmin',
-    createdAt: '2026-02-18T07:00:00Z',
-    updatedAt: '2026-02-18T08:20:00Z',
+    createdAt: daysAgo(3, 7),
+    updatedAt: daysAgo(3, 8),
     syncedToStrava: true,
     stravaActivityId: 'strava-mock-3',
   },
@@ -306,8 +318,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['strava'],
     device: 'garmin',
-    createdAt: '2026-02-17T06:15:00Z',
-    updatedAt: '2026-02-17T07:00:00Z',
+    createdAt: daysAgo(4, 6),
+    updatedAt: daysAgo(4, 7),
     syncedToStrava: true,
     stravaActivityId: 'strava-mock-4',
   },
@@ -401,8 +413,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['ai'],
     device: 'apple',
-    createdAt: '2026-02-15T09:30:00Z',
-    updatedAt: '2026-02-15T10:45:00Z',
+    createdAt: daysAgo(6, 9),
+    updatedAt: daysAgo(6, 10),
     syncedToStrava: false,
   },
   {
@@ -483,8 +495,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['ai'],
     device: 'apple',
-    createdAt: '2026-02-13T10:00:00Z',
-    updatedAt: '2026-02-13T11:15:00Z',
+    createdAt: daysAgo(8, 10),
+    updatedAt: daysAgo(8, 11),
     syncedToStrava: false,
   },
   {
@@ -533,8 +545,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['youtube'],
     device: 'garmin',
-    createdAt: '2026-02-11T07:30:00Z',
-    updatedAt: '2026-02-11T08:15:00Z',
+    createdAt: daysAgo(10, 7),
+    updatedAt: daysAgo(10, 8),
     syncedToStrava: true,
     stravaActivityId: 'strava-mock-7',
   },
@@ -604,8 +616,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['manual'],
     device: 'apple',
-    createdAt: '2026-02-08T09:00:00Z',
-    updatedAt: '2026-02-08T10:20:00Z',
+    createdAt: daysAgo(13, 9),
+    updatedAt: daysAgo(13, 10),
     syncedToStrava: false,
   },
   {
@@ -640,8 +652,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['strava'],
     device: 'garmin',
-    createdAt: '2026-02-06T06:00:00Z',
-    updatedAt: '2026-02-06T07:05:00Z',
+    createdAt: daysAgo(15, 6),
+    updatedAt: daysAgo(15, 7),
     syncedToStrava: true,
     stravaActivityId: 'strava-mock-9',
   },
@@ -734,8 +746,8 @@ export const MOCK_WORKOUT_HISTORY: WorkoutHistoryItem[] = [
     },
     sources: ['instagram'],
     device: 'apple',
-    createdAt: '2026-02-04T08:30:00Z',
-    updatedAt: '2026-02-04T09:45:00Z',
+    createdAt: daysAgo(17, 8),
+    updatedAt: daysAgo(17, 9),
     syncedToStrava: false,
   },
 ];
