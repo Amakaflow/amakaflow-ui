@@ -18,7 +18,9 @@ export type View =
   | 'create-ai'
   | 'export-page'
   | 'connections'
-  | 'coach';
+  | 'coach'
+  | 'training-preferences'
+  | 'dashboard';
 
 export const AnalyticsHub = lazy(() =>
   import('../components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub }))
@@ -70,4 +72,12 @@ export const ConnectionsPage = lazy(() =>
 
 export const CoachChat = lazy(() =>
   import('../components/CoachChat').then(m => ({ default: m.CoachChat }))
+);
+
+export const SyncDashboardPage = lazy(() =>
+  import('../components/SyncDashboard').then(m => ({ default: m.SyncDashboard }))
+);
+
+export const TrainingPreferencesPage = lazy(() =>
+  import('../components/TrainingPreferences').then(m => ({ default: m.TrainingPreferencesPage }))
 );

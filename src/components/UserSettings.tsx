@@ -70,11 +70,12 @@ type Props = {
   onNavigateToMobileCompanion?: () => void;
   onNavigateToConnections?: () => void;
   onNavigateToCoach?: () => void;
+  onNavigateToTrainingPreferences?: () => void;
 };
 
 type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps';
 
-export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections, onNavigateToCoach }: Props) {
+export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections, onNavigateToCoach, onNavigateToTrainingPreferences }: Props) {
   const { user: clerkUser } = useClerkUser();
   const { signOut } = useClerkAuth();
   const [name, setName] = useState(user.name);
@@ -1801,6 +1802,20 @@ Block: Warm-Up
                   <div className="flex-1">
                     <span className="font-medium">Coach Amaka</span>
                     <p className="text-sm text-muted-foreground">AI training coach with workout memory</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+
+              {/* Training Preferences link (AMA-1129) */}
+              <Card className="cursor-pointer hover:border-primary/50 transition-all" onClick={() => onNavigateToTrainingPreferences?.()}>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Bike className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-medium">Training Preferences</span>
+                    <p className="text-sm text-muted-foreground">Weekly volume, hard days, goal race</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </CardContent>
