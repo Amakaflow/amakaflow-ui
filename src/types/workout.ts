@@ -3,6 +3,74 @@
 // AMA-213: Workout type detection
 export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'running' | 'yoga' | 'follow_along' | 'mixed';
 
+// AMA-53 & AMA-54: Extended workout categories
+export type WorkoutCategory =
+  | 'strength'
+  | 'cardio'
+  | 'hiit'
+  | 'yoga'
+  | 'pilates'
+  | 'cycling'
+  | 'running'
+  | 'swimming'
+  | 'mobility'
+  | 'crossfit'
+  | 'bodyweight'
+  | 'powerlifting'
+  | 'olympic_lifting'
+  | 'functional'
+  | 'sport_specific'
+  | 'other';
+
+// AMA-54: Platform-specific export types
+export type ExportPlatform = 'garmin' | 'apple' | 'android' | 'zwift' | 'generic';
+
+export type ExportFormat = 'fit' | 'json' | 'yaml' | 'zwo' | 'plist';
+
+/** Maps export platforms to their supported formats */
+export const PLATFORM_EXPORT_FORMATS: Record<ExportPlatform, ExportFormat[]> = {
+  garmin: ['fit', 'json'],
+  apple: ['plist', 'json'],
+  android: ['json'],
+  zwift: ['zwo', 'json'],
+  generic: ['json', 'yaml'],
+};
+
+/** Display names for workout categories */
+export const WORKOUT_CATEGORY_LABELS: Record<WorkoutCategory, string> = {
+  strength: 'Strength',
+  cardio: 'Cardio',
+  hiit: 'HIIT',
+  yoga: 'Yoga',
+  pilates: 'Pilates',
+  cycling: 'Cycling',
+  running: 'Running',
+  swimming: 'Swimming',
+  mobility: 'Mobility',
+  crossfit: 'CrossFit',
+  bodyweight: 'Bodyweight',
+  powerlifting: 'Powerlifting',
+  olympic_lifting: 'Olympic Lifting',
+  functional: 'Functional',
+  sport_specific: 'Sport Specific',
+  other: 'Other',
+};
+
+/** Maps WorkoutType to WorkoutCategory */
+export function workoutTypeToCategory(type: WorkoutType): WorkoutCategory {
+  switch (type) {
+    case 'strength': return 'strength';
+    case 'circuit': return 'hiit';
+    case 'hiit': return 'hiit';
+    case 'cardio': return 'cardio';
+    case 'running': return 'running';
+    case 'yoga': return 'yoga';
+    case 'follow_along': return 'other';
+    case 'mixed': return 'other';
+    default: return 'other';
+  }
+}
+
 export interface WorkoutTypeDetection {
   type: WorkoutType;
   confidence: number; // 0.0 - 1.0
@@ -134,6 +202,9 @@ export interface WorkoutStructure {
   // AMA-213: Workout type detection from LLM
   workout_type?: WorkoutType | null;
   workout_type_confidence?: number | null;
+  // AMA-53/54: Extended category and platform metadata
+  category?: WorkoutCategory | null;
+  target_platform?: ExportPlatform | null;
   // For bulk imports (e.g., Pinterest multi-day plans)
   _bulkWorkouts?: WorkoutStructure[];
   _provenance?: {
