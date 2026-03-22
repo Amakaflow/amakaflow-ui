@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { FileJson, FileText, FileDown, HardDrive, Check } from 'lucide-react';
 import { Button } from '../ui/button';
-import { cn } from '../../lib/utils';
+import { cn } from '../ui/utils';
 
 export type ExportFormatOption = 'fit' | 'json' | 'csv' | 'tcx' | 'text' | 'pdf';
 

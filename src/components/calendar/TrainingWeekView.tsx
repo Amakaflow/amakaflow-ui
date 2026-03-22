@@ -17,10 +17,7 @@ import { ConflictWarningBanner } from './ConflictWarningBanner';
 import { MissedSessionPrompt } from './MissedSessionPrompt';
 import { ReadinessDowngradePrompt } from './ReadinessDowngradePrompt';
 import { PlanPreviewOverlay } from './PlanPreviewOverlay';
-<<<<<<< HEAD
 import { ConflictDetailPanel } from './ConflictDetailPanel';
-=======
->>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
 import { useWeekState } from './hooks/useWeekState';
 import type { TrainingSession, ConflictWarning, SchedulingConflict, SuggestedFix } from './types';
 import { mockSchedulingConflicts } from './mockData';
@@ -303,10 +300,7 @@ export function TrainingWeekView() {
               dayDate.setHours(0, 0, 0, 0);
               const isToday = dayDate.getTime() === today.getTime();
 
-<<<<<<< HEAD
               const dayConflicts = getConflictsForDay(day);
-=======
->>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
               return (
                 <DayColumn
                   key={i}
@@ -317,11 +311,8 @@ export function TrainingWeekView() {
                   viewLayer={viewLayer}
                   isToday={isToday}
                   isDropTarget={false}
-<<<<<<< HEAD
                   conflicts={dayConflicts}
                   onConflictClick={() => setShowConflictPanel(true)}
-=======
->>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
                 />
               );
             })}
