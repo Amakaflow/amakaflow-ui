@@ -11,8 +11,10 @@ import {
   Zap,
   Activity,
   Heart,
+  Brain,
 } from 'lucide-react';
 import type { TrainingSession, SessionSource, Intensity, ViewLayer } from './types';
+import { ReasoningPanel, type ReasoningData } from './ReasoningPanel';
 
 // --- Source colors ---
 const sourceColors: Record<SessionSource, { bg: string; border: string; label: string }> = {
@@ -52,6 +54,10 @@ interface SessionCardProps {
   expanded: boolean;
   onToggleExpand: () => void;
   viewLayer: ViewLayer;
+  /** AMA-1153: optional reasoning data for "Why this workout?" panel */
+  reasoning?: ReasoningData;
+  /** AMA-1153: callback to request reasoning for this session */
+  onRequestReasoning?: (sessionId: string) => void;
 }
 
 export function SessionCard({
@@ -60,6 +66,8 @@ export function SessionCard({
   expanded,
   onToggleExpand,
   viewLayer,
+  reasoning,
+  onRequestReasoning,
 }: SessionCardProps) {
   const {
     attributes,
@@ -179,12 +187,38 @@ export function SessionCard({
               </ol>
             </div>
           )}
-          {session.rationale && (
+          {/* AMA-1153: Structured reasoning panel (replaces simple rationale) */}
+          {reasoning ? (
+            <ReasoningPanel reasoning={reasoning} />
+          ) : session.rationale ? (
             <div className="rounded-md bg-primary/5 px-2 py-1.5">
-              <div className="font-medium text-foreground/80 mb-0.5">Why here?</div>
+              <div className="flex items-center justify-between">
+                <div className="font-medium text-foreground/80 mb-0.5">Why here?</div>
+                {onRequestReasoning && (
+                  <button
+                    data-testid={`why-btn-${session.id}`}
+                    onClick={(e) => { e.stopPropagation(); onRequestReasoning(session.id); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+                  >
+                    <Brain className="h-3 w-3" />
+                    Show sources
+                  </button>
+                )}
+              </div>
               <div className="text-muted-foreground">{session.rationale}</div>
             </div>
-          )}
+          ) : onRequestReasoning ? (
+            <button
+              data-testid={`why-btn-${session.id}`}
+              onClick={(e) => { e.stopPropagation(); onRequestReasoning(session.id); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-md bg-primary/5 px-2 py-1.5 text-[11px] text-primary hover:bg-primary/10 font-medium transition-colors"
+            >
+              <Brain className="h-3.5 w-3.5" />
+              Why this workout?
+            </button>
+          ) : null}
           {session.syncStatus && (
             <div className="text-muted-foreground/70 italic">{session.syncStatus}</div>
           )}
