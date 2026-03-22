@@ -118,7 +118,13 @@ export interface Exercise {
 
   // AMA-729: Multi-metric modifiers
   time_cap_sec?: number | null;     // Time cap for distance/calories exercises (e.g., 5min cap for 1000m)
+
+  // AMA-182: Ladder/Pyramid rep patterns
+  pattern?: RepPattern;             // Rep pattern for this exercise (default: 'standard')
 }
+
+// AMA-182: Rep pattern types for ladder/pyramid workouts
+export type RepPattern = 'standard' | 'ascending' | 'descending' | 'pyramid';
 
 export type WorkoutStructureType =
   | 'superset'    // 2 exercises back to back, no rest between, rest after pair
