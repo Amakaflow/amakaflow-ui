@@ -1,7 +1,7 @@
 // API Request/Response Types matching the actual backend
 
 // AMA-213: Workout type detection
-export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'follow_along' | 'mixed';
+export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'running' | 'yoga' | 'follow_along' | 'mixed';
 
 export interface WorkoutTypeDetection {
   type: WorkoutType;
@@ -23,6 +23,7 @@ export interface WorkoutSettings {
     activity: WarmupActivity;
     durationSec: number;
   };
+  autoAddPeriods?: boolean;            // AMA-205: Auto-add warm-up, rest, cooldown for strength workouts
 }
 
 export interface Exercise {

@@ -29,6 +29,8 @@ import {
   Shuffle,
   Check,
   X,
+  Footprints,
+  Leaf,
 } from 'lucide-react';
 import { WorkoutType } from '../types/workout';
 import {
@@ -52,6 +54,8 @@ const WORKOUT_TYPE_ICONS: Record<WorkoutType, React.ReactNode> = {
   circuit: <Repeat className="w-5 h-5" />,
   hiit: <Zap className="w-5 h-5" />,
   cardio: <Heart className="w-5 h-5" />,
+  running: <Footprints className="w-5 h-5" />,
+  yoga: <Leaf className="w-5 h-5" />,
   follow_along: <Play className="w-5 h-5" />,
   mixed: <Shuffle className="w-5 h-5" />,
 };
@@ -87,6 +91,8 @@ export function WorkoutTypeConfirmDialog({
     'circuit',
     'hiit',
     'cardio',
+    'running',
+    'yoga',
     'follow_along',
     'mixed',
   ];
