@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { SignInButton, SignUpButton } from '@clerk/clerk-react';
 import { Button } from '../components/ui/button';
 import { ChatProvider } from '../context/ChatContext';
+import { ProgressProvider } from '../components/ProgressView';
 import { ChatAwareLayout } from '../components/ChatAwareLayout';
 import { ProfileCompletion } from '../components/ProfileCompletion';
 import { BuildBadge } from '../components/BuildBadge';
@@ -70,6 +71,7 @@ export function AppShell() {
   if (!user) return <Spinner />;
 
   return (
+    <ProgressProvider demo>
     <ChatProvider>
       <ChatAwareLayout>
         <Toaster position="top-center" />
@@ -102,5 +104,6 @@ export function AppShell() {
         <DemoNav />
       </ChatAwareLayout>
     </ChatProvider>
+    </ProgressProvider>
   );
 }
