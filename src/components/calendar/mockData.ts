@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 import type { ConflictWarning, DayState, TrainingSession, WeekState, PlanPreviewState, ProposedSession, PlanSummaryData, SchedulingConflict } from './types';
-=======
 import type { ConflictWarning, DayState, TrainingSession, WeekState, PlanPreviewState, ProposedSession, PlanSummaryData } from './types';
->>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
 
 function makeDate(dayOffset: number): Date {
   const base = new Date(2026, 2, 16);
@@ -260,7 +257,6 @@ export function getMockPlanPreview(): PlanPreviewState {
     summary: mockPlanSummary,
   };
 }
-<<<<<<< HEAD
 
 
 // --- AMA-1118: Mock scheduling conflicts ---
@@ -330,5 +326,3 @@ export const mockSchedulingConflicts: SchedulingConflict[] = [
     ],
   },
 ];
-=======
->>>>>>> 647c3e1 (feat: add plan preview overlay with review before applying (AMA-1128))
