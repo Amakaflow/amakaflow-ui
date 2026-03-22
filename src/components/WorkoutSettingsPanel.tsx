@@ -234,6 +234,28 @@ export function WorkoutSettingsPanel({ settings, onSettingsChange }: WorkoutSett
               </div>
             )}
           </div>
+          {/* AMA-205: Auto-add Periods Toggle */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={currentSettings.autoAddPeriods || false}
+                  onCheckedChange={(checked) => {
+                    onSettingsChange({
+                      ...currentSettings,
+                      autoAddPeriods: checked,
+                    });
+                  }}
+                />
+                <div>
+                  <span className="text-sm font-medium">Auto-add Warm-up & Rest</span>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically add 5-min warm-up, 60-90s rest periods, and 5-min cooldown for strength workouts
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       )}
     </Card>

@@ -32,6 +32,14 @@ export const WORKOUT_TYPE_DEFAULTS: Record<WorkoutType, WorkoutTypeDefaults> = {
     warmup: { enabled: true, duration: 300, activity: 'treadmill' }, // 5 min easy pace warm-up
     rest: { type: 'button' }, // User controls rest
   },
+  running: {
+    warmup: { enabled: true, duration: 300, activity: 'treadmill' }, // 5 min easy jog warm-up
+    rest: { type: 'button' }, // User controls recovery
+  },
+  yoga: {
+    warmup: { enabled: false, duration: 0, activity: 'stretching' }, // Yoga has built-in warm-up flow
+    rest: { type: 'button' }, // User controls transitions
+  },
   follow_along: {
     warmup: { enabled: false, duration: 0, activity: 'stretching' }, // Video has built-in warm-up
     rest: { type: 'button' }, // Follow the video timing
@@ -48,6 +56,8 @@ export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   circuit: 'Circuit Training',
   hiit: 'HIIT',
   cardio: 'Cardio',
+  running: 'Running',
+  yoga: 'Yoga',
   follow_along: 'Follow Along',
   mixed: 'Mixed',
 };
@@ -58,6 +68,8 @@ export const WORKOUT_TYPE_ICONS: Record<WorkoutType, string> = {
   circuit: 'repeat',
   hiit: 'zap',
   cardio: 'heart',
+  running: 'footprints',
+  yoga: 'leaf',
   follow_along: 'play',
   mixed: 'shuffle',
 };

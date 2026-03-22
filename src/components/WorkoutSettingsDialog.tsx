@@ -51,6 +51,7 @@ export function WorkoutSettingsDialog({ open, title, settings, onSave, onClose }
   const [warmupEnabled, setWarmupEnabled] = useState(false);
   const [warmupActivity, setWarmupActivity] = useState<WarmupActivity>('stretching');
   const [warmupDurationSec, setWarmupDurationSec] = useState(300);
+  const [autoAddPeriods, setAutoAddPeriods] = useState(false);
 
   // Initialize state when dialog opens
   useEffect(() => {
@@ -62,6 +63,7 @@ export function WorkoutSettingsDialog({ open, title, settings, onSave, onClose }
       setWarmupEnabled(currentSettings.workoutWarmup?.enabled || false);
       setWarmupActivity(currentSettings.workoutWarmup?.activity || 'stretching');
       setWarmupDurationSec(currentSettings.workoutWarmup?.durationSec || 300);
+      setAutoAddPeriods(currentSettings.autoAddPeriods || false);
     }
   }, [open, title, settings]);
 
@@ -76,6 +78,7 @@ export function WorkoutSettingsDialog({ open, title, settings, onSave, onClose }
             durationSec: warmupDurationSec,
           }
         : undefined,
+      autoAddPeriods,
     };
     onSave(workoutTitle, newSettings);
     onClose();
@@ -214,6 +217,25 @@ export function WorkoutSettingsDialog({ open, title, settings, onSave, onClose }
                 </p>
               </div>
             )}
+          </div>
+
+          {/* AMA-205: Auto-add Periods Toggle */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="w-full flex items-center justify-between p-3 bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={autoAddPeriods}
+                  onCheckedChange={setAutoAddPeriods}
+                  data-testid="auto-add-periods-toggle"
+                />
+                <div>
+                  <span className="text-sm font-medium">Auto-add Warm-up & Rest</span>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically add 5-min warm-up, 60-90s rest, and 5-min cooldown for strength workouts
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Save Button */}

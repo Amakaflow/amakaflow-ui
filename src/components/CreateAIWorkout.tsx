@@ -40,13 +40,13 @@ const EQUIPMENT_OPTIONS = [
   'Medicine Ball',
 ];
 
+// AMA-915: Quick preset prompts for AI workout creation
 const PRESET_PROMPTS = [
-  'Push Day',
-  'Pull Day',
-  'Leg Day',
-  'Full Body',
-  '30-min HIIT',
-  'Core & Abs',
+  { label: 'Upper body strength', prompt: 'Upper body strength workout targeting chest, shoulders, and triceps with compound movements' },
+  { label: 'HIIT circuit', prompt: 'High intensity interval training circuit, 30 seconds work / 15 seconds rest, full body' },
+  { label: 'Leg day', prompt: 'Leg day workout with squats, lunges, leg press, and calf raises' },
+  { label: 'Full body', prompt: 'Full body workout hitting all major muscle groups with compound exercises' },
+  { label: 'Core workout', prompt: 'Core and abs workout with planks, crunches, leg raises, and rotational exercises' },
 ];
 
 interface CreateAIWorkoutProps {
@@ -135,31 +135,36 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
 
       {/* Input form */}
       <div className="space-y-4 rounded-lg border bg-card p-4">
-        {/* Title */}
+        {/* AMA-916: Editable Workout Title */}
         <div className="space-y-2">
-          <Label htmlFor="workout-title">Workout Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Label htmlFor="workout-title">Workout Title</Label>
           <Input
             id="workout-title"
-            placeholder="e.g., Monday Push Day"
+            placeholder="AI will suggest a title, or type your own"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={isDisabled}
+            data-testid="ai-workout-title"
           />
+          <p className="text-xs text-muted-foreground">
+            Leave blank for an AI-suggested title, or type your own
+          </p>
         </div>
 
         {/* Description */}
         <div className="space-y-2">
           <Label htmlFor="workout-description">Describe Your Workout</Label>
-          {/* Preset prompts */}
-          <div className="flex flex-wrap gap-1.5 mb-2">
+          {/* AMA-915: Quick preset prompt buttons */}
+          <div className="flex flex-wrap gap-1.5 mb-2" data-testid="preset-prompts">
             {PRESET_PROMPTS.map((preset) => (
               <Badge
-                key={preset}
-                variant={description === preset ? 'default' : 'outline'}
+                key={preset.label}
+                variant={description === preset.prompt ? 'default' : 'outline'}
                 className="cursor-pointer select-none"
-                onClick={() => !isDisabled && setDescription(preset)}
+                onClick={() => !isDisabled && setDescription(preset.prompt)}
+                data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
               >
-                {preset}
+                {preset.label}
               </Badge>
             ))}
           </div>
@@ -170,6 +175,7 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             disabled={isDisabled}
+            data-testid="ai-workout-description"
           />
         </div>
 
@@ -230,6 +236,7 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
           onClick={handleGenerate}
           disabled={isDisabled || !description.trim()}
           className="w-full gap-2"
+          data-testid="generate-workout-btn"
         >
           <Sparkles className="w-4 h-4" />
           {isDisabled ? 'Generating...' : 'Generate Workout'}
@@ -250,6 +257,10 @@ export function CreateAIWorkout({ onNavigate, onWorkoutGenerated }: CreateAIWork
   );
 }
 
+/**
+ * AMA-914: Mock "Create with AI" flow (demo mode).
+ * Builds a realistic pre-generated workout for the StructureWorkout editor.
+ */
 function buildMockWorkout(
   titleOrDescription: string,
   difficulty: string,
@@ -257,14 +268,14 @@ function buildMockWorkout(
   equipment: string[],
 ): WorkoutStructure {
   const title = titleOrDescription.length > 50
-    ? titleOrDescription.slice(0, 50).trim() + '…'
+    ? titleOrDescription.slice(0, 50).trim()
     : titleOrDescription;
 
   const numSets = difficulty === 'beginner' ? 3 : difficulty === 'advanced' ? 5 : 4;
   const restSec = difficulty === 'beginner' ? 90 : difficulty === 'advanced' ? 60 : 75;
   const eq = equipment.length > 0 ? equipment : ['Bodyweight'];
 
-  const makeExercise = (name: string, reps_range: string) => ({
+  const makeExercise = (name: string, reps_range: string, type: string = 'strength') => ({
     id: `mock-${Math.random().toString(36).slice(2)}`,
     name,
     sets: numSets,
@@ -274,26 +285,69 @@ function buildMockWorkout(
     rest_sec: null,
     distance_m: null,
     distance_range: null,
-    type: 'strength' as const,
+    type,
   });
 
-  const exercises = [
+  const mainExercises = [
     makeExercise(`${eq[0]} Squat`, '10-12'),
-    makeExercise(`${eq[0]} Press`, '8-10'),
-    makeExercise('Plank', `${durationMinutes > 45 ? 60 : 30}s`),
+    makeExercise(`${eq[0]} Bench Press`, '8-10'),
     makeExercise(`${eq[eq.length - 1]} Row`, '10-12'),
+    makeExercise(`${eq[0]} Overhead Press`, '8-10'),
+  ];
+
+  const accessoryExercises = [
+    makeExercise('Lateral Raises', '12-15'),
+    makeExercise('Bicep Curls', '10-12'),
+    makeExercise('Plank', `${durationMinutes > 45 ? 60 : 30}s`),
   ];
 
   return {
-    title,
+    title: title || 'AI Generated Workout',
     source: 'ai-generated',
+    workout_type: 'strength',
+    settings: {
+      defaultRestType: 'timed',
+      defaultRestSec: restSec,
+      workoutWarmup: {
+        enabled: true,
+        activity: 'stretching',
+        durationSec: 300,
+      },
+    },
     blocks: [
       {
-        label: 'Main Block',
+        id: `mock-block-warmup-${Date.now()}`,
+        label: 'Warm-up',
+        structure: 'warmup',
+        exercises: [],
+        warmup_enabled: true,
+        warmup_activity: 'stretching',
+        warmup_duration_sec: 300,
+      },
+      {
+        id: `mock-block-main-${Date.now()}`,
+        label: 'Main Lifts',
         structure: 'sets',
         sets: numSets,
         rest_between_sets_sec: restSec,
-        exercises,
+        exercises: mainExercises,
+      },
+      {
+        id: `mock-block-acc-${Date.now()}`,
+        label: 'Accessories',
+        structure: 'sets',
+        sets: numSets > 3 ? numSets - 1 : numSets,
+        rest_between_sets_sec: 60,
+        exercises: accessoryExercises,
+      },
+      {
+        id: `mock-block-cooldown-${Date.now()}`,
+        label: 'Cool-down',
+        structure: 'cooldown',
+        exercises: [],
+        warmup_enabled: true,
+        warmup_activity: 'stretching',
+        warmup_duration_sec: 300,
       },
     ],
   };
