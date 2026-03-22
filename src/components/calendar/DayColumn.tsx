@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { AlertTriangle } from 'lucide-react';
 import type { DayState, ViewLayer, SchedulingConflict } from './types';
+import type { ReasoningData } from './ReasoningPanel';
 import { ReadinessPill } from './ReadinessPill';
 import { SessionCard } from './SessionCard';
 import { ConflictIndicator } from './ConflictIndicator';
@@ -18,6 +19,10 @@ interface DayColumnProps {
   conflicts?: SchedulingConflict[];
   /** AMA-1118: callback when conflict indicator is clicked */
   onConflictClick?: () => void;
+  /** AMA-1153: reasoning data keyed by session ID */
+  reasoningBySession?: Record<string, ReasoningData>;
+  /** AMA-1153: callback to request reasoning */
+  onRequestReasoning?: (sessionId: string) => void;
 }
 
 export function DayColumn({
@@ -30,6 +35,8 @@ export function DayColumn({
   isDropTarget,
   conflicts = [],
   onConflictClick,
+  reasoningBySession = {},
+  onRequestReasoning,
 }: DayColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `day-${dayIndex}`,
@@ -93,6 +100,8 @@ export function DayColumn({
                 expanded={expandedSessionId === session.id}
                 onToggleExpand={() => onToggleExpand(session.id)}
                 viewLayer={viewLayer}
+                reasoning={reasoningBySession[session.id]}
+                onRequestReasoning={onRequestReasoning}
               />
             ))
           )}
