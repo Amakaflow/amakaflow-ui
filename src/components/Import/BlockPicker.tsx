@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { Check, GripVertical, X, Plus, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '../ui/utils';
 import {
@@ -15,6 +16,12 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { ProcessedItem, QueueItem, SelectedBlock } from '../../types/import';
+import { PlatformIcon } from './PlatformIcon';
+import {
+  PLATFORM_BADGE_COLORS,
+  PLATFORM_LABELS,
+  type SourcePlatform,
+} from './fixtures/multi-source-demo';
 
 interface BlockPickerProps {
   queueItems: QueueItem[];
@@ -28,9 +35,11 @@ interface BlockPickerProps {
 function SortableSelectedBlock({
   block,
   onRemove,
+  sourceIcon,
 }: {
   block: SelectedBlock;
   onRemove: () => void;
+  sourceIcon?: SourcePlatform;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.blockId });
@@ -52,6 +61,9 @@ function SortableSelectedBlock({
       >
         <GripVertical className="w-4 h-4" />
       </button>
+      {sourceIcon && (
+        <PlatformIcon platform={sourceIcon} className="w-3.5 h-3.5 shrink-0" />
+      )}
       <span className="flex-1">{block.blockLabel}</span>
       <button
         onClick={onRemove}
@@ -115,8 +127,62 @@ export function BlockPicker({
 
   const doneItems = processedItems.filter(p => p.status === 'done');
 
+  // ── Source platform helpers ──────────────────────────────────────────────
+
+  const getSourcePlatform = (item: ProcessedItem): SourcePlatform | undefined => {
+    const icon = item.sourceIcon;
+    if (icon === 'instagram' || icon === 'youtube' || icon === 'tiktok') return icon;
+    return undefined;
+  };
+
+  const uniqueSources = useMemo(() => {
+    const sources = new Set<SourcePlatform>();
+    doneItems.forEach(item => {
+      const p = getSourcePlatform(item);
+      if (p) sources.add(p);
+    });
+    return Array.from(sources);
+  }, [doneItems]);
+
+  // ── "Select All from [Source]" ───────────────────────────────────────────
+
+  const selectAllFromSource = (platform: SourcePlatform) => {
+    const blocksToAdd: SelectedBlock[] = [];
+    doneItems.forEach((item, workoutIndex) => {
+      if (getSourcePlatform(item) !== platform) return;
+      const blocks: Array<{ id: string; label?: string }> = item.workout?.blocks ?? [];
+      blocks.forEach((block, blockIndex) => {
+        if (!block.id) return;
+        if (selectedBlocks.some(s => s.blockId === block.id)) return;
+        blocksToAdd.push({
+          workoutIndex,
+          blockIndex,
+          blockId: block.id,
+          blockLabel: block.label ?? `Block ${blockIndex + 1}`,
+        });
+      });
+    });
+    if (blocksToAdd.length > 0) {
+      onSelectionChange([...selectedBlocks, ...blocksToAdd]);
+    }
+  };
+
+  // Map blockId -> source platform for the selected blocks panel
+  const blockSourceMap = useMemo(() => {
+    const map = new Map<string, SourcePlatform>();
+    doneItems.forEach(item => {
+      const platform = getSourcePlatform(item);
+      if (!platform) return;
+      const blocks: Array<{ id: string }> = item.workout?.blocks ?? [];
+      blocks.forEach(block => {
+        if (block.id) map.set(block.id, platform);
+      });
+    });
+    return map;
+  }, [doneItems]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="block-picker">
       <div>
         <h2 className="text-lg font-semibold">Build your workout</h2>
         <p className="text-sm text-muted-foreground mt-1">
@@ -124,15 +190,48 @@ export function BlockPicker({
         </p>
       </div>
 
+      {/* "Select All from [Source]" quick actions */}
+      {uniqueSources.length > 1 && (
+        <div className="flex flex-wrap gap-2" data-testid="select-all-sources">
+          {uniqueSources.map(platform => (
+            <Button
+              key={platform}
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => selectAllFromSource(platform)}
+            >
+              <PlatformIcon platform={platform} className="w-3.5 h-3.5" />
+              Select all from {PLATFORM_LABELS[platform]}
+            </Button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: source blocks */}
         <div className="space-y-4">
           {doneItems.map((item, workoutIndex) => {
             const blocks: Array<{ id: string; label?: string; exercises?: unknown[] }> =
               item.workout?.blocks ?? [];
+            const sourcePlatform = getSourcePlatform(item);
             return (
               <div key={item.queueId}>
-                <p className="text-sm font-medium mb-2 truncate">{item.workoutTitle}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  {sourcePlatform && (
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        'gap-1 px-2 py-0.5 text-xs',
+                        PLATFORM_BADGE_COLORS[sourcePlatform]
+                      )}
+                    >
+                      <PlatformIcon platform={sourcePlatform} className="w-3 h-3" />
+                      {PLATFORM_LABELS[sourcePlatform]}
+                    </Badge>
+                  )}
+                  <p className="text-sm font-medium truncate">{item.workoutTitle}</p>
+                </div>
                 <div className="space-y-1">
                   {blocks.map((block, blockIndex) => {
                     if (!block.id) return null;
@@ -145,11 +244,19 @@ export function BlockPicker({
                       reps?: number | string;
                       duration_sec?: number;
                     }>;
+                    const platformBorderClass = sourcePlatform
+                      ? {
+                          instagram: 'border-l-purple-500',
+                          youtube: 'border-l-red-500',
+                          tiktok: 'border-l-zinc-600 dark:border-l-zinc-400',
+                        }[sourcePlatform]
+                      : '';
                     return (
                       <div
                         key={block.id}
                         className={cn(
-                          'rounded-md border text-sm transition-colors',
+                          'rounded-md border border-l-[3px] text-sm transition-colors',
+                          platformBorderClass,
                           isSelected
                             ? 'border-primary bg-primary/10'
                             : 'border-border hover:bg-muted/50'
@@ -244,6 +351,7 @@ export function BlockPicker({
                       key={block.blockId}
                       block={block}
                       onRemove={() => remove(block.blockId)}
+                      sourceIcon={blockSourceMap.get(block.blockId)}
                     />
                   ))}
                 </div>
