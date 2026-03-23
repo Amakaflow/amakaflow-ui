@@ -86,6 +86,7 @@
     "react-markdown": "^10.1.0",
     "react-qr-code": "*",
     "react-resizable-panels": "^2.1.7",
+    "react-router-dom": "^7.13.1",
     "recharts": "^2.15.2",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",

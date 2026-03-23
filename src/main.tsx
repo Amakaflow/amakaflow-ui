@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import { AppShell } from "./app/AppShell.tsx";
 import { ClerkWrapper } from "./components/ClerkWrapper.tsx";
@@ -41,9 +42,11 @@ enableMocking()
   .then(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>
-        <ClerkWrapper>
-          <AppShell />
-        </ClerkWrapper>
+        <BrowserRouter>
+          <ClerkWrapper>
+            <AppShell />
+          </ClerkWrapper>
+        </BrowserRouter>
       </StrictMode>
     );
   });
