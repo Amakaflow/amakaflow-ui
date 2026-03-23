@@ -1,7 +1,17 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { BottomNav } from '../BottomNav';
 import type { View } from '../../app/router';
+
+/** Helper that wraps BottomNav in a MemoryRouter so useNavigate/useLocation work. */
+function renderBottomNav(props: { currentView: View; onNavigate: ReturnType<typeof vi.fn> }) {
+  return render(
+    <MemoryRouter>
+      <BottomNav {...props} />
+    </MemoryRouter>,
+  );
+}
 
 describe('BottomNav', () => {
   const onNavigate = vi.fn();
@@ -11,7 +21,7 @@ describe('BottomNav', () => {
   });
 
   it('renders all 5 tab buttons', () => {
-    render(<BottomNav currentView="home" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'home', onNavigate });
 
     expect(screen.getByLabelText('Home')).toBeInTheDocument();
     expect(screen.getByLabelText('Workouts')).toBeInTheDocument();
@@ -21,14 +31,14 @@ describe('BottomNav', () => {
   });
 
   it('highlights the active tab with aria-current="page"', () => {
-    render(<BottomNav currentView="workouts" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'workouts', onNavigate });
 
     expect(screen.getByLabelText('Workouts')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByLabelText('Home')).not.toHaveAttribute('aria-current');
   });
 
   it('calls onNavigate with the correct view when a tab is clicked', () => {
-    render(<BottomNav currentView="home" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'home', onNavigate });
 
     fireEvent.click(screen.getByLabelText('Calendar'));
     expect(onNavigate).toHaveBeenCalledWith('calendar');
@@ -38,39 +48,41 @@ describe('BottomNav', () => {
   });
 
   it('highlights Home tab for related views (import, workflow, create-ai)', () => {
-    const { rerender } = render(<BottomNav currentView="import" onNavigate={onNavigate} />);
+    const { unmount } = renderBottomNav({ currentView: 'import', onNavigate });
     expect(screen.getByLabelText('Home')).toHaveAttribute('aria-current', 'page');
+    unmount();
 
-    rerender(<BottomNav currentView="workflow" onNavigate={onNavigate} />);
+    const { unmount: u2 } = renderBottomNav({ currentView: 'workflow', onNavigate });
     expect(screen.getByLabelText('Home')).toHaveAttribute('aria-current', 'page');
+    u2();
 
-    rerender(<BottomNav currentView="create-ai" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'create-ai', onNavigate });
     expect(screen.getByLabelText('Home')).toHaveAttribute('aria-current', 'page');
   });
 
   it('highlights More tab for settings, help, programs, and other secondary views', () => {
     const secondaryViews: View[] = ['settings', 'help', 'programs'];
     for (const view of secondaryViews) {
-      const { unmount } = render(<BottomNav currentView={view} onNavigate={onNavigate} />);
+      const { unmount } = renderBottomNav({ currentView: view, onNavigate });
       expect(screen.getByLabelText('More')).toHaveAttribute('aria-current', 'page');
       unmount();
     }
   });
 
   it('uses z-[45] to sit between z-40 and z-50 layers', () => {
-    render(<BottomNav currentView="home" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'home', onNavigate });
     const nav = screen.getByTestId('bottom-nav');
     expect(nav.className).toContain('z-[45]');
   });
 
   it('has md:hidden class to hide on desktop viewports', () => {
-    render(<BottomNav currentView="home" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'home', onNavigate });
     const nav = screen.getByTestId('bottom-nav');
     expect(nav.className).toContain('md:hidden');
   });
 
   it('is fixed to the bottom of the viewport', () => {
-    render(<BottomNav currentView="home" onNavigate={onNavigate} />);
+    renderBottomNav({ currentView: 'home', onNavigate });
     const nav = screen.getByTestId('bottom-nav');
     expect(nav.className).toContain('fixed');
     expect(nav.className).toContain('bottom-0');

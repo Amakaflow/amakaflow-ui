@@ -53,6 +53,7 @@ export default defineConfig({
       },
       output: {
         manualChunks: {
+          'vendor-react-router': ['react-router-dom'],
           'vendor-recharts': ['recharts'],
           'vendor-sentry': ['@sentry/react', '@sentry/browser'],
           'vendor-lottie': ['lottie-react'],

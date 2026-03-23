@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { NavBar } from '../NavBar';
 import type { AppUser } from '../useAppAuth';
@@ -41,7 +42,11 @@ const renderNavBar = (overrides: Partial<{
     onNavigate: vi.fn(),
     ...overrides,
   };
-  return render(<NavBar {...props} />);
+  return render(
+    <MemoryRouter>
+      <NavBar {...props} />
+    </MemoryRouter>,
+  );
 };
 
 describe('NavBar', () => {

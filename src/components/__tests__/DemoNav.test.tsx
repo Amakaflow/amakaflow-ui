@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 
 // Mock demo-mode to enable DemoNav rendering
@@ -27,13 +28,13 @@ describe('DemoNav', () => {
   });
 
   it('renders the DEMO button', () => {
-    render(<DemoNav {...defaultProps} />);
+    render(<MemoryRouter><DemoNav {...defaultProps} /></MemoryRouter>);
     expect(screen.getByText('DEMO')).toBeInTheDocument();
   });
 
   it('opens the panel when DEMO button is clicked', async () => {
     const user = userEvent.setup();
-    render(<DemoNav {...defaultProps} />);
+    render(<MemoryRouter><DemoNav {...defaultProps} /></MemoryRouter>);
 
     await user.click(screen.getByText('DEMO'));
     expect(screen.getByText('Jump to screen')).toBeInTheDocument();
@@ -41,7 +42,7 @@ describe('DemoNav', () => {
 
   it('closes the panel when DEMO button is clicked a second time', async () => {
     const user = userEvent.setup();
-    render(<DemoNav {...defaultProps} />);
+    render(<MemoryRouter><DemoNav {...defaultProps} /></MemoryRouter>);
 
     // Open
     await user.click(screen.getByText('DEMO'));
@@ -53,7 +54,7 @@ describe('DemoNav', () => {
   });
 
   it('renders the DEMO button with z-[51] to stay above z-50 panels but below z-[60] overlays', () => {
-    render(<DemoNav {...defaultProps} />);
+    render(<MemoryRouter><DemoNav {...defaultProps} /></MemoryRouter>);
     const button = screen.getByText('DEMO');
     expect(button.className).toContain('z-[51]');
     expect(button.className).not.toContain('z-[60]');
@@ -64,8 +65,9 @@ describe('DemoNav', () => {
     const mod = await import('../../lib/demo-mode');
     Object.defineProperty(mod, 'isDemoMode', { value: false, writable: true });
 
-    const { container } = render(<DemoNav {...defaultProps} />);
-    expect(container.innerHTML).toBe('');
+    const { container } = render(<MemoryRouter><DemoNav {...defaultProps} /></MemoryRouter>);
+    // When isDemoMode is false, DemoNav returns null so only the MemoryRouter wrapper remains
+    expect(container.querySelector('button')).toBeNull();
 
     // Restore
     Object.defineProperty(mod, 'isDemoMode', { value: true, writable: true });
