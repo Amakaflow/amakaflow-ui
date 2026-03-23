@@ -1,5 +1,6 @@
 // src/components/DemoNav.tsx
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { isDemoMode } from '../lib/demo-mode';
 import {
   getImportScenario,
@@ -7,11 +8,10 @@ import {
   IMPORT_SCENARIO_LABELS,
   type ImportScenario,
 } from '../lib/demo-scenario';
+import { VIEW_TO_PATH, pathToView } from '../hooks/useUrlSync';
+import type { View } from '../app/router';
 
-// NOTE: Matches the View type defined in App.tsx
-type DemoView = 'home' | 'workflow' | 'profile' | 'analytics' | 'team' | 'settings' | 'strava-enhance' | 'calendar' | 'workouts' | 'mobile-companion' | 'bulk-import' | 'help' | 'program-detail' | 'programs' | 'create-ai';
-
-const VIEWS: { id: DemoView; label: string }[] = [
+const VIEWS: { id: View; label: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'workflow', label: 'New Workout Flow' },
   { id: 'workouts', label: 'Workouts' },
@@ -19,7 +19,7 @@ const VIEWS: { id: DemoView; label: string }[] = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'programs', label: 'Programs' },
   { id: 'create-ai', label: 'AI Workout Creator' },
-  { id: 'bulk-import', label: 'Bulk Import' },
+  { id: 'import', label: 'Import' },
   { id: 'mobile-companion', label: 'Mobile Companion' },
   { id: 'team', label: 'Team Sharing' },
   { id: 'help', label: 'Help' },
@@ -28,14 +28,19 @@ const VIEWS: { id: DemoView; label: string }[] = [
 
 const SCENARIOS = Object.entries(IMPORT_SCENARIO_LABELS) as [ImportScenario, string][];
 
-interface DemoNavProps {
-  onNavigate: (view: DemoView) => void;
-  currentView: string;
+export interface DemoNavProps {
+  /** @deprecated Props are no longer needed; DemoNav uses react-router internally. */
+  onNavigate?: (view: string) => void;
+  /** @deprecated Props are no longer needed; DemoNav uses react-router internally. */
+  currentView?: string;
 }
 
-export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
+export function DemoNav({ onNavigate: _onNavigate, currentView: _currentView }: DemoNavProps = {}) {
   const [open, setOpen] = useState(false);
   const [scenario, setScenario] = useState<ImportScenario>(getImportScenario);
+  const nav = useNavigate();
+  const location = useLocation();
+  const currentView = pathToView(location.pathname);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -50,6 +55,12 @@ export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
   function handleScenarioChange(s: ImportScenario) {
     setImportScenario(s);
     setScenario(s);
+  }
+
+  function handleNavigate(view: View) {
+    const path = VIEW_TO_PATH[view] || '/';
+    nav(path);
+    setOpen(false);
   }
 
   return (
@@ -92,7 +103,7 @@ export function DemoNav({ onNavigate, currentView }: DemoNavProps) {
             {VIEWS.map(v => (
               <button
                 key={v.id}
-                onClick={() => { onNavigate(v.id); setOpen(false); }}
+                onClick={() => handleNavigate(v.id)}
                 className={`text-left text-sm px-3 py-1.5 rounded-lg hover:bg-muted transition-colors ${
                   currentView === v.id ? 'bg-muted font-medium' : ''
                 }`}

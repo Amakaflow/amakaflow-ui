@@ -5,11 +5,13 @@ import {
   BarChart3,
   Menu,
 } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { View } from '../app/router';
+import { VIEW_TO_PATH, pathToView } from '../hooks/useUrlSync';
 
 export interface BottomNavProps {
-  currentView: View;
-  onNavigate: (view: View) => void;
+  currentView?: View;
+  onNavigate?: (view: View) => void;
 }
 
 interface NavTab {
@@ -33,7 +35,22 @@ function isActive(tab: NavTab, currentView: View): boolean {
   return tab.matchViews?.includes(currentView) ?? false;
 }
 
-export function BottomNav({ currentView, onNavigate }: BottomNavProps) {
+export function BottomNav({ currentView: currentViewProp, onNavigate: onNavigateProp }: BottomNavProps) {
+  const nav = useNavigate();
+  const location = useLocation();
+
+  // Derive currentView from the router if not passed via props
+  const currentView: View = currentViewProp ?? pathToView(location.pathname);
+
+  const handleNavigate = (view: View) => {
+    if (onNavigateProp) {
+      onNavigateProp(view);
+    } else {
+      const path = VIEW_TO_PATH[view] || '/';
+      nav(path);
+    }
+  };
+
   return (
     <nav
       data-testid="bottom-nav"
@@ -46,7 +63,7 @@ export function BottomNav({ currentView, onNavigate }: BottomNavProps) {
           return (
             <button
               key={tab.id}
-              onClick={() => onNavigate(tab.id)}
+              onClick={() => handleNavigate(tab.id)}
               className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors ${
                 active
                   ? 'text-primary'

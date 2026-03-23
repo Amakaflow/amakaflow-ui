@@ -1,4 +1,5 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import {
@@ -16,22 +17,37 @@ import {
 import { isDemoMode } from '../lib/demo-mode';
 import type { AppUser } from './useAppAuth';
 import type { View } from './router';
+import { VIEW_TO_PATH, pathToView } from '../hooks/useUrlSync';
 
 export interface NavBarProps {
   user: AppUser;
-  currentView: View;
+  currentView?: View;
   stravaConnected: boolean;
   hasClerk: boolean;
-  onNavigate: (view: View) => void;
+  onNavigate?: (view: View) => void;
 }
 
 export function NavBar({
   user,
-  currentView,
+  currentView: currentViewProp,
   stravaConnected,
   hasClerk,
-  onNavigate,
+  onNavigate: onNavigateProp,
 }: NavBarProps) {
+  const nav = useNavigate();
+  const location = useLocation();
+
+  const currentView: View = currentViewProp ?? pathToView(location.pathname);
+
+  const handleNavigate = (view: View) => {
+    if (onNavigateProp) {
+      onNavigateProp(view);
+    } else {
+      const path = VIEW_TO_PATH[view] || '/';
+      nav(path);
+    }
+  };
+
   return (
     <div className="hidden md:block border-b bg-card">
       <div className="container mx-auto px-4 py-3">
@@ -41,7 +57,7 @@ export function NavBar({
               <Button
                 variant="ghost"
                 className="p-0 h-auto hover:bg-transparent"
-                onClick={() => onNavigate('home')}
+                onClick={() => handleNavigate('home')}
               >
                 <div className="flex items-center gap-3">
                   <img
@@ -67,7 +83,7 @@ export function NavBar({
                 variant={currentView === 'dashboard' ? 'default' : 'ghost'}
                 size="sm"
                 data-assistant-target="nav-dashboard"
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => handleNavigate('dashboard')}
                 className="gap-2"
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -77,7 +93,7 @@ export function NavBar({
                 variant={(currentView === 'workflow' || currentView === 'import') ? 'default' : 'ghost'}
                 size="sm"
                 className="gap-1"
-                onClick={() => onNavigate('import')}
+                onClick={() => handleNavigate('import')}
               >
                 <Plus className="w-4 h-4" />
                 Import
@@ -85,7 +101,7 @@ export function NavBar({
               <Button
                 variant={currentView === 'create-ai' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => onNavigate('create-ai')}
+                onClick={() => handleNavigate('create-ai')}
                 className="gap-2"
               >
                 <Sparkles className="w-4 h-4" />
@@ -95,7 +111,7 @@ export function NavBar({
                 variant={currentView === 'calendar' ? 'default' : 'ghost'}
                 size="sm"
                 data-assistant-target="nav-calendar"
-                onClick={() => onNavigate('calendar')}
+                onClick={() => handleNavigate('calendar')}
                 className="gap-2"
               >
                 <CalendarDays className="w-4 h-4" />
@@ -105,7 +121,7 @@ export function NavBar({
                 variant={currentView === 'workouts' ? 'default' : 'ghost'}
                 size="sm"
                 data-assistant-target="nav-library"
-                onClick={() => onNavigate('workouts')}
+                onClick={() => handleNavigate('workouts')}
                 className="gap-2"
               >
                 <Dumbbell className="w-4 h-4" />
@@ -115,7 +131,7 @@ export function NavBar({
                 variant={currentView === 'programs' ? 'default' : 'ghost'}
                 size="sm"
                 data-assistant-target="nav-programs"
-                onClick={() => onNavigate('programs')}
+                onClick={() => handleNavigate('programs')}
                 className="gap-2"
               >
                 <FolderOpen className="w-4 h-4" />
@@ -125,7 +141,7 @@ export function NavBar({
                 variant={currentView === 'analytics' ? 'default' : 'ghost'}
                 size="sm"
                 data-assistant-target="nav-analytics"
-                onClick={() => onNavigate('analytics')}
+                onClick={() => handleNavigate('analytics')}
                 className="gap-2"
               >
                 <BarChart3 className="w-4 h-4" />
@@ -135,7 +151,7 @@ export function NavBar({
                 <Button
                   variant={currentView === 'strava-enhance' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => onNavigate('strava-enhance')}
+                  onClick={() => handleNavigate('strava-enhance')}
                   className="gap-2 text-orange-600 hover:text-orange-600"
                 >
                   <Activity className="w-4 h-4" />
@@ -149,7 +165,7 @@ export function NavBar({
             <Button
               variant={currentView === 'help' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => onNavigate('help')}
+              onClick={() => handleNavigate('help')}
               className="gap-2"
             >
               <HelpCircle className="w-4 h-4" />
@@ -159,7 +175,7 @@ export function NavBar({
               variant="ghost"
               size="sm"
               data-assistant-target="nav-settings"
-              onClick={() => onNavigate('settings')}
+              onClick={() => handleNavigate('settings')}
               className="gap-2"
             >
               <Settings className="w-4 h-4" />
