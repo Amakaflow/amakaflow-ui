@@ -37,9 +37,11 @@ import { GymEventModal } from './calendar/GymEventModal';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isSameDay, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useCalendarEvents, useConnectedCalendars } from '../hooks/useCalendarApi';
 import { useWorkoutSources } from '../hooks/useWorkoutSources';
+import { TrainingWeekView } from './calendar/TrainingWeekView';
+import { isDemoMode } from '../lib/demo-mode';
 import { toast } from 'sonner';
 
-type ViewMode = 'week' | 'month' | 'list';
+type ViewMode = 'week' | 'month' | 'list' | 'training';
 
 
 interface CalendarProps {
@@ -55,7 +57,7 @@ interface CalendarProps {
 export function Calendar({ userId, userLocation }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>(isDemoMode ? 'training' : 'week');
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [eventDialogData, setEventDialogData] = useState<{ date?: string; startTime?: string; source?: WorkoutSource } | null>(null);
@@ -377,7 +379,8 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
 
           <div className="flex items-center gap-2">
             <div className="flex items-center border rounded-md">
-              <Button variant={viewMode === 'week' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('week')} className="rounded-r-none">Week</Button>
+              <Button variant={viewMode === 'training' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('training')} className="rounded-r-none">Training</Button>
+              <Button variant={viewMode === 'week' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('week')} className="rounded-none border-x">Week</Button>
               <Button variant={viewMode === 'month' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('month')} className="rounded-none border-x">Month</Button>
               <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="rounded-l-none">List</Button>
             </div>
@@ -409,6 +412,9 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
         </div>
 
         <div className="flex-1 overflow-hidden">
+          {viewMode === 'training' && (
+            <TrainingWeekView />
+          )}
           {viewMode === 'week' && (
             <WeekView weekStart={weekStart} events={filteredEvents} selectedDate={selectedDate} onEventClick={handleEventClick} onTimeSlotClick={handleCreateEvent} loading={loading} />
           )}

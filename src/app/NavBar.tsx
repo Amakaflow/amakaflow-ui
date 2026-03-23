@@ -3,9 +3,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import {
   Activity,
   BarChart3,
   CalendarDays,
+  ChevronDown,
   Dumbbell,
   FolderOpen,
   HelpCircle,
@@ -48,6 +55,10 @@ export function NavBar({
     }
   };
 
+  const isCreateActive = currentView === 'workflow' || currentView === 'import' || currentView === 'create-ai';
+  const isTrainingActive = currentView === 'calendar' || currentView === 'workouts' || currentView === 'programs';
+  const isInsightsActive = currentView === 'analytics' || currentView === 'dashboard';
+
   return (
     <div className="hidden md:block border-b bg-card">
       <div className="container mx-auto px-4 py-3">
@@ -78,7 +89,8 @@ export function NavBar({
               </Button>
             </div>
 
-            <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
+            <nav className="hidden md:flex items-center gap-1">
+              {/* Dashboard - direct */}
               <Button
                 variant={currentView === 'dashboard' ? 'default' : 'ghost'}
                 size="sm"
@@ -89,64 +101,99 @@ export function NavBar({
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </Button>
-              <Button
-                variant={(currentView === 'workflow' || currentView === 'import') ? 'default' : 'ghost'}
-                size="sm"
-                className="gap-1"
-                onClick={() => handleNavigate('import')}
-              >
-                <Plus className="w-4 h-4" />
-                Import
-              </Button>
-              <Button
-                variant={currentView === 'create-ai' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleNavigate('create-ai')}
-                className="gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Create with AI
-              </Button>
-              <Button
-                variant={currentView === 'calendar' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-calendar"
-                onClick={() => handleNavigate('calendar')}
-                className="gap-2"
-              >
-                <CalendarDays className="w-4 h-4" />
-                Calendar
-              </Button>
-              <Button
-                variant={currentView === 'workouts' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-library"
-                onClick={() => handleNavigate('workouts')}
-                className="gap-2"
-              >
-                <Dumbbell className="w-4 h-4" />
-                My Workouts
-              </Button>
-              <Button
-                variant={currentView === 'programs' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-programs"
-                onClick={() => handleNavigate('programs')}
-                className="gap-2"
-              >
-                <FolderOpen className="w-4 h-4" />
-                Programs
-              </Button>
-              <Button
-                variant={currentView === 'analytics' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-analytics"
-                onClick={() => handleNavigate('analytics')}
-                className="gap-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Analytics
-              </Button>
+
+              {/* Create dropdown: Import, Create with AI */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isCreateActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1"
+                    data-testid="nav-create-menu"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => handleNavigate('import')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Import Workout
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('create-ai')}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Create with AI
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Training dropdown: Calendar, My Workouts, Programs */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isTrainingActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1"
+                    data-testid="nav-training-menu"
+                  >
+                    <Dumbbell className="w-4 h-4" />
+                    Training
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    onClick={() => handleNavigate('calendar')}
+                    data-assistant-target="nav-calendar"
+                  >
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    Calendar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleNavigate('workouts')}
+                    data-assistant-target="nav-library"
+                  >
+                    <Dumbbell className="w-4 h-4 mr-2" />
+                    My Workouts
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleNavigate('programs')}
+                    data-assistant-target="nav-programs"
+                  >
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Programs
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Insights dropdown: Analytics, Dashboard */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isInsightsActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1"
+                    data-testid="nav-insights-menu"
+                    data-assistant-target="nav-analytics"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Insights
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => handleNavigate('analytics')}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Analytics
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('dashboard')}>
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Sync Dashboard
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {stravaConnected && (
                 <Button
                   variant={currentView === 'strava-enhance' ? 'default' : 'ghost'}
@@ -179,7 +226,6 @@ export function NavBar({
               className="gap-2"
             >
               <Settings className="w-4 h-4" />
-              Settings
             </Button>
             {isDemoMode ? (
               <span className="text-sm font-medium text-muted-foreground px-2">

@@ -863,9 +863,18 @@ export function WorkoutList({
                           </div>
                         )}
                         <div className="flex-1 min-w-0 space-y-2">
-                          <CardTitle className="text-lg font-bold truncate text-foreground">
-                            {workout.title}
-                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                              {workout.category === 'strength' ? <Dumbbell className="w-4 h-4 text-primary" /> :
+                               workout.category === 'cardio' ? <Activity className="w-4 h-4 text-blue-500" /> :
+                               workout.category === 'hyrox' ? <Activity className="w-4 h-4 text-red-500" /> :
+                               workout.category === 'mobility' ? <Activity className="w-4 h-4 text-green-500" /> :
+                               <Dumbbell className="w-4 h-4 text-primary" />}
+                            </div>
+                            <CardTitle className="text-lg font-bold truncate text-foreground">
+                              {workout.title}
+                            </CardTitle>
+                          </div>
                           {/* Completion badge (AMA-891) */}
                           {(() => {
                             const workoutCompletions = completions?.filter(
@@ -921,6 +930,12 @@ export function WorkoutList({
                             <div className="text-muted-foreground">
                               <span className="font-medium">{workout.exerciseCount}</span> exercises
                             </div>
+                            {workout.durationSec > 0 && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-medium">{Math.round(workout.durationSec / 60)}min</span>
+                              </div>
+                            )}
                             <Badge variant="outline" className="text-xs">
                               {CATEGORY_DISPLAY_NAMES[workout.category]}
                             </Badge>
