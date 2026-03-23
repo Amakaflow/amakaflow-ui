@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './ui/alert-dialog';
-import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin, Mic, Plus, Trash2, Loader2, Instagram } from 'lucide-react';
+import { User, Mail, CreditCard, Bell, Shield, Smartphone, Watch, Bike, ArrowLeft, Link2, ChevronDown, ChevronRight, Settings as SettingsIcon, Info, MapPin, Mic, Plus, Trash2, Loader2, Instagram, Sun, Moon, Monitor, Palette, Key, Bug, Wrench } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -46,6 +46,8 @@ import { toast } from 'sonner';
 import { LinkedAccounts } from './LinkedAccounts';
 import { useClerkUser, useClerkAuth, updateUserProfileFromClerk } from '../lib/clerk-auth';
 import { cn } from './ui/utils';
+import { useTheme } from '../hooks/useTheme';
+import type { Theme } from '../hooks/useTheme';
 import { getPreferences, savePreferences, ImageProcessingMethod, getImageProcessingMethod, setImageProcessingMethod, getInstagramAutoExtract, setInstagramAutoExtract } from '../lib/preferences';
 import { getPairedDevices } from '../lib/mobile-api';
 import { Alert, AlertDescription } from './ui/alert';
@@ -74,7 +76,7 @@ type Props = {
   onNavigateToTrainingPreferences?: () => void;
 };
 
-type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps';
+type SettingsSection = 'general' | 'account' | 'voice' | 'devices' | 'notifications' | 'security' | 'connected-apps' | 'appearance' | 'api-key' | 'debug';
 
 export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted, onUserUpdate, onNavigateToMobileCompanion, onNavigateToConnections, onNavigateToCoach, onNavigateToTrainingPreferences }: Props) {
   const { user: clerkUser } = useClerkUser();
@@ -89,8 +91,9 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [autoSync, setAutoSync] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
-  const [activeSection, setActiveSection] = useState<SettingsSection>('general');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['GENERAL']));
+  const { theme, setTheme } = useTheme();
+  const [activeSection, setActiveSection] = useState<SettingsSection>('connected-apps');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['TRAINING', 'AI & IMPORT', 'NOTIFICATIONS', 'ACCOUNT']));
   const [imageProcessingMethod, setImageProcessingMethodState] = useState<ImageProcessingMethod>(getImageProcessingMethod());
   const [instagramAutoExtract, setInstagramAutoExtractState] = useState(getInstagramAutoExtract());
 
@@ -411,17 +414,17 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
 
   const menuItems = [
     {
-      category: 'GENERAL',
+      category: 'TRAINING',
       items: [
-        { id: 'general' as SettingsSection, label: 'General settings', icon: SettingsIcon },
-        { id: 'account' as SettingsSection, label: 'Account', icon: User },
+        { id: 'connected-apps' as SettingsSection, label: 'Connected platforms', icon: Link2 },
+        { id: 'devices' as SettingsSection, label: 'Export destinations', icon: Smartphone },
         { id: 'voice' as SettingsSection, label: 'Voice transcription', icon: Mic },
       ],
     },
     {
-      category: 'DEVICES',
+      category: 'AI & IMPORT',
       items: [
-        { id: 'devices' as SettingsSection, label: 'Export destinations', icon: Smartphone },
+        { id: 'general' as SettingsSection, label: 'Image & AI processing', icon: SettingsIcon },
       ],
     },
     {
@@ -431,10 +434,19 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
       ],
     },
     {
-      category: 'SECURITY',
+      category: 'ACCOUNT',
       items: [
-        { id: 'security' as SettingsSection, label: 'Security', icon: Shield },
-        { id: 'connected-apps' as SettingsSection, label: 'Connected apps', icon: Link2 },
+        { id: 'account' as SettingsSection, label: 'Profile & billing', icon: User },
+        { id: 'api-key' as SettingsSection, label: 'API key', icon: Key },
+        { id: 'appearance' as SettingsSection, label: 'Appearance', icon: Palette },
+      ],
+    },
+    {
+      category: 'ADVANCED',
+      defaultCollapsed: true,
+      items: [
+        { id: 'security' as SettingsSection, label: 'Security & data', icon: Shield },
+        { id: 'debug' as SettingsSection, label: 'Developer options', icon: Bug },
       ],
     },
   ];
@@ -1822,6 +1834,104 @@ Block: Warm-Up
                     <p className="text-sm text-muted-foreground">Weekly volume, hard days, goal race</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Appearance / Theme Toggle (AMA-1179) */}
+          {activeSection === 'appearance' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold mb-1">Appearance</h1>
+                <p className="text-muted-foreground text-sm">
+                  Customize the look and feel of AmakaFlow
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Palette className="w-5 h-5" />
+                    Theme
+                  </CardTitle>
+                  <CardDescription>
+                    Choose between dark, light, or system-matched theme
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { value: 'light' as Theme, label: 'Light', icon: Sun, desc: 'Light background with dark text' },
+                      { value: 'dark' as Theme, label: 'Dark', icon: Moon, desc: 'Dark background with light text' },
+                      { value: 'system' as Theme, label: 'System', icon: Monitor, desc: 'Match your OS preference' },
+                    ]).map((option) => (
+                      <div
+                        key={option.value}
+                        className={cn(
+                          "flex flex-col items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all",
+                          theme === option.value
+                            ? "bg-primary/5 border-primary ring-1 ring-primary"
+                            : "hover:bg-muted/50 hover:border-muted-foreground/30"
+                        )}
+                        onClick={() => setTheme(option.value)}
+                        data-testid={`theme-${option.value}`}
+                      >
+                        <option.icon className={cn("w-6 h-6", theme === option.value ? "text-primary" : "text-muted-foreground")} />
+                        <div className="text-center">
+                          <p className="font-medium text-sm">{option.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{option.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Your preference is saved automatically and persists across sessions.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* API Key (extracted from general for AMA-1175) */}
+          {activeSection === 'api-key' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold mb-1">API Key</h1>
+                <p className="text-muted-foreground text-sm">
+                  Bring your own API key for AI-powered features
+                </p>
+              </div>
+              <ApiKeySettings />
+            </div>
+          )}
+
+          {/* Debug / Developer options (AMA-1175) */}
+          {activeSection === 'debug' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold mb-1">Developer Options</h1>
+                <p className="text-muted-foreground text-sm">
+                  Advanced debugging and developer tools
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bug className="w-5 h-5" />
+                    Debug Info
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="bg-muted/30 rounded-lg p-3 text-xs font-mono space-y-1">
+                    <p>User ID: {user.id}</p>
+                    <p>Subscription: {user.subscription}</p>
+                    <p>Devices: {selectedDevices.join(', ') || 'none'}</p>
+                    <p>Theme: {theme}</p>
+                    <p>Demo mode: {String(import.meta.env.VITE_DEMO_MODE === 'true')}</p>
+                    <p>Build: {import.meta.env.MODE}</p>
+                  </div>
                 </CardContent>
               </Card>
             </div>

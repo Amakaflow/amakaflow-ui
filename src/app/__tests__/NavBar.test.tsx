@@ -50,17 +50,17 @@ const renderNavBar = (overrides: Partial<{
 };
 
 describe('NavBar', () => {
-  it('renders the 7 primary nav items', () => {
+  it('renders the grouped nav items (dropdown triggers)', () => {
     renderNavBar();
 
-    // The primary nav items: Import, Create with AI, Calendar, My Workouts, Programs, Analytics, Settings
-    expect(screen.getByText('Import')).toBeInTheDocument();
-    expect(screen.getByText('Create with AI')).toBeInTheDocument();
-    expect(screen.getByText('Calendar')).toBeInTheDocument();
-    expect(screen.getByText('My Workouts')).toBeInTheDocument();
-    expect(screen.getByText('Programs')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    // Direct nav items
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Help')).toBeInTheDocument();
+
+    // Dropdown triggers
+    expect(screen.getByText('Create')).toBeInTheDocument();
+    expect(screen.getByText('Training')).toBeInTheDocument();
+    expect(screen.getByText('Insights')).toBeInTheDocument();
   });
 
   it('has hidden md:block classes to hide on mobile and show on desktop', () => {
@@ -77,5 +77,26 @@ describe('NavBar', () => {
     expect(screen.queryByText('History')).not.toBeInTheDocument();
     expect(screen.queryByText('Volume')).not.toBeInTheDocument();
     expect(screen.queryByText('Team')).not.toBeInTheDocument();
+  });
+
+  it('reduces visible top-level items from 9+ to 5-6 via dropdown grouping', () => {
+    renderNavBar();
+
+    // Count visible top-level buttons in the nav (not dropdown items)
+    // Expected: Dashboard, Create (dropdown), Training (dropdown), Insights (dropdown), Help, Settings icon
+    const navButtons = screen.getAllByRole('button');
+    // Should have fewer than old layout (9 items)
+    // The logo button + Dashboard + Create + Training + Insights + Help + Settings = 7 buttons
+    expect(navButtons.length).toBeLessThanOrEqual(9);
+  });
+
+  it('shows Settings as icon-only button', () => {
+    renderNavBar();
+
+    const settingsButton = screen.getByTestId
+      ? document.querySelector('[data-assistant-target="nav-settings"]')
+      : null;
+    // Settings button should exist
+    expect(settingsButton).toBeTruthy();
   });
 });

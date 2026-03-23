@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { SignInButton, SignUpButton } from '@clerk/clerk-react';
 import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 import { ChatProvider } from '../context/ChatContext';
 import { ProgressProvider } from '../components/ProgressView';
 import { ChatAwareLayout } from '../components/ChatAwareLayout';
@@ -354,7 +355,7 @@ export function AppShell() {
                       onBack={workflowState.handleExportBack}
                     />
                   ) : (
-                    <div className="p-8 text-center text-muted-foreground">No workout to export</div>
+                    <ExportEmptyState onNavigate={navigate} />
                   )
                 }
               />
@@ -500,6 +501,45 @@ function WorkoutsRoute({
         onNavigate={navigate}
         onAddToCalendar={() => navigate('calendar')}
       />
+    </div>
+  );
+}
+
+// AMA-1176: Export page empty state
+function ExportEmptyState({ onNavigate }: { onNavigate: (view: View) => void }) {
+  const formats = [
+    { name: 'FIT', desc: 'Garmin, COROS, Zwift', color: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800' },
+    { name: 'JSON', desc: 'API & integrations', color: 'bg-green-500/10 text-green-600 border-green-200 dark:border-green-800' },
+    { name: 'PDF', desc: 'Print & share', color: 'bg-red-500/10 text-red-600 border-red-200 dark:border-red-800' },
+    { name: 'TCX', desc: 'Training Center XML', color: 'bg-purple-500/10 text-purple-600 border-purple-200 dark:border-purple-800' },
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] p-8" data-testid="export-empty-state">
+      <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
+        <svg className="w-10 h-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+      </div>
+      <h2 className="text-xl font-semibold mb-2">Select a workout to export</h2>
+      <p className="text-muted-foreground text-center max-w-md mb-6">
+        Choose a workout from your library to export it to your favorite device or format.
+      </p>
+      <Button onClick={() => onNavigate('workouts')} className="mb-8">
+        Go to My Workouts
+      </Button>
+
+      <div className="w-full max-w-lg">
+        <p className="text-sm font-medium text-muted-foreground mb-3 text-center">Available export formats</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {formats.map((fmt) => (
+            <Card key={fmt.name} className={`p-4 text-center border ${fmt.color}`}>
+              <p className="font-bold text-lg">{fmt.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{fmt.desc}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
