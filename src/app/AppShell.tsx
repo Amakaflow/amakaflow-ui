@@ -17,6 +17,7 @@ import { NavBar } from './NavBar';
 import { WorkflowView } from './WorkflowView';
 import { View } from './router';
 import { DeviceId } from '../lib/devices';
+import { useUrlSync, getInitialViewFromUrl } from '../hooks/useUrlSync';
 
 const Spinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -30,9 +31,12 @@ const Spinner = () => (
 export function AppShell() {
   const { user, authLoading, stravaConnected, hasClerk, clerkLoaded, needsProfileCompletion, handleProfileComplete } = useAppAuth();
   const { workoutHistoryList, refreshHistory } = useWorkoutHistory(user);
-  const [currentView, setCurrentView] = useState<View>('home');
+  const [currentView, setCurrentView] = useState<View>(getInitialViewFromUrl);
   const [selectedDevice, setSelectedDevice] = useState<DeviceId>('garmin');
   const navigate = (view: View) => setCurrentView(view);
+
+  // Sync URL bar with current view (Phase 1 — non-breaking, URL reflection only)
+  useUrlSync({ currentView, setCurrentView });
 
   if ((hasClerk && !clerkLoaded) || authLoading) return <Spinner />;
 
