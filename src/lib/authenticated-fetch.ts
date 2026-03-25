@@ -15,6 +15,11 @@
 
 type GetTokenFn = () => Promise<string | null>;
 
+// E2E test mode: inject X-Test-Auth headers instead of Clerk JWT
+const E2E_MODE = import.meta.env.VITE_E2E_MODE === 'true';
+const E2E_TEST_AUTH = import.meta.env.VITE_TEST_AUTH_SECRET || 'e2e-test-secret-dev-only';
+const E2E_TEST_USER_ID = import.meta.env.VITE_TEST_USER_ID || 'user_37lZCcU9AJ9b7MX2H71dZ2CuX2u';
+
 // Global token getter - set by AuthProvider when app initializes
 let globalGetToken: GetTokenFn | null = null;
 
@@ -46,13 +51,18 @@ export async function authenticatedFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = await getAuthToken();
-
   const headers = new Headers(options.headers);
 
-  // Add Authorization header if we have a token
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (E2E_MODE) {
+    // E2E test mode: use test auth headers instead of Clerk JWT
+    headers.set('X-Test-Auth', E2E_TEST_AUTH);
+    headers.set('X-Test-User-Id', E2E_TEST_USER_ID);
+  } else {
+    // Production: use Clerk JWT
+    const token = await getAuthToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
   }
 
   return fetch(url, {
@@ -67,12 +77,16 @@ export async function authenticatedFetch(
  */
 export function createAuthenticatedFetch(getToken: GetTokenFn) {
   return async (url: string, options: RequestInit = {}): Promise<Response> => {
-    const token = await getToken();
-
     const headers = new Headers(options.headers);
 
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
+    if (E2E_MODE) {
+      headers.set('X-Test-Auth', E2E_TEST_AUTH);
+      headers.set('X-Test-User-Id', E2E_TEST_USER_ID);
+    } else {
+      const token = await getToken();
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
     }
 
     return fetch(url, {
