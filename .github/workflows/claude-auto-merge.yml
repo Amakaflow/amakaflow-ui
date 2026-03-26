@@ -8,7 +8,7 @@ jobs:
   auto-merge:
     if: >
       github.event.issue.pull_request &&
-      github.event.comment.user.login == 'factory-droid' &&
+      github.event.comment.user.login == 'factory-droid[bot]' &&
       contains(github.event.comment.body, 'Droid finished')
     runs-on: ubuntu-latest
     permissions:
@@ -21,9 +21,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=${{ github.event.issue.number }}
-          # Wait a moment for checks to settle
           sleep 10
-          # Get check status
           STATUS=$(gh pr checks "$PR_NUMBER" --json state --jq '[.[].state] | if all(. == "SUCCESS" or . == "SKIPPED") then "ready" else "not-ready" end' 2>/dev/null || echo "not-ready")
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "CI status: $STATUS"
@@ -33,4 +31,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge ${{ github.event.issue.number }} --squash --auto || gh pr merge ${{ github.event.issue.number }} --squash
+          gh pr merge ${{ github.event.issue.number }} --squash || echo "Merge failed — may need manual merge"
