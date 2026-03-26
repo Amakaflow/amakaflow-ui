@@ -8,7 +8,7 @@ jobs:
   auto-merge:
     if: >
       github.event.issue.pull_request &&
-      github.event.comment.user.login == 'factory-droid[bot]' &&
+      contains(github.event.comment.user.login, 'factory-droid') &&
       contains(github.event.comment.body, 'Droid finished')
     runs-on: ubuntu-latest
     permissions:
@@ -21,14 +21,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=${{ github.event.issue.number }}
-          sleep 10
-          STATUS=$(gh pr checks "$PR_NUMBER" --json state --jq '[.[].state] | if all(. == "SUCCESS" or . == "SKIPPED") then "ready" else "not-ready" end' 2>/dev/null || echo "not-ready")
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          echo "CI status: $STATUS"
+          sleep 15
+          # Check if all required checks passed
+          FAILED=$(gh pr checks "$PR_NUMBER" --json name,state --jq '[.[] | select(.state != "SUCCESS" and .state != "SKIPPED" and .name != "auto-merge")] | length' 2>/dev/null || echo "99")
+          if [ "$FAILED" = "0" ]; then
+            echo "status=ready" >> "$GITHUB_OUTPUT"
+            echo "All checks passed — ready to merge"
+          else
+            echo "status=not-ready" >> "$GITHUB_OUTPUT"
+            echo "$FAILED checks still pending or failed"
+          fi
 
       - name: Merge PR
         if: steps.ci-check.outputs.status == 'ready'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge ${{ github.event.issue.number }} --squash || echo "Merge failed — may need manual merge"
+          echo "Merging PR #${{ github.event.issue.number }}"
+          gh pr merge ${{ github.event.issue.number }} --squash --delete-branch || echo "Merge failed — may need manual merge"
