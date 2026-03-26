@@ -1,0 +1,35 @@
+name: Claude auto-fix Droid reviews
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-fix:
+    if: >
+      github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Claude Code fix review comments
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: "factory-droid[bot],droid-review[bot]"
+          trigger_phrase: ""
+          direct_prompt: |
+            A code reviewer has requested changes on this PR. Read ALL review comments carefully and fix every issue they raised. For each comment:
+            1. Understand what change is requested
+            2. Make the fix in the correct file
+            3. If a comment is just a question or suggestion, respond explaining your reasoning
+
+            After making all fixes, commit with message: "fix: address review feedback"
