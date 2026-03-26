@@ -28,7 +28,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_bots: "factory-droid[bot],droid-review[bot]"
           trigger_phrase: ""
-          direct_prompt: |
+          prompt: |
             A code reviewer has requested changes on this PR. Read ALL review comments carefully and fix every issue they raised. For each comment:
             1. Understand what change is requested
             2. Make the fix in the correct file
