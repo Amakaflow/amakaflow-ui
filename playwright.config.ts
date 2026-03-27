@@ -43,7 +43,7 @@ export default defineConfig({
   // Global setup
   use: {
     // Base URL for navigation
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
 
     // Collect trace on failure
     trace: 'on-first-retry',
@@ -64,6 +64,16 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         permissions: ['microphone'],
+      },
+    },
+
+    // Accessibility regression tests - run on every PR alongside smoke
+    {
+      name: 'a11y',
+      testMatch: /.*\.smoke\.spec\.ts/,
+      grep: /@a11y/,
+      use: {
+        ...devices['Desktop Chrome'],
       },
     },
 
@@ -101,12 +111,32 @@ export default defineConfig({
         permissions: ['microphone'],
       },
     },
+
+    // E2E desktop (1280x800) - for comprehensive E2E tests
+    {
+      name: 'e2e-desktop',
+      testMatch: /e2e\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+
+    // E2E mobile (375x812) - for comprehensive E2E tests
+    {
+      name: 'e2e-mobile',
+      testMatch: /e2e\/.*\.spec\.ts/,
+      use: {
+        ...devices['iPhone 13'],
+        viewport: { width: 375, height: 812 },
+      },
+    },
   ],
 
   // Web server to run before tests
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
+    command: 'VITE_DEMO_MODE=true npm run dev',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

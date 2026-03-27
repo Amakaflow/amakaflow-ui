@@ -56,10 +56,17 @@ export interface FunctionResultEvent {
   result: string;
 }
 
+export interface PendingImport {
+  source_url: string;
+  title?: string;
+  exercise_count?: number;
+}
+
 export interface MessageEndEvent {
   session_id: string;
   tokens_used: number;
   latency_ms: number;
+  pending_imports?: PendingImport[];
 }
 
 export interface ErrorEvent {
@@ -69,13 +76,101 @@ export interface ErrorEvent {
   limit?: number;
 }
 
+// Stage events for Perplexity-style progress indicator
+export type WorkoutStage = 'analyzing' | 'researching' | 'searching' | 'creating' | 'complete';
+
+export interface StageEvent {
+  stage: WorkoutStage;
+  message: string;
+}
+
+// Structured workout data from function_result events
+export interface WorkoutExercise {
+  name: string;
+  sets?: number;
+  reps?: number | string;
+  muscle_group?: string;
+  notes?: string;
+}
+
+export interface GeneratedWorkout {
+  type: 'workout_generated';
+  workout: {
+    name: string;
+    exercises: WorkoutExercise[];
+    duration_minutes?: number;
+    difficulty?: string;
+  };
+}
+
+export interface SearchResultWorkout {
+  workout_id: string;
+  title: string;
+  exercise_count?: number;
+  duration_minutes?: number;
+  difficulty?: string;
+}
+
+export interface WorkoutSearchResults {
+  type: 'search_results';
+  workouts: SearchResultWorkout[];
+}
+
+export interface ImportedWorkout {
+  type: 'workout_imported';
+  success: boolean;
+  source: string;
+  workout: {
+    title: string;
+    exercises?: WorkoutExercise[];
+    exercise_count?: number;
+    exercise_names?: string[];
+    full_workout_data?: Record<string, unknown>;
+  };
+  source_url?: string;
+}
+
+export type WorkoutToolResult = GeneratedWorkout | WorkoutSearchResults | ImportedWorkout;
+
 export type SSEEventData =
   | { event: 'message_start'; data: MessageStartEvent }
   | { event: 'content_delta'; data: ContentDeltaEvent }
   | { event: 'function_call'; data: FunctionCallEvent }
   | { event: 'function_result'; data: FunctionResultEvent }
+  | { event: 'stage'; data: StageEvent }
+  | { event: 'heartbeat'; data: { status: string; tool_name: string; elapsed_seconds: number } }
   | { event: 'message_end'; data: MessageEndEvent }
   | { event: 'error'; data: ErrorEvent };
+
+// ============================================================================
+// Assistant Visualization Types (AMA-629)
+// ============================================================================
+
+export type VisualizationType = 'cursor-click' | 'typing' | 'ghost-preview' | 'outline-pulse';
+
+export interface ActionVisualization {
+  target: string;
+  type: VisualizationType;
+  label: string;
+  data?: Record<string, unknown>;
+}
+
+export interface TimelineStep {
+  id: string;
+  toolName: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
+  result?: string;
+}
+
+export interface AssistantVisualizationState {
+  isWorking: boolean;
+  currentStepLabel: string | null;
+  stepCount: number;
+  timeline: TimelineStep[];
+  activeVisualization: ActionVisualization | null;
+  speed: number;
+}
 
 // ============================================================================
 // Chat State
@@ -93,6 +188,22 @@ export interface ChatState {
   isStreaming: boolean;
   error: string | null;
   rateLimitInfo: RateLimitInfo | null;
+  /** Pending imports from last message - send back to API on next request */
+  pendingImports: PendingImport[];
+  /** Current stage for Perplexity-style progress (null when no active stage) */
+  currentStage: StageEvent | null;
+  /** History of stages for the current message */
+  completedStages: WorkoutStage[];
+  /** Structured workout data from tool results */
+  workoutData: GeneratedWorkout | null;
+  /** Search results from tool queries */
+  searchResults: WorkoutSearchResults | null;
+  /** Assistant visualization state (AMA-576) */
+  assistantWorking: boolean;
+  timeline: TimelineStep[];
+  activeVisualization: ActionVisualization | null;
+  currentStepLabel: string | null;
+  stepCount: { current: number; total: number };
 }
 
 // ============================================================================
@@ -109,9 +220,19 @@ export type ChatAction =
   | { type: 'APPEND_CONTENT_DELTA'; text: string }
   | { type: 'ADD_FUNCTION_CALL'; toolCall: ChatToolCall }
   | { type: 'UPDATE_FUNCTION_RESULT'; toolUseId: string; result: string }
-  | { type: 'FINALIZE_ASSISTANT_MESSAGE'; tokens_used: number; latency_ms: number }
+  | { type: 'FINALIZE_ASSISTANT_MESSAGE'; tokens_used: number; latency_ms: number; pending_imports?: PendingImport[] }
   | { type: 'SET_STREAMING'; isStreaming: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_RATE_LIMIT'; info: RateLimitInfo }
+  | { type: 'SET_STAGE'; stage: StageEvent }
+  | { type: 'CLEAR_STAGES' }
+  | { type: 'SET_WORKOUT_DATA'; data: GeneratedWorkout }
+  | { type: 'SET_SEARCH_RESULTS'; data: WorkoutSearchResults }
+  | { type: 'CLEAR_WORKOUT_DATA' }
   | { type: 'CLEAR_SESSION' }
-  | { type: 'LOAD_SESSION'; sessionId: string; messages: ChatMessage[] };
+  | { type: 'LOAD_SESSION'; sessionId: string; messages: ChatMessage[] }
+  | { type: 'SET_ASSISTANT_WORKING'; isWorking: boolean }
+  | { type: 'ADD_TIMELINE_STEP'; step: TimelineStep }
+  | { type: 'UPDATE_TIMELINE_STEP'; id: string; status: TimelineStep['status']; result?: string }
+  | { type: 'SET_ACTIVE_VISUALIZATION'; visualization: ActionVisualization | null }
+  | { type: 'CLEAR_TIMELINE' };

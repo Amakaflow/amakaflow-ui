@@ -709,7 +709,7 @@ export function WorkoutHistory({ history, onLoadWorkout, onEditWorkout, onUpdate
                           <span className="font-medium">{exerciseCount}</span> exercises
                         </div>
                         {item.syncedToStrava && (
-                          <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
+                          <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium">
                             <CheckCircle2 className="w-4 h-4" />
                             Strava
                           </div>

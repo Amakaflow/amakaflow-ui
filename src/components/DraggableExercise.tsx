@@ -12,6 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip';
+import { formatDuration, formatDistance } from '../lib/formatExercise';
 
 interface DraggableExerciseProps {
   exercise: Exercise;
@@ -194,13 +195,28 @@ export function DraggableExercise({
             {/* Current values */}
             <div className="flex gap-2 text-sm">
               {exercise.reps && <Badge variant="secondary">{exercise.reps} reps</Badge>}
-              {exercise.distance_m && <Badge variant="secondary">{exercise.distance_m}m</Badge>}
-              {exercise.duration_sec && <Badge variant="secondary">{exercise.duration_sec}s</Badge>}
+              {exercise.distance_m && <Badge variant="secondary">{formatDistance(exercise.distance_m)}</Badge>}
+              {exercise.duration_sec && !exercise.sets && <Badge variant="secondary">{formatDuration(exercise.duration_sec)}</Badge>}
               {exercise.weight_kg && <Badge variant="secondary">{exercise.weight_kg}kg</Badge>}
-              {exercise.sets && exercise.sets > 1 && (
+              {/* AMA-729: Combined display - sets × duration per set (e.g., 3 × 30s) */}
+              {exercise.sets && exercise.sets > 0 && exercise.duration_sec && exercise.duration_sec > 0 && (
+                <Badge variant="default" className="bg-primary/20 text-primary">
+                  <Repeat className="w-3 h-3 mr-1" />
+                  {exercise.sets} × {formatDuration(exercise.duration_sec)}
+                </Badge>
+              )}
+              {/* Regular sets badge (when no duration per set) */}
+              {exercise.sets && exercise.sets > 1 && (!exercise.duration_sec || exercise.duration_sec === 0) && (
                 <Badge variant="default" className="bg-primary/20 text-primary">
                   <Repeat className="w-3 h-3 mr-1" />
                   {exercise.sets} sets
+                </Badge>
+              )}
+              {/* AMA-729: Time cap badge */}
+              {exercise.time_cap_sec && exercise.time_cap_sec > 0 && (
+                <Badge variant="outline" className="border-blue-500 text-blue-500">
+                  <Timer className="w-3 h-3 mr-1" />
+                  {formatDuration(exercise.time_cap_sec)} cap
                 </Badge>
               )}
             </div>

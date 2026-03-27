@@ -1,3 +1,5 @@
+// @migration: Use src/api/clients/ingestor.ts for new call sites.
+// normalizeWorkoutStructure is re-exported from there too.
 import { WorkoutStructure, SourceType, Block, Superset, Exercise, BulkWorkoutResponse } from '../types/workout';
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
@@ -14,14 +16,6 @@ const API_TIMEOUT = 120000;
  * This function is exported for use when loading workouts from history
  */
 export function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStructure {
-  // DEBUG: Log incoming workout to trace warmup_sets persistence (AMA-94)
-  console.log('[normalizeWorkoutStructure] Input workout exercises:',
-    workout.blocks?.map(b => b.exercises?.map(e => ({
-      name: e?.name,
-      warmup_sets: e?.warmup_sets,
-      warmup_reps: e?.warmup_reps
-    }))));
-
   if (!workout.blocks || workout.blocks.length === 0) {
     return {
       ...workout,
@@ -45,17 +39,11 @@ export function normalizeWorkoutStructure(workout: WorkoutStructure): WorkoutStr
     let restBetweenRoundsSec = block.rest_between_rounds_sec || block.rest_between_sec;
 
     if (block.supersets && block.supersets.length > 0) {
+      // Keep exercises[] empty — all exercises live inside supersets
       exercises = [];
-      block.supersets.forEach((superset) => {
-        exercises.push(...superset.exercises);
-      });
 
       if (!structure) {
-        if (exercises.length === 2) {
-          structure = 'superset';
-        } else if (exercises.length > 2) {
-          structure = 'circuit';
-        }
+        structure = 'superset';
       }
 
       if (block.supersets[0]?.rest_between_sec && !restBetweenRoundsSec) {
@@ -201,14 +189,7 @@ function sanitizeYoutubeWorkout(workout: WorkoutStructure): WorkoutStructure {
         return null;
       }
 
-      let structure = block.structure || null;
-      if (!structure) {
-        if (cleanedExercises.length === 2) {
-          structure = 'superset';
-        } else if (cleanedExercises.length > 2) {
-          structure = 'circuit';
-        }
-      }
+      const structure = block.structure || null;
 
       return {
         ...block,
@@ -322,6 +303,7 @@ async function apiCall<T>(
 
 /**
  * Generate workout structure from sources
+ * @deprecated Use src/api/clients/ingestor.ts#generateWorkoutStructure for new call sites.
  */
 export async function generateWorkoutStructure(
   sources: Array<{ type: SourceType; content: string }>,
@@ -392,6 +374,20 @@ export async function generateWorkoutStructure(
         // Single workout response
         workout = resp as WorkoutStructure;
       }
+      break;
+    }
+
+    if (source.type === 'instagram') {
+      const resp = await apiCall<WorkoutStructure>(
+        '/ingest/instagram_reel',
+        {
+          method: 'POST',
+          body: JSON.stringify({ url: source.content }),
+        },
+        signal,
+      );
+
+      workout = resp;
       break;
     }
 
@@ -525,6 +521,7 @@ const HEALTH_CHECK_CACHE_DURATION = 5000;
 
 /**
  * Create an empty workout structure via API
+ * @deprecated Use src/api/clients/ingestor.ts#createEmptyWorkout for new call sites.
  */
 export async function createEmptyWorkout(): Promise<WorkoutStructure> {
   try {

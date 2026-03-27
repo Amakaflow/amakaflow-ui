@@ -5,8 +5,9 @@
  * Shows workout list with validation issues and allows selection.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useBulkImport } from '../../context/BulkImportContext';
+import { BulkImportAction } from '../../context/BulkImportContext';
 import { useBulkImportApi } from '../../hooks/useBulkImportApi';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -22,9 +23,39 @@ import {
   Clock,
   Copy,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { PreviewWorkout, ValidationIssueSeverity } from '../../types/bulk-import';
+import { WorkoutEditorInline } from '../WorkoutEditor/WorkoutEditorInline';
+import { WorkoutCoreData } from '../WorkoutEditor/WorkoutEditorCore';
+import { WorkoutOperation } from '../../types/workout-operations';
+import { bulkImportApi } from '../../lib/bulk-import-api';
+
+interface PreviewWorkoutInlineEditorProps {
+  jobId: string;
+  workoutId: string;
+  workoutData: WorkoutCoreData;
+  dispatch: React.Dispatch<BulkImportAction>;
+}
+
+function PreviewWorkoutInlineEditor({ jobId, workoutId, workoutData, dispatch }: PreviewWorkoutInlineEditorProps) {
+  const handleApplyOps = useCallback(async (ops: WorkoutOperation[]) => {
+    const result = await bulkImportApi.applyPreviewOperations(jobId, workoutId, ops);
+    dispatch({
+      type: 'UPDATE_PREVIEW_WORKOUT',
+      id: workoutId,
+      workout: result.preview.workout,
+    });
+  }, [jobId, workoutId, dispatch]);
+
+  return (
+    <WorkoutEditorInline
+      workoutData={workoutData}
+      onApplyOps={handleApplyOps}
+    />
+  );
+}
 
 interface PreviewStepProps {
   userId: string;
@@ -43,6 +74,7 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
   const { generatePreview } = useBulkImportApi({ userId });
 
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+  const [editingWorkouts, setEditingWorkouts] = useState<Set<string>>(new Set());
 
   // Auto-load preview data when component mounts and workouts are empty
   useEffect(() => {
@@ -60,6 +92,15 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
       } else {
         next.add(id);
       }
+      return next;
+    });
+  }, []);
+
+  // Toggle workout inline editing
+  const toggleEditing = useCallback((id: string) => {
+    setEditingWorkouts(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }, []);
@@ -236,6 +277,13 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                       Ready
                     </Badge>
                   )}
+                  <button
+                    onClick={() => toggleEditing(workout.id)}
+                    className="p-1.5 hover:bg-white/10 rounded-lg"
+                    aria-label={`Edit ${workout.title}`}
+                  >
+                    <Pencil className={cn('w-4 h-4', editingWorkouts.has(workout.id) ? 'text-primary' : 'text-muted-foreground')} />
+                  </button>
                 </div>
               </div>
 
@@ -338,6 +386,18 @@ export function PreviewStep({ userId, onStartImport }: PreviewStepProps) {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Inline Editor */}
+              {editingWorkouts.has(workout.id) && workout.workout.blocks && (
+                <div className="px-4 pb-4 border-t border-white/5 pt-4">
+                  <PreviewWorkoutInlineEditor
+                    jobId={state.jobId!}
+                    workoutId={workout.id}
+                    workoutData={workout.workout as WorkoutCoreData}
+                    dispatch={dispatch}
+                  />
                 </div>
               )}
             </div>

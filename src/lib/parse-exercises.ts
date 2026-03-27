@@ -43,6 +43,9 @@ const SETS_REPS_PATTERN = /\s*\d+\s*[x×]\s*\d+\s*m?\s*$/i;
 // Pattern to detect set/rep notation in text (for superset splitting logic)
 const HAS_SETS_REPS_PATTERN = /\d+\s*[x×]\s*\d+/;
 
+// Pattern to match standalone distance at end of line (e.g., "Rowing 500m", "Run 1.5km")
+const STANDALONE_DISTANCE_PATTERN = /\s+(\d+(?:\.\d+)?)\s*(m|km|mi|yd)\s*$/i;
+
 // Patterns to skip (hashtags, CTAs, section headers)
 const SKIP_PATTERNS = [
   /^#\w+/,  // Hashtags
@@ -56,6 +59,7 @@ const SKIP_PATTERNS = [
   /^round\s+\d+:/i,
   /^day\s+\d+:/i,
   /^week\s+\d+:/i,
+  /^\d+\s+rounds?(?:\s+of)?:?\s*$/i,  // "5 Rounds", "3 Rounds of:", etc.
 ];
 
 /**
@@ -115,15 +119,16 @@ function looksLikeExerciseName(text: string): boolean {
   if (!/\w/.test(trimmed)) return false;
   
   // Check for exercise-like keywords (optional but helpful)
+  // Use word boundary matching to avoid false positives like "Follow up" or "Break down"
   const exerciseKeywords = [
     'press', 'pull', 'push', 'row', 'squat', 'lunge', 'curl', 'raise', 'fly', 'extension',
-    'up', 'down', 'hold', 'negative', 'positive', 'pose', 'stretch', 'rotation'
+    'hold', 'negative', 'positive', 'pose', 'stretch', 'rotation'
   ];
   
   const lowerText = trimmed.toLowerCase();
   
   // If it has exercise keywords, it's likely an exercise
-  if (exerciseKeywords.some(kw => lowerText.includes(kw))) {
+  if (exerciseKeywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lowerText))) {
     return true;
   }
   
@@ -160,11 +165,13 @@ function extractExerciseName(line: string): { name: string | null; remainingText
   }
   
   // Handle "Workout:" prefix by extracting content after colon
+  // Only extract if the content has fitness notation (indicating it's exercises, not a title)
   if (trimmed.toLowerCase().startsWith('workout:')) {
     const afterColon = trimmed.substring(8).trim();
-    if (afterColon) {
+    if (afterColon && hasSetsRepsNotation(afterColon)) {
       return { name: null, remainingText: afterColon };
     }
+    // Skip lines like "Workout: Full Body Day" (no set/rep notation = title, not exercise)
     return { name: null, remainingText: null };
   }
   
@@ -234,17 +241,28 @@ export function parseDescriptionForExercises(text: string): ParsedExerciseSugges
       
       for (const part of supersetParts) {
         let cleanedName = cleanExerciseName(part);
-        
+
         // Skip very short names
         if (cleanedName.length <= 2) continue;
 
         // Skip if it looks like a hashtag or CTA
         if (cleanedName.startsWith('#')) continue;
 
+        // Extract standalone distance (e.g., "Rowing 500m" → name "Rowing", distance "500m")
+        let distance: string | undefined;
+        const distanceMatch = cleanedName.match(STANDALONE_DISTANCE_PATTERN);
+        if (distanceMatch) {
+          distance = `${distanceMatch[1]}${distanceMatch[2]}`;
+          cleanedName = cleanedName.replace(STANDALONE_DISTANCE_PATTERN, '').trim();
+          // Re-check name length after stripping distance
+          if (cleanedName.length <= 2) continue;
+        }
+
         exercises.push({
           id: `parsed_${Date.now()}_${exercises.length}`,
           label: cleanedName,
-          duration_sec: 30,
+          duration_sec: distance ? undefined : 30,
+          distance,
           accepted: true, // Default to accepted since user explicitly pasted this
         });
       }

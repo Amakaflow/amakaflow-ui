@@ -1,10 +1,11 @@
+// @migration: Use src/api/clients/calendar.ts for new call sites.
 /**
  * Calendar API client
  * Connects to the calendar-api backend for workout events
  */
 
-import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import * as calendarClient from '../api/clients/calendar';
 
 // Use centralized API config
 const API_BASE_URL = API_URLS.CALENDAR;
@@ -108,67 +109,45 @@ class CalendarApiClient {
     // No-op: user ID is now extracted from JWT on the backend
   }
 
-  private getHeaders(): HeadersInit {
-    return {
-      'Content-Type': 'application/json',
-    };
-  }
-
-  private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
-    return response.json();
-  }
-
   // ==========================================
   // WORKOUT EVENTS
   // ==========================================
 
+  // Helper to validate date string is in YYYY-MM-DD format
+  private isValidDateString(dateStr: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  }
+
+  // Helper to parse date string to Date object with validation
+  private parseDate(dateStr: string): Date {
+    const date = new Date(dateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date: ${dateStr}`);
+    }
+    return date;
+  }
+
   async getEvents(start: string, end: string): Promise<WorkoutEvent[]> {
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar?start=${start}&end=${end}`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<WorkoutEvent[]>(response);
+    if (!this.isValidDateString(start) || !this.isValidDateString(end)) {
+      throw new Error('Invalid date parameters: start and end must be valid YYYY-MM-DD format date strings');
+    }
+    return calendarClient.getEvents(start, end);
   }
 
   async getEvent(eventId: string): Promise<WorkoutEvent> {
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/${eventId}`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.getEvent(eventId);
   }
 
   async createEvent(event: CreateWorkoutEvent): Promise<WorkoutEvent> {
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(event),
-    });
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.createEvent(event);
   }
 
   async updateEvent(eventId: string, event: UpdateWorkoutEvent): Promise<WorkoutEvent> {
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(event),
-    });
-    return this.handleResponse<WorkoutEvent>(response);
+    return calendarClient.updateEvent(eventId, event);
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/${eventId}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
+    return calendarClient.deleteEvent(eventId);
   }
 
   // ==========================================
@@ -176,52 +155,19 @@ class CalendarApiClient {
   // ==========================================
 
   async getConnectedCalendars(): Promise<ConnectedCalendar[]> {
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/connected-calendars`,
-      { headers: this.getHeaders() }
-    );
-    return this.handleResponse<ConnectedCalendar[]>(response);
+    return calendarClient.getConnectedCalendars();
   }
 
   async createConnectedCalendar(calendar: CreateConnectedCalendar): Promise<ConnectedCalendar> {
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(calendar),
-    });
-    return this.handleResponse<ConnectedCalendar>(response);
+    return calendarClient.createConnectedCalendar(calendar);
   }
 
   async deleteConnectedCalendar(calendarId: string): Promise<void> {
-    const response = await authenticatedFetch(`${this.baseUrl}/calendar/connected-calendars/${calendarId}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API error: ${response.status}`);
-    }
+    return calendarClient.deleteConnectedCalendar(calendarId);
   }
 
-  async syncConnectedCalendar(calendarId: string): Promise<{
-    success: boolean;
-    events_created: number;
-    events_updated: number;
-    total_events: number;
-  }> {
-    const response = await authenticatedFetch(
-      `${this.baseUrl}/calendar/connected-calendars/${calendarId}/sync`,
-      {
-        method: 'POST',
-        headers: this.getHeaders(),
-      }
-    );
-    return this.handleResponse<{
-      success: boolean;
-      events_created: number;
-      events_updated: number;
-      total_events: number;
-    }>(response);
+  async syncConnectedCalendar(calendarId: string) {
+    return calendarClient.syncConnectedCalendar(calendarId);
   }
 }
 

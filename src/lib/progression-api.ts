@@ -12,6 +12,7 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 import type {
   ExerciseHistory,
   ExercisesWithHistoryResponse,
@@ -334,6 +335,10 @@ class ProgressionApiClient {
   async getExercisesWithHistory(
     params: GetExercisesParams = {}
   ): Promise<ExercisesWithHistoryResponse> {
+    if (isDemoMode) {
+      const { DEMO_EXERCISES_WITH_HISTORY } = await import('./mock-data/demo-extended');
+      return DEMO_EXERCISES_WITH_HISTORY;
+    }
     const searchParams = new URLSearchParams();
     if (params.limit !== undefined) {
       searchParams.set('limit', params.limit.toString());
@@ -360,6 +365,10 @@ class ProgressionApiClient {
    * Each session includes all sets with weight, reps, and calculated estimated 1RM.
    */
   async getExerciseHistory(params: GetExerciseHistoryParams): Promise<ExerciseHistory> {
+    if (isDemoMode) {
+      const { getDemoExerciseHistory } = await import('./mock-data/demo-extended');
+      return getDemoExerciseHistory(params.exerciseId);
+    }
     const searchParams = new URLSearchParams();
     if (params.limit !== undefined) {
       searchParams.set('limit', params.limit.toString());
@@ -447,6 +456,10 @@ class ProgressionApiClient {
   async getVolumeAnalytics(
     params: GetVolumeAnalyticsParams = {}
   ): Promise<VolumeAnalytics> {
+    if (isDemoMode) {
+      const { DEMO_VOLUME_ANALYTICS } = await import('./mock-data/demo-extended');
+      return DEMO_VOLUME_ANALYTICS;
+    }
     const searchParams = new URLSearchParams();
     if (params.startDate !== undefined) {
       searchParams.set('start_date', params.startDate);

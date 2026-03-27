@@ -1,0 +1,31 @@
+name: Protect main branch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: protect-main-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify source branch is develop or sync/*
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          HEAD="$HEAD_REF"
+          if [[ "$HEAD" == "develop" || "$HEAD" == sync/* ]]; then
+            echo "✅ '$HEAD' is allowed to merge into main."
+          else
+            echo "::error::PRs into main must come from 'develop' or 'sync/*'."
+            echo ""
+            echo "Source branch '$HEAD' must not target main directly."
+            echo "Merge it into 'develop' first, then cut a release via develop → main."
+            exit 1
+          fi

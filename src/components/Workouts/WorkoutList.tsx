@@ -1,0 +1,1278 @@
+/**
+ * WorkoutList — thin JSX shell for the workouts list feature.
+ *
+ * All state, effects, memos, and handlers live in useWorkoutList.
+ * This file owns only rendering.
+ */
+
+import React, { useState } from 'react';
+import {
+  Dumbbell,
+  Clock,
+  Watch,
+  Bike,
+  Download,
+  CheckCircle2,
+  Eye,
+  Trash2,
+  ChevronRight,
+  ChevronDown,
+  Edit,
+  List,
+  LayoutGrid,
+  Video,
+  Youtube,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  FileSpreadsheet,
+  FileText,
+  Activity,
+  Star,
+  Tag,
+  Upload,
+  CalendarDays,
+  CheckSquare,
+  Square,
+  Check,
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { ScrollArea } from '../ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { ExportDevicePicker } from '../Export';
+import type { DeviceConfig } from '../../lib/devices';
+import { getPrimaryExportDestinations } from '../../lib/devices';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+
+import type { UnifiedWorkout } from '../../types/unified-workout';
+import { CATEGORY_DISPLAY_NAMES, isHistoryWorkout } from '../../types/unified-workout';
+import type { SortOption } from '../../lib/workout-filters';
+import { SORT_OPTIONS } from '../../lib/workout-filters';
+import { BlockPicker } from '../Import/BlockPicker';
+import type { ProcessedItem } from '../../types/import';
+
+import { ViewWorkout } from '../ViewWorkout';
+import { WorkoutEditSheet } from '../WorkoutEditor/WorkoutEditSheet';
+import { ProgramsSection } from '../ProgramsSection';
+import { TagPill } from '../TagPill';
+import { TagManagementModal } from '../TagManagementModal';
+import { WorkoutTagsEditor } from '../WorkoutTagsEditor';
+import { ActivityHistory } from '../ActivityHistory';
+import { CompletionDetailView } from '../CompletionDetailView';
+import { SyncStatusIndicator } from './UnifiedWorkoutCard';
+import { SelectActionBar } from './SelectActionBar';
+
+import type { WorkoutHistoryItem } from '../../lib/workout-history';
+import {
+  useWorkoutList,
+  formatDate,
+  getSourceIcon,
+  getSourceLabel,
+} from './hooks/useWorkoutList';
+
+// Helper to get synced devices from sync status (AMA-891)
+function getSyncedDevices(syncStatus: { garmin?: { synced?: boolean }; apple?: { synced?: boolean }; strava?: { synced?: boolean }; ios?: { synced?: boolean } }): string[] {
+  const devices: string[] = [];
+  if (syncStatus.garmin?.synced) devices.push('Garmin');
+  if (syncStatus.apple?.synced) devices.push('Apple');
+  if (syncStatus.strava?.synced) devices.push('Strava');
+  if (syncStatus.ios?.synced) devices.push('iOS');
+  return devices;
+}
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface WorkoutListProps {
+  profileId: string;
+  onEditWorkout: (item: WorkoutHistoryItem) => void;
+  onLoadWorkout: (item: WorkoutHistoryItem) => void;
+  onDeleteWorkout: (id: string) => void;
+  onBulkDeleteWorkouts?: (ids: string[]) => Promise<void> | void;
+  onViewProgram?: (programId: string) => void;
+  onExportWorkout?: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  onBatchExport?: (items: WorkoutHistoryItem[]) => void;
+  onNavigate?: (view: string) => void;
+  onAddToCalendar?: (workout: WorkoutHistoryItem) => void;
+  onMergeWorkouts?: (mergedWorkout: { title: string; blocks: unknown[] }) => void;
+}
+
+// =============================================================================
+// Export Popover Button
+// =============================================================================
+
+interface ExportPopoverButtonProps {
+  workoutId: string;
+  historyItem: WorkoutHistoryItem;
+  onExportWorkout: (item: WorkoutHistoryItem, device: DeviceConfig) => void;
+  size?: 'icon' | 'labeled';
+}
+
+function ExportPopoverButton({ workoutId, historyItem, onExportWorkout, size = 'labeled' }: ExportPopoverButtonProps) {
+  const [open, setOpen] = useState(false);
+  const devices = getPrimaryExportDestinations();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {size === 'icon' ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            aria-label="Export to device"
+            data-testid={`workout-export-${workoutId}`}
+          >
+            <Upload className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 h-9 font-medium"
+            data-testid={`workout-export-${workoutId}`}
+          >
+            <Upload className="w-4 h-4" />
+            Export to Device
+          </Button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="end">
+        <ExportDevicePicker
+          workoutId={workoutId}
+          devices={devices}
+          onInlineExport={async (device) => {
+            await onExportWorkout(historyItem, device);
+            setOpen(false);
+          }}
+          onOpenExportPage={(device) => {
+            onExportWorkout(historyItem, device);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// =============================================================================
+// Merge helpers
+// =============================================================================
+
+/**
+ * Convert UnifiedWorkout[] to ProcessedItem[] for use with BlockPicker.
+ * Only history workouts have structured block data; follow-along items yield an
+ * empty blocks array which BlockPicker handles gracefully.
+ */
+function workoutsToProcessedItems(workouts: UnifiedWorkout[]): ProcessedItem[] {
+  return workouts.map(w => {
+    let blocks: unknown[] = [];
+    if (isHistoryWorkout(w)) {
+      const raw = w._original.data as any;
+      // workout.blocks is the canonical location; fall back to workout_data.blocks
+      const rawBlocks = raw?.workout?.blocks ?? raw?.workout_data?.blocks ?? [];
+      blocks = rawBlocks.map((block: any, i: number) => ({
+        ...block,
+        id: block.id ?? `${w.id}-block-${i}`,
+      }));
+    }
+    return {
+      queueId: w.id,
+      workoutTitle: w.title,
+      status: 'done' as const,
+      workout: { blocks },
+      blockCount: blocks.length,
+    };
+  });
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function WorkoutList({
+  profileId,
+  onEditWorkout,
+  onLoadWorkout,
+  onDeleteWorkout,
+  onBulkDeleteWorkouts,
+  onViewProgram,
+  onExportWorkout,
+  onBatchExport,
+  onNavigate,
+  onAddToCalendar,
+  onMergeWorkouts,
+}: WorkoutListProps) {
+  const {
+    // State values
+    isLoading,
+    error,
+    allWorkouts,
+    setAllWorkouts,
+    viewMode,
+    setViewMode,
+    searchQuery,
+    setSearchQuery,
+    sourceFilter,
+    setSourceFilter,
+    platformFilter,
+    setPlatformFilter,
+    categoryFilter,
+    setCategoryFilter,
+    syncFilter,
+    setSyncFilter,
+    sortOption,
+    setSortOption,
+    pageIndex,
+    setPageIndex,
+    PAGE_SIZE,
+    selectedIds,
+    selectModeActive,
+    setSelectModeActive,
+    mergePhase,
+    setMergePhase,
+    mergeSelectedBlocks,
+    setMergeSelectedBlocks,
+    showDeleteModal,
+    pendingDeleteIds,
+    confirmDeleteId,
+    deletingId,
+    viewingWorkout,
+    setViewingWorkout,
+    editingWorkout,
+    setEditingWorkout,
+    pendingEditRef,
+    tagFilter,
+    setTagFilter,
+    availableTags,
+    showTagManagement,
+    setShowTagManagement,
+    completions,
+    completionsLoading,
+    completionsTotal,
+    selectedCompletionId,
+    setSelectedCompletionId,
+
+    // Derived / memos
+    availablePlatforms,
+    availableCategories,
+    filteredWorkouts,
+    totalPages,
+    currentPageIndex,
+    pageStart,
+    displayedWorkouts,
+    isAllSelected,
+
+    // Callbacks / handlers
+    loadWorkouts,
+    loadTags,
+    loadCompletions,
+    loadMoreCompletions,
+    toggleSelectAll,
+    toggleSelectMode,
+    toggleSelectId,
+    clearSelection,
+    handleBulkDeleteClick,
+    confirmBulkDelete,
+    cancelBulkDelete,
+    handleDeleteClick,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+    handleFavoriteToggle,
+    handleTagsUpdate,
+    handleEdit,
+    handleLoad,
+    handleView,
+    handleEditWorkout,
+    handleCsvExport,
+    handleApiExport,
+    handleLoadUnified,
+  } = useWorkoutList({
+    profileId,
+    onEditWorkout,
+    onLoadWorkout,
+    onDeleteWorkout,
+    onBulkDeleteWorkouts,
+    onViewProgram,
+  });
+
+  const handleBatchExport = () => {
+    if (!onBatchExport) return;
+    const items = allWorkouts
+      .filter(w => selectedIds.includes(w.id) && isHistoryWorkout(w))
+      .map(w => w._original.data as WorkoutHistoryItem);
+    onBatchExport(items);
+    clearSelection();
+  };
+
+  // Merge phase: render BlockPicker full-screen instead of the list
+  if (mergePhase === 'block-picker') {
+    const selectedWorkouts = allWorkouts.filter(w => selectedIds.includes(w.id));
+    const processedItems = workoutsToProcessedItems(selectedWorkouts);
+
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Merge workouts</h1>
+          <p className="text-muted-foreground mt-1">
+            Choose the blocks you want, then edit and save as a new workout.
+          </p>
+        </div>
+        <BlockPicker
+          queueItems={[]}
+          processedItems={processedItems}
+          selectedBlocks={mergeSelectedBlocks}
+          onSelectionChange={setMergeSelectedBlocks}
+          onCancel={() => {
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+          }}
+          onConfirm={() => {
+            const blocks = mergeSelectedBlocks.map(sel => {
+              const item = processedItems[sel.workoutIndex];
+              return (item?.workout as any)?.blocks?.[sel.blockIndex];
+            }).filter(Boolean);
+
+            if (onMergeWorkouts) {
+              onMergeWorkouts({ title: 'Merged Workout', blocks });
+            }
+            setMergePhase('list');
+            setMergeSelectedBlocks([]);
+            clearSelection();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive opacity-50" />
+        <h3 className="text-xl mb-2">Error Loading Workouts</h3>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={loadWorkouts}>Retry</Button>
+      </div>
+    );
+  }
+
+  // Render empty state
+  if (allWorkouts.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Dumbbell className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-20" />
+        <h3 className="text-xl mb-2">No workouts yet</h3>
+        <p className="text-muted-foreground mb-4">
+          Your saved workouts and follow-along videos will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          data-testid="bulk-delete-modal"
+        >
+          <div className="bg-background p-6 rounded-xl shadow-xl w-[360px] border">
+            <h2
+              className="text-lg font-semibold mb-3"
+              data-testid="bulk-delete-modal-title"
+            >
+              Delete {pendingDeleteIds.length} workout(s)?
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={cancelBulkDelete}
+                data-testid="bulk-delete-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmBulkDelete}
+                data-testid="bulk-delete-confirm"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl mb-1">My Workouts</h2>
+            <p className="text-sm text-muted-foreground">
+              {filteredWorkouts.length} workout{filteredWorkouts.length !== 1 ? 's' : ''}
+              {filteredWorkouts.length !== allWorkouts.length && ` (of ${allWorkouts.length})`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectModeActive && (
+              <>
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all workouts"
+                  className="w-4 h-4"
+                  data-testid="select-all-checkbox"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => handleBulkDeleteClick(selectedIds)}
+                  className="gap-2"
+                  data-testid="bulk-delete-button"
+                >
+                  Delete selected ({selectedIds.length})
+                </Button>
+              </>
+            )}
+            <Button
+              variant={selectModeActive ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleSelectMode}
+              className="gap-1.5"
+              data-testid="select-mode-toggle"
+            >
+              {selectModeActive ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {selectModeActive ? 'Done' : 'Select'}
+            </Button>
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="gap-2"
+              data-testid="view-mode-cards"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Cards
+            </Button>
+            <Button
+              variant={viewMode === 'compact' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('compact')}
+              className="gap-2"
+              data-testid="view-mode-compact"
+            >
+              <List className="w-4 h-4" />
+              Compact
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter Row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPageIndex(0);
+            }}
+            placeholder="Search workouts..."
+            data-assistant-target="search-input"
+            data-testid="workout-search-input"
+            className="h-8 w-48 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          {/* Tag strip filter */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <Button
+              size="sm"
+              variant={tagFilter === null ? 'default' : 'outline'}
+              onClick={() => {
+                setTagFilter(null);
+                setPageIndex(0);
+              }}
+              className="shrink-0"
+              data-testid="tag-all"
+            >
+              All
+            </Button>
+            {availableTags.map((tag) => (
+              <Button
+                key={tag.id}
+                size="sm"
+                variant={tagFilter === tag.name ? 'default' : 'outline'}
+                onClick={() => {
+                  setTagFilter(tag.name);
+                  setPageIndex(0);
+                }}
+                className="shrink-0"
+                data-testid={`tag-${tag.name}`}
+              >
+                {tag.name}
+              </Button>
+            ))}
+          </div>
+          <div className="h-4 border-l mx-1" /> {/* Divider */}
+          <select
+            aria-label="Sort by"
+            value={sortOption}
+            onChange={(e) => {
+              setSortOption(e.target.value as SortOption);
+              setPageIndex(0);
+            }}
+            className="h-8 rounded-md border px-2 text-sm bg-background"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {(tagFilter !== null || searchQuery || sortOption !== 'recently-added') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setTagFilter(null);
+                setSearchQuery('');
+                setSortOption('recently-added');
+                setPageIndex(0);
+              }}
+              className="h-8 text-xs text-muted-foreground"
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs for Library, Programs, History */}
+      <Tabs defaultValue="library" onValueChange={(value) => {
+        if (value === 'history') {
+          loadCompletions();
+        }
+      }}>
+        <TabsList>
+          <TabsTrigger value="library">Library</TabsTrigger>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+
+        {/* Library Tab - Workout cards */}
+        <TabsContent value="library">
+          <ScrollArea className="h-[calc(100vh-280px)]">
+            <div data-assistant-target="library-results" className={viewMode === 'cards' ? 'space-y-2 pr-4 max-w-7xl mx-auto' : 'space-y-1 pr-4 max-w-7xl mx-auto'}>
+              {displayedWorkouts.map((workout) => {
+                const isVideo = workout._original.type === 'follow-along';
+                // Compact view
+                if (viewMode === 'compact') {
+                  return (
+                    <div
+                      key={workout.id}
+                      data-testid={`workout-item-${workout.id}`}
+                      className={`flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors group ${
+                        selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40' : ''
+                      }`}
+                    >
+                      {selectModeActive && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(workout.id)}
+                          onChange={() => toggleSelectId(workout.id)}
+                          aria-label="Select workout"
+                          className="w-4 h-4 flex-shrink-0"
+                          data-testid={`workout-checkbox-${workout.id}`}
+                        />
+                      )}
+                      {/* Thumbnail for video workouts */}
+                      {isVideo && workout.thumbnailUrl && (
+                        <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-muted">
+                          <img
+                            src={workout.thumbnailUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-semibold truncate">{workout.title}</h3>
+                          {isVideo ? (
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <Video className="w-3 h-3" />
+                              Video
+                            </Badge>
+                          ) : (
+                            <SyncStatusIndicator workout={workout} />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatDate(workout.createdAt)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {getSourceIcon(workout)}
+                            <span className="capitalize">{getSourceLabel(workout)}</span>
+                          </span>
+                          <span>{workout.exerciseCount} exercises</span>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0">
+                            {CATEGORY_DISPLAY_NAMES[workout.category]}
+                          </Badge>
+                          {/* Tags */}
+                          {workout.tags.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {workout.tags.slice(0, 3).map((tagName) => {
+                                const tag = availableTags.find((t) => t.name === tagName);
+                                return (
+                                  <TagPill
+                                    key={tagName}
+                                    name={tagName}
+                                    color={tag?.color}
+                                    size="sm"
+                                  />
+                                );
+                              })}
+                              {workout.tags.length > 3 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{workout.tags.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {/* Tag editor */}
+                        <WorkoutTagsEditor
+                          workoutId={workout.id}
+                          profileId={profileId}
+                          currentTags={workout.tags}
+                          onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
+                        />
+                        {onExportWorkout && isHistoryWorkout(workout) && (
+                          <ExportPopoverButton
+                            workoutId={workout.id}
+                            historyItem={workout._original.data}
+                            onExportWorkout={onExportWorkout}
+                            size="icon"
+                          />
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleFavoriteToggle(workout, e)}
+                          className="h-8 w-8 p-0"
+                          aria-label={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Star
+                            className={`w-4 h-4 ${
+                              workout.isFavorite
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-muted-foreground hover:text-yellow-400'
+                            }`}
+                          />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleView(workout)}
+                          className="h-8 w-8 p-0"
+                          aria-label="View workout"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEdit(workout)}
+                          className="h-8 w-8 p-0"
+                          aria-label="Edit workout"
+                          data-testid={`workout-edit-${workout.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        {!isVideo && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleLoad(workout)}
+                            className="h-8 w-8 p-0"
+                            aria-label="Load workout"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {isVideo && workout.sourceUrl && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => window.open(workout.sourceUrl, '_blank')}
+                            className="h-8 w-8 p-0"
+                            aria-label="Open video source"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              aria-label="Export workout"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              CSV (Strong/Hevy)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              CSV (Extended)
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
+                              <Activity className="w-4 h-4 mr-2" />
+                              FIT (Garmin)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              TCX
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Text (TrainingPeaks)
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              PDF
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {onAddToCalendar && (
+                          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={() => onAddToCalendar(workout._original)}>
+                            <CalendarDays className="w-4 h-4" />
+                            Add to Calendar
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteClick(workout.id)}
+                          disabled={deletingId === workout.id}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          aria-label="Delete workout"
+                          data-testid={`workout-delete-${workout.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Card view
+                return (
+                  <div key={workout.id} className="relative">
+                    {selectModeActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectId(workout.id);
+                        }}
+                        className="absolute top-3 left-3 z-10"
+                        aria-label={selectedIds.includes(workout.id) ? 'Deselect workout' : 'Select workout'}
+                        data-testid={`workout-checkbox-${workout.id}`}
+                      >
+                        <div className={cn(
+                          'w-5 h-5 rounded border-2 flex items-center justify-center bg-background',
+                          selectedIds.includes(workout.id)
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground'
+                        )}>
+                          {selectedIds.includes(workout.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                        </div>
+                      </button>
+                    )}
+                  <Card
+                    data-testid={`workout-item-${workout.id}`}
+                    className={`hover:shadow-md transition-all border-border/50 bg-card ${
+                      selectedIds.includes(workout.id) ? 'bg-muted/40 border-primary/40 shadow-sm' : ''
+                    }`}
+                  >
+                    <CardHeader className="pb-3 px-4 pt-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* inline checkbox replaced by overlay button in select mode */}
+                        {/* Thumbnail for video workouts */}
+                        {isVideo && workout.thumbnailUrl && (
+                          <div className="w-24 h-16 rounded overflow-hidden flex-shrink-0 bg-muted">
+                            <img
+                              src={workout.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                              {workout.category === 'strength' ? <Dumbbell className="w-4 h-4 text-primary" /> :
+                               workout.category === 'cardio' ? <Activity className="w-4 h-4 text-blue-500" /> :
+                               workout.category === 'hyrox' ? <Activity className="w-4 h-4 text-red-500" /> :
+                               workout.category === 'mobility' ? <Activity className="w-4 h-4 text-green-500" /> :
+                               <Dumbbell className="w-4 h-4 text-primary" />}
+                            </div>
+                            <CardTitle className="text-lg font-bold truncate text-foreground">
+                              {workout.title}
+                            </CardTitle>
+                          </div>
+                          {/* Completion badge (AMA-891) */}
+                          {(() => {
+                            const workoutCompletions = completions?.filter(
+                              c => c.sourceWorkoutId === workout.id || c.workoutName === workout.title
+                            ) || [];
+                            if (workoutCompletions.length > 0) {
+                              const lastCompletion = workoutCompletions[0];
+                              const lastDate = new Date(lastCompletion.startedAt);
+                              if (isNaN(lastDate.getTime())) {
+                                return (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>Done {workoutCompletions.length}×</span>
+                                  </div>
+                                );
+                              }
+                              const formattedDate = lastDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                              return (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>Done {workoutCompletions.length}× · Last {formattedDate}</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {/* Sync status badge (AMA-891) */}
+                          {(() => {
+                            const syncedDevices = getSyncedDevices(workout.syncStatus);
+                            if (syncedDevices.length > 0) {
+                              return (
+                                <div className="flex items-center gap-1 text-sm text-green-700 dark:text-green-400 font-medium">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>{syncedDevices[0]} ✓</span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <span>Not synced</span>
+                              </div>
+                            );
+                          })()}
+                          <div className="flex flex-wrap items-center gap-3 text-sm">
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Clock className="w-4 h-4" />
+                              <span className="font-medium">{formatDate(workout.createdAt)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              {getSourceIcon(workout)}
+                              <span className="font-medium capitalize">{getSourceLabel(workout)}</span>
+                            </div>
+                            <div className="text-muted-foreground">
+                              <span className="font-medium">{workout.exerciseCount}</span> exercises
+                            </div>
+                            {workout.durationSec > 0 && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-medium">{Math.round(workout.durationSec / 60)}min</span>
+                              </div>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {CATEGORY_DISPLAY_NAMES[workout.category]}
+                            </Badge>
+                          </div>
+                          {/* Tags */}
+                          {workout.tags.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-2">
+                              {workout.tags.slice(0, 5).map((tagName) => {
+                                const tag = availableTags.find((t) => t.name === tagName);
+                                return (
+                                  <TagPill
+                                    key={tagName}
+                                    name={tagName}
+                                    color={tag?.color}
+                                    size="sm"
+                                  />
+                                );
+                              })}
+                              {workout.tags.length > 5 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{workout.tags.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          {isVideo ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <Video className="w-3 h-3" />
+                              Video
+                            </Badge>
+                          ) : (() => {
+                            const syncedDevices = getSyncedDevices(workout.syncStatus);
+                            if (syncedDevices.length > 0) {
+                              return (
+                                <Badge variant="default" className="bg-green-600 hover:bg-green-700 gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {syncedDevices[0]} ✓
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge variant="outline" className="font-medium">Not synced</Badge>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 pt-0 border-t bg-muted/20">
+                      <div className="flex items-center justify-between gap-3 pt-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => handleFavoriteToggle(workout, e)}
+                            className="h-9 w-9 p-0"
+                            title={workout.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                          >
+                            <Star
+                              className={`w-5 h-5 ${
+                                workout.isFavorite
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-muted-foreground hover:text-yellow-400'
+                              }`}
+                            />
+                          </Button>
+                          <WorkoutTagsEditor
+                            workoutId={workout.id}
+                            profileId={profileId}
+                            currentTags={workout.tags}
+                            onTagsUpdate={(tags) => handleTagsUpdate(workout.id, tags)}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleView(workout)}
+                            className="gap-2 h-9 font-medium"
+                          >
+                            <Eye className="w-4 h-4" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEdit(workout)}
+                            className="gap-2 h-9 font-medium"
+                            data-testid={`workout-edit-${workout.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                            Edit
+                          </Button>
+                          {!isVideo && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleLoad(workout)}
+                              className="gap-2 h-9 font-medium"
+                            >
+                              Load
+                            </Button>
+                          )}
+                          {isVideo && workout.sourceUrl && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(workout.sourceUrl, '_blank')}
+                              className="gap-2 h-9 font-medium"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              Open Video
+                            </Button>
+                          )}
+                          {onExportWorkout && isHistoryWorkout(workout) && (
+                            <ExportPopoverButton
+                              workoutId={workout.id}
+                              historyItem={workout._original.data}
+                              onExportWorkout={onExportWorkout}
+                              size="labeled"
+                            />
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 h-9 font-medium"
+                              >
+                                <Download className="w-4 h-4" />
+                                Export
+                                <ChevronDown className="w-3 h-3 ml-1" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'strong')}>
+                                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                CSV (Strong/Hevy compatible)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCsvExport(workout, 'extended')}>
+                                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                CSV (Extended for spreadsheets)
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'fit')}>
+                                <Activity className="w-4 h-4 mr-2" />
+                                FIT (Garmin)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'tcx')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                TCX
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'text')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Text (TrainingPeaks)
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'json')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                JSON
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApiExport(workout, 'pdf')}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                PDF
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {onAddToCalendar && (
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => onAddToCalendar(workout._original)}>
+                              <CalendarDays className="w-4 h-4" />
+                              Add to Calendar
+                            </Button>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteClick(workout.id)}
+                          disabled={deletingId === workout.id}
+                          className="h-9 gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 font-medium"
+                          data-testid={`workout-delete-${workout.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {deletingId === workout.id ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
+            <div>
+              Showing {filteredWorkouts.length === 0 ? 0 : pageStart + 1} –{' '}
+              {Math.min(pageStart + PAGE_SIZE, filteredWorkouts.length)} of{' '}
+              {filteredWorkouts.length} workout{filteredWorkouts.length === 1 ? '' : 's'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex === 0}
+                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              >
+                Previous
+              </Button>
+              <span>
+                Page {currentPageIndex + 1} of {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPageIndex >= totalPages - 1}
+                onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Programs Tab */}
+        <TabsContent value="programs">
+          <ProgramsSection
+            profileId={profileId}
+            workouts={allWorkouts}
+            onLoadWorkout={handleLoadUnified}
+            onViewProgram={onViewProgram}
+            onAddToCalendar={() => {
+              if (onNavigate) onNavigate('calendar');
+            }}
+          />
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history">
+          <div className="pr-4 max-w-7xl mx-auto" data-testid="activity-history">
+            <ActivityHistory
+              completions={completions}
+              loading={completionsLoading}
+              onLoadMore={loadMoreCompletions}
+              hasMore={completions.length < completionsTotal}
+              onCompletionClick={setSelectedCompletionId}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && handleDeleteCancel()}>
+        <AlertDialogContent data-testid="delete-confirmation-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="delete-confirmation-title">Delete Workout</AlertDialogTitle>
+            <AlertDialogDescription data-testid="delete-confirmation-description">
+              Are you sure you want to delete this workout? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={handleDeleteCancel}
+              disabled={!!deletingId}
+              data-testid="delete-confirmation-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={!!deletingId}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="delete-confirmation-confirm"
+            >
+              {deletingId ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View Workout Modal */}
+      {viewingWorkout && (
+        <ViewWorkout
+          workout={viewingWorkout}
+          onClose={() => setViewingWorkout(null)}
+          onEdit={() => {
+            const unified = allWorkouts.find((w) => w.id === viewingWorkout.id);
+            if (unified) pendingEditRef.current = unified;
+            setViewingWorkout(null);
+          }}
+        />
+      )}
+
+      {/* Edit Workout Sheet */}
+      {editingWorkout && (
+        <WorkoutEditSheet
+          workout={editingWorkout}
+          open={true}
+          onClose={() => setEditingWorkout(null)}
+          onSaved={(updated) => {
+            setAllWorkouts((prev) =>
+              prev.map((w) => (w.id === updated.id ? { ...w, title: updated.title } : w))
+            );
+            setEditingWorkout(null);
+          }}
+        />
+      )}
+
+      {/* Completion Detail Modal */}
+      {selectedCompletionId && (
+        <CompletionDetailView
+          completionId={selectedCompletionId}
+          onClose={() => setSelectedCompletionId(null)}
+        />
+      )}
+
+      {/* Tag Management Modal */}
+      <TagManagementModal
+        isOpen={showTagManagement}
+        onClose={() => setShowTagManagement(false)}
+        profileId={profileId}
+        onTagsChange={loadTags}
+      />
+
+      {/* Select Mode Action Bar */}
+      {selectModeActive && (
+        <SelectActionBar
+          selectedCount={selectedIds.length}
+          onCancel={clearSelection}
+          onExport={handleBatchExport}
+          onMerge={() => setMergePhase('block-picker')}
+        />
+      )}
+    </div>
+  );
+}

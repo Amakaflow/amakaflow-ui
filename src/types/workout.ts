@@ -1,7 +1,75 @@
 // API Request/Response Types matching the actual backend
 
 // AMA-213: Workout type detection
-export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'follow_along' | 'mixed';
+export type WorkoutType = 'strength' | 'circuit' | 'hiit' | 'cardio' | 'running' | 'yoga' | 'follow_along' | 'mixed';
+
+// AMA-53 & AMA-54: Extended workout categories
+export type WorkoutCategory =
+  | 'strength'
+  | 'cardio'
+  | 'hiit'
+  | 'yoga'
+  | 'pilates'
+  | 'cycling'
+  | 'running'
+  | 'swimming'
+  | 'mobility'
+  | 'crossfit'
+  | 'bodyweight'
+  | 'powerlifting'
+  | 'olympic_lifting'
+  | 'functional'
+  | 'sport_specific'
+  | 'other';
+
+// AMA-54: Platform-specific export types
+export type ExportPlatform = 'garmin' | 'apple' | 'android' | 'zwift' | 'generic';
+
+export type ExportFormat = 'fit' | 'json' | 'yaml' | 'zwo' | 'plist';
+
+/** Maps export platforms to their supported formats */
+export const PLATFORM_EXPORT_FORMATS: Record<ExportPlatform, ExportFormat[]> = {
+  garmin: ['fit', 'json'],
+  apple: ['plist', 'json'],
+  android: ['json'],
+  zwift: ['zwo', 'json'],
+  generic: ['json', 'yaml'],
+};
+
+/** Display names for workout categories */
+export const WORKOUT_CATEGORY_LABELS: Record<WorkoutCategory, string> = {
+  strength: 'Strength',
+  cardio: 'Cardio',
+  hiit: 'HIIT',
+  yoga: 'Yoga',
+  pilates: 'Pilates',
+  cycling: 'Cycling',
+  running: 'Running',
+  swimming: 'Swimming',
+  mobility: 'Mobility',
+  crossfit: 'CrossFit',
+  bodyweight: 'Bodyweight',
+  powerlifting: 'Powerlifting',
+  olympic_lifting: 'Olympic Lifting',
+  functional: 'Functional',
+  sport_specific: 'Sport Specific',
+  other: 'Other',
+};
+
+/** Maps WorkoutType to WorkoutCategory */
+export function workoutTypeToCategory(type: WorkoutType): WorkoutCategory {
+  switch (type) {
+    case 'strength': return 'strength';
+    case 'circuit': return 'hiit';
+    case 'hiit': return 'hiit';
+    case 'cardio': return 'cardio';
+    case 'running': return 'running';
+    case 'yoga': return 'yoga';
+    case 'follow_along': return 'other';
+    case 'mixed': return 'other';
+    default: return 'other';
+  }
+}
 
 export interface WorkoutTypeDetection {
   type: WorkoutType;
@@ -23,6 +91,7 @@ export interface WorkoutSettings {
     activity: WarmupActivity;
     durationSec: number;
   };
+  autoAddPeriods?: boolean;            // AMA-205: Auto-add warm-up, rest, cooldown for strength workouts
 }
 
 export interface Exercise {
@@ -36,6 +105,7 @@ export interface Exercise {
   rest_type?: RestType; // How rest is triggered: 'timed' (default) or 'button'
   distance_m: number | null;
   distance_range: string | null;
+  calories?: number | null; // Calorie target (e.g. rowing machine, ski erg measured in cals)
   type: 'strength' | 'cardio' | 'HIIT' | 'interval' | string;
   followAlongUrl?: string | null; // Instagram, TikTok, YouTube, or any video URL for this exercise
   notes?: string | null;
@@ -45,9 +115,18 @@ export interface Exercise {
   // Warm-up sets are lighter preparatory sets performed before working sets
   warmup_sets?: number | null;      // Number of warm-up sets (e.g., 1, 2, 3)
   warmup_reps?: number | null;      // Reps per warm-up set (may differ from working reps)
+
+  // AMA-729: Multi-metric modifiers
+  time_cap_sec?: number | null;     // Time cap for distance/calories exercises (e.g., 5min cap for 1000m)
+
+  // AMA-182: Ladder/Pyramid rep patterns
+  pattern?: RepPattern;             // Rep pattern for this exercise (default: 'standard')
 }
 
-export type WorkoutStructureType = 
+// AMA-182: Rep pattern types for ladder/pyramid workouts
+export type RepPattern = 'standard' | 'ascending' | 'descending' | 'pyramid';
+
+export type WorkoutStructureType =
   | 'superset'    // 2 exercises back to back, no rest between, rest after pair
   | 'circuit'     // Multiple exercises back to back, no rest between, rest after circuit
   | 'tabata'      // Work/rest intervals (typically 20s work, 10s rest)
@@ -56,7 +135,9 @@ export type WorkoutStructureType =
   | 'for-time'    // Complete as fast as possible
   | 'rounds'      // Fixed number of rounds
   | 'sets'        // Fixed number of sets with rest between
-  | 'regular';    // Standard workout with rest between exercises
+  | 'regular'     // Standard workout with rest between exercises
+  | 'warmup'      // Warm-up block (activity + duration)
+  | 'cooldown';   // Cool-down block (activity + duration)
 
 export interface Block {
   id?: string; // Unique ID for drag-and-drop stability
@@ -127,6 +208,9 @@ export interface WorkoutStructure {
   // AMA-213: Workout type detection from LLM
   workout_type?: WorkoutType | null;
   workout_type_confidence?: number | null;
+  // AMA-53/54: Extended category and platform metadata
+  category?: WorkoutCategory | null;
+  target_platform?: ExportPlatform | null;
   // For bulk imports (e.g., Pinterest multi-day plans)
   _bulkWorkouts?: WorkoutStructure[];
   _provenance?: {

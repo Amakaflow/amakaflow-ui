@@ -63,6 +63,8 @@ function SortableExerciseCard({
     const parts: string[] = [];
     if (exercise.reps) {
       parts.push(`${exercise.reps}`);
+    } else if (exercise.calories) {
+      parts.push(`${exercise.calories} cal`);
     } else if (exercise.distance_m) {
       parts.push(`${exercise.distance_m}m`);
     } else if (exercise.duration_sec) {

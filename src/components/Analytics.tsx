@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { TrendingUp, Dumbbell, Clock, Target, Watch, Bike } from 'lucide-react';
 import { WorkoutHistoryItem, getWorkoutStats } from '../lib/workout-history';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 
 type Props = {
   user: {
@@ -154,7 +154,7 @@ export function Analytics({ user, history }: Props) {
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
-                <YAxis />
+                <YAxis allowDecimals={false} tickCount={5} domain={[0, (max: number) => Math.max(Math.ceil(max), 1)]} />
                 <Tooltip />
                 <Bar dataKey="workouts" fill="#0ea5e9" />
               </BarChart>
@@ -176,16 +176,17 @@ export function Analytics({ user, history }: Props) {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    nameKey="name"
                   >
                     {deviceData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -207,7 +208,7 @@ export function Analytics({ user, history }: Props) {
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="week" />
-              <YAxis />
+              <YAxis allowDecimals={false} tickCount={5} domain={[0, (max: number) => Math.max(Math.ceil(max), 1)]} />
               <Tooltip />
               <Line type="monotone" dataKey="workouts" stroke="#8b5cf6" strokeWidth={2} />
             </LineChart>

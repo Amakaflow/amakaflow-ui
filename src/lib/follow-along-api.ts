@@ -1,6 +1,7 @@
 import { ENABLE_GARMIN_DEBUG } from './env';
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 import type {
   FollowAlongWorkout,
   IngestFollowAlongRequest,
@@ -112,7 +113,7 @@ export async function createFollowAlongManual(params: {
  * @deprecated userId parameter is no longer used - user is identified via JWT
  */
 export async function listFollowAlong(_userId?: string): Promise<ListFollowAlongResponse> {
-
+  if (isDemoMode) return { items: [] };
   const response = await authenticatedFetch(`${MAPPER_API_BASE_URL}/follow-along`);
   
   if (!response.ok) {

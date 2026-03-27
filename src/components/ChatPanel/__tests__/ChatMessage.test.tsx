@@ -81,7 +81,7 @@ describe('ChatMessage', () => {
     const tc: ChatToolCall[] = [{ id: 'tc1', name: 'search_workouts', status: 'running' }];
     render(<ChatMessage message={assistantMsg('', { tool_calls: tc })} />);
     expect(screen.getByTestId('chat-tool-call')).toBeInTheDocument();
-    expect(screen.getByText('search_workouts')).toBeInTheDocument();
+    expect(screen.getByText('Searching exercises')).toBeInTheDocument();
   });
 
   it('shows spinner for status=running', () => {

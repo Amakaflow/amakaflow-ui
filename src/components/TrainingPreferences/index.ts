@@ -1,0 +1,1 @@
+export { TrainingPreferencesPage } from './TrainingPreferencesPage';

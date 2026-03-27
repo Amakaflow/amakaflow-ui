@@ -51,7 +51,7 @@ export function ChatPanel() {
         <button
           onClick={togglePanel}
           className={cn(
-            'fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95',
+            'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95',
             // Mobile: bottom-right for right-thumb reach
             // Desktop: bottom-left to not conflict with panel
             isMobile ? 'bottom-4 right-4' : 'bottom-6 left-6'
@@ -74,7 +74,7 @@ export function ChatPanel() {
       {/* Desktop: Right-side panel (fixed 380px width) */}
       {!isMobile && state.isOpen && (
         <div
-          className="fixed z-50 flex flex-col overflow-hidden bg-card shadow-xl border-l animate-in slide-in-from-right duration-300"
+          className="fixed z-[60] flex flex-col overflow-hidden bg-card shadow-xl border-l animate-in slide-in-from-right duration-300"
           style={{
             top: 0,
             right: 0,

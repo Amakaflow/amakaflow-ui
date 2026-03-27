@@ -89,7 +89,7 @@ export const initialProgramWizardState: ProgramWizardState = {
   experienceLevel: null,
   durationWeeks: 8,
   sessionsPerWeek: 3,
-  preferredDays: [],
+  preferredDays: ['monday', 'wednesday', 'friday'],
   timePerSession: 60,
   equipmentPreset: null,
   useCustomEquipment: false,

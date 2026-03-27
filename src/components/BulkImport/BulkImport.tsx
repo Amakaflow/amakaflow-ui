@@ -95,7 +95,7 @@ function BulkImportContent({
   onViewPrograms,
   initialInputType,
 }: BulkImportProps) {
-  const { state, goNext, goBack, canGoNext, canGoBack, reset, setInputType } = useBulkImport();
+  const { state, dispatch, goNext, goBack, canGoNext, canGoBack, reset, setInputType } = useBulkImport();
   const { executeImport } = useBulkImportApi({ userId });
 
   // Set initial input type on mount
@@ -182,7 +182,16 @@ function BulkImportContent({
           )}
 
           {state.step === 'map' && (
-            <MapStep userId={userId} />
+            <MapStep
+              userId={userId}
+              columns={state.mappings.columns}
+              patterns={state.mappings.patterns}
+              loading={state.loading}
+              onApply={(columns) => {
+                dispatch({ type: 'SET_COLUMN_MAPPINGS', columns, patterns: state.mappings.patterns });
+                goNext();
+              }}
+            />
           )}
 
           {state.step === 'match' && (

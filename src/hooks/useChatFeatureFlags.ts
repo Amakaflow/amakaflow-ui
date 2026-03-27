@@ -75,8 +75,10 @@ export function useChatFeatureFlags(): UseChatFeatureFlagsResult {
         // chat_enabled: env var kills it, otherwise check DB
         chat_enabled: CHAT_ENABLED && parseJsonbValue(dbFlags.chat_enabled, DEFAULT_CHAT_FLAGS.chat_enabled),
 
-        // chat_beta_period: env var or DB
-        chat_beta_period: CHAT_BETA_PERIOD || parseJsonbValue(dbFlags.chat_beta_period, DEFAULT_CHAT_FLAGS.chat_beta_period),
+        // chat_beta_period: explicit env var overrides DB, otherwise use DB/default
+        chat_beta_period: import.meta.env.VITE_CHAT_BETA_PERIOD !== undefined
+          ? CHAT_BETA_PERIOD
+          : parseJsonbValue(dbFlags.chat_beta_period, DEFAULT_CHAT_FLAGS.chat_beta_period),
 
         // chat_beta_access: DB user flag > Clerk metadata > default
         chat_beta_access:

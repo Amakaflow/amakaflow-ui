@@ -31,6 +31,9 @@ export type WorkoutHistoryItem = {
     android?: SyncStatusEntry;
     garmin?: SyncStatusEntry;
   };
+  // AMA-904: Export tracking fields
+  exported_at?: string;
+  exported_to_device?: string;
 };
 
 const LEGACY_HISTORY_KEY = 'amakaflow_workout_history';
@@ -373,7 +376,7 @@ export async function deleteWorkoutFromHistory(
  */
 export async function clearWorkoutHistory(): Promise<void> {
   try {
-    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(getHistoryKey());
   } catch (err) {
     console.error('Failed to clear workout history:', err);
   }
@@ -406,7 +409,7 @@ export async function clearAllWorkoutHistory(profileId?: string): Promise<boolea
     }
 
     try {
-      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(getHistoryKey());
       console.log('[clearAllWorkoutHistory] Cleared localStorage');
     } catch (err) {
       console.error('[clearAllWorkoutHistory] Error clearing localStorage:', err);

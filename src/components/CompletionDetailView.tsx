@@ -169,31 +169,67 @@ interface HeartRateGraphProps {
 }
 
 function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
-  const { path } = useMemo(() => {
+  const { path, minBpm, maxBpmVal, avgBpm, avgX, avgY, maxX, maxY } = useMemo(() => {
     if (!samples || samples.length < 2) {
-      return { path: '' };
+      return { path: '', minBpm: 0, maxBpmVal: 0, avgBpm: 0, avgX: 0, avgY: 0, maxX: 0, maxY: 0 };
     }
 
     const sortedSamples = [...samples].sort((a, b) => a.t - b.t);
     const bpmValues = sortedSamples.map((s) => s.bpm);
-    const minBpm = Math.min(...bpmValues) - 10;
-    const maxBpmVal = Math.max(...bpmValues) + 10;
+    const minBpm = Math.floor(Math.min(...bpmValues) / 10) * 10 - 10;
+    const maxBpmVal = Math.ceil(Math.max(...bpmValues) / 10) * 10 + 10;
     const bpmRange = maxBpmVal - minBpm;
+
+    // Calculate average BPM
+    const avgBpm = Math.round(bpmValues.reduce((sum, v) => sum + v, 0) / bpmValues.length);
 
     const width = 100;
     const height = 60;
+    const xOffset = 15; // Space for Y-axis labels
     const timeRange = sortedSamples[sortedSamples.length - 1].t - sortedSamples[0].t;
 
     const points = sortedSamples.map((sample, i) => {
       const x = timeRange > 0
-        ? ((sample.t - sortedSamples[0].t) / timeRange) * width
-        : (i / (sortedSamples.length - 1)) * width;
+        ? xOffset + ((sample.t - sortedSamples[0].t) / timeRange) * width
+        : xOffset + (i / (sortedSamples.length - 1)) * width;
       const y = height - ((sample.bpm - minBpm) / bpmRange) * height;
       return `${x},${y}`;
     });
 
+    // Calculate positions for avg and max annotations (find closest points in time)
+    const avgTime = sortedSamples[0].t + (sortedSamples[sortedSamples.length - 1].t - sortedSamples[0].t) / 2;
+    const { sample: avgSample, index: avgIndex } = sortedSamples.reduce(
+      (best, curr, idx) => Math.abs(curr.t - avgTime) < Math.abs(best.sample.t - avgTime)
+        ? { sample: curr, index: idx }
+        : best,
+      { sample: sortedSamples[0], index: 0 }
+    );
+    const avgX = timeRange > 0
+      ? xOffset + ((avgSample.t - sortedSamples[0].t) / timeRange) * width
+      : xOffset + (avgIndex / (sortedSamples.length - 1)) * width;
+    const avgY = height - ((avgBpm - minBpm) / bpmRange) * height;
+
+    // Find max HR sample
+    const { sample: maxSample, index: maxIndex } = sortedSamples.reduce(
+      (best, curr, idx) => curr.bpm > best.sample.bpm
+        ? { sample: curr, index: idx }
+        : best,
+      { sample: sortedSamples[0], index: 0 }
+    );
+    const maxX = timeRange > 0
+      ? xOffset + ((maxSample.t - sortedSamples[0].t) / timeRange) * width
+      : xOffset + (maxIndex / (sortedSamples.length - 1)) * width;
+    const maxY = height - ((maxSample.bpm - minBpm) / bpmRange) * height;
+
     return {
       path: `M ${points.join(' L ')}`,
+      minBpm,
+      maxBpmVal,
+      avgBpm,
+      avgX,
+      avgY,
+      maxX,
+      maxY,
     };
   }, [samples]);
 
@@ -209,7 +245,28 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
     <div className="bg-slate-800 rounded-lg p-4">
       {/* Graph */}
       <div className="h-16 mb-2">
-        <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="none">
+        <svg viewBox="0 0 130 60" className="w-full h-full" preserveAspectRatio="none">
+          {/* Y-axis labels */}
+          <text x="2" y="8" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
+            {maxBpmVal}
+          </text>
+          <text x="2" y="34" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
+            {avgBpm}
+          </text>
+          <text x="2" y="58" fill="#94a3b8" fontSize={5} fontFamily="system-ui">
+            {minBpm}
+          </text>
+          
+          {/* Y-axis line */}
+          <line x1="12" y1="2" x2="12" y2="58" stroke="#475569" strokeWidth="0.5" />
+          
+          {/* X-axis line */}
+          <line x1="12" y1="58" x2="128" y2="58" stroke="#475569" strokeWidth="0.5" />
+          
+          {/* Unit label (bpm) */}
+          <text x="14" y="6" fill="#64748b" fontSize={4} fontFamily="system-ui">bpm</text>
+          
+          {/* Heart rate path */}
           <path
             d={path}
             fill="none"
@@ -219,17 +276,29 @@ function HeartRateGraph({ samples, avgHR, maxHR }: HeartRateGraphProps) {
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
           />
+          
+          {/* AVG point annotation */}
+          <circle cx={avgX} cy={avgY} r="2" fill="#f97316" />
+          <text x={avgX + 3} y={avgY + 1} fill="#f97316" fontSize={4} fontFamily="system-ui" fontWeight="600">
+            {avgBpm}
+          </text>
+          
+          {/* MAX point annotation */}
+          <circle cx={maxX} cy={maxY} r="2" fill="#f97316" />
+          <text x={maxX + 3} y={maxY + 1} fill="#f97316" fontSize={4} fontFamily="system-ui" fontWeight="600">
+            {maxHR}
+          </text>
         </svg>
       </div>
       {/* Stats */}
       <div className="flex justify-between text-sm">
         <span className="text-slate-300">
           <span className="text-white font-semibold">{avgHR || '--'}</span>{' '}
-          <span className="text-slate-400">AVG</span>
+          <span className="text-slate-400">bpm AVG</span>
         </span>
         <span className="text-slate-300">
           <span className="text-white font-semibold">{maxHR || '--'}</span>{' '}
-          <span className="text-slate-400">MAX</span>
+          <span className="text-slate-400">bpm MAX</span>
         </span>
       </div>
     </div>
@@ -438,7 +507,7 @@ function ExercisesTable({ intervals }: ExercisesTableProps) {
       {/* Table Header */}
       <div className="flex items-center py-3 px-4 bg-muted/30 text-xs text-muted-foreground uppercase tracking-wider border-b">
         <div style={{ width: 48 }}></div>
-        <div style={{ flex: 1 }}>SET # OLLB</div>
+        <div style={{ flex: 1 }}>Exercise</div>
         <div style={{ width: 70 }} className="text-center">SET</div>
         <div style={{ width: 80 }} className="text-center">Reps</div>
         <div style={{ width: 70 }} className="text-center">TIME</div>

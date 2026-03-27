@@ -19,10 +19,10 @@ export function ExperienceStep() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-xl font-semibold text-foreground">
           What&apos;s your experience level?
         </h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           We&apos;ll adjust exercise complexity and volume accordingly
         </p>
       </div>
@@ -41,16 +41,16 @@ export function ExperienceStep() {
               className={cn(
                 'flex items-center gap-4 w-full p-4 rounded-lg border-2 text-left transition-colors',
                 isSelected
-                  ? 'border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800'
-                  : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600'
+                  ? 'border-primary bg-secondary'
+                  : 'border-border hover:border-primary'
               )}
             >
               <div
                 className={cn(
                   'flex items-center justify-center w-12 h-12 rounded-lg',
                   isSelected
-                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
                 )}
               >
                 <Icon className="w-6 h-6" />
@@ -58,26 +58,23 @@ export function ExperienceStep() {
               <div className="flex-1 min-w-0">
                 <div
                   className={cn(
-                    'font-medium',
-                    isSelected
-                      ? 'text-zinc-900 dark:text-zinc-100'
-                      : 'text-zinc-700 dark:text-zinc-300'
+                    'font-medium text-foreground'
                   )}
                 >
                   {label}
                 </div>
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">{description}</div>
+                <div className="text-sm text-muted-foreground">{description}</div>
               </div>
               <div
                 className={cn(
                   'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
                   isSelected
-                    ? 'border-zinc-900 dark:border-zinc-100'
-                    : 'border-zinc-300 dark:border-zinc-600'
+                    ? 'border-primary'
+                    : 'border-gray-300'
                 )}
               >
                 {isSelected && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary" />
                 )}
               </div>
             </button>

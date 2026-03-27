@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import {
   Calendar,
+  CalendarDays,
   Clock,
   Dumbbell,
   Eye,
@@ -43,7 +44,8 @@ import { STATUS_LABELS } from '../../types/training-program';
 interface ProgramCardProps {
   program: TrainingProgram;
   loadingAction?: string;
-  onView: () => void;
+  onViewProgram: (id: string) => void;
+  onAddToCalendar: (program: TrainingProgram) => void;
   onActivate: () => void;
   onPause: () => void;
   onDelete: () => void;
@@ -52,7 +54,8 @@ interface ProgramCardProps {
 export function ProgramCard({
   program,
   loadingAction,
-  onView,
+  onViewProgram,
+  onAddToCalendar,
   onActivate,
   onPause,
   onDelete,
@@ -169,79 +172,11 @@ export function ProgramCard({
     }
   };
 
-  // Render status-specific actions
-  const renderActions = () => {
-    const isLoading = !!loadingAction;
-
-    switch (program.status) {
-      case 'active':
-        return (
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPause();
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={isLoading}
-          >
-            {loadingAction === 'pause' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Pause className="w-3.5 h-3.5" />
-            )}
-            Pause
-          </Button>
-        );
-
-      case 'draft':
-      case 'paused':
-        return (
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onActivate();
-            }}
-            size="sm"
-            className="gap-1.5"
-            disabled={isLoading}
-          >
-            {loadingAction === 'activate' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Play className="w-3.5 h-3.5" />
-            )}
-            Activate
-          </Button>
-        );
-
-      case 'completed':
-        return (
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onView();
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            View
-          </Button>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <>
       <Card
         className="p-4 cursor-pointer hover:bg-muted/50 transition-colors border-l-4 border-l-primary focus:ring-2 focus:ring-primary focus:outline-none"
-        onClick={onView}
+        onClick={() => onViewProgram(program.id)}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         role="button"
@@ -275,7 +210,27 @@ export function ProgramCard({
 
         {/* Actions */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex-1">{renderActions()}</div>
+          <div className="flex-1 flex gap-2">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCalendar(program);
+              }}
+              className="gap-2"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Add to Calendar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewProgram(program.id);
+              }}
+            >
+              View Plan
+            </Button>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -284,7 +239,7 @@ export function ProgramCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onView}>
+              <DropdownMenuItem onClick={() => onViewProgram(program.id)}>
                 <Eye className="w-4 h-4 mr-2" />
                 View Details
               </DropdownMenuItem>

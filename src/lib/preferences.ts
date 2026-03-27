@@ -8,10 +8,12 @@ export type ImageProcessingMethod = 'ocr' | 'vision';
 
 export interface UserPreferences {
   imageProcessingMethod: ImageProcessingMethod;
+  instagramAutoExtract: boolean;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   imageProcessingMethod: 'ocr', // Default to OCR (free)
+  instagramAutoExtract: false,
 };
 
 /**
@@ -55,5 +57,19 @@ export function getImageProcessingMethod(): ImageProcessingMethod {
  */
 export function setImageProcessingMethod(method: ImageProcessingMethod): void {
   savePreferences({ imageProcessingMethod: method });
+}
+
+/**
+ * Get the current Instagram auto-extract preference
+ */
+export function getInstagramAutoExtract(): boolean {
+  return getPreferences().instagramAutoExtract;
+}
+
+/**
+ * Set the Instagram auto-extract preference
+ */
+export function setInstagramAutoExtract(enabled: boolean): void {
+  savePreferences({ instagramAutoExtract: enabled });
 }
 

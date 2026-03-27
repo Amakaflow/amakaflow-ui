@@ -6,6 +6,7 @@
 
 import { authenticatedFetch } from './authenticated-fetch';
 import { API_URLS } from './config';
+import { isDemoMode } from './demo-mode';
 
 // Use centralized API config
 const MAPPER_API_BASE_URL = API_URLS.MAPPER;
@@ -141,6 +142,10 @@ export async function revokePairingTokens(
  * including device info (model, OS version) and when they were paired.
  */
 export async function getPairedDevices(): Promise<PairedDevice[]> {
+  if (isDemoMode) {
+    const { DEMO_PAIRED_DEVICES } = await import('./mock-data/demo-extended');
+    return DEMO_PAIRED_DEVICES;
+  }
   const response = await authenticatedFetch(`${MAPPER_API_BASE_URL}/mobile/pairing/devices`, {
     method: 'GET',
     headers: {

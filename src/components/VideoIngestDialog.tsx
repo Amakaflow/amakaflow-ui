@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,14 +13,17 @@ import {
   saveVideoToCache,
   supportsAutoExtraction,
   getPlatformDisplayName,
+  ingestInstagramReel,
   type VideoPlatform,
   type OEmbedData,
   type CachedVideo,
   type WorkoutStep,
 } from '../lib/video-api';
+import { getInstagramAutoExtract } from '../lib/preferences';
 import { searchExercises, type ExerciseLibraryItem } from '../lib/exercise-library';
 import { ingestFollowAlong, createFollowAlongManual } from '../lib/follow-along-api';
 import { parseDescriptionForExercises, type ParsedExerciseSuggestion } from '../lib/parse-exercises';
+import { authenticatedFetch } from '../lib/authenticated-fetch';
 import { API_URLS } from '../lib/config';
 import type { FollowAlongWorkout } from '../types/follow-along';
 
@@ -73,6 +76,14 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
   const [parsedSuggestions, setParsedSuggestions] = useState<ParsedExerciseSuggestion[]>([]);
   const [isLoadingParse, setIsLoadingParse] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const parseDescriptionRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to Parse Description section when it expands
+  useEffect(() => {
+    if (showDescriptionParser && parseDescriptionRef.current) {
+      parseDescriptionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showDescriptionParser]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -200,15 +211,52 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       }
 
       // Check if auto-extraction is supported
-      if (supportsAutoExtraction(clientPlatform)) {
-        // Use existing auto-extraction flow
+      const instagramAuto = getInstagramAutoExtract();
+      if (supportsAutoExtraction(clientPlatform, instagramAuto)) {
         setStep('extracting');
-        const result = await ingestFollowAlong(normalizedVideoUrl, userId);
-        onWorkoutCreated(result.followAlongWorkout);
-        toast.success('Workout extracted successfully!');
-        onOpenChange(false);
+
+        if (clientPlatform === 'instagram') {
+          // Instagram auto-extraction via Apify (workout-ingestor-api)
+          const reelResult = await ingestInstagramReel(normalizedVideoUrl);
+          // Convert Apify response to editable exercises
+          const mapExercise = (ex: any): ExerciseEntry => ({
+            id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            label: ex.name,
+            duration_sec: ex.duration_sec || 30,
+            target_reps: ex.reps,
+            notes: ex.sets ? `${ex.sets} sets` : undefined,
+          });
+          const extractedExercises: ExerciseEntry[] = (reelResult.blocks || []).flatMap(block => {
+            const regular = (block.exercises || []).map(mapExercise);
+            const fromSupersets = (block.supersets || []).flatMap((ss: any) =>
+              (ss.exercises || []).map(mapExercise)
+            );
+            return [...regular, ...fromSupersets];
+          });
+
+          // Pre-fill title and exercises, then show manual-entry for review
+          setWorkoutTitle(reelResult.title || (reelResult._provenance?.creator
+            ? `Workout by ${reelResult._provenance?.creator}`
+            : 'Instagram Workout'));
+          setExercises(extractedExercises);
+          setStep('manual-entry');
+          setIsLoading(false);
+
+          if (extractedExercises.length > 0) {
+            toast.success(`Apify extracted ${extractedExercises.length} exercises — review and save`);
+          } else {
+            toast.info('No exercises found — add them manually');
+          }
+          return;
+        } else {
+          // YouTube/TikTok/Pinterest — existing flow
+          const result = await ingestFollowAlong(normalizedVideoUrl, userId);
+          onWorkoutCreated(result.followAlongWorkout);
+          toast.success('Workout extracted successfully!');
+          onOpenChange(false);
+        }
       } else {
-        // Instagram - fetch oEmbed and show manual entry
+        // Instagram manual - fetch oEmbed and show manual entry
         setStep('preview');
         try {
           const oembed = await fetchOEmbed(normalizedVideoUrl, clientPlatform);
@@ -373,22 +421,20 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     setIsLoadingParse(true);
     setParseError(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       // Try API first
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(`${API_URLS.INGESTOR}/parse/text`, {
+      const response = await authenticatedFetch(`${API_URLS.INGESTOR}/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: descriptionText,
-          source: 'instagram_caption'
+          source: platform || 'instagram_caption'
         }),
         signal: controller.signal
       });
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -441,9 +487,10 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
         toast.warning(`Offline mode: Found ${localSuggestions.length} exercises (limited parsing)`);
       }
     } finally {
+      clearTimeout(timeoutId);
       setIsLoadingParse(false);
     }
-  }, [descriptionText]);
+  }, [descriptionText, platform]);
 
   // Toggle a parsed suggestion's accepted state
   const handleToggleParsedSuggestion = useCallback((id: string) => {
@@ -882,7 +929,7 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
                 </CardContent>
               </Card>
             ) : (
-              <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+              <Card ref={parseDescriptionRef} className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
                 <CardContent className="pt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium flex items-center gap-1">
@@ -995,9 +1042,9 @@ SA cable row 4x12 + SA DB press 4x8`}
                             <span className="text-xs text-muted-foreground w-4">{i + 1}</span>
                             <span className="flex-1 truncate">{suggestion.label}</span>
                             {/* Show structured data: sets × reps (superset) */}
-                            {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group || suggestion.source === 'local') && (
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
-                                {suggestion.sets && suggestion.reps 
+                            {(suggestion.sets || suggestion.reps || suggestion.distance || suggestion.superset_group) && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                {suggestion.sets && suggestion.reps
                                   ? `${suggestion.sets} × ${suggestion.reps}`
                                   : suggestion.sets && suggestion.distance
                                   ? `${suggestion.sets} × ${suggestion.distance}`
@@ -1005,15 +1052,15 @@ SA cable row 4x12 + SA DB press 4x8`}
                                   ? suggestion.distance
                                   : ''}
                                 {suggestion.superset_group && (
-                                  <span className="text-purple-600 dark:text-purple-400">
+                                  <span className="ml-1 text-purple-600 dark:text-purple-400">
                                     (superset {suggestion.superset_group})
                                   </span>
                                 )}
-                                {suggestion.source === 'local' && (
-                                  <span className="text-amber-600 dark:text-amber-400 text-[10px] font-semibold whitespace-nowrap">
-                                    [offline]
-                                  </span>
-                                )}
+                              </span>
+                            )}
+                            {suggestion.source === 'local' && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                                [offline]
                               </span>
                             )}
                             {suggestion.duration_sec && !suggestion.sets && (

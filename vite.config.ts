@@ -46,6 +46,20 @@ export default defineConfig({
   build: {
     target: 'esnext',
     outDir: 'build',
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        pipeline: 'pipeline.html',
+      },
+      output: {
+        manualChunks: {
+          'vendor-react-router': ['react-router-dom'],
+          'vendor-recharts': ['recharts'],
+          'vendor-sentry': ['@sentry/react', '@sentry/browser'],
+          'vendor-lottie': ['lottie-react'],
+        },
+      },
+    },
   },
   server: {
     port: 3000,

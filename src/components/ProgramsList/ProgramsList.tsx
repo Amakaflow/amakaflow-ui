@@ -10,6 +10,7 @@ import { ProgramsHeader } from './ProgramsHeader';
 import { ProgramsFilterBar, type StatusFilter, type SortBy } from './ProgramsFilterBar';
 import { ProgramCard } from './ProgramCard';
 import { ProgramsEmptyState } from './ProgramsEmptyState';
+import { ProgramsAddMore } from './ProgramsAddMore';
 import { ProgramsLoadingSkeleton } from './ProgramsLoadingSkeleton';
 import { ProgramWizard } from '../ProgramWizard';
 import {
@@ -22,9 +23,10 @@ import type { TrainingProgram, ProgramStatus } from '../../types/training-progra
 interface ProgramsListProps {
   userId: string;
   onViewProgram: (programId: string) => void;
+  onAddToCalendar: (program: TrainingProgram) => void;
 }
 
-export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
+export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: ProgramsListProps) {
   // Data state
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -282,19 +284,23 @@ export function ProgramsList({ userId, onViewProgram }: ProgramsListProps) {
           onViewDrafts={handleViewDrafts}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPrograms.map((program) => (
-            <ProgramCard
-              key={program.id}
-              program={program}
-              loadingAction={loadingActions[program.id]}
-              onView={() => onViewProgram(program.id)}
-              onActivate={() => handleActivate(program.id)}
-              onPause={() => handlePause(program.id)}
-              onDelete={() => handleDelete(program.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPrograms.map((program) => (
+              <ProgramCard
+                key={program.id}
+                program={program}
+                loadingAction={loadingActions[program.id]}
+                onViewProgram={onViewProgram}
+                onAddToCalendar={onAddToCalendar}
+                onActivate={() => handleActivate(program.id)}
+                onPause={() => handlePause(program.id)}
+                onDelete={() => handleDelete(program.id)}
+              />
+            ))}
+          </div>
+          <ProgramsAddMore onCreateProgram={handleCreateProgram} />
+        </>
       )}
 
       {/* Program Generation Wizard */}

@@ -1,0 +1,38 @@
+{
+  "description": "Single Instagram URL produces a complete push workout",
+  "input": {
+    "sources": [{ "type": "url", "content": "https://instagram.com/p/abc123" }]
+  },
+  "mocks": {
+    "ingestor": {
+      "title": "Push Day",
+      "blocks": [
+        {
+          "label": "Main Block",
+          "structure": "regular",
+          "exercises": [
+            { "name": "bench press", "sets": 3, "reps": 10 },
+            { "name": "overhead press", "sets": 3, "reps": 8 }
+          ]
+        }
+      ],
+      "source": "instagram",
+      "workout_type": "strength",
+      "workout_type_confidence": 0.92
+    },
+    "mapper": {
+      "success": true,
+      "matches": [
+        { "original_name": "bench press", "matched_name": "Bench Press", "confidence": 0.97, "garmin_id": "bench_press" },
+        { "original_name": "overhead press", "matched_name": "Overhead Press", "confidence": 0.94, "garmin_id": "overhead_press" }
+      ],
+      "unmapped": []
+    }
+  },
+  "expectedOutput": {
+    "title": "Push Day",
+    "blockCount": 1,
+    "exerciseCount": 2,
+    "unmapped": []
+  }
+}

@@ -9,12 +9,14 @@ import { Source, SourceType, WorkoutStructure } from '../types/workout';
 import { Textarea } from './ui/textarea';
 import { WorkoutTemplates } from './WorkoutTemplates';
 import { getImageProcessingMethod } from '../lib/preferences';
+import { getInstagramAutoExtract } from '../lib/preferences';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { VideoIngestDialog } from './VideoIngestDialog';
 import { useClerkUser } from '../lib/clerk-auth';
+import { isDemoMode, DEMO_USER } from '../lib/demo-mode';
 import type { FollowAlongWorkout } from '../types/follow-along';
 import { toast } from 'sonner';
 
@@ -86,23 +88,42 @@ function VideoInputSection({ currentInput, setCurrentInput, onAddSource }: Video
           ],
           alertText: 'Processing may take 20-30 seconds as video frames are analyzed.',
         };
-      case 'instagram':
-        return {
-          icon: <Instagram className="w-4 h-4 text-purple-600" />,
-          name: 'Instagram',
-          method: 'oEmbed Preview + Manual Exercise Entry',
-          detail: 'Add exercises manually with autocomplete',
-          badge: 'Semi-Manual',
-          badgeColor: 'bg-purple-600',
-          alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
-          alertIconColor: 'text-purple-600 dark:text-purple-400',
-          alertTextColor: 'text-purple-800 dark:text-purple-200',
-          steps: [
-            { label: 'Step 1', text: 'Video thumbnail and metadata fetched via oEmbed' },
-            { label: 'Step 2', text: 'You add exercises manually with autocomplete suggestions' },
-          ],
-          alertText: 'Instagram videos require manual exercise entry. oEmbed provides thumbnail and creator info when available.',
-        };
+      case 'instagram': {
+        const isAutoExtract = getInstagramAutoExtract();
+        return isAutoExtract
+          ? {
+              icon: <Instagram className="w-4 h-4 text-purple-600" />,
+              name: 'Instagram',
+              method: 'Apify Transcript + AI Exercise Extraction',
+              detail: 'Reel transcript extracted via Apify, parsed by GPT-4o-mini',
+              badge: 'AI-Powered',
+              badgeColor: 'bg-purple-600',
+              alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
+              alertIconColor: 'text-purple-600 dark:text-purple-400',
+              alertTextColor: 'text-purple-800 dark:text-purple-200',
+              steps: [
+                { label: 'Step 1', text: 'Reel transcript and metadata fetched via Apify' },
+                { label: 'Step 2', text: 'Exercises extracted from transcript using AI' },
+              ],
+              alertText: 'Requires Apify API token. Pro/Trainer tier only.',
+            }
+          : {
+              icon: <Instagram className="w-4 h-4 text-purple-600" />,
+              name: 'Instagram',
+              method: 'oEmbed Preview + Manual Exercise Entry',
+              detail: 'Add exercises manually with autocomplete',
+              badge: 'Semi-Manual',
+              badgeColor: 'bg-purple-600',
+              alertColor: 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800',
+              alertIconColor: 'text-purple-600 dark:text-purple-400',
+              alertTextColor: 'text-purple-800 dark:text-purple-200',
+              steps: [
+                { label: 'Step 1', text: 'Video thumbnail and metadata fetched via oEmbed' },
+                { label: 'Step 2', text: 'You add exercises manually with autocomplete suggestions' },
+              ],
+              alertText: 'Instagram videos require manual exercise entry. Upgrade to Pro for AI-powered extraction.',
+            };
+      }
       case 'pinterest':
         return {
           icon: <ImageIcon className="w-4 h-4 text-red-500" />,
@@ -363,7 +384,8 @@ Always follow the exact format above. No exceptions.`;
 }
 
 export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, progress, onCancel }: AddSourcesProps) {
-  const { user } = useClerkUser();
+  const { user: clerkUser } = useClerkUser();
+  const user = isDemoMode ? DEMO_USER : clerkUser;
   const [sources, setSources] = useState<Source[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [activeTab, setActiveTab] = useState<string>('video');
@@ -401,8 +423,9 @@ export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, p
         return;
       }
 
-      // Instagram requires manual entry - open VideoIngestDialog
-      if (platform === 'instagram') {
+      // Instagram manual mode: open VideoIngestDialog for semi-manual entry
+      // Instagram auto-extract (Apify): add to sources list like YouTube/TikTok
+      if (platform === 'instagram' && !getInstagramAutoExtract()) {
         setPendingInstagramUrl(currentInput.trim());
         setShowVideoIngestDialog(true);
         setCurrentInput('');
@@ -515,6 +538,8 @@ export function AddSources({ onGenerate, onLoadTemplate, onCreateNew, loading, p
     switch (type) {
       case 'youtube': return <Youtube className="w-4 h-4 text-red-600" />;
       case 'tiktok': return <Music2 className="w-4 h-4 text-pink-600" />;
+      case 'instagram': return <Instagram className="w-4 h-4 text-purple-600" />;
+      case 'pinterest': return <ImageIcon className="w-4 h-4 text-red-500" />;
       case 'image': return <Image className="w-4 h-4" />;
       case 'ai-text': return <Sparkles className="w-4 h-4" />;
       default: return <Video className="w-4 h-4" />;

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { Search, Dumbbell, Loader2 } from 'lucide-react';
+import { Search, Dumbbell, Loader2, Sparkles } from 'lucide-react';
 import { DeviceId } from '../lib/devices';
 import { API_URLS } from '../lib/config';
 
@@ -14,144 +14,147 @@ type Props = {
   device: DeviceId;
 };
 
-interface WgerExercise {
-  id: number;
+interface ExerciseResult {
+  id: string;
   name: string;
-  description_plain: string;
-  category: string | null;
+  aliases: string[];
   primary_muscles: string[];
   secondary_muscles: string[];
   equipment: string[];
-  image_urls: string[];
-  source: string;
+  category: string | null;
+  movement_pattern: string | null;
+  difficulty: string | null;
+  rank: number;
 }
 
-// Mock exercise library - fallback if API fails
-const EXERCISE_LIBRARY: Record<DeviceId, Array<{ name: string; category: string; confidence: number }>> = {
-  garmin: [
-    { name: 'Barbell Back Squat', category: 'Strength', confidence: 0.95 },
-    { name: 'Deadlift', category: 'Strength', confidence: 0.95 },
-    { name: 'Bench Press', category: 'Strength', confidence: 0.95 },
-    { name: 'Pull-ups', category: 'Strength', confidence: 0.90 },
-    { name: 'Overhead Press', category: 'Strength', confidence: 0.90 },
-    { name: 'Romanian Deadlift', category: 'Strength', confidence: 0.85 },
-    { name: 'Lunges', category: 'Strength', confidence: 0.85 },
-    { name: 'Dumbbell Row', category: 'Strength', confidence: 0.85 },
-    { name: 'Bicep Curl', category: 'Strength', confidence: 0.80 },
-    { name: 'Tricep Extension', category: 'Strength', confidence: 0.80 },
-    { name: 'Leg Press', category: 'Strength', confidence: 0.80 },
-    { name: 'Lat Pulldown', category: 'Strength', confidence: 0.80 },
-    { name: 'Running', category: 'Cardio', confidence: 0.95 },
-    { name: 'Cycling', category: 'Cardio', confidence: 0.95 },
-    { name: 'Rowing', category: 'Cardio', confidence: 0.90 },
-    { name: 'Jump Rope', category: 'Cardio', confidence: 0.85 },
-    { name: 'Box Jumps', category: 'Plyometric', confidence: 0.80 },
-    { name: 'Burpees', category: 'Plyometric', confidence: 0.80 },
-    { name: 'Plank', category: 'Core', confidence: 0.90 },
-    { name: 'Russian Twists', category: 'Core', confidence: 0.85 },
-  ],
-  apple: [
-    { name: 'Push-ups', category: 'Strength', confidence: 0.90 },
-    { name: 'Squats', category: 'Strength', confidence: 0.90 },
-    { name: 'Lunges', category: 'Strength', confidence: 0.85 },
-    { name: 'Plank', category: 'Core', confidence: 0.90 },
-    { name: 'Running', category: 'Cardio', confidence: 0.95 },
-    { name: 'Walking', category: 'Cardio', confidence: 0.95 },
-    { name: 'Cycling', category: 'Cardio', confidence: 0.95 },
-    { name: 'Swimming', category: 'Cardio', confidence: 0.90 },
-    { name: 'HIIT', category: 'Cardio', confidence: 0.85 },
-    { name: 'Yoga', category: 'Flexibility', confidence: 0.90 },
-    { name: 'Stretching', category: 'Flexibility', confidence: 0.85 },
-    { name: 'Jump Rope', category: 'Cardio', confidence: 0.85 },
-    { name: 'Burpees', category: 'Plyometric', confidence: 0.80 },
-    { name: 'Mountain Climbers', category: 'Plyometric', confidence: 0.80 },
-  ],
-  zwift: [
-    { name: 'Cycling - Endurance', category: 'Cycling', confidence: 0.95 },
-    { name: 'Cycling - Tempo', category: 'Cycling', confidence: 0.95 },
-    { name: 'Cycling - Threshold', category: 'Cycling', confidence: 0.95 },
-    { name: 'Cycling - VO2 Max', category: 'Cycling', confidence: 0.95 },
-    { name: 'Cycling - Sprint', category: 'Cycling', confidence: 0.95 },
-    { name: 'Running - Easy', category: 'Running', confidence: 0.90 },
-    { name: 'Running - Tempo', category: 'Running', confidence: 0.90 },
-    { name: 'Running - Interval', category: 'Running', confidence: 0.90 },
-    { name: 'Recovery Ride', category: 'Cycling', confidence: 0.85 },
-    { name: 'Hill Climb', category: 'Cycling', confidence: 0.85 },
-  ]
+// Equipment display labels
+const EQUIPMENT_ICONS: Record<string, string> = {
+  barbell: 'Barbell',
+  dumbbell: 'Dumbbell',
+  cable: 'Cable',
+  machine: 'Machine',
+  bodyweight: 'BW',
+  kettlebell: 'KB',
+  resistance_band: 'Band',
+  smith_machine: 'Smith',
+  pull_up_bar: 'Bar',
+  bench: 'Bench',
+  medicine_ball: 'Med Ball',
+  sled: 'Sled',
+};
+
+// Muscle group display labels
+const MUSCLE_LABELS: Record<string, string> = {
+  chest: 'Chest',
+  lats: 'Lats',
+  quadriceps: 'Quads',
+  hamstrings: 'Hamstrings',
+  glutes: 'Glutes',
+  anterior_deltoid: 'Front Delts',
+  lateral_deltoid: 'Side Delts',
+  posterior_deltoid: 'Rear Delts',
+  biceps: 'Biceps',
+  triceps: 'Triceps',
+  core: 'Core',
+  abs: 'Abs',
+  obliques: 'Obliques',
+  calves: 'Calves',
+  traps: 'Traps',
+  rhomboids: 'Rhomboids',
+  forearms: 'Forearms',
+  lower_back: 'Lower Back',
+  shoulders: 'Shoulders',
+  adductors: 'Adductors',
 };
 
 export function ExerciseSearch({ onSelect, onClose, device }: Props) {
   const [search, setSearch] = useState('');
-  const [exercises, setExercises] = useState<WgerExercise[]>([]);
-  const [filteredExercises, setFilteredExercises] = useState<WgerExercise[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState<ExerciseResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [classifying, setClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch exercises from WGER API
+  // Debounced search — 150ms delay, hits local DB (< 50ms response)
+  const searchExercises = useCallback(async (query: string) => {
+    if (!query || query.length < 2) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `${API_URLS.MAPPER}/exercises/search?q=${encodeURIComponent(query)}&limit=15`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setResults(data.results || []);
+    } catch (err: any) {
+      console.warn('Exercise search failed:', err);
+      setError('Search temporarily unavailable');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Debounce search input
   useEffect(() => {
-    const fetchExercises = async () => {
-      try {
-        setLoading(true);
-        // Use centralized API config
-        const API_BASE_URL = API_URLS.INGESTOR;
-        const response = await fetch(`${API_BASE_URL}/exercises/wger`);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch exercises: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        setExercises(data.exercises || []);
-        setError(null);
-      } catch (err: any) {
-        console.warn('Failed to fetch WGER exercises, using fallback:', err);
-        setError('Using limited exercise library');
-        // Fallback to mock data
-        const mockExercises: WgerExercise[] = EXERCISE_LIBRARY[device].map((ex, idx) => ({
-          id: idx,
-          name: ex.name,
-          description_plain: '',
-          category: ex.category,
-          primary_muscles: [],
-          secondary_muscles: [],
-          equipment: [],
-          image_urls: [],
-          source: 'mock'
-        }));
-        setExercises(mockExercises);
-      } finally {
-        setLoading(false);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (!search || search.length < 2) {
+      setResults([]);
+      return;
+    }
+
+    setLoading(true);
+    debounceRef.current = setTimeout(() => {
+      searchExercises(search);
+    }, 150);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
     };
+  }, [search, searchExercises]);
 
-    fetchExercises();
-  }, [device]);
+  // LLM fallback for unknown exercises
+  const classifyExercise = async (name: string) => {
+    try {
+      setClassifying(true);
+      const response = await fetch(`${API_URLS.MAPPER}/exercises/classify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exercise_name: name }),
+      });
 
-  // Filter exercises
-  useEffect(() => {
-    let results = exercises;
-
-    // Filter by category
-    if (selectedCategory) {
-      results = results.filter(e => e.category === selectedCategory);
+      if (response.ok) {
+        // Exercise was classified and cached — just select it
+        onSelect(name);
+      } else {
+        // Even if classification fails, let user add it as custom
+        onSelect(name);
+      }
+    } catch {
+      onSelect(name);
+    } finally {
+      setClassifying(false);
     }
+  };
 
-    // Filter by search
-    if (search) {
-      const searchLower = search.toLowerCase();
-      results = results.filter(e =>
-        e.name.toLowerCase().includes(searchLower) ||
-        e.description_plain.toLowerCase().includes(searchLower) ||
-        e.primary_muscles.some(m => m.toLowerCase().includes(searchLower)) ||
-        e.equipment.some(eq => eq.toLowerCase().includes(searchLower))
-      );
-    }
-
-    setFilteredExercises(results);
-  }, [search, selectedCategory, exercises]);
-
-  const categories = [...new Set(exercises.map(e => e.category).filter(Boolean))] as string[];
+  const formatMuscle = (m: string) => MUSCLE_LABELS[m] || m.replace(/_/g, ' ');
+  const formatEquipment = (e: string) => EQUIPMENT_ICONS[e] || e.replace(/_/g, ' ');
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -159,7 +162,7 @@ export function ExerciseSearch({ onSelect, onClose, device }: Props) {
         <DialogHeader>
           <DialogTitle>Add Exercise</DialogTitle>
           <DialogDescription>
-            Search and select an exercise from the WGER exercise database, or create a custom exercise.
+            Search from 800+ exercises. Results appear instantly as you type.
           </DialogDescription>
         </DialogHeader>
 
@@ -170,103 +173,118 @@ export function ExerciseSearch({ onSelect, onClose, device }: Props) {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search exercises..."
+              placeholder="Search exercises... (e.g., bench, squat, RDL)"
               className="pl-10"
               autoFocus
             />
+            {loading && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+            )}
           </div>
-
-          {/* Category Filter */}
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant={selectedCategory === null ? 'default' : 'outline'}
-              onClick={() => setSelectedCategory(null)}
-            >
-              All
-            </Button>
-            {categories.map(category => (
-              <Button
-                key={category}
-                size="sm"
-                variant={selectedCategory === category ? 'default' : 'outline'}
-                onClick={() => setSelectedCategory(category)}
-              >
-                {category}
-              </Button>
-            ))}
-          </div>
-
-          {/* Loading State */}
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading exercises...</span>
-            </div>
-          )}
 
           {/* Error Message */}
-          {error && !loading && (
+          {error && (
             <div className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
               {error}
             </div>
           )}
 
           {/* Results */}
-          {!loading && (
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-2 pr-4">
-                {filteredExercises.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Dumbbell className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                    <p>No exercises found</p>
-                    <p className="text-sm">Try a different search term</p>
-                  </div>
-                ) : (
-                  filteredExercises.map((exercise) => (
-                    <button
-                      key={exercise.id}
-                      onClick={() => onSelect(exercise.name)}
-                      className="w-full text-left p-3 border rounded-lg hover:bg-muted transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className="font-medium">{exercise.name}</p>
+          <ScrollArea className="h-[400px]">
+            <div data-assistant-target="exercise-search-results" className="space-y-2 pr-4">
+              {search.length < 2 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Dumbbell className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>Start typing to search</p>
+                  <p className="text-sm mt-1">Search by name, muscle group, or equipment</p>
+                </div>
+              ) : results.length === 0 && !loading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Dumbbell className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No exercises found for "{search}"</p>
+                  <p className="text-sm mt-1">We can learn this exercise for you</p>
+                </div>
+              ) : (
+                results.map((exercise) => (
+                  <button
+                    key={exercise.id}
+                    onClick={() => onSelect(exercise.name)}
+                    className="w-full text-left p-3 border rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{exercise.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
                           {exercise.category && (
-                            <p className="text-sm text-muted-foreground">{exercise.category}</p>
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {exercise.category}
+                            </span>
                           )}
-                          {exercise.primary_muscles.length > 0 && (
-                            <div className="flex gap-1 mt-1 flex-wrap">
-                              {exercise.primary_muscles.slice(0, 3).map((muscle, idx) => (
-                                <Badge key={idx} variant="secondary" className="text-xs">
-                                  {muscle}
-                                </Badge>
-                              ))}
-                            </div>
+                          {exercise.difficulty && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                              exercise.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                              exercise.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {exercise.difficulty}
+                            </span>
                           )}
                         </div>
-                        {exercise.source === 'wger' && (
-                          <Badge variant="outline" className="text-xs">
-                            WGER
-                          </Badge>
+                        {exercise.primary_muscles.length > 0 && (
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {exercise.primary_muscles.slice(0, 3).map((muscle, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {formatMuscle(muscle)}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {exercise.equipment.length > 0 && (
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {exercise.equipment.slice(0, 3).map((eq, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {formatEquipment(eq)}
+                              </Badge>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
 
-          {/* Custom Exercise */}
-          {search && filteredExercises.length === 0 && (
-            <Button
-              onClick={() => onSelect(search)}
-              variant="outline"
-              className="w-full"
-            >
-              Add "{search}" as custom exercise
-            </Button>
+          {/* LLM Fallback — "Not found? We'll learn this exercise" */}
+          {search.length >= 2 && results.length === 0 && !loading && (
+            <div className="space-y-2">
+              <Button
+                onClick={() => classifyExercise(search)}
+                variant="outline"
+                className="w-full"
+                disabled={classifying}
+              >
+                {classifying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Learning "{search}"...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Not found? We'll learn "{search}"
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => onSelect(search)}
+                variant="ghost"
+                className="w-full text-muted-foreground"
+              >
+                Or add "{search}" as custom exercise
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

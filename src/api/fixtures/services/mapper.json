@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "matches": [
+    {
+      "original_name": "bench press",
+      "matched_name": "Bench Press",
+      "confidence": 0.97,
+      "garmin_id": "bench_press"
+    }
+  ],
+  "unmapped": []
+}

@@ -1,0 +1,16 @@
+{
+  "title": "Push Day",
+  "blocks": [
+    {
+      "label": "Main Block",
+      "structure": "regular",
+      "exercises": [
+        { "name": "bench press", "sets": 3, "reps": 10 },
+        { "name": "overhead press", "sets": 3, "reps": 8 }
+      ]
+    }
+  ],
+  "source": "instagram",
+  "workout_type": "strength",
+  "workout_type_confidence": 0.92
+}

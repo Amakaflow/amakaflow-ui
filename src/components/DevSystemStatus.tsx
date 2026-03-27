@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getApiHealthEndpoints } from "../lib/config";
+import { isDemoMode } from "../lib/demo-mode";
 
 type ServiceConfig = {
   name: string;
@@ -16,8 +17,8 @@ type ServiceState = ServiceConfig & {
 const SERVICES: ServiceConfig[] = getApiHealthEndpoints();
 
 export function DevSystemStatus() {
-  // Don't show anything in production
-  if (import.meta.env.PROD) return null;
+  // Don't show in production or demo mode
+  if (import.meta.env.PROD || isDemoMode) return null;
   if (SERVICES.length === 0) return null;
 
   const [open, setOpen] = useState(false);

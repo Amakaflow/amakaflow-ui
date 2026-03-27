@@ -7,12 +7,14 @@
 
 import { useCallback, useRef } from 'react';
 import { streamChat } from '../lib/chat-api';
+import { getActionConfig } from './useActionMap';
 import type {
   ChatMessage,
   ChatAction,
   ChatState,
   SSEEventData,
   RateLimitInfo,
+  VisualizationType,
 } from '../types/chat';
 
 interface UseChatStreamOptions {
@@ -29,23 +31,47 @@ function nextMessageId(): string {
   return `msg_${crypto.randomUUID()}`;
 }
 
+/** Map useActionMap visualization types to chat.ts VisualizationType */
+function toVisualizationType(type: string): VisualizationType {
+  if (type === 'ghost-preview') return 'ghost-preview';
+  return 'outline-pulse';
+}
+
 export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseChatStreamReturn {
   const abortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
   const receivedContentRef = useRef(false);
   const sessionIdRef = useRef(state.sessionId);
+  const contentBufferRef = useRef('');
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxRetries = 3;
 
   // Keep sessionIdRef in sync with state
   sessionIdRef.current = state.sessionId;
 
+  const flushContentBuffer = useCallback(() => {
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
+    flushTimerRef.current = null;
+  }, [dispatch]);
+
   const cancelStream = useCallback(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (contentBufferRef.current) {
+      dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+      contentBufferRef.current = '';
+    }
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
     }
     dispatch({ type: 'SET_STREAMING', isStreaming: false });
-  }, [dispatch]);
+  }, [dispatch, flushContentBuffer]);
 
   const sendMessage = useCallback(
     (text: string) => {
@@ -84,22 +110,33 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
       receivedContentRef.current = false;
 
       const executeStream = () => {
+        // Build context with pending imports
+        const context = state.pendingImports.length > 0
+          ? { pending_imports: state.pendingImports }
+          : undefined;
+
         streamChat({
           message: trimmed,
           sessionId: sessionIdRef.current,
+          context,
           signal: controller.signal,
           onEvent: (event: SSEEventData) => {
             switch (event.event) {
               case 'message_start':
                 dispatch({ type: 'SET_SESSION_ID', sessionId: event.data.session_id });
+                dispatch({ type: 'CLEAR_WORKOUT_DATA' });
+                dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: true });
                 break;
 
               case 'content_delta':
                 receivedContentRef.current = true;
-                dispatch({ type: 'APPEND_CONTENT_DELTA', text: event.data.text });
+                contentBufferRef.current += event.data.text;
+                if (!flushTimerRef.current) {
+                  flushTimerRef.current = setTimeout(flushContentBuffer, 80);
+                }
                 break;
 
-              case 'function_call':
+              case 'function_call': {
                 dispatch({
                   type: 'ADD_FUNCTION_CALL',
                   toolCall: {
@@ -108,21 +145,101 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                     status: 'running',
                   },
                 });
+                // Wire timeline visualization
+                const actionConfig = getActionConfig(event.data.name, {});
+                dispatch({
+                  type: 'ADD_TIMELINE_STEP',
+                  step: {
+                    id: event.data.id,
+                    toolName: event.data.name,
+                    label: actionConfig.label,
+                    status: 'running',
+                  },
+                });
+                if (actionConfig.type !== 'none') {
+                  dispatch({
+                    type: 'SET_ACTIVE_VISUALIZATION',
+                    visualization: {
+                      target: actionConfig.target ?? '',
+                      type: toVisualizationType(actionConfig.type),
+                      label: actionConfig.label,
+                    },
+                  });
+                }
                 break;
+              }
 
-              case 'function_result':
+              case 'function_result': {
                 dispatch({
                   type: 'UPDATE_FUNCTION_RESULT',
                   toolUseId: event.data.tool_use_id,
                   result: event.data.result,
                 });
+                dispatch({
+                  type: 'UPDATE_TIMELINE_STEP',
+                  id: event.data.tool_use_id,
+                  status: 'completed',
+                  result: event.data.result,
+                });
+                dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
+
+                // Parse structured workout data from tool results
+                try {
+                  const parsed = typeof event.data.result === 'string'
+                    ? JSON.parse(event.data.result)
+                    : event.data.result;
+
+                  if (parsed?.type === 'workout_generated') {
+                    dispatch({ type: 'SET_WORKOUT_DATA', data: parsed });
+                  } else if (parsed?.type === 'workout_imported' && parsed?.workout) {
+                    // Map imported workout into GeneratedWorkout shape for card rendering
+                    const exercises = parsed.workout.exercises ?? [];
+                    dispatch({
+                      type: 'SET_WORKOUT_DATA',
+                      data: {
+                        type: 'workout_generated',
+                        workout: {
+                          name: parsed.workout.title ?? 'Imported Workout',
+                          exercises,
+                          source: parsed.source,
+                        },
+                      },
+                    });
+                  } else if (parsed?.type === 'search_results') {
+                    dispatch({ type: 'SET_SEARCH_RESULTS', data: parsed });
+                  }
+                } catch {
+                  // Non-JSON result, ignore
+                }
+                break;
+              }
+
+              case 'stage':
+                dispatch({
+                  type: 'SET_STAGE',
+                  stage: event.data,
+                });
+                break;
+
+              case 'heartbeat':
+                // Heartbeats keep connection alive — no state update needed
                 break;
 
               case 'message_end':
+                // Flush any remaining buffered content before finalizing
+                if (flushTimerRef.current) {
+                  clearTimeout(flushTimerRef.current);
+                  flushTimerRef.current = null;
+                }
+                if (contentBufferRef.current) {
+                  dispatch({ type: 'APPEND_CONTENT_DELTA', text: contentBufferRef.current });
+                  contentBufferRef.current = '';
+                }
                 dispatch({
                   type: 'FINALIZE_ASSISTANT_MESSAGE',
                   tokens_used: event.data.tokens_used,
                   latency_ms: event.data.latency_ms,
+                  pending_imports: event.data.pending_imports,
                 });
                 // FINALIZE_ASSISTANT_MESSAGE already sets isStreaming: false
                 abortRef.current = null;
@@ -132,6 +249,8 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
                 const { data } = event;
                 dispatch({ type: 'SET_ERROR', error: data.message });
                 dispatch({ type: 'SET_STREAMING', isStreaming: false });
+                dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: false });
+                dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
                 if (data.usage !== undefined && data.limit !== undefined) {
                   const info: RateLimitInfo = { usage: data.usage, limit: data.limit };
                   dispatch({ type: 'SET_RATE_LIMIT', info });
@@ -154,6 +273,8 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
             dispatch({ type: 'SET_ERROR', error: error.message });
             dispatch({ type: 'SET_STREAMING', isStreaming: false });
+            dispatch({ type: 'SET_ASSISTANT_WORKING', isWorking: false });
+            dispatch({ type: 'SET_ACTIVE_VISUALIZATION', visualization: null });
             abortRef.current = null;
           },
           onComplete: () => {
@@ -168,7 +289,7 @@ export function useChatStream({ state, dispatch }: UseChatStreamOptions): UseCha
 
       executeStream();
     },
-    [state.isStreaming, dispatch],
+    [state.isStreaming, state.pendingImports, dispatch, flushContentBuffer],
   );
 
   return { sendMessage, cancelStream };
