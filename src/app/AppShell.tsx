@@ -83,7 +83,7 @@ export function AppShell() {
 
   // Workflow state (still needs setCurrentView for internal hooks)
   const workflowState = useWorkflowState({
-    user: user!,
+    user,
     selectedDevice,
     setSelectedDevice,
     refreshHistory,
