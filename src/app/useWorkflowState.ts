@@ -27,7 +27,7 @@ interface WorkoutTypeDialogState {
 }
 
 export interface UseWorkflowStateProps {
-  user: AppUser;
+  user: AppUser | null;
   selectedDevice: DeviceId;
   setSelectedDevice: (d: DeviceId) => void;
   refreshHistory: () => Promise<void>;
@@ -92,7 +92,7 @@ export function useWorkflowState({
   // ── Domain hooks ────────────────────────────────────────────────────────────
 
   const generation = useWorkflowGeneration({
-    userId: user.id,
+    userId: user?.id ?? '',
     selectedDevice,
     refreshHistory,
     onWorkoutGenerated: (w, srcs) => {
@@ -116,7 +116,7 @@ export function useWorkflowState({
   });
 
   const editing = useWorkflowEditing({
-    userId: user.id,
+    userId: user?.id ?? '',
     selectedDevice,
     setSelectedDevice,
     refreshHistory,
