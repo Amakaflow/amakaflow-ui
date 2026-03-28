@@ -134,6 +134,12 @@ test.describe('Workout Edit/Restructure', () => {
     const editor = page.locator('[data-assistant-target="workout-log"]');
     await expect(editor).toBeVisible({ timeout: 10_000 });
 
+    // Blocks start collapsed — expand the first block by clicking its "Show" button
+    const expandBtn = page.getByRole('button', { name: /Show/i }).first();
+    await expect(expandBtn).toBeVisible({ timeout: 5_000 });
+    await expandBtn.click();
+    await page.waitForTimeout(300);
+
     // Find and click "Add Exercise" button on the first block
     const addExerciseBtn = page.getByRole('button', { name: /Add Exercise/i }).first();
     await expect(addExerciseBtn).toBeVisible({ timeout: 5_000 });
@@ -171,6 +177,12 @@ test.describe('Workout Edit/Restructure', () => {
 
     const editor = page.locator('[data-assistant-target="workout-log"]');
     await expect(editor).toBeVisible({ timeout: 10_000 });
+
+    // Blocks start collapsed — expand the first block
+    const expandBtnDel = page.getByRole('button', { name: /Show/i }).first();
+    await expect(expandBtnDel).toBeVisible({ timeout: 5_000 });
+    await expandBtnDel.click();
+    await page.waitForTimeout(300);
 
     // Count exercises before deletion
     // Exercises are rendered inside sortable exercise items
