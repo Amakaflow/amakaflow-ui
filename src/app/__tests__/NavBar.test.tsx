@@ -45,23 +45,23 @@ const renderNavBar = (overrides: Partial<{
 };
 
 describe('NavBar', () => {
-  it('renders exactly the 6 primary nav items', () => {
+  it('renders exactly the 7 primary nav items', () => {
     renderNavBar();
 
-    // The 6 primary nav items: Import, Create with AI, Calendar, My Workouts, Analytics, Settings
+    // The 7 primary nav items: Import, Create with AI, Calendar, My Workouts, Programs, Analytics, Settings
     expect(screen.getByText('Import')).toBeInTheDocument();
     expect(screen.getByText('Create with AI')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();
     expect(screen.getByText('My Workouts')).toBeInTheDocument();
+    expect(screen.getByText('Programs')).toBeInTheDocument();
     expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  it('does NOT render Programs, History, Volume, or Team as top-level nav items', () => {
+  it('does NOT render History, Volume, or Team as top-level nav items', () => {
     renderNavBar();
 
-    // These should NOT be present in the nav
-    expect(screen.queryByText('Programs')).not.toBeInTheDocument();
+    // These should NOT be present in the nav (Programs is now a valid nav item)
     expect(screen.queryByText('History')).not.toBeInTheDocument();
     expect(screen.queryByText('Volume')).not.toBeInTheDocument();
     expect(screen.queryByText('Team')).not.toBeInTheDocument();
