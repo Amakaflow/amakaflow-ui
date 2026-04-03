@@ -45,10 +45,10 @@ const renderNavBar = (overrides: Partial<{
 };
 
 describe('NavBar', () => {
-  it('renders exactly the 7 primary nav items', () => {
+  it('renders exactly the 6 primary nav items plus Settings', () => {
     renderNavBar();
 
-    // The 7 primary nav items: Import, Create with AI, Calendar, My Workouts, Programs, Analytics, Settings
+    // 6 primary nav items + Settings (rendered outside <nav> block)
     expect(screen.getByText('Import')).toBeInTheDocument();
     expect(screen.getByText('Create with AI')).toBeInTheDocument();
     expect(screen.getByText('Calendar')).toBeInTheDocument();
