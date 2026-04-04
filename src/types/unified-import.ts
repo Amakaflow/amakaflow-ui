@@ -7,7 +7,7 @@
  */
 
 /** Which tab the user has open on the import screen. */
-export type ImportTab = 'urls-media' | 'file' | 'clip-queue' | 'integrations';
+export type ImportTab = 'urls-media' | 'file' | 'integrations';
 
 /** A single item in the pre-import queue (before processing). */
 export interface QueueItem {

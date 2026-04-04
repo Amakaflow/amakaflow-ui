@@ -30,7 +30,7 @@ export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
 
   const handleGarminClick = () => {
     if (onNavigate) {
-      onNavigate('settings/connections');
+      onNavigate('connections');
     } else {
       toast.info('Connect Garmin in Settings > Connections');
     }
@@ -46,6 +46,9 @@ export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
       <Card
         className="cursor-pointer hover:bg-muted/30 transition-colors"
         onClick={() => { void handleStravaClick(); }}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void handleStravaClick(); } }}
       >
         <CardContent className="flex items-center gap-4 p-4">
           <span className="text-2xl" role="img" aria-label="Strava">🚴</span>
@@ -61,6 +64,9 @@ export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
       <Card
         className="cursor-pointer hover:bg-muted/30 transition-colors"
         onClick={() => fitInputRef.current?.click()}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fitInputRef.current?.click(); } }}
       >
         <CardContent className="flex items-center gap-4 p-4">
           <span className="text-2xl" role="img" aria-label="FIT/TCX files">📁</span>
@@ -84,6 +90,9 @@ export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
       <Card
         className="cursor-pointer hover:bg-muted/30 transition-colors"
         onClick={handleGarminClick}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleGarminClick(); } }}
       >
         <CardContent className="flex items-center gap-4 p-4">
           <span className="text-2xl" role="img" aria-label="Garmin Connect">⌚</span>
