@@ -20,6 +20,7 @@ import { useChat } from '../../context/ChatContext';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { BetaFeedbackWidget } from './BetaFeedbackWidget';
+import { ChatSettings } from './ChatSettings';
 import { useChatFeatureFlags } from '../../hooks/useChatFeatureFlags';
 import { CHAT_BETA_PERIOD } from '../../lib/env';
 import {
@@ -251,7 +252,7 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
 
       {/* Settings panel */}
       {showSettings && !isMobile && (
-        <div className="border-t p-4 bg-muted/30" data-testid="chat-settings-panel">
+        <div className="border-t p-4 bg-muted/30 overflow-y-auto max-h-[60vh]" data-testid="chat-settings-panel">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-sm">Chat Settings</h4>
             <Button
@@ -263,9 +264,7 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
               <X className="w-3.5 h-3.5" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Settings coming in next update. You can clear your conversation history using the trash icon above.
-          </p>
+          <ChatSettings onClose={() => setShowSettings(false)} />
         </div>
       )}
 
