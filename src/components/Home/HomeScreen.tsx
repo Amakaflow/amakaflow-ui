@@ -7,6 +7,10 @@ import type { AppUser } from '../../app/useAppAuth';
 import { isDemoMode } from '../../lib/demo-mode';
 import { MOCK_ANALYTICS } from '../../lib/mock-data/analytics';
 import { MOCK_WORKOUT_HISTORY } from '../../lib/mock-data/workouts';
+import { TrustSignals } from './TrustSignals';
+import { SampleWorkoutPreview } from './SampleWorkoutPreview';
+import { SupportedDevices } from './SupportedDevices';
+import { PrivacyFooter } from './PrivacyFooter';
 
 interface HomeScreenProps {
   user: AppUser;
@@ -90,6 +94,9 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
         <p className="text-muted-foreground mt-1">Here's your training overview</p>
       </div>
 
+      {/* Trust signals — social proof bar + founder quote */}
+      <TrustSignals />
+
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         <Card>
@@ -140,6 +147,12 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
           ))}
         </div>
       </div>
+
+      {/* Sample workout preview — shows what AmakaFlow produces */}
+      <SampleWorkoutPreview />
+
+      {/* Supported devices grid */}
+      <SupportedDevices />
 
       {/* Recent workouts */}
       <div>
@@ -199,6 +212,8 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
           </Card>
         )}
       </div>
+      {/* Privacy statement */}
+      <PrivacyFooter />
     </div>
   );
 }
