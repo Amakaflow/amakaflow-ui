@@ -70,7 +70,7 @@ export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <CardTitle className="text-3xl mb-2">Welcome to AmakaFlow</CardTitle>
+              <CardTitle className="text-2xl sm:text-3xl mb-2 break-words">Welcome to AmakaFlow</CardTitle>
               <CardDescription className="text-base">
                 Transform workout content into structured training for your fitness devices
               </CardDescription>
@@ -165,8 +165,8 @@ export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
             {/* Pricing preview */}
             <PricingSection />
 
-            <div className="flex gap-3 pt-2">
-              <Button onClick={onGetStarted} size="lg" className="flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:flex-1">
                 <Play className="w-4 h-4 mr-2" />
                 Get Started
               </Button>
@@ -174,6 +174,7 @@ export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
                 variant="outline"
                 onClick={handleDismiss}
                 size="lg"
+                className="w-full sm:w-auto"
               >
                 Skip for now
               </Button>

@@ -86,10 +86,10 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
     : recentWorkouts.slice(0, 5);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto px-4 space-y-8">
       {/* Greeting */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
           {getGreeting()}, {displayName}
         </h1>
         <p className="text-muted-foreground mt-1">Here's your training overview</p>
@@ -99,32 +99,32 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
       <TrustSignals />
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="pt-4 sm:pt-6 px-2 sm:px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Dumbbell className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-3xl font-bold">{stats.totalWorkouts}</p>
-            <p className="text-sm text-muted-foreground">Total workouts</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stats.totalWorkouts}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="pt-4 sm:pt-6 px-2 sm:px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-3xl font-bold">{stats.thisWeek}</p>
-            <p className="text-sm text-muted-foreground">This week</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stats.thisWeek}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">This week</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="pt-4 sm:pt-6 px-2 sm:px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Flame className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-3xl font-bold">{stats.streak}</p>
-            <p className="text-sm text-muted-foreground">Day streak</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stats.streak}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Streak</p>
           </CardContent>
         </Card>
       </div>
@@ -137,7 +137,7 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
             <button
               key={action.view}
               onClick={() => onNavigate(action.view)}
-              className="text-left rounded-xl border p-4 hover:bg-muted/50 transition-colors"
+              className="text-left rounded-xl border p-4 hover:bg-muted/50 transition-colors min-h-[44px]"
             >
               <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg mb-3 ${action.color}`}>
                 {action.icon}

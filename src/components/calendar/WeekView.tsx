@@ -93,9 +93,9 @@ export function WeekView({
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-x-auto">
       {/* Header Row */}
-      <div className="flex border-b flex-shrink-0 bg-background">
+      <div className="flex border-b flex-shrink-0 bg-background min-w-[560px]">
         {/* Time column spacer */}
         <div className="w-16 flex-shrink-0 h-16 flex items-center justify-center border-r bg-background">
           <span className="text-xs text-muted-foreground uppercase">Time</span>
@@ -131,7 +131,7 @@ export function WeekView({
       </div>
 
       {/* All-Day Events Row */}
-      <div className="flex border-b flex-shrink-0 bg-muted/30">
+      <div className="flex border-b flex-shrink-0 bg-muted/30 min-w-[560px]">
         {/* Label */}
         <div className="w-16 flex-shrink-0 flex items-start justify-end pr-2 pt-2 border-r">
           <span className="text-xs text-muted-foreground leading-none">All day</span>
@@ -176,7 +176,7 @@ export function WeekView({
 
       {/* Scrollable Grid */}
       <div className="flex-1 overflow-auto">
-        <div className="flex" style={{ minHeight: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
+        <div className="flex min-w-[560px]" style={{ minHeight: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
           {/* Time column */}
           <div className="w-16 flex-shrink-0 border-r bg-background">
             {hours.map((hour) => (
