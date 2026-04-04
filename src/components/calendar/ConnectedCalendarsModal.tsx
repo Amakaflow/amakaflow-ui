@@ -108,9 +108,8 @@ export function ConnectedCalendarsModal({
   };
 
   const handleOAuthConnect = (provider: 'google' | 'outlook' | 'apple') => {
-    console.log('Initiating OAuth flow for:', provider);
-    toast.info('OAuth integration coming soon!');
-    setShowAddFlow(null);
+    const label = provider === 'google' ? 'Google' : provider === 'outlook' ? 'Outlook' : 'Apple';
+    toast.info(`${label} Calendar OAuth is not available yet. Use the ICS URL option to connect your calendar.`);
   };
 
   const getCalendarIcon = (type: ConnectedCalendar['type']) => {
@@ -252,27 +251,30 @@ export function ConnectedCalendarsModal({
                   </Button>
                   <Button
                     variant="outline"
-                    className="justify-start gap-2 h-auto py-3"
+                    className="justify-start gap-2 h-auto py-3 opacity-60"
                     onClick={() => handleOAuthConnect('apple')}
                   >
                     <Calendar className="w-4 h-4" />
                     Add Apple Calendar
+                    <span className="text-xs text-muted-foreground ml-auto">Not available yet</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="justify-start gap-2 h-auto py-3"
+                    className="justify-start gap-2 h-auto py-3 opacity-60"
                     onClick={() => handleOAuthConnect('google')}
                   >
                     <Calendar className="w-4 h-4" />
                     Add Google Calendar
+                    <span className="text-xs text-muted-foreground ml-auto">Not available yet</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="justify-start gap-2 h-auto py-3"
+                    className="justify-start gap-2 h-auto py-3 opacity-60"
                     onClick={() => handleOAuthConnect('outlook')}
                   >
                     <Calendar className="w-4 h-4" />
                     Add Outlook Calendar
+                    <span className="text-xs text-muted-foreground ml-auto">Not available yet</span>
                   </Button>
                 </div>
               </div>

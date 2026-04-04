@@ -264,7 +264,7 @@ export function ChatPanelContent({ variant = 'desktop', onClose }: ChatPanelCont
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Chat settings coming soon. You can clear your conversation history using the trash icon.
+            Settings coming in next update. You can clear your conversation history using the trash icon above.
           </p>
         </div>
       )}

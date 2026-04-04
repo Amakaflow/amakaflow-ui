@@ -1,13 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
-import { Link, FileSpreadsheet, Bookmark, Plug, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { Link, FileSpreadsheet, Plug, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { useImportFlow } from './hooks/useImportFlow';
 import { FileImportTab } from './FileImportTab';
 import { ImportQueue } from './ImportQueue';
 import { ProcessingView } from './ProcessingView';
 import { ResultsScreen } from './ResultsScreen';
 import { BlockPicker } from './BlockPicker';
-import { ClipQueueTab } from './ClipQueueTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { MapStep } from '../BulkImport/MapStep';
 import type { QueueItem, ProcessedItem } from '../../types/import';
@@ -92,7 +91,6 @@ export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedIt
       <TabsList className="mb-6">
         <TabsTrigger value="urls-media" className="gap-2"><Link className="w-4 h-4" />URLs &amp; Media</TabsTrigger>
         <TabsTrigger value="file" className="gap-2"><FileSpreadsheet className="w-4 h-4" />File</TabsTrigger>
-        <TabsTrigger value="clip-queue" className="gap-2"><Bookmark className="w-4 h-4" />Clip Queue</TabsTrigger>
         <TabsTrigger value="integrations" className="gap-2"><Plug className="w-4 h-4" />Integrations</TabsTrigger>
       </TabsList>
       <TabsContent value="urls-media">
@@ -102,8 +100,7 @@ export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedIt
         </div>}
       </TabsContent>
       <TabsContent value="file"><FileImportTab onFilesDetected={handleFilesDetected} /></TabsContent>
-      <TabsContent value="clip-queue"><ClipQueueTab /></TabsContent>
-      <TabsContent value="integrations"><IntegrationsTab /></TabsContent>
+      <TabsContent value="integrations"><IntegrationsTab onNavigate={onNavigate} /></TabsContent>
     </Tabs>
   );
 }
