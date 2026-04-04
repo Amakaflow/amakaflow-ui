@@ -1,7 +1,7 @@
 import type { ColumnMapping, DetectedPattern } from './bulk-import';
 
 /** Which tab the user has open on the import screen. */
-export type ImportTab = 'urls-media' | 'file' | 'clip-queue' | 'integrations';
+export type ImportTab = 'urls-media' | 'file' | 'integrations';
 
 /** Which phase of the import workflow we're in. */
 export type Phase = 'input' | 'processing' | 'results' | 'block-picker' | 'column-mapping' | 'saved';
@@ -12,7 +12,7 @@ export type QueueItem =
   | { id: string; type: 'image'; label: string; raw: File   }
   | { id: string; type: 'pdf';   label: string; raw: File   }
   | { id: string; type: 'text';  label: string; raw: string }
-  | { id: string; type: 'clip';  label: string; raw: string };
+;
 
 /** Per-item processing state. */
 export type ItemStatus = 'pending' | 'detecting' | 'extracting' | 'done' | 'failed' | 'error';

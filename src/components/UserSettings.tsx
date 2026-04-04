@@ -622,12 +622,9 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
                     />
                   </div>
                   {user.subscription === 'free' && import.meta.env.VITE_BYPASS_TIER_GATE !== 'true' && (
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription className="text-xs">
-                        AI-powered Instagram extraction requires a Pro or Trainer subscription.
-                      </AlertDescription>
-                    </Alert>
+                    <p className="text-xs text-muted-foreground text-amber-600 dark:text-amber-500">
+                      AI-powered Instagram extraction requires a Pro or Trainer subscription.
+                    </p>
                   )}
                 </CardContent>
               </Card>
