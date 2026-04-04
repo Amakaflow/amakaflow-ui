@@ -30,24 +30,24 @@ describe('SyncDashboard', () => {
     expect(screen.getByTestId('pending-decisions-section')).toBeTruthy();
   });
 
-  it('renders integration status bars for connected platforms', async () => {
+  it('renders integration status cards for connected platforms', async () => {
     render(<SyncDashboard />);
 
     await waitFor(() => {
       expect(screen.getByTestId('sync-dashboard')).toBeTruthy();
     });
 
-    // Mock data has 3 integrations
-    expect(screen.getByTestId('integration-status-stryd')).toBeTruthy();
-    expect(screen.getByTestId('integration-status-garmin')).toBeTruthy();
-    expect(screen.getByTestId('integration-status-strava')).toBeTruthy();
+    // Mock data has 3 integrations (new card test IDs)
+    expect(screen.getByTestId('integration-card-stryd')).toBeTruthy();
+    expect(screen.getByTestId('integration-card-garmin')).toBeTruthy();
+    expect(screen.getByTestId('integration-card-strava')).toBeTruthy();
   });
 
-  it('renders summary badges with session count', async () => {
+  it('renders stats bar with session count', async () => {
     render(<SyncDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('dashboard-summary')).toBeTruthy();
+      expect(screen.getByTestId('dashboard-stats-bar')).toBeTruthy();
     });
 
     // Total sessions: 5 + 12 + 3 = 20

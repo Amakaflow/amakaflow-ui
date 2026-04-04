@@ -26,7 +26,7 @@ describe('BottomNav', () => {
     expect(screen.getByLabelText('Home')).toBeInTheDocument();
     expect(screen.getByLabelText('Workouts')).toBeInTheDocument();
     expect(screen.getByLabelText('Calendar')).toBeInTheDocument();
-    expect(screen.getByLabelText('Analytics')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sync')).toBeInTheDocument();
     expect(screen.getByLabelText('More')).toBeInTheDocument();
   });
 
@@ -43,8 +43,8 @@ describe('BottomNav', () => {
     fireEvent.click(screen.getByLabelText('Calendar'));
     expect(onNavigate).toHaveBeenCalledWith('calendar');
 
-    fireEvent.click(screen.getByLabelText('Analytics'));
-    expect(onNavigate).toHaveBeenCalledWith('analytics');
+    fireEvent.click(screen.getByLabelText('Sync'));
+    expect(onNavigate).toHaveBeenCalledWith('dashboard');
   });
 
   it('highlights Home tab for related views (import, workflow, create-ai)', () => {
