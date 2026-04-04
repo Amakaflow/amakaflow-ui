@@ -442,21 +442,21 @@ export function MobileCompanion({ userId, onBack }: MobileCompanionProps) {
           <Alert>
             <Smartphone className="h-4 w-4" />
             <AlertDescription>
-              The AmakaFlow companion app is available for testing. Pair your device by scanning
-              the QR code above — no app store download required yet.
+              Web pairing is available now — scan the QR code above to connect your device.
+              Store listings are not yet published.
             </AlertDescription>
           </Alert>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" className="flex-1" disabled>
+            <Button variant="outline" className="flex-1" disabled aria-disabled="true">
               <ExternalLink className="w-4 h-4 mr-2" />
               App Store
-              <Badge variant="secondary" className="ml-2">Available for testing — scan QR code to pair</Badge>
+              <Badge variant="secondary" className="ml-2">Coming soon</Badge>
             </Button>
-            <Button variant="outline" className="flex-1" disabled>
+            <Button variant="outline" className="flex-1" disabled aria-disabled="true">
               <ExternalLink className="w-4 h-4 mr-2" />
               Google Play
-              <Badge variant="secondary" className="ml-2">Available for testing — scan QR code to pair</Badge>
+              <Badge variant="secondary" className="ml-2">Coming soon</Badge>
             </Button>
           </div>
 

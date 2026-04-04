@@ -6,9 +6,10 @@ import { toast } from 'sonner';
 
 interface IntegrationsTabProps {
   onNavigate?: (view: string) => void;
+  onFilesDetected?: (files: File[]) => Promise<void>;
 }
 
-export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
+export function IntegrationsTab({ onNavigate, onFilesDetected }: IntegrationsTabProps) {
   const fitInputRef = useRef<HTMLInputElement>(null);
 
   const handleStravaClick = async () => {
@@ -23,9 +24,13 @@ export function IntegrationsTab({ onNavigate }: IntegrationsTabProps) {
   const handleFitFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-    toast.info(`${files.length} file${files.length > 1 ? 's' : ''} selected — import coming in next update`);
-    // Reset input so the same file can be selected again
+    // Reset input before async work so the same file can be re-selected
     e.target.value = '';
+    if (onFilesDetected) {
+      void onFilesDetected(files);
+    } else {
+      toast.info(`${files.length} file${files.length > 1 ? 's' : ''} selected — processing…`);
+    }
   };
 
   const handleGarminClick = () => {

@@ -12,7 +12,7 @@ export type QueueItem =
   | { id: string; type: 'image'; label: string; raw: File   }
   | { id: string; type: 'pdf';   label: string; raw: File   }
   | { id: string; type: 'text';  label: string; raw: string }
-  | { id: string; type: 'clip';  label: string; raw: string };
+;
 
 /** Per-item processing state. */
 export type ItemStatus = 'pending' | 'detecting' | 'extracting' | 'done' | 'failed' | 'error';

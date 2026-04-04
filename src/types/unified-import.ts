@@ -12,7 +12,7 @@ export type ImportTab = 'urls-media' | 'file' | 'integrations';
 /** A single item in the pre-import queue (before processing). */
 export interface QueueItem {
   id: string;              // stable local UUID (use crypto.randomUUID())
-  type: 'url' | 'image' | 'pdf' | 'text' | 'clip';
+  type: 'url' | 'image' | 'pdf' | 'text';
   label: string;           // display label (truncated URL, filename, etc.)
   raw: string | File;      // the actual payload
 }

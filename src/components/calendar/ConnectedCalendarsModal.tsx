@@ -252,6 +252,7 @@ export function ConnectedCalendarsModal({
                   <Button
                     variant="outline"
                     className="justify-start gap-2 h-auto py-3 opacity-60"
+                    aria-disabled="true"
                     onClick={() => handleOAuthConnect('apple')}
                   >
                     <Calendar className="w-4 h-4" />
@@ -261,6 +262,7 @@ export function ConnectedCalendarsModal({
                   <Button
                     variant="outline"
                     className="justify-start gap-2 h-auto py-3 opacity-60"
+                    aria-disabled="true"
                     onClick={() => handleOAuthConnect('google')}
                   >
                     <Calendar className="w-4 h-4" />
@@ -270,6 +272,7 @@ export function ConnectedCalendarsModal({
                   <Button
                     variant="outline"
                     className="justify-start gap-2 h-auto py-3 opacity-60"
+                    aria-disabled="true"
                     onClick={() => handleOAuthConnect('outlook')}
                   >
                     <Calendar className="w-4 h-4" />

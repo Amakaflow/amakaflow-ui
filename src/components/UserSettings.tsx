@@ -618,8 +618,14 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
                     <Switch
                       checked={instagramAutoExtract}
                       onCheckedChange={handleInstagramModeChange}
+                      disabled={user.subscription === 'free' && import.meta.env.VITE_BYPASS_TIER_GATE !== 'true'}
                     />
                   </div>
+                  {user.subscription === 'free' && import.meta.env.VITE_BYPASS_TIER_GATE !== 'true' && (
+                    <p className="text-xs text-muted-foreground text-amber-600 dark:text-amber-500">
+                      AI-powered Instagram extraction requires a Pro or Trainer subscription.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 

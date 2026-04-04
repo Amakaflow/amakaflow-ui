@@ -100,7 +100,15 @@ export function ImportScreen({ userId, onDone, onEditWorkout, initialProcessedIt
         </div>}
       </TabsContent>
       <TabsContent value="file"><FileImportTab onFilesDetected={handleFilesDetected} /></TabsContent>
-      <TabsContent value="integrations"><IntegrationsTab onNavigate={onNavigate} /></TabsContent>
+      <TabsContent value="integrations">
+        <IntegrationsTab
+          onNavigate={onNavigate}
+          onFilesDetected={async (files) => {
+            setActiveTab('file');
+            await handleFilesDetected(files);
+          }}
+        />
+      </TabsContent>
     </Tabs>
   );
 }
