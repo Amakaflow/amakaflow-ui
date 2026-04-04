@@ -93,6 +93,7 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
   const { theme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<SettingsSection>('connected-apps');
+  const [mobileView, setMobileView] = useState<'menu' | 'panel'>('menu');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['TRAINING', 'AI & IMPORT', 'NOTIFICATIONS', 'ACCOUNT']));
   const [imageProcessingMethod, setImageProcessingMethodState] = useState<ImageProcessingMethod>(getImageProcessingMethod());
   const [instagramAutoExtract, setInstagramAutoExtractState] = useState(getInstagramAutoExtract());
@@ -454,7 +455,13 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
   return (
     <div className="flex min-h-screen w-full">
       {/* Sidebar Navigation */}
-      <aside className="w-64 border-r bg-muted/20 flex-shrink-0 flex flex-col">
+      <aside className={cn(
+        "border-r bg-muted/20 flex-shrink-0 flex flex-col",
+        // Desktop: always visible as fixed-width sidebar
+        "md:w-64",
+        // Mobile: full-width when showing menu, hidden when showing panel
+        mobileView === 'menu' ? "w-full" : "hidden md:flex"
+      )}>
         <div className="p-4 border-b flex-shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
@@ -483,16 +490,21 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
                     {group.items.map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => setActiveSection(item.id)}
+                        onClick={() => { setActiveSection(item.id); setMobileView('panel'); }}
                         className={cn(
                           "w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors",
                           activeSection === item.id
                             ? "bg-accent text-accent-foreground font-medium"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                          // On mobile, make tap targets larger and show chevron
+                          "md:justify-start justify-between"
                         )}
                       >
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.label}</span>
+                        <span className="flex items-center gap-2">
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </span>
+                        <ChevronRight className="w-4 h-4 md:hidden text-muted-foreground" />
                       </button>
                     ))}
                   </div>
@@ -504,7 +516,18 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto bg-background">
+      <main className={cn(
+        "flex-1 overflow-auto bg-background",
+        // Mobile: full-width when showing panel, hidden when showing menu
+        mobileView === 'panel' ? "block" : "hidden md:block"
+      )}>
+        {/* Mobile back button */}
+        <div className="md:hidden flex items-center gap-2 p-4 border-b bg-muted/20">
+          <Button variant="ghost" size="sm" onClick={() => setMobileView('menu')} className="h-8 w-8 p-0">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm font-medium">Settings</span>
+        </div>
         <div className="max-w-4xl mx-auto p-6">
 
           {/* General Settings */}
