@@ -1,0 +1,183 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - region "Notifications alt+T":
+        - list:
+          - listitem:
+            - generic:
+              - img
+            - generic:
+              - generic: Created new workout. Start building your workout structure!
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - button:
+                  - generic:
+                    - img
+                    - generic:
+                      - generic:
+                        - generic: AmakaFlow
+                        - generic: pro
+                      - paragraph: Alex Demo
+              - navigation:
+                - button:
+                  - img
+                  - text: Dashboard
+                - button:
+                  - img
+                  - text: Create
+                  - img
+                - button:
+                  - img
+                  - text: Training
+                  - img
+                - button:
+                  - img
+                  - text: Insights
+                  - img
+            - generic:
+              - button:
+                - img
+                - text: Help
+              - button:
+                - img
+              - generic: Alex Demo
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=1]: Create Workout
+              - paragraph: Ingest → Structure → Export
+            - generic:
+              - generic:
+                - generic:
+                  - generic: "1"
+                  - generic: Add Sources
+                - img
+              - generic:
+                - generic:
+                  - generic: "2"
+                  - generic: Structure Workout
+        - main:
+          - button:
+            - img
+            - text: Back
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - heading [level=4]: My Test Workout
+                        - button:
+                          - img
+              - generic:
+                - generic:
+                  - img
+                  - generic: Drag blocks and exercises to reorder
+                - generic:
+                  - button:
+                    - img
+                    - text: Collapse All
+                  - button:
+                    - img
+                    - text: Expand All
+              - generic:
+                - img
+                - generic: No warm-up found. Want to add one?
+                - button: + Add Warm-up
+                - button: Skip
+              - generic:
+                - img
+                - generic: No default rest set. Add a rest period that applies to all blocks?
+                - button: + Set Rest
+                - button: Skip
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - button:
+                              - img
+                            - combobox:
+                              - generic: Type
+                              - img
+                            - generic: Workout
+                            - generic: 0 exercises
+                            - button:
+                              - img
+                              - generic: Show
+                            - button:
+                              - img
+                            - button:
+                              - img
+              - generic:
+                - img
+                - generic: No cooldown found. Want to add one?
+                - button: + Add Cooldown
+                - button: Skip
+              - button:
+                - img
+                - text: Add Block
+              - generic:
+                - generic:
+                  - generic:
+                    - button:
+                      - img
+                      - text: Export
+                    - button:
+                      - img
+                      - text: Copy JSON
+            - status
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic: My Test Workout
+                - generic: 1 block(s)
+                - generic: 0 exercise(s)
+      - generic:
+        - generic:
+          - img
+          - generic: Coming Soon
+        - button [disabled]:
+          - img
+      - button: DEMO
+  - dialog "Workout Settings" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Workout Settings" [level=2] [ref=e4]
+      - paragraph [ref=e5]: Configure workout name and default settings
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: Workout Name
+        - textbox "Enter workout name" [ref=e9]: My Test Workout
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Default Rest After Exercise
+          - combobox [ref=e13]:
+            - generic: Lap Button
+            - img
+        - paragraph [ref=e15]:
+          - img [ref=e16]
+          - text: Press lap button when ready to continue to next exercise
+      - generic [ref=e20]:
+        - switch [ref=e21] [cursor=pointer]
+        - generic [ref=e22]: Workout Warm-Up
+      - generic [ref=e25]:
+        - switch [ref=e26] [cursor=pointer]
+        - generic [ref=e27]:
+          - text: Auto-add Warm-up & Rest
+          - paragraph [ref=e28]: Automatically add 5-min warm-up, 60-90s rest, and 5-min cooldown for strength workouts
+      - button "Save Settings" [active] [ref=e29]
+    - button "Close" [ref=e30]:
+      - img [ref=e31]
+      - generic [ref=e34]: Close
+```

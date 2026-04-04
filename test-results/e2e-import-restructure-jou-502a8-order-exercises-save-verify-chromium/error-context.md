@@ -1,0 +1,303 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - region "Notifications alt+T"
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button "AmakaFlow AmakaFlow pro Alex Demo" [ref=e9]:
+        - generic [ref=e10]:
+          - img "AmakaFlow" [ref=e11]
+          - generic [ref=e12]:
+            - generic [ref=e13]:
+              - generic [ref=e14]: AmakaFlow
+              - generic [ref=e15]: pro
+            - paragraph [ref=e16]: Alex Demo
+      - navigation [ref=e17]:
+        - button "Dashboard" [ref=e18]:
+          - img
+          - text: Dashboard
+        - button "Create" [ref=e19]:
+          - img
+          - text: Create
+          - img
+        - button "Training" [ref=e20]:
+          - img
+          - text: Training
+          - img
+        - button "Insights" [ref=e21]:
+          - img
+          - text: Insights
+          - img
+    - generic [ref=e22]:
+      - button "Help" [ref=e23]:
+        - img
+        - text: Help
+      - button [ref=e24]:
+        - img
+      - generic [ref=e25]: Alex Demo
+  - generic [ref=e26]:
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - heading "Create Workout" [level=1] [ref=e30]
+        - paragraph [ref=e31]: Ingest → Structure → Export
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: "1"
+            - generic [ref=e36]: Add Sources
+          - img [ref=e37]
+        - generic [ref=e40]:
+          - generic [ref=e41]: "2"
+          - generic [ref=e42]: Structure Workout
+    - main [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - heading "Add Workout Sources" [level=2] [ref=e47]
+            - paragraph [ref=e48]: Transform workout content from YouTube, TikTok, images, or AI text into structured blocks that sync with your watches
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - heading "Input Sources" [level=4] [ref=e51]
+              - paragraph [ref=e52]: Add links or content from various platforms to build your workout
+            - generic [ref=e54]:
+              - tablist [ref=e55]:
+                - tab "Video" [selected] [ref=e56]:
+                  - img
+                  - text: Video
+                - tab "Image" [ref=e57]:
+                  - img
+                  - text: Image
+                - tab "AI Text" [ref=e58]:
+                  - img
+                  - text: AI Text
+              - tabpanel "Video" [ref=e59]:
+                - generic [ref=e60]:
+                  - generic [ref=e61]:
+                    - img [ref=e62]
+                    - generic [ref=e65]:
+                      - paragraph [ref=e66]: Paste a video URL to get started
+                      - paragraph [ref=e67]: Supports YouTube, TikTok, Instagram, and Pinterest
+                  - generic [ref=e68]:
+                    - generic [ref=e69]:
+                      - img
+                      - text: YouTube
+                    - generic [ref=e70]:
+                      - img
+                      - text: TikTok
+                    - generic [ref=e71]:
+                      - img
+                      - text: Instagram
+                    - generic [ref=e72]:
+                      - img
+                      - text: Pinterest
+                - generic [ref=e73]:
+                  - generic [ref=e74]: Video URL
+                  - generic [ref=e75]:
+                    - textbox "Paste YouTube, TikTok, Instagram, or Pinterest URL..." [ref=e76]
+                    - button [disabled]:
+                      - img
+          - generic [ref=e78]:
+            - button "Generate Structure" [disabled]:
+              - img
+              - text: Generate Structure
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - generic [ref=e81]:
+              - heading "Create New Workout" [level=4] [ref=e82]
+              - paragraph [ref=e83]: Start with a blank workout and build it manually
+            - button "Create New Workout" [ref=e85]:
+              - img
+              - text: Create New Workout
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - heading "Templates & History" [level=4] [ref=e88]:
+                - img [ref=e89]
+                - text: Templates & History
+              - paragraph [ref=e95]: Start from a template or load a previous workout
+            - generic [ref=e97]:
+              - tablist [ref=e98]:
+                - tab "Templates" [selected] [ref=e99]:
+                  - img
+                  - text: Templates
+                - tab "History" [ref=e100]:
+                  - img
+                  - text: History
+              - tabpanel "Templates" [ref=e101]:
+                - generic [ref=e105]:
+                  - generic [ref=e106]:
+                    - button "Traditional Strength 3" [expanded] [ref=e107]:
+                      - generic [ref=e108]:
+                        - img [ref=e109]
+                        - generic [ref=e111]: Traditional Strength
+                        - generic [ref=e112]: "3"
+                    - generic [ref=e114]:
+                      - generic [ref=e115]:
+                        - generic [ref=e118]:
+                          - heading "Push Day - Chest & Triceps" [level=4] [ref=e119]
+                          - paragraph [ref=e120]:
+                            - text: 3 block(s) • 6 exercises
+                            - generic [ref=e121]: •
+                            - generic [ref=e122]:
+                              - img [ref=e123]
+                              - text: ~35 min
+                        - generic [ref=e126]:
+                          - generic [ref=e127]:
+                            - generic [ref=e128]: Warm-up
+                            - generic [ref=e129]: Chest
+                            - generic [ref=e130]: +1 more
+                          - button "Use Template" [ref=e131]:
+                            - img
+                            - text: Use Template
+                      - generic [ref=e132]:
+                        - generic [ref=e135]:
+                          - heading "Pull Day - Back & Biceps" [level=4] [ref=e136]
+                          - paragraph [ref=e137]:
+                            - text: 3 block(s) • 7 exercises
+                            - generic [ref=e138]: •
+                            - generic [ref=e139]:
+                              - img [ref=e140]
+                              - text: ~45 min
+                        - generic [ref=e143]:
+                          - generic [ref=e144]:
+                            - generic [ref=e145]: Warm-up
+                            - generic [ref=e146]: Back
+                            - generic [ref=e147]: +1 more
+                          - button "Use Template" [ref=e148]:
+                            - img
+                            - text: Use Template
+                      - generic [ref=e149]:
+                        - generic [ref=e152]:
+                          - heading "Leg Day - Quads & Hamstrings" [level=4] [ref=e153]
+                          - paragraph [ref=e154]:
+                            - text: 3 block(s) • 7 exercises
+                            - generic [ref=e155]: •
+                            - generic [ref=e156]:
+                              - img [ref=e157]
+                              - text: ~50 min
+                        - generic [ref=e160]:
+                          - generic [ref=e161]:
+                            - generic [ref=e162]: Warm-up
+                            - generic [ref=e163]: Quads
+                            - generic [ref=e164]: +1 more
+                          - button "Use Template" [ref=e165]:
+                            - img
+                            - text: Use Template
+                  - generic [ref=e166]:
+                    - button "HIIT / Interval 2" [expanded] [ref=e167]:
+                      - generic [ref=e168]:
+                        - img [ref=e169]
+                        - generic [ref=e171]: HIIT / Interval
+                        - generic [ref=e172]: "2"
+                    - generic [ref=e174]:
+                      - generic [ref=e175]:
+                        - generic [ref=e178]:
+                          - heading "Tabata Blast" [level=4] [ref=e179]
+                          - paragraph [ref=e180]:
+                            - text: 7 block(s) • 7 exercises
+                            - generic [ref=e181]: •
+                            - generic [ref=e182]:
+                              - img [ref=e183]
+                              - text: ~20 min
+                        - generic [ref=e186]:
+                          - generic [ref=e187]:
+                            - generic [ref=e188]: Tabata 1 - Jump Squats
+                            - generic [ref=e189]: Rest
+                            - generic [ref=e190]: +5 more
+                          - button "Use Template" [ref=e191]:
+                            - img
+                            - text: Use Template
+                      - generic [ref=e192]:
+                        - generic [ref=e195]:
+                          - heading "30/30 HIIT Circuit" [level=4] [ref=e196]
+                          - paragraph [ref=e197]:
+                            - text: 3 block(s) • 8 exercises
+                            - generic [ref=e198]: •
+                            - generic [ref=e199]:
+                              - img [ref=e200]
+                              - text: ~22 min
+                        - generic [ref=e203]:
+                          - generic [ref=e204]:
+                            - generic [ref=e205]: Warm-up
+                            - generic [ref=e206]: HIIT Circuit - 3 Rounds
+                            - generic [ref=e207]: +1 more
+                          - button "Use Template" [ref=e208]:
+                            - img
+                            - text: Use Template
+                  - generic [ref=e209]:
+                    - button "Quick Workouts 3" [expanded] [ref=e210]:
+                      - generic [ref=e211]:
+                        - img [ref=e212]
+                        - generic [ref=e214]: Quick Workouts
+                        - generic [ref=e215]: "3"
+                    - generic [ref=e217]:
+                      - generic [ref=e218]:
+                        - generic [ref=e221]:
+                          - heading "10-Minute Ab Blast" [level=4] [ref=e222]
+                          - paragraph [ref=e223]:
+                            - text: 1 block(s) • 5 exercises
+                            - generic [ref=e224]: •
+                            - generic [ref=e225]:
+                              - img [ref=e226]
+                              - text: 10 min
+                        - generic [ref=e229]:
+                          - generic [ref=e231]: Ab Circuit - 2 Rounds
+                          - button "Use Template" [ref=e232]:
+                            - img
+                            - text: Use Template
+                      - generic [ref=e233]:
+                        - generic [ref=e236]:
+                          - heading "15-Minute Upper Body Burn" [level=4] [ref=e237]
+                          - paragraph [ref=e238]:
+                            - text: 1 block(s) • 5 exercises
+                            - generic [ref=e239]: •
+                            - generic [ref=e240]:
+                              - img [ref=e241]
+                              - text: 15 min
+                        - generic [ref=e244]:
+                          - generic [ref=e246]: Upper Body Circuit - 3 Rounds
+                          - button "Use Template" [ref=e247]:
+                            - img
+                            - text: Use Template
+                      - generic [ref=e248]:
+                        - generic [ref=e251]:
+                          - heading "12-Minute Dumbbell Arms" [level=4] [ref=e252]
+                          - paragraph [ref=e253]:
+                            - text: 1 block(s) • 5 exercises
+                            - generic [ref=e254]: •
+                            - generic [ref=e255]:
+                              - img [ref=e256]
+                              - text: 12 min
+                        - generic [ref=e259]:
+                          - generic [ref=e261]: Arm Circuit - 3 Rounds
+                          - button "Use Template" [ref=e262]:
+                            - img
+                            - text: Use Template
+                  - button "EMOM / AMRAP 2" [ref=e264]:
+                    - generic [ref=e265]:
+                      - img [ref=e266]
+                      - generic [ref=e268]: EMOM / AMRAP
+                      - generic [ref=e269]: "2"
+                  - button "Single Body Part 2" [ref=e271]:
+                    - generic [ref=e272]:
+                      - img [ref=e273]
+                      - generic [ref=e275]: Single Body Part
+                      - generic [ref=e276]: "2"
+                  - button "Supersets 1" [ref=e278]:
+                    - generic [ref=e279]:
+                      - img [ref=e280]
+                      - generic [ref=e282]: Supersets
+                      - generic [ref=e283]: "1"
+                  - button "Cardio / Race 1" [ref=e285]:
+                    - generic [ref=e286]:
+                      - img [ref=e287]
+                      - generic [ref=e289]: Cardio / Race
+                      - generic [ref=e290]: "1"
+  - generic [ref=e291]:
+    - generic [ref=e292]:
+      - img [ref=e293]
+      - generic [ref=e296]: Coming Soon
+    - button "AI Chat - Coming Soon" [disabled] [ref=e297]:
+      - img [ref=e298]
+  - button "DEMO" [ref=e300]
+```

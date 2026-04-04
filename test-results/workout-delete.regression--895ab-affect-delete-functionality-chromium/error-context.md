@@ -1,0 +1,447 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - region "Notifications alt+T"
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button "AmakaFlow AmakaFlow pro Alex Demo" [ref=e9]:
+        - generic [ref=e10]:
+          - img "AmakaFlow" [ref=e11]
+          - generic [ref=e12]:
+            - generic [ref=e13]:
+              - generic [ref=e14]: AmakaFlow
+              - generic [ref=e15]: pro
+            - paragraph [ref=e16]: Alex Demo
+      - navigation [ref=e17]:
+        - button "Dashboard" [ref=e18]:
+          - img
+          - text: Dashboard
+        - button "Create" [ref=e19]:
+          - img
+          - text: Create
+          - img
+        - button "Training" [ref=e20]:
+          - img
+          - text: Training
+          - img
+        - button "Insights" [ref=e21]:
+          - img
+          - text: Insights
+          - img
+    - generic [ref=e22]:
+      - button "Help" [ref=e23]:
+        - img
+        - text: Help
+      - button [ref=e24]:
+        - img
+      - generic [ref=e25]: Alex Demo
+  - generic [ref=e28]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - heading "My Workouts" [level=2] [ref=e32]
+          - paragraph [ref=e33]: 10 workouts
+        - generic [ref=e34]:
+          - button "Select" [ref=e35]:
+            - img
+            - text: Select
+          - button "Cards" [ref=e36]:
+            - img
+            - text: Cards
+          - button "Compact" [ref=e37]:
+            - img
+            - text: Compact
+      - generic [ref=e38]:
+        - textbox "Search workouts..." [ref=e39]
+        - button "All" [ref=e41]
+        - combobox "Sort by" [ref=e43]:
+          - option "Recently Added" [selected]
+          - option "Recently Used"
+          - option "Alphabetical (A-Z)"
+          - option "Alphabetical (Z-A)"
+          - option "Shortest Duration"
+          - option "Longest Duration"
+          - option "Fewest Exercises"
+          - option "Most Exercises"
+    - generic [ref=e44]:
+      - tablist [ref=e45]:
+        - tab "Library" [selected] [ref=e46]
+        - tab "Programs" [ref=e47]
+        - tab "History" [ref=e48]
+      - tabpanel "Library" [ref=e49]:
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - generic [ref=e56]:
+                - heading "Upper Body Strength" [level=3] [ref=e57]
+                - generic [ref=e58]:
+                  - img [ref=e59]
+                  - generic [ref=e60]: Not assigned
+              - generic [ref=e61]:
+                - generic [ref=e62]:
+                  - img [ref=e63]
+                  - text: Apr 3, 2026
+                - generic [ref=e66]:
+                  - img [ref=e67]
+                  - generic [ref=e72]: apple
+                - generic [ref=e73]: 4 exercises
+                - generic [ref=e74]: Strength
+            - generic [ref=e75]:
+              - button "Add tags" [ref=e76]:
+                - img
+              - button "Export to device" [ref=e77]:
+                - img
+              - button "Add to favorites" [ref=e78]:
+                - img
+              - button "View workout" [ref=e79]:
+                - img
+              - button "Edit workout" [ref=e80]:
+                - img
+              - button "Load workout" [ref=e81]:
+                - img
+              - button "Export workout" [ref=e82]:
+                - img
+              - button "Add to Calendar" [ref=e83]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e84]:
+                - img
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - heading "Hyrox Session" [level=3] [ref=e88]
+                - generic [ref=e90]:
+                  - img [ref=e91]
+                  - generic [ref=e94]: Strava
+              - generic [ref=e95]:
+                - generic [ref=e96]:
+                  - img [ref=e97]
+                  - text: Apr 2, 2026
+                - generic [ref=e100]:
+                  - img [ref=e101]
+                  - generic [ref=e106]: garmin
+                - generic [ref=e107]: 5 exercises
+                - generic [ref=e108]: HIIT
+            - generic [ref=e109]:
+              - button "Add tags" [ref=e110]:
+                - img
+              - button "Export to device" [ref=e111]:
+                - img
+              - button "Add to favorites" [ref=e112]:
+                - img
+              - button "View workout" [ref=e113]:
+                - img
+              - button "Edit workout" [ref=e114]:
+                - img
+              - button "Load workout" [ref=e115]:
+                - img
+              - button "Export workout" [ref=e116]:
+                - img
+              - button "Add to Calendar" [ref=e117]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e118]:
+                - img
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - generic [ref=e121]:
+                - heading "Lower Body Power" [level=3] [ref=e122]
+                - generic [ref=e124]:
+                  - img [ref=e125]
+                  - generic [ref=e128]: Strava
+              - generic [ref=e129]:
+                - generic [ref=e130]:
+                  - img [ref=e131]
+                  - text: Mar 31, 2026
+                - generic [ref=e134]:
+                  - img [ref=e135]
+                  - generic [ref=e140]: garmin
+                - generic [ref=e141]: 5 exercises
+                - generic [ref=e142]: Strength
+            - generic [ref=e143]:
+              - button "Add tags" [ref=e144]:
+                - img
+              - button "Export to device" [ref=e145]:
+                - img
+              - button "Add to favorites" [ref=e146]:
+                - img
+              - button "View workout" [ref=e147]:
+                - img
+              - button "Edit workout" [ref=e148]:
+                - img
+              - button "Load workout" [ref=e149]:
+                - img
+              - button "Export workout" [ref=e150]:
+                - img
+              - button "Add to Calendar" [ref=e151]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e152]:
+                - img
+          - generic [ref=e153]:
+            - generic [ref=e154]:
+              - generic [ref=e155]:
+                - heading "Morning Run" [level=3] [ref=e156]
+                - generic [ref=e158]:
+                  - img [ref=e159]
+                  - generic [ref=e162]: Strava
+              - generic [ref=e163]:
+                - generic [ref=e164]:
+                  - img [ref=e165]
+                  - text: Mar 30, 2026
+                - generic [ref=e168]:
+                  - img [ref=e169]
+                  - generic [ref=e174]: garmin
+                - generic [ref=e175]: 1 exercises
+                - generic [ref=e176]: Running
+            - generic [ref=e177]:
+              - button "Add tags" [ref=e178]:
+                - img
+              - button "Export to device" [ref=e179]:
+                - img
+              - button "Add to favorites" [ref=e180]:
+                - img
+              - button "View workout" [ref=e181]:
+                - img
+              - button "Edit workout" [ref=e182]:
+                - img
+              - button "Load workout" [ref=e183]:
+                - img
+              - button "Export workout" [ref=e184]:
+                - img
+              - button "Add to Calendar" [ref=e185]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e186]:
+                - img
+          - generic [ref=e187]:
+            - generic [ref=e188]:
+              - generic [ref=e189]:
+                - heading "Push Day — PPL" [level=3] [ref=e190]
+                - generic [ref=e191]:
+                  - img [ref=e192]
+                  - generic [ref=e193]: Not assigned
+              - generic [ref=e194]:
+                - generic [ref=e195]:
+                  - img [ref=e196]
+                  - text: Mar 28, 2026
+                - generic [ref=e199]:
+                  - img [ref=e200]
+                  - generic [ref=e205]: apple
+                - generic [ref=e206]: 5 exercises
+                - generic [ref=e207]: Strength
+            - generic [ref=e208]:
+              - button "Add tags" [ref=e209]:
+                - img
+              - button "Export to device" [ref=e210]:
+                - img
+              - button "Add to favorites" [ref=e211]:
+                - img
+              - button "View workout" [ref=e212]:
+                - img
+              - button "Edit workout" [ref=e213]:
+                - img
+              - button "Load workout" [ref=e214]:
+                - img
+              - button "Export workout" [ref=e215]:
+                - img
+              - button "Add to Calendar" [ref=e216]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e217]:
+                - img
+          - generic [ref=e218]:
+            - generic [ref=e219]:
+              - generic [ref=e220]:
+                - heading "Pull Day — PPL" [level=3] [ref=e221]
+                - generic [ref=e222]:
+                  - img [ref=e223]
+                  - generic [ref=e224]: Not assigned
+              - generic [ref=e225]:
+                - generic [ref=e226]:
+                  - img [ref=e227]
+                  - text: Mar 26, 2026
+                - generic [ref=e230]:
+                  - img [ref=e231]
+                  - generic [ref=e236]: apple
+                - generic [ref=e237]: 4 exercises
+                - generic [ref=e238]: Strength
+            - generic [ref=e239]:
+              - button "Add tags" [ref=e240]:
+                - img
+              - button "Export to device" [ref=e241]:
+                - img
+              - button "Add to favorites" [ref=e242]:
+                - img
+              - button "View workout" [ref=e243]:
+                - img
+              - button "Edit workout" [ref=e244]:
+                - img
+              - button "Load workout" [ref=e245]:
+                - img
+              - button "Export workout" [ref=e246]:
+                - img
+              - button "Add to Calendar" [ref=e247]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e248]:
+                - img
+          - generic [ref=e249]:
+            - generic [ref=e250]:
+              - generic [ref=e251]:
+                - heading "HIIT Cardio Blast" [level=3] [ref=e252]
+                - generic [ref=e254]:
+                  - img [ref=e255]
+                  - generic [ref=e258]: Strava
+              - generic [ref=e259]:
+                - generic [ref=e260]:
+                  - img [ref=e261]
+                  - text: Mar 24, 2026
+                - generic [ref=e264]:
+                  - img [ref=e265]
+                  - generic [ref=e268]: garmin
+                - generic [ref=e269]: 2 exercises
+                - generic [ref=e270]: HIIT
+            - generic [ref=e271]:
+              - button "Add tags" [ref=e272]:
+                - img
+              - button "Export to device" [ref=e273]:
+                - img
+              - button "Add to favorites" [ref=e274]:
+                - img
+              - button "View workout" [ref=e275]:
+                - img
+              - button "Edit workout" [ref=e276]:
+                - img
+              - button "Load workout" [ref=e277]:
+                - img
+              - button "Export workout" [ref=e278]:
+                - img
+              - button "Add to Calendar" [ref=e279]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e280]:
+                - img
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - heading "Leg Day — PPL" [level=3] [ref=e284]
+                - generic [ref=e285]:
+                  - img [ref=e286]
+                  - generic [ref=e287]: Not assigned
+              - generic [ref=e288]:
+                - generic [ref=e289]:
+                  - img [ref=e290]
+                  - text: Mar 21, 2026
+                - generic [ref=e293]:
+                  - img [ref=e294]
+                  - generic [ref=e299]: apple
+                - generic [ref=e300]: 3 exercises
+                - generic [ref=e301]: Strength
+            - generic [ref=e302]:
+              - button "Add tags" [ref=e303]:
+                - img
+              - button "Export to device" [ref=e304]:
+                - img
+              - button "Add to favorites" [ref=e305]:
+                - img
+              - button "View workout" [ref=e306]:
+                - img
+              - button "Edit workout" [ref=e307]:
+                - img
+              - button "Load workout" [ref=e308]:
+                - img
+              - button "Export workout" [ref=e309]:
+                - img
+              - button "Add to Calendar" [ref=e310]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e311]:
+                - img
+          - generic [ref=e312]:
+            - generic [ref=e313]:
+              - generic [ref=e314]:
+                - heading "Zone 2 Bike Ride" [level=3] [ref=e315]
+                - generic [ref=e317]:
+                  - img [ref=e318]
+                  - generic [ref=e321]: Strava
+              - generic [ref=e322]:
+                - generic [ref=e323]:
+                  - img [ref=e324]
+                  - text: Mar 19, 2026
+                - generic [ref=e327]:
+                  - img [ref=e328]
+                  - generic [ref=e333]: garmin
+                - generic [ref=e334]: 1 exercises
+                - generic [ref=e335]: Cycling
+            - generic [ref=e336]:
+              - button "Add tags" [ref=e337]:
+                - img
+              - button "Export to device" [ref=e338]:
+                - img
+              - button "Add to favorites" [ref=e339]:
+                - img
+              - button "View workout" [ref=e340]:
+                - img
+              - button "Edit workout" [ref=e341]:
+                - img
+              - button "Load workout" [ref=e342]:
+                - img
+              - button "Export workout" [ref=e343]:
+                - img
+              - button "Add to Calendar" [ref=e344]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e345]:
+                - img
+          - generic [ref=e346]:
+            - generic [ref=e347]:
+              - generic [ref=e348]:
+                - heading "Full Body Conditioning" [level=3] [ref=e349]
+                - generic [ref=e350]:
+                  - img [ref=e351]
+                  - generic [ref=e352]: Not assigned
+              - generic [ref=e353]:
+                - generic [ref=e354]:
+                  - img [ref=e355]
+                  - text: Mar 17, 2026
+                - generic [ref=e358]:
+                  - img [ref=e359]
+                  - generic [ref=e362]: apple
+                - generic [ref=e363]: 5 exercises
+                - generic [ref=e364]: Strength
+            - generic [ref=e365]:
+              - button "Add tags" [ref=e366]:
+                - img
+              - button "Export to device" [ref=e367]:
+                - img
+              - button "Add to favorites" [ref=e368]:
+                - img
+              - button "View workout" [ref=e369]:
+                - img
+              - button "Edit workout" [ref=e370]:
+                - img
+              - button "Load workout" [ref=e371]:
+                - img
+              - button "Export workout" [ref=e372]:
+                - img
+              - button "Add to Calendar" [ref=e373]:
+                - img
+                - text: Add to Calendar
+              - button "Delete workout" [ref=e374]:
+                - img
+        - generic [ref=e375]:
+          - generic [ref=e376]: Showing 1 – 10 of 10 workouts
+          - generic [ref=e377]:
+            - button "Previous" [disabled]
+            - generic [ref=e378]: Page 1 of 1
+            - button "Next" [disabled]
+  - generic [ref=e379]:
+    - generic [ref=e380]:
+      - img [ref=e381]
+      - generic [ref=e384]: Coming Soon
+    - button "AI Chat - Coming Soon" [disabled] [ref=e385]:
+      - img [ref=e386]
+  - button "DEMO" [ref=e388]
+```

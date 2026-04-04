@@ -1,0 +1,145 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - region "Notifications alt+T"
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button "AmakaFlow AmakaFlow pro Alex Demo" [ref=e9]:
+        - generic [ref=e10]:
+          - img "AmakaFlow" [ref=e11]
+          - generic [ref=e12]:
+            - generic [ref=e13]:
+              - generic [ref=e14]: AmakaFlow
+              - generic [ref=e15]: pro
+            - paragraph [ref=e16]: Alex Demo
+      - navigation [ref=e17]:
+        - button "Dashboard" [ref=e18]:
+          - img
+          - text: Dashboard
+        - button "Create" [ref=e19]:
+          - img
+          - text: Create
+          - img
+        - button "Training" [ref=e20]:
+          - img
+          - text: Training
+          - img
+        - button "Insights" [ref=e21]:
+          - img
+          - text: Insights
+          - img
+    - generic [ref=e22]:
+      - button "Help" [ref=e23]:
+        - img
+        - text: Help
+      - button [ref=e24]:
+        - img
+      - generic [ref=e25]: Alex Demo
+  - generic [ref=e26]:
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - heading "Create Workout" [level=1] [ref=e30]
+        - paragraph [ref=e31]: Ingest → Structure → Export
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: "1"
+            - generic [ref=e36]: Add Sources
+          - img [ref=e37]
+        - generic [ref=e40]:
+          - generic [ref=e41]: "2"
+          - generic [ref=e42]: Structure Workout
+    - main [ref=e43]:
+      - button "Back" [ref=e44]:
+        - img
+        - text: Back
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e51]:
+            - heading "New Workout" [level=4] [ref=e52]
+            - button "Workout Settings" [ref=e53]:
+              - img
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - img [ref=e56]
+              - generic [ref=e61]: Drag blocks and exercises to reorder
+            - generic [ref=e62]:
+              - button "Collapse All" [ref=e63]:
+                - img
+                - text: Collapse All
+              - button "Expand All" [ref=e64]:
+                - img
+                - text: Expand All
+          - generic [ref=e65]:
+            - img [ref=e66]
+            - generic [ref=e68]: No warm-up found. Want to add one?
+            - button "Add Warm-up" [ref=e69]: + Add Warm-up
+            - button "skip" [ref=e70]: Skip
+          - generic [ref=e71]:
+            - img [ref=e72]
+            - generic [ref=e74]: No default rest set. Add a rest period that applies to all blocks?
+            - button "Set Rest" [ref=e75]: + Set Rest
+            - button "skip" [ref=e76]: Skip
+          - generic [ref=e78]:
+            - generic [ref=e83]:
+              - button [ref=e84]:
+                - img [ref=e85]
+              - combobox [ref=e92]:
+                - generic: Type
+                - img
+              - generic [ref=e93]: Workout
+              - generic [ref=e94]: 0 exercises
+              - button "Show" [ref=e95]:
+                - img
+                - generic [ref=e96]: Show
+              - button "Edit block name" [ref=e97]:
+                - img
+              - button "Delete block" [ref=e98]:
+                - img
+            - generic [ref=e103]:
+              - button [ref=e104]:
+                - img [ref=e105]
+              - combobox [ref=e112]:
+                - generic: Sets
+                - img
+              - generic [ref=e113]: Sets
+              - generic [ref=e114]: 0 exercises
+              - button "Show" [ref=e115]:
+                - img
+                - generic [ref=e116]: Show
+              - button "configure" [ref=e117]:
+                - img
+                - text: Configure
+              - button "Edit block name" [ref=e118]:
+                - img
+              - button "Delete block" [ref=e119]:
+                - img
+          - generic [ref=e120]:
+            - img [ref=e121]
+            - generic [ref=e123]: No cooldown found. Want to add one?
+            - button "Add Cooldown" [ref=e124]: + Add Cooldown
+            - button "skip" [ref=e125]: Skip
+          - button "Add Block" [ref=e126]:
+            - img
+            - text: Add Block
+          - generic [ref=e129]:
+            - button "Export" [ref=e130]:
+              - img
+              - text: Export
+            - button "Copy JSON" [ref=e131]:
+              - img
+              - text: Copy JSON
+        - status [ref=e132]
+    - generic [ref=e136]:
+      - generic [ref=e137]: New Workout
+      - generic [ref=e138]: 2 block(s)
+      - generic [ref=e139]: 0 exercise(s)
+  - generic [ref=e140]:
+    - generic [ref=e141]:
+      - img [ref=e142]
+      - generic [ref=e145]: Coming Soon
+    - button "AI Chat - Coming Soon" [disabled] [ref=e146]:
+      - img [ref=e147]
+  - button "DEMO" [ref=e149]
+```
