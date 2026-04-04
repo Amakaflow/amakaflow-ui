@@ -261,7 +261,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Sidebar */}
-      <div className={`border-r border-border bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
+      <div className={`border-r border-border bg-[#f8f9fa] dark:bg-background flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
         {!sidebarCollapsed && (
           <>
             {showMiniCalendar && (
@@ -555,15 +555,15 @@ function ListView({ events, onEventClick }: { events: CalendarEvent[]; onEventCl
 }
 
 function getEventColorClass(type?: WorkoutType): string {
-  if (!type) return 'bg-gray-100 border-gray-300 text-gray-900';
+  if (!type) return 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100';
   const colors: Record<WorkoutType, string> = {
-    run: 'bg-blue-100 border-blue-300 text-blue-900',
-    strength: 'bg-purple-100 border-purple-300 text-purple-900',
-    hyrox: 'bg-red-100 border-red-300 text-red-900',
-    class: 'bg-green-100 border-green-300 text-green-900',
-    home_workout: 'bg-yellow-100 border-yellow-300 text-yellow-900',
-    mobility: 'bg-indigo-100 border-indigo-300 text-indigo-900',
-    recovery: 'bg-gray-100 border-gray-300 text-gray-900',
+    run: 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-200',
+    strength: 'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 text-purple-900 dark:text-purple-200',
+    hyrox: 'bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700 text-red-900 dark:text-red-200',
+    class: 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700 text-green-900 dark:text-green-200',
+    home_workout: 'bg-yellow-100 dark:bg-yellow-900/40 border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-200',
+    mobility: 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200',
+    recovery: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100',
   };
   return colors[type] || colors.recovery;
 }

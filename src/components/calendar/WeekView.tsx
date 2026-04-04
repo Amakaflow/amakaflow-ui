@@ -19,13 +19,13 @@ const END_HOUR = 19;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 
 const typeColors: Record<WorkoutType, { bg: string; border: string; text: string }> = {
-  run: { bg: 'bg-blue-100', border: 'border-l-blue-500', text: 'text-blue-900' },
-  strength: { bg: 'bg-purple-100', border: 'border-l-purple-500', text: 'text-purple-900' },
-  hyrox: { bg: 'bg-red-100', border: 'border-l-red-500', text: 'text-red-900' },
-  class: { bg: 'bg-green-100', border: 'border-l-green-500', text: 'text-green-900' },
-  home_workout: { bg: 'bg-amber-100', border: 'border-l-amber-500', text: 'text-amber-900' },
-  mobility: { bg: 'bg-indigo-100', border: 'border-l-indigo-500', text: 'text-indigo-900' },
-  recovery: { bg: 'bg-slate-100', border: 'border-l-slate-500', text: 'text-slate-900' },
+  run: { bg: 'bg-blue-100 dark:bg-blue-900/40', border: 'border-l-blue-500 dark:border-l-blue-400', text: 'text-blue-900 dark:text-blue-200' },
+  strength: { bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-l-purple-500 dark:border-l-purple-400', text: 'text-purple-900 dark:text-purple-200' },
+  hyrox: { bg: 'bg-red-100 dark:bg-red-900/40', border: 'border-l-red-500 dark:border-l-red-400', text: 'text-red-900 dark:text-red-200' },
+  class: { bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-l-green-500 dark:border-l-green-400', text: 'text-green-900 dark:text-green-200' },
+  home_workout: { bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-l-amber-500 dark:border-l-amber-400', text: 'text-amber-900 dark:text-amber-200' },
+  mobility: { bg: 'bg-indigo-100 dark:bg-indigo-900/40', border: 'border-l-indigo-500 dark:border-l-indigo-400', text: 'text-indigo-900 dark:text-indigo-200' },
+  recovery: { bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-l-slate-500 dark:border-l-slate-400', text: 'text-slate-900 dark:text-slate-200' },
 };
 
 export function WeekView({
