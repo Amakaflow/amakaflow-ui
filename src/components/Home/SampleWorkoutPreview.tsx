@@ -83,7 +83,7 @@ export function SampleWorkoutPreview() {
                   Every exercise is validated by you before export
                 </span>
                 <span className="text-xs font-medium text-green-600 dark:text-green-400 flex-shrink-0">
-                  AI Accuracy: 92%
+                  AI-assisted with human verification
                 </span>
               </div>
             </CardContent>

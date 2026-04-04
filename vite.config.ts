@@ -64,6 +64,7 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false, // stops xdg-open ENOENT spam in container
+    allowedHosts: true, // Allow all hosts including ngrok tunnels
   },
   test: {
     globals: true,
