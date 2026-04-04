@@ -16,3 +16,18 @@ export type {
   ChatContext,
   StreamChatOptions,
 } from '../../lib/chat-api';
+
+// Chat settings REST API (AMA-1422)
+export {
+  getChatSettings,
+  updateChatSettings,
+  DEFAULT_CHAT_PREFERENCES,
+} from '../../lib/chat-settings-api';
+
+export type {
+  ChatPreferences,
+  ChatTone,
+  ChatFocusArea,
+  ChatExperienceLevel,
+  ChatPreferredStyle,
+} from '../../lib/chat-settings-api';
