@@ -16,8 +16,8 @@ import {
   Dumbbell,
   FolderOpen,
   HelpCircle,
-  LayoutDashboard,
   Plus,
+  RefreshCw,
   Settings,
   Sparkles,
 } from 'lucide-react';
@@ -57,7 +57,7 @@ export function NavBar({
 
   const isCreateActive = currentView === 'workflow' || currentView === 'import' || currentView === 'create-ai';
   const isTrainingActive = currentView === 'calendar' || currentView === 'workouts' || currentView === 'programs';
-  const isInsightsActive = currentView === 'analytics' || currentView === 'dashboard';
+  const isInsightsActive = currentView === 'analytics';
 
   return (
     <div className="hidden md:block border-b bg-card">
@@ -90,18 +90,6 @@ export function NavBar({
             </div>
 
             <nav className="hidden md:flex items-center gap-1">
-              {/* Dashboard - direct */}
-              <Button
-                variant={currentView === 'dashboard' ? 'default' : 'ghost'}
-                size="sm"
-                data-assistant-target="nav-dashboard"
-                onClick={() => handleNavigate('dashboard')}
-                className="gap-2"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
-              </Button>
-
               {/* Create dropdown: Import, Create with AI */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -167,32 +155,31 @@ export function NavBar({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Insights dropdown: Analytics, Dashboard */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant={isInsightsActive ? 'default' : 'ghost'}
-                    size="sm"
-                    className="gap-1"
-                    data-testid="nav-insights-menu"
-                    data-assistant-target="nav-analytics"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    Insights
-                    <ChevronDown className="w-3 h-3 ml-0.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => handleNavigate('analytics')}>
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Analytics
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleNavigate('dashboard')}>
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Sync Dashboard
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Insights — Analytics only */}
+              <Button
+                variant={isInsightsActive ? 'default' : 'ghost'}
+                size="sm"
+                data-testid="nav-insights-menu"
+                data-assistant-target="nav-analytics"
+                onClick={() => handleNavigate('analytics')}
+                className="gap-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Insights
+              </Button>
+
+              {/* Sync Dashboard — direct top-level item */}
+              <Button
+                variant={currentView === 'dashboard' ? 'default' : 'ghost'}
+                size="sm"
+                data-testid="nav-sync"
+                data-assistant-target="nav-sync"
+                onClick={() => handleNavigate('dashboard')}
+                className="gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Sync
+              </Button>
 
               {stravaConnected && (
                 <Button

@@ -4,6 +4,7 @@ import {
   Home,
   BarChart3,
   Menu,
+  RefreshCw,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { View } from '../app/router';
@@ -26,8 +27,8 @@ const TABS: NavTab[] = [
   { id: 'home', label: 'Home', icon: Home, matchViews: ['home', 'import', 'workflow', 'create-ai'] },
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'settings', label: 'More', icon: Menu, matchViews: ['settings', 'help', 'programs', 'strava-enhance', 'mobile-companion', 'team', 'program-detail', 'export-page', 'connections', 'coach', 'training-preferences'] },
+  { id: 'dashboard', label: 'Sync', icon: RefreshCw },
+  { id: 'settings', label: 'More', icon: Menu, matchViews: ['settings', 'help', 'programs', 'strava-enhance', 'mobile-companion', 'team', 'program-detail', 'export-page', 'connections', 'coach', 'training-preferences', 'analytics'] },
 ];
 
 function isActive(tab: NavTab, currentView: View): boolean {
