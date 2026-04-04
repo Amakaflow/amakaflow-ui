@@ -226,13 +226,15 @@ export function SyncDashboard({ className }: SyncDashboardProps) {
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as FeedTab)}
         >
-          <TabsList className="mb-4">
-            {FEED_TABS.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="text-xs sm:text-sm">
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="overflow-x-auto -mx-1 px-1 mb-4">
+            <TabsList className="w-max min-w-full">
+              {FEED_TABS.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} className="text-xs sm:text-sm min-h-[44px] sm:min-h-0">
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           {FEED_TABS.map((tab) => (
             <TabsContent key={tab.id} value={tab.id}>

@@ -139,7 +139,7 @@ export function AppShell() {
           hasClerk={hasClerk}
           onNavigate={navigate}
         />
-        <div className="pb-16 md:pb-0">
+        <div className="pb-16 md:pb-0 overflow-x-hidden">
           <Suspense fallback={<LoadingSpinner />}>
             <Routes location={displayLocation}>
               {/* Home */}
@@ -407,16 +407,18 @@ function HomeRoute({
 }) {
   if (workflowState.welcomeDismissed) {
     return (
-      <HomeScreen
-        user={user}
-        recentWorkouts={workoutHistoryList}
-        onNavigate={navigate}
-      />
+      <div className="py-6 sm:py-8">
+        <HomeScreen
+          user={user}
+          recentWorkouts={workoutHistoryList}
+          onNavigate={navigate}
+        />
+      </div>
     );
   }
   return (
     <>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         <WelcomeGuide
           onGetStarted={() => {
             workflowState.handleWelcomeDismiss();

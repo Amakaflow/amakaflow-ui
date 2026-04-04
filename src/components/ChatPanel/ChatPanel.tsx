@@ -52,9 +52,9 @@ export function ChatPanel() {
           onClick={togglePanel}
           className={cn(
             'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95',
-            // Mobile: bottom-right for right-thumb reach
+            // Mobile: above BottomNav (64px) + safe area, right side for thumb reach
             // Desktop: bottom-left to not conflict with panel
-            isMobile ? 'bottom-4 right-4' : 'bottom-6 left-6'
+            isMobile ? 'bottom-20 right-4' : 'bottom-6 left-6'
           )}
           style={
             isMobile

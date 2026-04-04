@@ -101,20 +101,20 @@ export function SampleWorkoutPreview({ onNavigate }: SampleWorkoutPreviewProps =
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-1">
         <div>
           <h2 className="text-lg font-semibold">See what AmakaFlow produces</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Paste a YouTube link and get a structured, ready-to-export workout in seconds.
           </p>
         </div>
-        <div className="flex gap-2 ml-4 flex-shrink-0">
+        <div className="flex gap-2 sm:ml-4 sm:flex-shrink-0">
           {!isPlaying && (
             <Button
               size="sm"
               variant="outline"
               onClick={runDemo}
-              className="gap-1.5 text-xs"
+              className="gap-1.5 text-xs flex-1 sm:flex-none min-h-[44px] sm:min-h-0"
             >
               <Play className="w-3.5 h-3.5" />
               Watch demo
@@ -123,7 +123,7 @@ export function SampleWorkoutPreview({ onNavigate }: SampleWorkoutPreviewProps =
           <Button
             size="sm"
             onClick={handleTryItLive}
-            className="gap-1.5 text-xs"
+            className="gap-1.5 text-xs flex-1 sm:flex-none min-h-[44px] sm:min-h-0"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Try it live

@@ -62,7 +62,10 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [eventDialogData, setEventDialogData] = useState<{ date?: string; startTime?: string; source?: WorkoutSource } | null>(null);
   const [showEventDrawer, setShowEventDrawer] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Collapse sidebar by default on mobile (screen narrower than 768px)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
   const [showMiniCalendar, setShowMiniCalendar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSmartPlanner, setShowSmartPlanner] = useState(false);
@@ -365,35 +368,38 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
 
       {/* Main Calendar View */}
       <div className="flex-1 flex flex-col">
-        <div className="border-b bg-card p-4 flex items-center justify-between sticky top-0 z-40 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+        <div className="border-b bg-card p-2 sm:p-4 flex flex-wrap items-center gap-2 sticky top-0 z-40 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="min-h-[44px] min-w-[44px]" aria-label="Toggle sidebar">
               <Menu className="w-5 h-5" />
             </Button>
-            <Button variant="outline" size="sm" onClick={handleToday}>Today</Button>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={handlePreviousWeek}><ChevronLeft className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={handleNextWeek}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="outline" size="sm" onClick={handleToday} className="min-h-[44px]">Today</Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={handlePreviousWeek} className="min-h-[44px] min-w-[44px]" aria-label="Previous"><ChevronLeft className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={handleNextWeek} className="min-h-[44px] min-w-[44px]" aria-label="Next"><ChevronRight className="w-4 h-4" /></Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center border rounded-md">
-              <Button variant={viewMode === 'training' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('training')} className="rounded-r-none">Training</Button>
-              <Button variant={viewMode === 'week' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('week')} className="rounded-none border-x">Week</Button>
-              <Button variant={viewMode === 'month' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('month')} className="rounded-none border-x">Month</Button>
-              <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="rounded-l-none">List</Button>
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <div className="flex items-center border rounded-md overflow-hidden">
+              <Button variant={viewMode === 'training' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('training')} className="rounded-r-none text-xs px-2 min-h-[44px] sm:min-h-0">Training</Button>
+              <Button variant={viewMode === 'week' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('week')} className="rounded-none border-x text-xs px-2 min-h-[44px] sm:min-h-0">Week</Button>
+              <Button variant={viewMode === 'month' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('month')} className="rounded-none border-x text-xs px-2 min-h-[44px] sm:min-h-0">Month</Button>
+              <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="rounded-l-none text-xs px-2 min-h-[44px] sm:min-h-0">List</Button>
             </div>
 
-            <Button variant="ghost" size="sm" onClick={() => setShowSmartPlanner(true)} className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowSmartPlanner(true)} className="gap-1 text-xs min-h-[44px] sm:min-h-0 hidden sm:flex">
               <Sparkles className="w-4 h-4" />
               Smart Plan Week
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowSmartPlanner(true)} className="sm:hidden min-h-[44px] min-w-[44px]" aria-label="Smart Planner">
+              <Sparkles className="w-4 h-4" />
             </Button>
 
             <DropdownMenu open={newDropdownOpen} onOpenChange={setNewDropdownOpen} modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm">
-                  <Plus className="w-4 h-4 mr-2" />New<ChevronDown className="w-4 h-4 ml-1" />
+                <Button variant="default" size="sm" className="min-h-[44px] sm:min-h-0" aria-label="New event menu">
+                  <Plus className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">New</span><ChevronDown className="w-4 h-4 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
