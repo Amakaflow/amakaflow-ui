@@ -14,6 +14,7 @@ import {
   Monitor,
   ArrowDownToLine,
 } from 'lucide-react';
+import { PricingSection } from './Home/PricingSection';
 
 interface WelcomeGuideProps {
   onGetStarted: () => void;
@@ -160,6 +161,9 @@ export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
                 <footer className="text-xs font-medium mt-0.5">— David, Founder</footer>
               </blockquote>
             </div>
+
+            {/* Pricing preview */}
+            <PricingSection />
 
             <div className="flex gap-3 pt-2">
               <Button onClick={onGetStarted} size="lg" className="flex-1">
