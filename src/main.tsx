@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import { AppShell } from "./app/AppShell.tsx";
 import { ClerkWrapper } from "./components/ClerkWrapper.tsx";
+import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { isDemoMode } from "./lib/demo-mode";
 import "./index.css";
 
@@ -42,11 +43,13 @@ enableMocking()
   .then(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>
-        <BrowserRouter>
-          <ClerkWrapper>
-            <AppShell />
-          </ClerkWrapper>
-        </BrowserRouter>
+        <ThemeProvider>
+          <BrowserRouter>
+            <ClerkWrapper>
+              <AppShell />
+            </ClerkWrapper>
+          </BrowserRouter>
+        </ThemeProvider>
       </StrictMode>
     );
   });

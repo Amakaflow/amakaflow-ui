@@ -29,6 +29,24 @@
 
     <!-- PWA Manifest (future) -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Eager theme initializer: apply stored theme before React mounts to avoid flash -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('amakaflow-theme');
+          var theme = (stored === 'dark' || stored === 'light' || stored === 'system') ? stored : 'system';
+          var resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme;
+          if (resolved === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>

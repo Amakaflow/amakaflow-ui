@@ -10,6 +10,7 @@ import { MOCK_WORKOUT_HISTORY } from '../../lib/mock-data/workouts';
 import { TrustSignals } from './TrustSignals';
 import { SampleWorkoutPreview } from './SampleWorkoutPreview';
 import { SupportedDevices } from './SupportedDevices';
+import { PricingSection } from './PricingSection';
 import { PrivacyFooter } from './PrivacyFooter';
 
 interface HomeScreenProps {
@@ -149,10 +150,13 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
       </div>
 
       {/* Sample workout preview — shows what AmakaFlow produces */}
-      <SampleWorkoutPreview />
+      <SampleWorkoutPreview onNavigate={onNavigate} />
 
       {/* Supported devices grid */}
       <SupportedDevices />
+
+      {/* Pricing section */}
+      <PricingSection />
 
       {/* Recent workouts */}
       <div>
