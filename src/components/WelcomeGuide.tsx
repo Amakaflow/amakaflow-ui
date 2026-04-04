@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  Youtube, 
-  Image as ImageIcon, 
+import {
+  Youtube,
+  Image as ImageIcon,
   Bot,
   FileText,
   ShieldCheck,
   Download,
   X,
-  Play
+  Play,
+  Monitor,
+  ArrowDownToLine,
 } from 'lucide-react';
 
 interface WelcomeGuideProps {
@@ -122,12 +124,49 @@ export function WelcomeGuide({ onGetStarted, onDismiss }: WelcomeGuideProps) {
               ))}
             </div>
 
-            <div className="flex gap-3 pt-4">
+            {/* Compact trust signals */}
+            <div className="rounded-lg border bg-muted/20 px-4 py-3 space-y-2">
+              {/* Device icons row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-medium text-muted-foreground mr-1">Works with:</span>
+                {[
+                  { emoji: '⌚', label: 'Garmin' },
+                  { emoji: '🍎', label: 'Apple Watch' },
+                  { emoji: '🚴', label: 'Zwift' },
+                  { emoji: '▶️', label: 'YouTube' },
+                  { emoji: '📸', label: 'Instagram' },
+                ].map((d) => (
+                  <span key={d.label} title={d.label} className="text-lg leading-none" aria-label={d.label}>
+                    {d.emoji}
+                  </span>
+                ))}
+              </div>
+              {/* One-liner stat */}
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                AI-assisted with human verification
+                <span className="text-muted-foreground/40">•</span>
+                <Monitor className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                6 platforms
+                <span className="text-muted-foreground/40">•</span>
+                <ArrowDownToLine className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                Import from YouTube, Instagram &amp; more
+              </p>
+              {/* Founder quote */}
+              <blockquote className="border-l-2 border-primary pl-2.5">
+                <p className="text-xs text-muted-foreground italic">
+                  "I built this because I was tired of manually copying workouts."
+                </p>
+                <footer className="text-xs font-medium mt-0.5">— David, Founder</footer>
+              </blockquote>
+            </div>
+
+            <div className="flex gap-3 pt-2">
               <Button onClick={onGetStarted} size="lg" className="flex-1">
                 <Play className="w-4 h-4 mr-2" />
                 Get Started
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={handleDismiss}
                 size="lg"
