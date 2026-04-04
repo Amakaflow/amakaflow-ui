@@ -370,13 +370,13 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
       <div className="flex-1 flex flex-col">
         <div className="border-b bg-card p-2 sm:p-4 flex flex-wrap items-center gap-2 sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="min-h-[44px] min-w-[44px]">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="min-h-[44px] min-w-[44px]" aria-label="Toggle sidebar">
               <Menu className="w-5 h-5" />
             </Button>
             <Button variant="outline" size="sm" onClick={handleToday} className="min-h-[44px]">Today</Button>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={handlePreviousWeek} className="min-h-[44px] min-w-[44px]"><ChevronLeft className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={handleNextWeek} className="min-h-[44px] min-w-[44px]"><ChevronRight className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={handlePreviousWeek} className="min-h-[44px] min-w-[44px]" aria-label="Previous"><ChevronLeft className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={handleNextWeek} className="min-h-[44px] min-w-[44px]" aria-label="Next"><ChevronRight className="w-4 h-4" /></Button>
             </div>
           </div>
 
@@ -392,13 +392,13 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
               <Sparkles className="w-4 h-4" />
               Smart Plan Week
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setShowSmartPlanner(true)} className="sm:hidden min-h-[44px] min-w-[44px]">
+            <Button variant="ghost" size="icon" onClick={() => setShowSmartPlanner(true)} className="sm:hidden min-h-[44px] min-w-[44px]" aria-label="Smart Planner">
               <Sparkles className="w-4 h-4" />
             </Button>
 
             <DropdownMenu open={newDropdownOpen} onOpenChange={setNewDropdownOpen} modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm" className="min-h-[44px] sm:min-h-0">
+                <Button variant="default" size="sm" className="min-h-[44px] sm:min-h-0" aria-label="New event menu">
                   <Plus className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">New</span><ChevronDown className="w-4 h-4 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
