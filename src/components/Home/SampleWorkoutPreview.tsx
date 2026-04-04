@@ -91,7 +91,7 @@ export function SampleWorkoutPreview({ onNavigate }: SampleWorkoutPreviewProps =
     if (onNavigate) {
       // Navigate to import with a pre-filled URL via query param
       onNavigate('import');
-    } else {
+    } else if (typeof window !== 'undefined') {
       // Fallback: navigate via window location
       window.location.href = '/import?url=' + encodeURIComponent(DEMO_URL);
     }

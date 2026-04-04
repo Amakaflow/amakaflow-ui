@@ -39,6 +39,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() =>
+    theme === 'system' ? getSystemTheme() : theme
+  );
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
@@ -53,16 +56,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Apply on mount and listen for system changes
   useEffect(() => {
     applyTheme(theme);
+    const newResolvedTheme = theme === 'system' ? getSystemTheme() : theme;
+    setResolvedTheme(newResolvedTheme);
 
     if (theme === 'system') {
       const mql = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = () => applyTheme('system');
+      const handler = () => {
+        applyTheme('system');
+        setResolvedTheme(getSystemTheme());
+      };
       mql.addEventListener('change', handler);
       return () => mql.removeEventListener('change', handler);
     }
   }, [theme]);
-
-  const resolvedTheme = theme === 'system' ? getSystemTheme() : theme;
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
