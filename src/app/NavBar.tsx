@@ -11,15 +11,21 @@ import {
 import {
   Activity,
   BarChart3,
+  Bot,
   CalendarDays,
   ChevronDown,
   Dumbbell,
   FolderOpen,
+  Flame,
   HelpCircle,
+  MessageSquare,
   Plus,
   RefreshCw,
   Settings,
   Sparkles,
+  Trophy,
+  UtensilsCrossed,
+  Users,
 } from 'lucide-react';
 import { isDemoMode } from '../lib/demo-mode';
 import type { AppUser } from './useAppAuth';
@@ -57,7 +63,8 @@ export function NavBar({
 
   const isCreateActive = currentView === 'workflow' || currentView === 'import' || currentView === 'create-ai';
   const isTrainingActive = currentView === 'calendar' || currentView === 'workouts' || currentView === 'programs';
-  const isInsightsActive = currentView === 'analytics';
+  const isInsightsActive = currentView === 'analytics' || currentView === 'nutrition' || currentView === 'gamification';
+  const isCommunityActive = currentView === 'social' || currentView === 'challenges' || currentView === 'crews';
 
   return (
     <div className="hidden md:block border-b bg-card">
@@ -155,17 +162,78 @@ export function NavBar({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Insights — Analytics only */}
+              {/* Insights dropdown: Analytics, Nutrition, Gamification */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isInsightsActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1"
+                    data-testid="nav-insights-menu"
+                    data-assistant-target="nav-analytics"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Insights
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => handleNavigate('analytics')}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Analytics
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('nutrition')}>
+                    <UtensilsCrossed className="w-4 h-4 mr-2" />
+                    Nutrition
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('gamification')}>
+                    <Trophy className="w-4 h-4 mr-2" />
+                    Progress &amp; Badges
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Community dropdown: Feed, Challenges, Crews */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isCommunityActive ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1"
+                    data-testid="nav-community-menu"
+                  >
+                    <Users className="w-4 h-4" />
+                    Community
+                    <ChevronDown className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => handleNavigate('social')}>
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Feed
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('challenges')}>
+                    <Flame className="w-4 h-4 mr-2" />
+                    Challenges
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNavigate('crews')}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Crews
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* AI Coach — direct top-level item */}
               <Button
-                variant={isInsightsActive ? 'default' : 'ghost'}
+                variant={currentView === 'coach' ? 'default' : 'ghost'}
                 size="sm"
-                data-testid="nav-insights-menu"
-                data-assistant-target="nav-analytics"
-                onClick={() => handleNavigate('analytics')}
+                data-testid="nav-coach"
+                data-assistant-target="nav-coach"
+                onClick={() => handleNavigate('coach')}
                 className="gap-2"
               >
-                <BarChart3 className="w-4 h-4" />
-                Insights
+                <Bot className="w-4 h-4" />
+                AI Coach
               </Button>
 
               {/* Sync Dashboard — direct top-level item */}

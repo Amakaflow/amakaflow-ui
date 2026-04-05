@@ -36,6 +36,11 @@ import {
   CoachChat,
   SyncDashboardPage,
   TrainingPreferencesPage,
+  NutritionPage,
+  SocialFeedPage,
+  ChallengesPage,
+  CrewsPage,
+  GamificationPage,
 } from './router';
 import { TeamSharing } from '../components/TeamSharing';
 import { HomeScreen } from '../components/Home/HomeScreen';
@@ -335,6 +340,17 @@ export function AppShell() {
                   </div>
                 }
               />
+
+              {/* Nutrition */}
+              <Route path="/nutrition" element={<NutritionPage />} />
+
+              {/* Social */}
+              <Route path="/social" element={<SocialFeedPage />} />
+              <Route path="/challenges" element={<ChallengesPage />} />
+              <Route path="/crews" element={<CrewsPage />} />
+
+              {/* Gamification */}
+              <Route path="/gamification" element={<GamificationPage />} />
 
               {/* Help */}
               <Route path="/help" element={<HelpPage onBack={() => navigate('home')} />} />
