@@ -41,6 +41,7 @@ import {
   ChallengesPage,
   CrewsPage,
   GamificationPage,
+  MorePage,
 } from './router';
 import { TeamSharing } from '../components/TeamSharing';
 import { HomeScreen } from '../components/Home/HomeScreen';
@@ -351,6 +352,9 @@ export function AppShell() {
 
               {/* Gamification */}
               <Route path="/gamification" element={<GamificationPage />} />
+
+              {/* More menu */}
+              <Route path="/more" element={<MorePage />} />
 
               {/* Help */}
               <Route path="/help" element={<HelpPage onBack={() => navigate('home')} />} />

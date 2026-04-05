@@ -25,7 +25,8 @@ export type View =
   | 'social'
   | 'challenges'
   | 'crews'
-  | 'gamification';
+  | 'gamification'
+  | 'more';
 
 export const AnalyticsHub = lazy(() =>
   import('../components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub }))
@@ -105,4 +106,8 @@ export const CrewsPage = lazy(() =>
 
 export const GamificationPage = lazy(() =>
   import('../components/Gamification/GamificationPage').then(m => ({ default: m.GamificationPage }))
+);
+
+export const MorePage = lazy(() =>
+  import('../components/MorePage').then(m => ({ default: m.MorePage }))
 );

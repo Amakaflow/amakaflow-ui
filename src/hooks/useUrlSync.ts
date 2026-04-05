@@ -31,6 +31,7 @@ export const VIEW_TO_PATH: Record<View, string> = {
   challenges: '/challenges',
   crews: '/crews',
   gamification: '/gamification',
+  more: '/more',
 };
 
 const PATH_TO_VIEW: Record<string, View> = Object.fromEntries(
