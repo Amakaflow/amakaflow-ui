@@ -20,7 +20,12 @@ export type View =
   | 'connections'
   | 'coach'
   | 'training-preferences'
-  | 'dashboard';
+  | 'dashboard'
+  | 'nutrition'
+  | 'social'
+  | 'challenges'
+  | 'crews'
+  | 'gamification';
 
 export const AnalyticsHub = lazy(() =>
   import('../components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub }))
@@ -80,4 +85,24 @@ export const SyncDashboardPage = lazy(() =>
 
 export const TrainingPreferencesPage = lazy(() =>
   import('../components/TrainingPreferences').then(m => ({ default: m.TrainingPreferencesPage }))
+);
+
+export const NutritionPage = lazy(() =>
+  import('../components/Nutrition/NutritionPage').then(m => ({ default: m.NutritionPage }))
+);
+
+export const SocialFeedPage = lazy(() =>
+  import('../components/Social/SocialFeedPage').then(m => ({ default: m.SocialFeedPage }))
+);
+
+export const ChallengesPage = lazy(() =>
+  import('../components/Social/ChallengesPage').then(m => ({ default: m.ChallengesPage }))
+);
+
+export const CrewsPage = lazy(() =>
+  import('../components/Social/CrewsPage').then(m => ({ default: m.CrewsPage }))
+);
+
+export const GamificationPage = lazy(() =>
+  import('../components/Gamification/GamificationPage').then(m => ({ default: m.GamificationPage }))
 );
