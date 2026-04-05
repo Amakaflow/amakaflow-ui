@@ -23,8 +23,8 @@ const DEMO_COUNTS: Record<string, number> = {
   manual: 1,
 };
 const DEMO_CONNECTED_CALENDARS = [
-  { registryId: 'runna', label: 'Runna – Subscribed', connectionId: 'demo-runna-1', workoutCount: 3 },
-  { registryId: 'apple-calendar', label: 'Apple Calendar', connectionId: 'demo-apple-cal-1', workoutCount: 3 },
+  { registryId: 'runna', label: 'Runna – Subscribed', connectionId: 'conn-cal-runna-1', workoutCount: 3 },
+  { registryId: 'apple-calendar', label: 'Apple Calendar', connectionId: 'conn-cal-apple-1', workoutCount: 3 },
 ];
 
 interface UseWorkoutSourcesProps {

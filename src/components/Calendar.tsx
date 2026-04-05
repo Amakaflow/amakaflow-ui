@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { 
   Calendar as CalendarIcon, 
@@ -17,7 +16,6 @@ import {
   Search,
   Sparkles,
   Dumbbell,
-  Link as LinkIcon,
   Settings
 } from 'lucide-react';
 import {
@@ -80,8 +78,10 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   const monthEnd = endOfMonth(currentDate);
 
   // Use the appropriate range based on view mode
+  // List view shows 4 weeks ahead for an "upcoming" experience
+  const listEnd = endOfWeek(addWeeks(currentDate, 3), { weekStartsOn: 0 });
   const rangeStart = viewMode === 'month' ? monthStart : weekStart;
-  const rangeEnd = viewMode === 'month' ? monthEnd : weekEnd;
+  const rangeEnd = viewMode === 'month' ? monthEnd : viewMode === 'list' ? listEnd : weekEnd;
 
   // Use calendar API hooks
   const {
@@ -249,6 +249,20 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   // Cast events to CalendarEvent type for compatibility
   const typedEvents = events as unknown as CalendarEvent[];
 
+  // Compute source event counts — only show sources with actual events
+  const sourcesWithCounts = workoutSources
+    .map(source => {
+      const filterId = source.connectionId ?? source.id;
+      const eventCount = typedEvents.filter(e => {
+        if (source.connectionId) {
+          return e.source === 'connected_calendar' && e.connected_calendar_id === source.connectionId;
+        }
+        return source.matchesSources.includes(e.source);
+      }).length;
+      return { source, filterId, eventCount };
+    })
+    .filter(({ eventCount }) => eventCount > 0);
+
   const filteredEvents = typedEvents.filter(event => {
     if (activeFilters.length === 0) return true;
     return workoutSources
@@ -264,7 +278,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Sidebar */}
-      <div className={`border-r border-border bg-[#f8f9fa] dark:bg-background flex-col transition-all duration-300 hidden md:flex ${sidebarCollapsed ? 'md:w-0 md:overflow-hidden' : 'w-52 lg:w-64'}`}>
+      <div className={`border-r border-border bg-muted/50 flex-col transition-all duration-300 hidden md:flex ${sidebarCollapsed ? 'md:w-0 md:overflow-hidden' : 'w-52 lg:w-64'}`}>
         {!sidebarCollapsed && (
           <>
             {showMiniCalendar && (
@@ -296,7 +310,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
             <div className="px-4 pb-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Search workouts" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+                <Input placeholder="Search workouts" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 min-h-[44px]" />
               </div>
             </div>
 
@@ -305,58 +319,37 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
             <ScrollArea className="flex-1">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium">Workout Sources</h3>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <h3 className="text-sm font-medium">Sources</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground"
+                    onClick={() => setShowConnectedCalendars(true)}
+                  >
+                    <Settings className="w-3 h-3 mr-1" />
+                    Manage
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  {workoutSources.map(source => {
-                    const filterId = source.connectionId ?? source.id;
+                <div className="flex flex-wrap gap-1.5">
+                  {sourcesWithCounts.map(({ source, filterId, eventCount }) => {
                     const isActive = activeFilters.includes(filterId);
-                    const eventCount = typedEvents.filter(e => {
-                      if (source.connectionId) {
-                        return e.source === 'connected_calendar' && e.connected_calendar_id === source.connectionId;
-                      }
-                      return source.matchesSources.includes(e.source);
-                    }).length;
-
                     return (
-                      <div key={filterId} className="flex items-center gap-2">
-                        <Checkbox
-                          id={filterId}
-                          checked={isActive}
-                          onCheckedChange={(checked) => {
-                            if (checked) setActiveFilters([...activeFilters, filterId]);
-                            else setActiveFilters(activeFilters.filter(f => f !== filterId));
-                          }}
-                        />
-                        <label htmlFor={filterId} className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
-                          <div className={`w-3 h-3 rounded-full ${source.color}`} />
-                          <span className="flex items-center gap-1">
-                            {source.icon} {source.label}
-                            {source.connectionId && <LinkIcon className="w-3 h-3 text-blue-600" />}
-                          </span>
-                          {source.isConnected ? (
-                            <span className="text-xs text-muted-foreground ml-auto">{eventCount}</span>
-                          ) : (
-                            <span
-                              className="text-xs text-blue-500 ml-auto cursor-pointer hover:underline"
-                              onClick={() => setShowConnectedCalendars(true)}
-                            >
-                              Connect
-                            </span>
-                          )}
-                        </label>
-                        {source.connectionId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={() => setShowConnectedCalendars(true)}
-                          >
-                            <Settings className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
+                      <button
+                        key={filterId}
+                        onClick={() => {
+                          if (isActive) setActiveFilters(activeFilters.filter(f => f !== filterId));
+                          else setActiveFilters([...activeFilters, filterId]);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all min-h-[32px] border ${
+                          isActive
+                            ? 'bg-primary/10 border-primary/30 text-foreground'
+                            : 'bg-muted/30 border-transparent text-muted-foreground opacity-50'
+                        }`}
+                      >
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${source.color}`} />
+                        {source.label}
+                        <span className="text-[10px] opacity-70">{eventCount}</span>
+                      </button>
                     );
                   })}
                 </div>
@@ -385,7 +378,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
               <Button variant={viewMode === 'training' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('training')} className="rounded-r-none text-xs px-2 min-h-[44px] sm:min-h-0">Training</Button>
               <Button variant={viewMode === 'week' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('week')} className="rounded-none border-x text-xs px-2 min-h-[44px] sm:min-h-0">Week</Button>
               <Button variant={viewMode === 'month' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('month')} className="rounded-none border-x text-xs px-2 min-h-[44px] sm:min-h-0">Month</Button>
-              <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="rounded-l-none text-xs px-2 min-h-[44px] sm:min-h-0">List</Button>
+              <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="rounded-l-none text-xs px-2 min-h-[44px] sm:min-h-0">Upcoming</Button>
             </div>
 
             <Button variant="ghost" size="sm" onClick={() => setShowSmartPlanner(true)} className="gap-1 text-xs min-h-[44px] sm:min-h-0 hidden sm:flex">
@@ -416,6 +409,34 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Filter chips bar — visible on mobile where sidebar is hidden */}
+        {sourcesWithCounts.length > 0 && viewMode !== 'training' && (
+          <div className="border-b bg-card/50 px-2 sm:px-4 py-2 flex items-center gap-2 overflow-x-auto md:hidden">
+            <span className="text-xs text-muted-foreground flex-shrink-0">Filter:</span>
+            {sourcesWithCounts.map(({ source, filterId, eventCount }) => {
+              const isActive = activeFilters.includes(filterId);
+              return (
+                <button
+                  key={filterId}
+                  onClick={() => {
+                    if (isActive) setActiveFilters(activeFilters.filter(f => f !== filterId));
+                    else setActiveFilters([...activeFilters, filterId]);
+                  }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all flex-shrink-0 border ${
+                    isActive
+                      ? 'bg-primary/10 border-primary/30 text-foreground'
+                      : 'bg-muted/30 border-transparent text-muted-foreground opacity-50'
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${source.color}`} />
+                  {source.label}
+                  <span className="text-[10px] opacity-70">{eventCount}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden">
           {viewMode === 'training' && (
@@ -512,46 +533,92 @@ function MonthView({ currentDate, events, onEventClick, onDateClick, onCreateEve
   );
 }
 
-// List View Component  
+// Upcoming List View — shows events across 4 weeks
 function ListView({ events, onEventClick }: { events: CalendarEvent[]; onEventClick: (event: CalendarEvent) => void }) {
+  const today = format(new Date(), 'yyyy-MM-dd');
+
+  // Group events by date, then sort
   const groupedEvents = events.reduce((acc, event) => {
     if (!acc[event.date]) acc[event.date] = [];
     acc[event.date].push(event);
     return acc;
   }, {} as Record<string, CalendarEvent[]>);
 
+  const sortedDates = Object.keys(groupedEvents).sort();
+
+  // Group dates by week for section headers
+  const weekGroups: { weekLabel: string; dates: string[] }[] = [];
+  let currentWeekLabel = '';
+  for (const date of sortedDates) {
+    const d = parseISO(date);
+    const ws = startOfWeek(d, { weekStartsOn: 0 });
+    const we = endOfWeek(d, { weekStartsOn: 0 });
+    const label = `${format(ws, 'MMM d')} – ${format(we, 'MMM d')}`;
+    if (label !== currentWeekLabel) {
+      weekGroups.push({ weekLabel: label, dates: [] });
+      currentWeekLabel = label;
+    }
+    weekGroups[weekGroups.length - 1].dates.push(date);
+  }
+
   return (
     <ScrollArea className="h-full">
-      <div className="p-6 space-y-6">
-        {Object.entries(groupedEvents).length === 0 ? (
+      <div className="p-4 sm:p-6 space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <h2 className="text-lg font-semibold">Upcoming</h2>
+          <Badge variant="secondary">{events.length} events</Badge>
+        </div>
+
+        {sortedDates.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <CalendarIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No events scheduled</p>
+            <p>No upcoming events</p>
+            <p className="text-sm mt-1">Add workouts to see them here</p>
           </div>
         ) : (
-          Object.entries(groupedEvents).sort(([a], [b]) => a.localeCompare(b)).map(([date, dateEvents]) => (
-            <div key={date} className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-lg font-medium">{format(parseISO(date), 'EEEE, MMMM d, yyyy')}</h3>
-                <Badge variant="secondary">{dateEvents.length} events</Badge>
+          weekGroups.map(({ weekLabel, dates }) => (
+            <div key={weekLabel} className="space-y-3">
+              <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-sm py-1">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{weekLabel}</h3>
               </div>
-              <div className="space-y-2">
-                {dateEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')).map(event => (
-                  <Card key={event.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onEventClick(event)}>
-                    <div className="flex items-start gap-4">
-                      {event.start_time && <div className="text-sm text-muted-foreground min-w-[60px]">{event.start_time.substring(0, 5)}</div>}
-                      <div className="flex-1">
-                        <div className="font-medium flex items-center gap-2">{event.title}{event.is_anchor && <span>🔒</span>}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs capitalize">{event.type?.replace('_', ' ') || 'workout'}</Badge>
-                          <Badge variant="outline" className="text-xs capitalize">{event.source?.replace('_', ' ') || 'manual'}</Badge>
-                          {event.status === 'completed' && <Badge className="text-xs bg-green-600"><Check className="w-3 h-3 mr-1" />Completed</Badge>}
-                        </div>
-                      </div>
+              {dates.map(date => {
+                const dateEvents = groupedEvents[date];
+                const isToday = date === today;
+                const isPast = date < today;
+                return (
+                  <div key={date} className="space-y-1.5">
+                    <div className={`flex items-center gap-2 ${isToday ? 'text-primary font-semibold' : isPast ? 'text-muted-foreground' : ''}`}>
+                      <span className={`text-sm ${isToday ? 'bg-primary text-primary-foreground rounded-full px-2 py-0.5' : ''}`}>
+                        {format(parseISO(date), 'EEE, MMM d')}
+                      </span>
+                      {isToday && <span className="text-xs text-primary">Today</span>}
                     </div>
-                  </Card>
-                ))}
-              </div>
+                    {dateEvents.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')).map(event => (
+                      <Card key={event.id} className={`p-3 cursor-pointer hover:shadow-md transition-shadow ${isPast && event.status !== 'completed' ? 'opacity-60' : ''}`} onClick={() => onEventClick(event)}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${getEventBarColor(event.type)}`} />
+                          {event.start_time && <div className="text-sm text-muted-foreground min-w-[45px] font-mono">{event.start_time.substring(0, 5)}</div>}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm flex items-center gap-1.5 truncate">
+                              {event.title}
+                              {event.is_anchor && <span className="text-[10px]">📌</span>}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${getEventChipStyle(event.type)}`}>
+                                {event.type?.replace('_', ' ') || 'workout'}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">{event.source?.replace('_', ' ')}</span>
+                            </div>
+                          </div>
+                          {event.status === 'completed' && (
+                            <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           ))
         )}
@@ -561,15 +628,41 @@ function ListView({ events, onEventClick }: { events: CalendarEvent[]; onEventCl
 }
 
 function getEventColorClass(type?: WorkoutType): string {
-  if (!type) return 'bg-gray-100 border-gray-300 text-gray-900';
+  if (!type) return 'bg-gray-100 border-gray-300 text-gray-900 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100';
   const colors: Record<WorkoutType, string> = {
-    run: 'bg-blue-100 border-blue-300 text-blue-900',
-    strength: 'bg-purple-100 border-purple-300 text-purple-900',
-    hyrox: 'bg-red-100 border-red-300 text-red-900',
-    class: 'bg-green-100 border-green-300 text-green-900',
-    home_workout: 'bg-yellow-100 border-yellow-300 text-yellow-900',
-    mobility: 'bg-indigo-100 border-indigo-300 text-indigo-900',
-    recovery: 'bg-gray-100 border-gray-300 text-gray-900',
+    run: 'bg-blue-100 border-blue-300 text-blue-900 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-200',
+    strength: 'bg-purple-100 border-purple-300 text-purple-900 dark:bg-purple-900/40 dark:border-purple-700 dark:text-purple-200',
+    hyrox: 'bg-red-100 border-red-300 text-red-900 dark:bg-red-900/40 dark:border-red-700 dark:text-red-200',
+    class: 'bg-green-100 border-green-300 text-green-900 dark:bg-green-900/40 dark:border-green-700 dark:text-green-200',
+    home_workout: 'bg-yellow-100 border-yellow-300 text-yellow-900 dark:bg-yellow-900/40 dark:border-yellow-700 dark:text-yellow-200',
+    mobility: 'bg-indigo-100 border-indigo-300 text-indigo-900 dark:bg-indigo-900/40 dark:border-indigo-700 dark:text-indigo-200',
+    recovery: 'bg-gray-100 border-gray-300 text-gray-900 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100',
   };
   return colors[type] || colors.recovery;
+}
+
+function getEventBarColor(type?: WorkoutType): string {
+  const colors: Record<string, string> = {
+    run: 'bg-blue-500',
+    strength: 'bg-purple-500',
+    hyrox: 'bg-red-500',
+    class: 'bg-green-500',
+    home_workout: 'bg-yellow-500',
+    mobility: 'bg-indigo-500',
+    recovery: 'bg-gray-400',
+  };
+  return colors[type || ''] || 'bg-gray-400';
+}
+
+function getEventChipStyle(type?: WorkoutType): string {
+  const styles: Record<string, string> = {
+    run: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+    strength: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300',
+    hyrox: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+    class: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
+    home_workout: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+    mobility: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300',
+    recovery: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  };
+  return styles[type || ''] || styles.recovery;
 }

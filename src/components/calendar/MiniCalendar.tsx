@@ -54,33 +54,77 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
   return (
     <div className="mini-calendar-container relative">
       <style>{`
-        /* Target the day button specifically */
+        /* Make day cells larger for touch targets on iPad */
+        .mini-calendar-container .rdp-cell,
+        .mini-calendar-container .rdp-head_cell {
+          width: 36px !important;
+          height: 36px !important;
+        }
+
+        .mini-calendar-container .rdp-day {
+          width: 36px !important;
+          height: 36px !important;
+          font-size: 14px !important;
+          color: hsl(var(--foreground)) !important;
+        }
+
+        .mini-calendar-container .rdp-head_cell {
+          color: hsl(var(--muted-foreground)) !important;
+          font-size: 12px !important;
+        }
+
+        /* Selected date styling */
+        .mini-calendar-container .rdp-day_selected {
+          background-color: hsl(var(--primary)) !important;
+          color: hsl(var(--primary-foreground)) !important;
+          font-weight: 600 !important;
+        }
+
+        /* Today styling */
+        .mini-calendar-container .rdp-day_today:not(.rdp-day_selected) {
+          background-color: hsl(var(--accent)) !important;
+          color: hsl(var(--accent-foreground)) !important;
+          font-weight: 600 !important;
+        }
+
+        /* Outside days (other month) */
+        .mini-calendar-container .rdp-day_outside {
+          color: hsl(var(--muted-foreground)) !important;
+          opacity: 0.4 !important;
+        }
+
+        /* Event indicator dot */
         .mini-calendar-container .rdp-day.has-event {
           font-weight: 700 !important;
         }
-        
-        .mini-calendar-container .rdp-day.has-event button {
-          position: relative;
-          font-weight: 700 !important;
-        }
-        
-        .mini-calendar-container .rdp-day.has-event button::after {
+
+        .mini-calendar-container .rdp-day.has-event:not(.rdp-day_selected)::after {
           content: '';
           position: absolute;
-          bottom: 2px;
+          bottom: 3px;
           left: 50%;
           transform: translateX(-50%);
-          width: 4px;
-          height: 4px;
-          background-color: #3b82f6;
+          width: 5px;
+          height: 5px;
+          background-color: hsl(var(--primary));
           border-radius: 50%;
         }
-        
-        /* Hide the default calendar header - use more specific selectors */
+
+        .mini-calendar-container .rdp-day.has-event {
+          position: relative;
+        }
+
+        /* Hover state for interactive feedback */
+        .mini-calendar-container .rdp-day:not(.rdp-day_selected):not(.rdp-day_outside):hover {
+          background-color: hsl(var(--accent)) !important;
+          cursor: pointer;
+        }
+
+        /* Hide the default calendar header - use our custom one */
         .mini-calendar-container .rdp-caption {
           display: none !important;
         }
-        
+
         .mini-calendar-container .rdp-nav {
           display: none !important;
         }
@@ -89,20 +133,32 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
         .mini-calendar-container .rdp {
           min-height: 280px;
         }
-        
+
         /* Remove top padding since we removed the caption */
         .mini-calendar-container .rdp-month {
           gap: 0 !important;
         }
+
+        /* Make the table fill the width */
+        .mini-calendar-container .rdp-table {
+          width: 100% !important;
+        }
+
+        .mini-calendar-container .rdp-head_row,
+        .mini-calendar-container .rdp-row {
+          display: flex !important;
+          justify-content: space-around !important;
+          width: 100% !important;
+        }
       `}</style>
 
-      {/* Single Unified Header - ONLY header in component */}
+      {/* Header with month navigation */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-10 w-10 min-h-[44px] min-w-[44px]"
             onClick={handlePreviousMonth}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -110,7 +166,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
 
           <Button
             variant="ghost"
-            className="h-8 px-3 font-medium hover:bg-accent min-w-[140px]"
+            className="h-10 px-3 font-medium hover:bg-accent min-w-[120px]"
             onClick={() => setShowYearMonthPicker(!showYearMonthPicker)}
           >
             {format(currentMonth, 'MMMM yyyy')}
@@ -119,7 +175,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-10 w-10 min-h-[44px] min-w-[44px]"
             onClick={handleNextMonth}
           >
             <ChevronRight className="h-4 w-4" />
@@ -127,10 +183,9 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
         </div>
       </div>
 
-      {/* Unified Grid Container - Same container for both variants */}
+      {/* Calendar or Year/Month Picker */}
       <div className="min-h-[280px]">
         {showYearMonthPicker ? (
-          /* Variant B: Year/Month Picker View */
           <div className="py-2">
             <div className="mb-6">
               <h4 className="text-xs font-medium mb-3 text-muted-foreground">Year</h4>
@@ -140,7 +195,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
                     key={year}
                     variant={year === currentMonth.getFullYear() ? 'default' : 'outline'}
                     size="sm"
-                    className="h-9 text-sm"
+                    className="h-11 text-sm min-h-[44px]"
                     onClick={() => handleYearSelect(year)}
                   >
                     {year}
@@ -148,7 +203,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
                 ))}
               </div>
             </div>
-            
+
             <div>
               <h4 className="text-xs font-medium mb-3 text-muted-foreground">Month</h4>
               <div className="grid grid-cols-3 gap-2">
@@ -157,7 +212,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
                     key={month}
                     variant={month === currentMonth.getMonth() ? 'default' : 'outline'}
                     size="sm"
-                    className="h-9 text-sm"
+                    className="h-11 text-sm min-h-[44px]"
                     onClick={() => handleMonthSelect(month)}
                   >
                     {format(new Date(2024, month, 1), 'MMM')}
@@ -167,14 +222,13 @@ export function MiniCalendar({ selectedDate, onSelectDate, events }: MiniCalenda
             </div>
           </div>
         ) : (
-          /* Variant A: Month View */
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={(date) => date && onSelectDate(date)}
             month={currentMonth}
             onMonthChange={setCurrentMonth}
-            className="rounded-md"
+            className="rounded-md w-full"
             modifiers={modifiers}
             modifiersClassNames={{
               hasEvent: 'has-event'

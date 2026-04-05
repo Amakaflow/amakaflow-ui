@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_URLS } from '../../../lib/config';
 import { MOCK_WORKOUT_HISTORY } from '../../../lib/mock-data';
+import { DEMO_PROGRAMS, DEMO_USER_TAGS } from '../../../lib/mock-data/demo-extended';
 import type { SavedWorkout, WorkoutProgram, UserTag } from '../../generated/mapper';
 
 const BASE = API_URLS.MAPPER;
@@ -74,7 +75,7 @@ export const mapperHandlers = [
   }),
 
   http.get(`${BASE}/programs`, () => {
-    return HttpResponse.json({ success: true, programs: [] as WorkoutProgram[], count: 0 });
+    return HttpResponse.json({ success: true, programs: DEMO_PROGRAMS as unknown as WorkoutProgram[], count: DEMO_PROGRAMS.length });
   }),
 
   http.post(`${BASE}/programs`, async ({ request }) => {
@@ -117,7 +118,7 @@ export const mapperHandlers = [
   }),
 
   http.get(`${BASE}/tags`, () => {
-    return HttpResponse.json({ success: true, tags: [] as UserTag[], count: 0 });
+    return HttpResponse.json({ success: true, tags: DEMO_USER_TAGS as unknown as UserTag[], count: DEMO_USER_TAGS.length });
   }),
 
   http.post(`${BASE}/tags`, async ({ request }) => {
