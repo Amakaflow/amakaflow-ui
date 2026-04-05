@@ -62,9 +62,9 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [eventDialogData, setEventDialogData] = useState<{ date?: string; startTime?: string; source?: WorkoutSource } | null>(null);
   const [showEventDrawer, setShowEventDrawer] = useState(false);
-  // Collapse sidebar by default on mobile (screen narrower than 768px)
+  // Collapse sidebar by default on tablet and below (screen narrower than 1024px)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    typeof window !== 'undefined' && window.innerWidth < 768
+    typeof window !== 'undefined' && window.innerWidth < 1024
   );
   const [showMiniCalendar, setShowMiniCalendar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -264,7 +264,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Sidebar */}
-      <div className={`border-r border-border bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
+      <div className={`border-r border-border bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-52 lg:w-64'}`}>
         {!sidebarCollapsed && (
           <>
             {showMiniCalendar && (
