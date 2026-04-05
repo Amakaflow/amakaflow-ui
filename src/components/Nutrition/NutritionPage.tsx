@@ -35,9 +35,10 @@ const MOCK_LOG: FoodEntry[] = [
   { id: '5', name: 'Greek yogurt',                 calories: 150, time: '9:00 PM' },
 ];
 
-function fuelingStatus(calories: number, goal: number): 'green' | 'yellow' | 'red' {
+function fuelingStatus(calories: number, goal: number): 'green' | 'yellow' | 'red' | 'orange' {
   const pct = calories / goal;
-  if (pct >= 0.75 && pct <= 1.1) return 'green';
+  if (pct > 1.1)                  return 'orange';
+  if (pct >= 0.75 && pct <= 1.1)  return 'green';
   if (pct >= 0.5)                 return 'yellow';
   return 'red';
 }
@@ -45,6 +46,7 @@ function fuelingStatus(calories: number, goal: number): 'green' | 'yellow' | 're
 const STATUS_CONFIG = {
   green:  { label: 'Well Fueled',      bg: 'bg-green-500/10',  text: 'text-green-600',  border: 'border-green-200 dark:border-green-800' },
   yellow: { label: 'Getting There',    bg: 'bg-yellow-500/10', text: 'text-yellow-600', border: 'border-yellow-200 dark:border-yellow-800' },
+  orange: { label: 'Over Target',      bg: 'bg-orange-500/10', text: 'text-orange-600', border: 'border-orange-200 dark:border-orange-800' },
   red:    { label: 'Under-Fueled',     bg: 'bg-red-500/10',    text: 'text-red-600',    border: 'border-red-200 dark:border-red-800' },
 };
 
@@ -123,7 +125,7 @@ export function NutritionPage() {
               {Array.from({ length: WATER_GOAL }).map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => setWater(i + 1)}
+                  onClick={() => setWater(waterGlasses === i + 1 ? i : i + 1)}
                   aria-label={`Set water to ${i + 1} glasses`}
                   className={`w-7 h-7 rounded-full border-2 transition-colors ${
                     i < waterGlasses
