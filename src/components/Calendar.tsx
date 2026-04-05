@@ -264,7 +264,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Sidebar */}
-      <div className={`border-r border-border bg-[#f8f9fa] flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-52 lg:w-64'}`}>
+      <div className={`border-r border-border bg-[#f8f9fa] dark:bg-background flex-col transition-all duration-300 hidden md:flex ${sidebarCollapsed ? 'md:w-0 md:overflow-hidden' : 'w-52 lg:w-64'}`}>
         {!sidebarCollapsed && (
           <>
             {showMiniCalendar && (
@@ -370,7 +370,7 @@ export function Calendar({ userId, userLocation }: CalendarProps) {
       <div className="flex-1 flex flex-col">
         <div className="border-b bg-card p-2 sm:p-4 flex flex-wrap items-center gap-2 sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="min-h-[44px] min-w-[44px]" aria-label="Toggle sidebar">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="min-h-[44px] min-w-[44px] hidden md:flex" aria-label="Toggle sidebar">
               <Menu className="w-5 h-5" />
             </Button>
             <Button variant="outline" size="sm" onClick={handleToday} className="min-h-[44px]">Today</Button>
