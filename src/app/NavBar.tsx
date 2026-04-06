@@ -28,6 +28,7 @@ import {
   Users,
 } from 'lucide-react';
 import { isDemoMode } from '../lib/demo-mode';
+import { NotificationCenter } from '../components/NotificationCenter';
 import type { AppUser } from './useAppAuth';
 import type { View } from './router';
 import { VIEW_TO_PATH, pathToView } from '../hooks/useUrlSync';
@@ -264,6 +265,7 @@ export function NavBar({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <NotificationCenter />
             <Button
               variant={currentView === 'help' ? 'default' : 'ghost'}
               size="sm"

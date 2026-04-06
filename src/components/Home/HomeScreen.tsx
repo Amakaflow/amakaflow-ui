@@ -6,6 +6,7 @@ import type { View } from '../../app/router';
 import type { AppUser } from '../../app/useAppAuth';
 import { isDemoMode } from '../../lib/demo-mode';
 import { OrchestratorChat } from '../OrchestratorChat';
+import { QuickImport } from '../QuickImport';
 import { MOCK_ANALYTICS } from '../../lib/mock-data/analytics';
 import { MOCK_WORKOUT_HISTORY } from '../../lib/mock-data/workouts';
 
@@ -199,6 +200,11 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Quick Import */}
+      <div className="max-w-2xl mx-auto mt-4">
+        <QuickImport />
       </div>
 
       {/* AI Coach — Orchestrator */}
