@@ -11,6 +11,7 @@
  * - VITE_GARMIN_API_URL: Garmin Sync API (Garmin integration)
  * - VITE_CALENDAR_API_URL: Calendar API (calendar sync, smart planner)
  * - VITE_CHAT_API_URL: Chat API (AI assistant, SSE streaming)
+ * - VITE_ORCHESTRATOR_API_URL: Orchestrator API (agentic training operations)
  */
 
 // API Base URLs with environment variable support
@@ -50,6 +51,12 @@ export const API_URLS = {
    * Default: http://localhost:8005
    */
   CHAT: import.meta.env.VITE_CHAT_API_URL || 'http://localhost:8005',
+
+  /**
+   * Orchestrator API - handles agentic training operations
+   * Default: http://localhost:8010
+   */
+  ORCHESTRATOR: import.meta.env.VITE_ORCHESTRATOR_API_URL || 'http://localhost:8010',
 } as const;
 
 // Type for API URL keys
@@ -86,5 +93,6 @@ export function getApiHealthEndpoints(): Array<{ name: string; url: string }> {
     { name: 'Garmin Sync API (UNOFFICIAL - TEST ONLY)', url: `${API_URLS.GARMIN}/health` },
     { name: 'Calendar API', url: `${API_URLS.CALENDAR}/health` },
     { name: 'Chat API', url: `${API_URLS.CHAT}/health` },
+    { name: 'Orchestrator API', url: `${API_URLS.ORCHESTRATOR}/health` },
   ];
 }

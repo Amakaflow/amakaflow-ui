@@ -4,6 +4,7 @@ import { calendarHandlers } from './calendar';
 import { chatHandlers } from './chat';
 import { stravaHandlers } from './strava';
 import { garminHandlers } from './garmin';
+import { orchestratorHandlers } from './orchestrator';
 
 export const handlers: RequestHandler[] = [
   ...mapperHandlers,
@@ -11,4 +12,5 @@ export const handlers: RequestHandler[] = [
   ...chatHandlers,
   ...stravaHandlers,
   ...garminHandlers,
+  ...orchestratorHandlers,
 ];
