@@ -17,6 +17,10 @@ export interface TierLimits {
   connectedCalendars: boolean;
 }
 
+// Pricing display constants — single source of truth, keep in sync with landing page
+export const PRO_PRICE_DISPLAY = '$9.99/mo';
+export const PRO_ANNUAL_DISPLAY = '$74.99/yr';
+
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
     importsPerMonth: 5,
@@ -45,7 +49,8 @@ const IS_BETA = true; // Flip to false when billing is live
 
 export function getUserTier(): Tier {
   if (IS_BETA) return 'pro'; // Beta: everyone gets Pro
-  // TODO: Read from user profile / Stripe subscription
+  // TODO(post-beta): Read tier from user profile or Stripe subscription status
+  // Example: return userProfile?.subscription?.tier || 'free';
   return 'free';
 }
 
@@ -84,8 +89,10 @@ function getUsage(): UsageData {
       }
       return data;
     }
-  } catch {
-    // ignore parse errors
+  } catch (e) {
+    console.warn('Usage tracking unavailable:', e);
+    // During beta this is fine (IS_BETA=true returns Pro anyway)
+    // Post-beta: should fall back to server-side tracking
   }
   return { importsThisMonth: 0, monthKey: getCurrentMonthKey(), connectedDevices: [] };
 }

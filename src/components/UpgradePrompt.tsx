@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
 import { Sparkles } from 'lucide-react';
+import { PRO_PRICE_DISPLAY } from '../lib/subscription';
 
 interface UpgradePromptProps {
   feature: string;
@@ -17,9 +18,9 @@ export function UpgradePrompt({ feature, message, onUpgrade }: UpgradePromptProp
           {message || 'Upgrade to Pro to unlock this feature and remove all limits.'}
         </p>
       </div>
-      <Button size="sm" onClick={onUpgrade} className="gap-2">
+      <Button size="sm" onClick={onUpgrade} disabled={!onUpgrade} className="gap-2">
         <Sparkles className="w-3.5 h-3.5" />
-        Upgrade to Pro — $9.99/mo
+        Upgrade to Pro — {PRO_PRICE_DISPLAY}
       </Button>
     </div>
   );

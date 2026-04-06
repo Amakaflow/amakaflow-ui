@@ -1,4 +1,5 @@
-import { getImportsRemaining, getUserTier } from '../lib/subscription';
+// TODO: Extract to useSubscription hook when usage tracking moves to Supabase
+import { getImportsRemaining, getUserTier, getTierLimits } from '../lib/subscription';
 import { Badge } from './ui/badge';
 
 export function ImportLimitBanner() {
@@ -6,6 +7,7 @@ export function ImportLimitBanner() {
   if (tier === 'pro') return null;
 
   const remaining = getImportsRemaining();
+  const limits = getTierLimits();
 
   return (
     <div className="flex items-center justify-between rounded-lg bg-muted/50 border px-4 py-2 text-sm">
@@ -16,7 +18,7 @@ export function ImportLimitBanner() {
         }
       </span>
       <Badge variant={remaining > 0 ? 'secondary' : 'destructive'} className="text-xs">
-        {remaining > 0 ? `${remaining}/5` : 'Limit reached'}
+        {remaining > 0 ? `${remaining}/${limits.importsPerMonth}` : 'Limit reached'}
       </Badge>
     </div>
   );
