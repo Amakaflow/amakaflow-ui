@@ -22,13 +22,13 @@ export function OrchestratorChat() {
   };
 
   const handleApprove = async (threadId: string) => {
-    await approve(threadId);
-    setShowApproval(false);
+    const result = await approve(threadId);
+    if (result) setShowApproval(false);  // Only close on success
   };
 
   const handleReject = async (threadId: string) => {
-    await reject(threadId);
-    setShowApproval(false);
+    const result = await reject(threadId);
+    if (result) setShowApproval(false);  // Only close on success
   };
 
   return (

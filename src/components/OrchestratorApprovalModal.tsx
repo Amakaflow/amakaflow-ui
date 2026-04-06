@@ -26,12 +26,23 @@ export function OrchestratorApprovalModal({
 }: OrchestratorApprovalModalProps) {
   if (!open) return null;
 
+  const titleId = 'orchestrator-approval-title';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-lg">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="w-full max-w-lg"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Review Proposed Changes</CardTitle>
+            <CardTitle id={titleId} className="text-lg">Review Proposed Changes</CardTitle>
             <Badge variant="outline" className="text-amber-600 border-amber-300">
               Awaiting Approval
             </Badge>
