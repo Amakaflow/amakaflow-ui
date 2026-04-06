@@ -55,10 +55,23 @@ export function useWeekState() {
   // Generate now shows the preview overlay instead of immediately applying
   const generateWeek = useCallback(async () => {
     setIsGenerating(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    // Show preview overlay with mock data
-    setPlanPreview(getMockPlanPreview());
+    try {
+      // Try orchestrator first
+      const { sendMessage } = await import('../../../api/clients/orchestrator');
+      const result = await sendMessage('Plan my week', 'web');
+      if (result && result.tool_results?.length > 0) {
+        // Orchestrator returned real plan — use it
+        // For now, still show mock preview since we need to map the response format
+        // TODO: Map orchestrator plan response to PlanPreviewState
+        setPlanPreview(getMockPlanPreview());
+      } else {
+        // Orchestrator returned advice/no tools — fall back to mock
+        setPlanPreview(getMockPlanPreview());
+      }
+    } catch {
+      // Orchestrator unavailable — fall back to mock preview
+      setPlanPreview(getMockPlanPreview());
+    }
     setIsGenerating(false);
   }, []);
 

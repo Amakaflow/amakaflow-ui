@@ -1,10 +1,11 @@
-import { Upload, Dumbbell, Calendar, History, TrendingUp, Flame, Clock } from 'lucide-react';
+import { Upload, Dumbbell, Calendar, History, TrendingUp, Flame, Clock, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import type { View } from '../../app/router';
 import type { AppUser } from '../../app/useAppAuth';
 import { isDemoMode } from '../../lib/demo-mode';
+import { OrchestratorChat } from '../OrchestratorChat';
 import { MOCK_ANALYTICS } from '../../lib/mock-data/analytics';
 import { MOCK_WORKOUT_HISTORY } from '../../lib/mock-data/workouts';
 
@@ -198,6 +199,17 @@ export function HomeScreen({ user, recentWorkouts, onNavigate }: HomeScreenProps
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* AI Coach — Orchestrator */}
+      <div className="max-w-2xl mx-auto">
+        <div className="rounded-lg border bg-card p-4">
+          <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AI Coach
+          </h3>
+          <OrchestratorChat />
+        </div>
       </div>
     </div>
   );
