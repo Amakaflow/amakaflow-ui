@@ -1,0 +1,23 @@
+# CodeRabbit configuration — AmakaFlow Web App
+# Docs: https://docs.coderabbit.ai/reference/configuration
+
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  auto_review:
+    enabled: true
+    drafts: false
+
+knowledge_base:
+  linear:
+    usage: enabled
+    team_keys:
+      - "AMA"
+  mcp:
+    usage: enabled
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "ARCHITECTURE.md"
