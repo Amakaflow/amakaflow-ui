@@ -1,10 +1,12 @@
 /**
  * Subscription and usage tracking for Free vs Pro tiers.
- * During beta: everything unlocked. Post-beta: enforce limits.
+ * Uses Clerk Billing for tier detection and feature gating.
  */
 
-// Tier definitions matching landing page pricing
 export type Tier = 'free' | 'pro';
+
+export const PRO_PRICE_DISPLAY = '$9.99/mo';
+export const PRO_ANNUAL_DISPLAY = '$75.00/yr';
 
 export interface TierLimits {
   importsPerMonth: number;
@@ -16,10 +18,6 @@ export interface TierLimits {
   advancedAnalytics: boolean;
   connectedCalendars: boolean;
 }
-
-// Pricing display constants — single source of truth, keep in sync with landing page
-export const PRO_PRICE_DISPLAY = '$9.99/mo';
-export const PRO_ANNUAL_DISPLAY = '$74.99/yr';
 
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
@@ -44,32 +42,25 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
 };
 
-// Beta override — everything unlocked during beta
-const IS_BETA = true; // Flip to false when billing is live
+// These functions are called from React components that have access to useAuth()
+// For non-hook contexts, use the hook-based versions below
 
-export function getUserTier(): Tier {
-  if (IS_BETA) return 'pro'; // Beta: everyone gets Pro
-  // TODO(post-beta): Read tier from user profile or Stripe subscription status
-  // Example: return userProfile?.subscription?.tier || 'free';
-  return 'free';
+export function getTierLimits(tier: Tier): TierLimits {
+  return TIER_LIMITS[tier];
 }
 
-export function getTierLimits(): TierLimits {
-  return TIER_LIMITS[getUserTier()];
-}
-
-export function isFeatureAvailable(feature: keyof TierLimits): boolean {
-  const limits = getTierLimits();
+export function isFeatureAvailable(tier: Tier, feature: keyof TierLimits): boolean {
+  const limits = TIER_LIMITS[tier];
   const value = limits[feature];
   return typeof value === 'boolean' ? value : true;
 }
 
-// Usage tracking (stored in localStorage during beta, Supabase post-beta)
+// Usage tracking (localStorage — complementary to Clerk's subscription status)
 const USAGE_KEY = 'amakaflow_usage';
 
 interface UsageData {
   importsThisMonth: number;
-  monthKey: string; // "2026-04"
+  monthKey: string;
   connectedDevices: string[];
 }
 
@@ -83,7 +74,6 @@ function getUsage(): UsageData {
     const raw = localStorage.getItem(USAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw) as UsageData;
-      // Reset if month changed
       if (data.monthKey !== getCurrentMonthKey()) {
         return { importsThisMonth: 0, monthKey: getCurrentMonthKey(), connectedDevices: data.connectedDevices || [] };
       }
@@ -91,8 +81,6 @@ function getUsage(): UsageData {
     }
   } catch (e) {
     console.warn('Usage tracking unavailable:', e);
-    // During beta this is fine (IS_BETA=true returns Pro anyway)
-    // Post-beta: should fall back to server-side tracking
   }
   return { importsThisMonth: 0, monthKey: getCurrentMonthKey(), connectedDevices: [] };
 }
@@ -111,13 +99,16 @@ export function trackImport(): void {
   saveUsage(usage);
 }
 
-export function getImportsRemaining(): number {
-  const limits = getTierLimits();
-  if (limits.importsPerMonth === Infinity) return Infinity;
-  const usage = getUsage();
-  return Math.max(0, limits.importsPerMonth - usage.importsThisMonth);
+export function getImportsUsed(): number {
+  return getUsage().importsThisMonth;
 }
 
-export function canImport(): boolean {
-  return getImportsRemaining() > 0;
+export function getImportsRemaining(tier: Tier): number {
+  const limits = getTierLimits(tier);
+  if (limits.importsPerMonth === Infinity) return Infinity;
+  return Math.max(0, limits.importsPerMonth - getUsage().importsThisMonth);
+}
+
+export function canImport(tier: Tier): boolean {
+  return getImportsRemaining(tier) > 0;
 }

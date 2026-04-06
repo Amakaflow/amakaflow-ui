@@ -2,8 +2,10 @@
  * PricingPage — side-by-side Free vs Premium comparison.
  *
  * AMA-1134: Freemium subscription and paywall.
+ * AMA-1436: Clerk Billing integration — PricingTable renders live plan data.
  */
 
+import { PricingTable } from '@clerk/clerk-react';
 import { Check, X, Zap, Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -159,6 +161,11 @@ export function PricingPage({
             )}
           </CardFooter>
         </Card>
+      </div>
+
+      {/* Clerk Billing — live plan checkout */}
+      <div className="max-w-3xl mx-auto">
+        <PricingTable />
       </div>
 
       {/* FAQ / reassurance */}
