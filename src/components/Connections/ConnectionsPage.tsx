@@ -5,6 +5,7 @@ import { PlatformCard } from './PlatformCard';
 import { ConnectModal } from './ConnectModal';
 import { useConnections } from './hooks/useConnections';
 import type { PlatformConnection, PlatformId } from './types';
+import { TelegramConnection } from '../settings/TelegramConnection';
 
 interface ConnectionsPageProps {
   onBack?: () => void;
@@ -73,6 +74,9 @@ export function ConnectionsPage({ onBack }: ConnectionsPageProps) {
           />
         ))}
       </div>
+
+      {/* Telegram */}
+      <TelegramConnection />
 
       {/* Connect Modal */}
       <ConnectModal
