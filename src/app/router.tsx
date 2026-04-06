@@ -76,6 +76,10 @@ export const ConnectionsPage = lazy(() =>
   import('../components/Connections').then(m => ({ default: m.ConnectionsPage }))
 );
 
+export const StravaCallbackPage = lazy(() =>
+  import('../components/Connections').then(m => ({ default: m.StravaCallback }))
+);
+
 export const CoachChat = lazy(() =>
   import('../components/CoachChat').then(m => ({ default: m.CoachChat }))
 );

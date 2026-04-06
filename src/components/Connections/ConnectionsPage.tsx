@@ -6,6 +6,7 @@ import { ConnectModal } from './ConnectModal';
 import { useConnections } from './hooks/useConnections';
 import type { PlatformConnection, PlatformId } from './types';
 import { TelegramConnection } from '../settings/TelegramConnection';
+import { GarminPairing } from './GarminPairing';
 
 interface ConnectionsPageProps {
   onBack?: () => void;
@@ -74,6 +75,9 @@ export function ConnectionsPage({ onBack }: ConnectionsPageProps) {
           />
         ))}
       </div>
+
+      {/* Garmin — Connect IQ pairing (replaces old Garmin Connect OAuth) */}
+      <GarminPairing />
 
       {/* Telegram */}
       <TelegramConnection />

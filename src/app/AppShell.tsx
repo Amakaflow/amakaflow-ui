@@ -33,6 +33,7 @@ import {
   ProgramsList,
   CreateAIWorkout,
   ConnectionsPage,
+  StravaCallbackPage,
   CoachChat,
   SyncDashboardPage,
   TrainingPreferencesPage,
@@ -328,6 +329,7 @@ export function AppShell() {
               {/* Settings sub-routes */}
               <Route path="/settings/connections" element={<ConnectionsPage onBack={() => navigate('settings')} />} />
               <Route path="/settings/preferences" element={<TrainingPreferencesPage />} />
+              <Route path="/strava/callback" element={<StravaCallbackPage />} />
 
               {/* Strava Enhance */}
               <Route path="/strava-enhance" element={<StravaEnhance onClose={() => navigate('workflow')} />} />
