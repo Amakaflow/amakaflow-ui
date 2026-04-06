@@ -1,8 +1,130 @@
 import { useState, useCallback } from 'react';
-import type { WeekState, PlanPreviewState, Intensity } from '../types';
+import type { WeekState, PlanPreviewState, PlanSummaryData, ProposedSession, SessionType, Intensity } from '../types';
 import { getMockWeekState, getGeneratedWeekState, getMockPlanPreview } from '../mockData';
 
 export type ViewLayer = 'planned' | 'actuals';
+
+// ---------------------------------------------------------------------------
+// Orchestrator response → PlanPreviewState mapping (AMA-1436)
+// ---------------------------------------------------------------------------
+
+const SESSION_TYPE_MAP: Record<string, SessionType> = {
+  run: 'run',
+  strength: 'strength',
+  hyrox: 'strength',
+  yoga: 'yoga',
+  class: 'class',
+  cycling: 'run',
+  swimming: 'run',
+  mobility: 'yoga',
+  recovery: 'rest',
+};
+
+const SESSION_TYPE_LABELS: Record<string, string> = {
+  run: 'Run',
+  strength: 'Strength',
+  hyrox: 'HYROX',
+  yoga: 'Yoga',
+  class: 'Class',
+  cycling: 'Cycling',
+  swimming: 'Swimming',
+  mobility: 'Mobility',
+  recovery: 'Recovery',
+};
+
+function formatSessionTitle(type: string, durationMin: number): string {
+  const label = SESSION_TYPE_LABELS[type] ?? type;
+  return `${label} — ${durationMin}min`;
+}
+
+function mapOrchestratorPlanToPreview(
+  toolResults: Record<string, unknown>[],
+): PlanPreviewState | null {
+  const plannerResult = toolResults.find(
+    (r: any) => r.tool === 'planner' && r.status === 'success',
+  );
+  if (!plannerResult) return null;
+
+  const data = plannerResult.data as any;
+  const sessions: any[] = data.sessions ?? data.proposed_sessions ?? [];
+  const movedSessions: any[] = data.moved_sessions ?? [];
+
+  if (sessions.length === 0 && movedSessions.length === 0) return null;
+
+  const proposals: ProposedSession[] = [];
+
+  // Map new sessions
+  for (const s of sessions) {
+    const sessionDate = new Date(s.date + 'T00:00:00');
+    const dayIndex = (sessionDate.getDay() + 6) % 7; // Sun=0 → Mon=0
+
+    proposals.push({
+      id: crypto.randomUUID(),
+      session: {
+        id: crypto.randomUUID(),
+        title: formatSessionTitle(s.type, s.duration_min),
+        type: SESSION_TYPE_MAP[s.type] ?? 'strength',
+        source: 'amakaflow',
+        duration: s.duration_min,
+        intensity: s.intensity as Intensity,
+        status: 'planned',
+        locked: false,
+        rationale: s.rationale,
+      },
+      kind: 'new',
+      rationale: s.rationale ?? '',
+      toDayIndex: dayIndex,
+    });
+  }
+
+  // Map moved sessions
+  for (const m of movedSessions) {
+    const toDate = new Date(m.to_date + 'T00:00:00');
+    const fromDate = new Date(m.from_date + 'T00:00:00');
+    const toDayIndex = (toDate.getDay() + 6) % 7;
+    const fromDayIndex = (fromDate.getDay() + 6) % 7;
+
+    proposals.push({
+      id: m.id ?? crypto.randomUUID(),
+      session: {
+        id: m.id,
+        title: 'Moved Session',
+        type: 'strength',
+        source: 'amakaflow',
+        duration: 60,
+        intensity: 'moderate',
+        status: 'planned',
+        locked: false,
+        rationale: m.rationale,
+      },
+      kind: 'moved',
+      rationale: m.rationale ?? '',
+      fromDayIndex,
+      toDayIndex,
+    });
+  }
+
+  // Build summary
+  const totalMinutes = sessions.reduce(
+    (sum: number, s: any) => sum + (s.duration_min ?? 0),
+    0,
+  );
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  const hardDays = sessions.filter((s: any) => s.intensity === 'hard').length;
+
+  const summary: PlanSummaryData = {
+    added: sessions.length,
+    moved: movedSessions.length,
+    removed: 0,
+    totalWeeklyVolume: `${hours}h ${mins}min`,
+    hardDaysUsed: hardDays,
+    hardDaysCap: 3,
+    warnings: data.violations ?? [],
+  };
+
+  return { active: true, proposals, summary };
+}
 
 const emptyPreview: PlanPreviewState = {
   active: false,
@@ -56,14 +178,15 @@ export function useWeekState() {
   const generateWeek = useCallback(async () => {
     setIsGenerating(true);
     try {
-      // Try orchestrator first
       const { sendMessage } = await import('../../../api/clients/orchestrator');
       const result = await sendMessage('Plan my week', 'web');
       if (result && result.tool_results?.length > 0) {
-        // Orchestrator returned real plan — use it
-        // For now, still show mock preview since we need to map the response format
-        // TODO: Map orchestrator plan response to PlanPreviewState
-        setPlanPreview(getMockPlanPreview());
+        const preview = mapOrchestratorPlanToPreview(result.tool_results);
+        if (preview) {
+          setPlanPreview(preview);
+        } else {
+          setPlanPreview(getMockPlanPreview());
+        }
       } else {
         // Orchestrator returned advice/no tools — fall back to mock
         setPlanPreview(getMockPlanPreview());
