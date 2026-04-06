@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Minus,
   Pencil,
+  Watch,
 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -270,6 +271,38 @@ export function UnifiedWorkoutCard({
   className,
 }: UnifiedWorkoutCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncState, setSyncState] = useState<'none' | 'synced' | 'failed'>(
+    workout.syncStatus?.garmin?.synced === true ||
+    workout.syncStatus?.garmin?.status === 'synced'
+      ? 'synced'
+      : 'none'
+  );
+
+  const handlePushToGarmin = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsSyncing(true);
+    try {
+      // Try orchestrator first
+      const { sendMessage } = await import('../../api/clients/orchestrator');
+      const result = await sendMessage(`Push workout "${workout.title}" to Garmin`, 'web');
+      if (result?.tool_results?.some((r: any) => r.status === 'success')) {
+        setSyncState('synced');
+      } else {
+        setSyncState('failed');
+      }
+    } catch {
+      // Orchestrator unavailable — try legacy sync
+      if (onSync) {
+        onSync(workout);
+        setSyncState('synced');
+      } else {
+        setSyncState('failed');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [workout.title, onSync, workout]);
 
   const handleDelete = useCallback(async () => {
     if (!onDelete) return;
@@ -422,6 +455,42 @@ export function UnifiedWorkoutCard({
 
               {/* Relative time */}
               <span>{getRelativeTime(workout.createdAt)}</span>
+            </div>
+
+            {/* Push to Garmin — one-tap visible action */}
+            <div className="mt-3">
+              <Button
+                variant={syncState === 'synced' ? 'ghost' : syncState === 'failed' ? 'destructive' : 'outline'}
+                size="sm"
+                className={cn(
+                  "w-full gap-2 text-xs",
+                  syncState === 'synced' && "text-green-500 border-green-500/20"
+                )}
+                onClick={handlePushToGarmin}
+                disabled={isSyncing || syncState === 'synced'}
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Pushing to Garmin...
+                  </>
+                ) : syncState === 'synced' ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    On your Garmin ✓
+                  </>
+                ) : syncState === 'failed' ? (
+                  <>
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Failed — tap to retry
+                  </>
+                ) : (
+                  <>
+                    <Watch className="h-3.5 w-3.5" />
+                    Push to Garmin
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Sync status — only show when workout has been genuinely exported/synced (AMA-904) */}
