@@ -31,6 +31,10 @@ export const MOCK_CONNECTIONS: PlatformConnection[] = [
   },
 ];
 
+// PLATFORM_DEFAULTS: used in non-demo (real) mode as the initial state.
+// Strava uses real per-user OAuth via POST /strava/oauth/initiate.
+// Garmin uses credential-based auth (env vars via garmin-sync-api) — no per-user OAuth yet.
+// Stryd uses email/password credentials.
 export const PLATFORM_DEFAULTS: PlatformConnection[] = [
   {
     id: 'stryd',
@@ -45,6 +49,9 @@ export const PLATFORM_DEFAULTS: PlatformConnection[] = [
     name: 'Garmin Connect',
     icon: 'Watch',
     color: 'blue-600',
+    // Garmin sync is credential-based (server-side env vars), not per-user OAuth.
+    // Keep as oauth2 in the UI so the connect flow is triggered, but the backend
+    // uses shared credentials from garmin-sync-api — no redirect occurs.
     authMethod: 'oauth2',
     status: 'disconnected',
   },
@@ -53,6 +60,7 @@ export const PLATFORM_DEFAULTS: PlatformConnection[] = [
     name: 'Strava',
     icon: 'Bike',
     color: 'orange-600',
+    // Strava uses real per-user OAuth: POST /strava/oauth/initiate → redirect.
     authMethod: 'oauth2',
     status: 'disconnected',
   },
