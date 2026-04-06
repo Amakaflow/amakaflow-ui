@@ -5,7 +5,7 @@
  * with quick actions for view, sync, and delete.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Dumbbell,
   Clock,
@@ -279,14 +279,22 @@ export function UnifiedWorkoutCard({
       : 'none'
   );
 
+  // Fix: keep local syncState in sync when the parent passes updated workout props
+  useEffect(() => {
+    const garminSynced = workout.syncStatus?.garmin?.synced ||
+      workout.syncStatus?.garmin?.status === 'synced';
+    setSyncState(garminSynced ? 'synced' : 'none');
+  }, [workout.syncStatus?.garmin?.synced, workout.syncStatus?.garmin?.status]);
+
   const handlePushToGarmin = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsSyncing(true);
     try {
-      // Try orchestrator first
+      // Progressive enhancement: try orchestrator first, fall back to onSync callback.
+      // This keeps the component working without the orchestrator service running.
       const { sendMessage } = await import('../../api/clients/orchestrator');
       const result = await sendMessage(`Push workout "${workout.title}" to Garmin`, 'web');
-      if (result?.tool_results?.some((r: any) => r.status === 'success')) {
+      if (result?.tool_results?.some((r: { status: string }) => r.status === 'success')) {
         setSyncState('synced');
       } else {
         setSyncState('failed');
@@ -295,14 +303,15 @@ export function UnifiedWorkoutCard({
       // Orchestrator unavailable — try legacy sync
       if (onSync) {
         onSync(workout);
-        setSyncState('synced');
+        // Don't assume success — onSync may fail silently
+        // Leave state as 'none' and let prop update handle it
       } else {
         setSyncState('failed');
       }
     } finally {
       setIsSyncing(false);
     }
-  }, [workout.title, onSync, workout]);
+  }, [workout.title, workout.id, onSync]);
 
   const handleDelete = useCallback(async () => {
     if (!onDelete) return;
