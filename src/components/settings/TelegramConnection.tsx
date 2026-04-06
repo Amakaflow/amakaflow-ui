@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -16,11 +16,20 @@ export function TelegramConnection({
   botUrl = 'https://t.me/AmakaFlowBot',
 }: TelegramConnectionProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(botUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(botUrl);
+      setCopied(true);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may fail in insecure contexts — silent fallback
+    }
   };
 
   return (
@@ -43,7 +52,7 @@ export function TelegramConnection({
         {isConnected ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Connected as <strong>@{telegramUsername}</strong>
+              Connected as <strong>@{telegramUsername || 'unknown'}</strong>
             </p>
             <p className="text-xs text-muted-foreground">
               You can chat with your AI coach, import workouts, and approve plan changes directly from
