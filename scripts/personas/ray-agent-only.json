@@ -1,0 +1,73 @@
+{
+  "id": "ray-agent-only",
+  "name": "Ray",
+  "profile": "50yo agent-only user, no website, Telegram + Garmin, premium",
+  "tier": "premium",
+  "mode": "api",
+  "steps": [
+    {
+      "name": "Ask AI to create workout",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "Create a 45-minute upper body workout for today. Use the generate_workout tool."},
+      "expectStream": true,
+      "expectToolOrContent": "generate_workout"
+    },
+    {
+      "name": "Map exercises to Garmin",
+      "type": "api",
+      "port": 8001,
+      "endpoint": "/exercises/match/batch",
+      "method": "POST",
+      "body": {"names": ["Bench Press", "Overhead Press", "Dumbbell Row", "Lateral Raise", "Tricep Pushdown"]},
+      "expectField": "results"
+    },
+    {
+      "name": "Push workout to Garmin",
+      "type": "api",
+      "port": 8099,
+      "_note": "Uses MOCK Garmin (8099), never real (8002).",
+      "endpoint": "/garmin/push-workout",
+      "method": "POST",
+      "body": {"workout": {"title": "Upper Body Day", "blocks": [{"label": "Main", "exercises": [{"name": "Bench Press", "sets": 4, "reps": 10}, {"name": "Overhead Press", "sets": 3, "reps": 12}, {"name": "Dumbbell Row", "sets": 4, "reps": 10}]}]}, "schedule_date": "TODAY"}
+    },
+    {
+      "name": "Verify workout on mock Garmin",
+      "type": "api",
+      "port": 8099,
+      "endpoint": "/workout-service/workouts",
+      "method": "GET",
+      "expectField": "length > 0"
+    },
+    {
+      "name": "Ask AI what I did last week",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "What workouts did I do last week?"},
+      "expectStream": true
+    },
+    {
+      "name": "Check exercise matching accuracy",
+      "type": "api",
+      "port": 8001,
+      "endpoint": "/exercises/match",
+      "method": "POST",
+      "body": {"name": "bench press"},
+      "expectField": "matched_name"
+    },
+    {
+      "name": "Check health endpoints",
+      "type": "api-multi",
+      "checks": [
+        {"port": 8001, "endpoint": "/health"},
+        {"port": 8003, "endpoint": "/health"},
+        {"port": 8004, "endpoint": "/health"},
+        {"port": 8005, "endpoint": "/health"}
+      ]
+    }
+  ]
+}

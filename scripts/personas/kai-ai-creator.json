@@ -1,0 +1,83 @@
+{
+  "id": "kai-ai-creator",
+  "name": "Kai",
+  "profile": "25yo gym-goer, creates all workouts via AI, pushes to mock Garmin, tracks completions",
+  "tier": "premium",
+  "mode": "api",
+  "steps": [
+    {
+      "name": "Ask AI to create push-pull workout",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "Create a 45-minute push-pull workout with bench press, overhead press, pull-ups, and rows. 4 sets each. Use the generate_workout tool."},
+      "expectStream": true,
+      "expectToolOrContent": "generate_workout"
+    },
+    {
+      "name": "Ask AI for a HIIT finisher",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "Add a 10-minute HIIT finisher with battle ropes and box jumps to my workout"},
+      "expectStream": true
+    },
+    {
+      "name": "Map exercises to Garmin format",
+      "type": "api",
+      "port": 8001,
+      "endpoint": "/exercises/match/batch",
+      "method": "POST",
+      "body": {"names": ["Bench Press", "Overhead Press", "Pull-Ups", "Barbell Row", "Battle Ropes", "Box Jumps"]},
+      "expectField": "results"
+    },
+    {
+      "name": "Push workout to mock Garmin",
+      "type": "api",
+      "port": 8099,
+      "_note": "Uses MOCK Garmin only, never real.",
+      "endpoint": "/workout-service/workout",
+      "method": "POST",
+      "body": {
+        "workoutName": "Push-Pull + HIIT",
+        "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"},
+        "workoutSegments": [{"segmentOrder": 1, "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"}, "workoutSteps": [
+          {"stepId": 1, "stepOrder": 1, "stepType": {"stepTypeKey": "exercise"}, "endCondition": {"conditionTypeKey": "lap.button"}, "exerciseName": "BENCH_PRESS", "category": "BENCH_PRESS", "type": "ExecutableStepDTO"},
+          {"stepId": 2, "stepOrder": 2, "stepType": {"stepTypeKey": "exercise"}, "endCondition": {"conditionTypeKey": "lap.button"}, "exerciseName": "OVERHEAD_PRESS", "category": "SHOULDER_PRESS", "type": "ExecutableStepDTO"},
+          {"stepId": 3, "stepOrder": 3, "stepType": {"stepTypeKey": "exercise"}, "endCondition": {"conditionTypeKey": "lap.button"}, "exerciseName": "PULL_UPS", "category": "OTHER", "type": "ExecutableStepDTO"},
+          {"stepId": 4, "stepOrder": 4, "stepType": {"stepTypeKey": "exercise"}, "endCondition": {"conditionTypeKey": "lap.button"}, "exerciseName": "BARBELL_ROW", "category": "OTHER", "type": "ExecutableStepDTO"}
+        ]}]
+      },
+      "expectField": "stepCount"
+    },
+    {
+      "name": "Verify workout on mock Garmin",
+      "type": "api",
+      "port": 8099,
+      "endpoint": "/workout-service/workouts",
+      "method": "GET",
+      "expectField": "length > 0"
+    },
+    {
+      "name": "Log completed workout",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "I just finished the push-pull workout. Bench press 80kg 4x8, overhead press 50kg 4x8, pull-ups 4x10, rows 60kg 4x10. Felt strong, RPE 7."},
+      "expectStream": true
+    },
+    {
+      "name": "Check all services healthy",
+      "type": "api-multi",
+      "checks": [
+        {"port": 8001, "endpoint": "/health"},
+        {"port": 8004, "endpoint": "/health"},
+        {"port": 8005, "endpoint": "/health"},
+        {"port": 8099, "endpoint": "/health"}
+      ]
+    }
+  ]
+}

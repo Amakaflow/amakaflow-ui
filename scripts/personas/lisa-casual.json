@@ -1,0 +1,63 @@
+{
+  "id": "lisa-casual",
+  "name": "Lisa",
+  "profile": "42yo casual lifter, templates + editing, iPhone + Apple Watch, free tier",
+  "tier": "free",
+  "mode": "web",
+  "steps": [
+    {
+      "name": "Open app",
+      "type": "navigate",
+      "url": "/"
+    },
+    {
+      "name": "Go to Create Workout",
+      "type": "navigate",
+      "url": "/workflow"
+    },
+    {
+      "name": "Load template",
+      "type": "click",
+      "selector": "button",
+      "text": "Use Template",
+      "nth": 0
+    },
+    {
+      "name": "Go to Structure page",
+      "type": "click",
+      "selector": "text=Structure Workout"
+    },
+    {
+      "name": "Expand all blocks",
+      "type": "click",
+      "selector": "button",
+      "text": "Expand All"
+    },
+    {
+      "name": "Edit exercise - switch to Duration",
+      "type": "edit-exercise",
+      "action": "switch-tab",
+      "tab": "Duration"
+    },
+    {
+      "name": "Change block type to Circuit",
+      "type": "block-type-change",
+      "targetType": "Circuit"
+    },
+    {
+      "name": "Validate exercises intact",
+      "type": "validate",
+      "selector": "[class*='cursor-grab']",
+      "expect": "count > 0"
+    },
+    {
+      "name": "Check Apple Watch export availability",
+      "type": "api",
+      "port": 8001,
+      "endpoint": "/health",
+      "method": "GET",
+      "expectField": "status",
+      "_note": "TODO: Replace with POST /export/workoutkit when AMA-1370 is built"
+    }
+  ]
+}

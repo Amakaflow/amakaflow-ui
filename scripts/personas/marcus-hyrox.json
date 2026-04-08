@@ -1,0 +1,64 @@
+{
+  "id": "marcus-hyrox",
+  "name": "Marcus",
+  "profile": "35yo Hyrox athlete, AI coach + Instagram, Android + Garmin, premium",
+  "tier": "premium",
+  "mode": "web",
+  "steps": [
+    {
+      "name": "Open app",
+      "type": "navigate",
+      "url": "/"
+    },
+    {
+      "name": "Open AI Coach",
+      "type": "dropdown",
+      "menu": "nav-create-menu",
+      "item": "Create with AI"
+    },
+    {
+      "name": "Ask AI for Hyrox workout",
+      "type": "api",
+      "port": 8005,
+      "endpoint": "/chat/stream",
+      "method": "POST",
+      "body": {"message": "Create a 30-minute Hyrox prep workout with sled push and burpees"},
+      "expectStream": true
+    },
+    {
+      "name": "Push to Garmin",
+      "type": "api",
+      "port": 8099,
+      "_note": "Uses MOCK Garmin (8099), never real (8002). Real push only on David's explicit request.",
+      "endpoint": "/garmin/push-workout",
+      "method": "POST",
+      "body": {"workout": {"title": "Hyrox Prep", "blocks": [{"label": "Main", "exercises": [{"name": "Sled Push", "sets": 4, "reps": 1}, {"name": "Burpees", "sets": 4, "reps": 15}]}]}, "schedule_date": "TODAY"}
+    },
+    {
+      "name": "View Programs",
+      "type": "dropdown",
+      "menu": "nav-training-menu",
+      "item": "Programs"
+    },
+    {
+      "name": "Check Analytics",
+      "type": "dropdown",
+      "menu": "nav-insights-menu",
+      "item": "Analytics"
+    },
+    {
+      "name": "Check Sync Dashboard",
+      "type": "dropdown",
+      "menu": "nav-insights-menu",
+      "item": "Sync Dashboard"
+    },
+    {
+      "name": "Verify Garmin mock received workout",
+      "type": "api",
+      "port": 8099,
+      "endpoint": "/workout-service/workouts",
+      "method": "GET",
+      "expectField": "length > 0"
+    }
+  ]
+}
