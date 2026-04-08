@@ -1,0 +1,64 @@
+{
+  "id": "sarah-beginner",
+  "name": "Sarah",
+  "profile": "28yo beginner, YouTube importer, Wear OS, free tier",
+  "tier": "free",
+  "mode": "web",
+  "steps": [
+    {
+      "name": "Open app",
+      "type": "navigate",
+      "url": "/"
+    },
+    {
+      "name": "Navigate to Import",
+      "type": "dropdown",
+      "menu": "nav-create-menu",
+      "item": "Import Workout"
+    },
+    {
+      "name": "Import YouTube workout",
+      "type": "youtube-import",
+      "url": "https://www.youtube.com/watch?v=ixkQaZXVQjs"
+    },
+    {
+      "name": "Save to library",
+      "type": "click",
+      "selector": "button",
+      "text": "Save all"
+    },
+    {
+      "name": "View My Workouts",
+      "type": "dropdown",
+      "menu": "nav-training-menu",
+      "item": "My Workouts"
+    },
+    {
+      "name": "Check workout list",
+      "type": "validate",
+      "selector": "[data-testid^='workout-item-']",
+      "expect": "count > 0"
+    },
+    {
+      "name": "View Calendar",
+      "type": "dropdown",
+      "menu": "nav-training-menu",
+      "item": "Calendar"
+    },
+    {
+      "name": "Check Wear OS export availability",
+      "type": "api",
+      "port": 8001,
+      "endpoint": "/health",
+      "method": "GET",
+      "expectField": "status",
+      "_note": "TODO: Replace with POST /export/healthconnect when AMA-1370 is built"
+    },
+    {
+      "name": "Check Analytics",
+      "type": "dropdown",
+      "menu": "nav-insights-menu",
+      "item": "Analytics"
+    }
+  ]
+}

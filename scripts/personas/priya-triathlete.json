@@ -1,0 +1,71 @@
+{
+  "id": "priya-triathlete",
+  "name": "Priya",
+  "profile": "31yo Ironman triathlete, multi-sport, iOS + Strava, premium",
+  "tier": "premium",
+  "mode": "web",
+  "steps": [
+    {
+      "name": "Open app",
+      "type": "navigate",
+      "url": "/"
+    },
+    {
+      "name": "Import swim workout",
+      "type": "dropdown",
+      "menu": "nav-create-menu",
+      "item": "Import Workout"
+    },
+    {
+      "name": "Import swim via text",
+      "type": "api",
+      "port": 8004,
+      "endpoint": "/ingest/ai_workout",
+      "method": "POST",
+      "contentType": "text/plain",
+      "body": "Swim: 400m warmup, 8x100m intervals at 1:30 pace with 20s rest, 200m cooldown"
+    },
+    {
+      "name": "Import bike workout",
+      "type": "api",
+      "port": 8004,
+      "endpoint": "/ingest/ai_workout",
+      "method": "POST",
+      "contentType": "text/plain",
+      "body": "Bike: 20min warmup zone 2, 4x8min sweet spot intervals with 4min recovery, 10min cooldown"
+    },
+    {
+      "name": "Import run workout",
+      "type": "api",
+      "port": 8004,
+      "endpoint": "/ingest/ai_workout",
+      "method": "POST",
+      "contentType": "text/plain",
+      "body": "Run: 10min easy warmup, 6x800m at 5K pace with 90s jog recovery, 10min cooldown"
+    },
+    {
+      "name": "View Calendar (multi-sport day)",
+      "type": "dropdown",
+      "menu": "nav-training-menu",
+      "item": "Calendar"
+    },
+    {
+      "name": "Check Analytics",
+      "type": "dropdown",
+      "menu": "nav-insights-menu",
+      "item": "Analytics"
+    },
+    {
+      "name": "Check Sync Dashboard (Strava)",
+      "type": "dropdown",
+      "menu": "nav-insights-menu",
+      "item": "Sync Dashboard"
+    },
+    {
+      "name": "View Programs",
+      "type": "dropdown",
+      "menu": "nav-training-menu",
+      "item": "Programs"
+    }
+  ]
+}
