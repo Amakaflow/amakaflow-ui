@@ -29,10 +29,10 @@
       "name": "Push to Garmin",
       "type": "api",
       "port": 8099,
-      "_note": "Uses MOCK Garmin (8099), never real (8002). Real push only on David's explicit request.",
-      "endpoint": "/garmin/push-workout",
+      "_note": "Uses MOCK Garmin (8099), never real (8002). Real push only on David's explicit request. Endpoint path matches mock_garmin_server.py: POST /workout-service/workout (singular).",
+      "endpoint": "/workout-service/workout",
       "method": "POST",
-      "body": {"workout": {"title": "Hyrox Prep", "blocks": [{"label": "Main", "exercises": [{"name": "Sled Push", "sets": 4, "reps": 1}, {"name": "Burpees", "sets": 4, "reps": 15}]}]}, "schedule_date": "TODAY"}
+      "body": {"workoutName": "Hyrox Prep", "sportType": {"sportTypeKey": "strength_training"}, "workoutSegments": [{"segmentOrder": 1, "sportType": {"sportTypeKey": "strength_training"}, "workoutSteps": [{"type": "ExecutableStepDTO", "stepOrder": 1, "description": "Sled Push", "durationType": {"durationTypeKey": "reps"}, "durationValue": 1}, {"type": "ExecutableStepDTO", "stepOrder": 2, "description": "Burpees", "durationType": {"durationTypeKey": "reps"}, "durationValue": 15}]}]}
     },
     {
       "name": "View Programs",
@@ -48,17 +48,18 @@
     },
     {
       "name": "Check Sync Dashboard",
-      "type": "dropdown",
-      "menu": "nav-insights-menu",
-      "item": "Sync Dashboard"
+      "_note": "Sync Dashboard was promoted from nav-insights-menu to a top-level button with data-testid=nav-sync (labeled 'Sync').",
+      "type": "click",
+      "selector": "[data-testid='nav-sync']"
     },
     {
       "name": "Verify Garmin mock received workout",
       "type": "api",
       "port": 8099,
+      "_note": "Mock returns {workouts: [...]} not a bare array. Use nested length check.",
       "endpoint": "/workout-service/workouts",
       "method": "GET",
-      "expectField": "length > 0"
+      "expectField": "workouts.length > 0"
     }
   ]
 }

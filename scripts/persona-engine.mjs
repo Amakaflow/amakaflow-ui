@@ -226,7 +226,18 @@ async function executeApiStep(step, userId) {
     if (step.expectField) {
       if (step.expectField.includes('>')) {
         const [field, op] = step.expectField.split(' > ');
-        const val = field === 'length' ? (Array.isArray(data) ? data.length : 0) : data?.[field];
+        let val;
+        if (field === 'length') {
+          // Bare array response: data is the array
+          val = Array.isArray(data) ? data.length : 0;
+        } else if (field.endsWith('.length')) {
+          // Nested array: e.g. "workouts.length" → data.workouts.length
+          const arrayKey = field.slice(0, -'.length'.length);
+          const arr = data?.[arrayKey];
+          val = Array.isArray(arr) ? arr.length : 0;
+        } else {
+          val = data?.[field];
+        }
         const pass = val > parseInt(op);
         return { pass, check: `API ${step.endpoint}: ${field}=${val} (expected > ${op})` };
       }

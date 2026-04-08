@@ -28,18 +28,19 @@
       "name": "Push workout to Garmin",
       "type": "api",
       "port": 8099,
-      "_note": "Uses MOCK Garmin (8099), never real (8002).",
-      "endpoint": "/garmin/push-workout",
+      "_note": "Uses MOCK Garmin (8099), never real (8002). Endpoint path matches mock_garmin_server.py: POST /workout-service/workout (singular).",
+      "endpoint": "/workout-service/workout",
       "method": "POST",
-      "body": {"workout": {"title": "Upper Body Day", "blocks": [{"label": "Main", "exercises": [{"name": "Bench Press", "sets": 4, "reps": 10}, {"name": "Overhead Press", "sets": 3, "reps": 12}, {"name": "Dumbbell Row", "sets": 4, "reps": 10}]}]}, "schedule_date": "TODAY"}
+      "body": {"workoutName": "Upper Body Day", "sportType": {"sportTypeKey": "strength_training"}, "workoutSegments": [{"segmentOrder": 1, "sportType": {"sportTypeKey": "strength_training"}, "workoutSteps": [{"type": "ExecutableStepDTO", "stepOrder": 1, "description": "Bench Press", "durationType": {"durationTypeKey": "reps"}, "durationValue": 10}, {"type": "ExecutableStepDTO", "stepOrder": 2, "description": "Overhead Press", "durationType": {"durationTypeKey": "reps"}, "durationValue": 12}, {"type": "ExecutableStepDTO", "stepOrder": 3, "description": "Dumbbell Row", "durationType": {"durationTypeKey": "reps"}, "durationValue": 10}]}]}
     },
     {
       "name": "Verify workout on mock Garmin",
       "type": "api",
       "port": 8099,
+      "_note": "Mock returns {workouts: [...]} not a bare array. Use nested length check.",
       "endpoint": "/workout-service/workouts",
       "method": "GET",
-      "expectField": "length > 0"
+      "expectField": "workouts.length > 0"
     },
     {
       "name": "Ask AI what I did last week",
