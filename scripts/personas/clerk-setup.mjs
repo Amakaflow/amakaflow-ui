@@ -92,13 +92,18 @@ function getClerkClient() {
 // bypasses RLS so we can pre-seed profile rows to skip the onboarding wizard
 // (AMA-1448 covers testing the onboarding UI itself). Service role key is
 // backend-only and must NEVER be exposed to client code.
-let supabaseAdmin = null;
+//
+// Sentinel semantics:
+//   undefined → never attempted
+//   null      → attempted but unavailable (env vars missing)
+//   <client>  → initialized and ready
+let supabaseAdmin; // undefined: never attempted
 function getSupabaseAdmin() {
-  if (supabaseAdmin !== null) return supabaseAdmin;
+  if (supabaseAdmin !== undefined) return supabaseAdmin;
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRole) {
-    supabaseAdmin = false; // sentinel: attempted, not available
+    supabaseAdmin = null; // attempted, not available
     return null;
   }
   supabaseAdmin = createSupabaseClient(url, serviceRole, {

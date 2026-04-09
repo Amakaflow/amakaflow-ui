@@ -58,6 +58,14 @@ async function executeStep(step, page, userId, ctx) {
       // The user is provisioned at run start by createPersonaUser() in
       // clerk-setup.mjs (which calls @clerk/backend's users.createUser).
       // Credentials flow through ctx into this step.
+      if (!ctx?.clerkReady) {
+        // clerkSetup() failed earlier in the run. Skip with a clear message
+        // rather than triggering a noisy Clerk client error inside signIn.
+        return {
+          pass: false,
+          check: 'Skipped — clerkSetup did not succeed (CLERK_PUBLISHABLE_KEY missing or dev instance unreachable?)',
+        };
+      }
       if (!ctx?.credentials) {
         return { pass: false, check: 'login step requires Clerk credentials in run context' };
       }
@@ -436,7 +444,7 @@ async function executeApiStep(step, userId) {
 // DIARY ENGINE
 // ═══════════════════════════════════════════════════════════════════════
 
-async function runPersona(persona) {
+async function runPersona(persona, runOptions = {}) {
   const personaDir = `${RUN_DIR}/${persona.id}`;
   await mkdir(personaDir, { recursive: true });
 
@@ -452,11 +460,14 @@ async function runPersona(persona) {
     score: { passed: 0, failed: 0, total: persona.steps.length },
   };
 
-  // Provision a real Clerk user if any step needs login. AMA-1447: programmatic
-  // per-persona identity via @clerk/backend. Created here, deleted in finally.
+  // Provision a real Clerk user if any step needs login AND Clerk setup
+  // succeeded. If clerkSetup failed earlier we skip provisioning entirely
+  // (no point creating a user we can't sign in with), and the login step
+  // itself will report "Skipped — clerkSetup did not succeed".
   const needsLogin = persona.steps.some((s) => s.type === 'login');
+  const clerkReady = runOptions.clerkReady === true;
   let clerkCredentials = null;
-  if (needsLogin) {
+  if (needsLogin && clerkReady) {
     try {
       clerkCredentials = await createPersonaUser(persona);
       console.log(`  🔐 Provisioned Clerk user ${clerkCredentials.email} (id=${clerkCredentials.userId})`);
@@ -465,8 +476,10 @@ async function runPersona(persona) {
       // Continue — login step will fail with a clear error and the rest of
       // the run will be visible in the diary so we can debug.
     }
+  } else if (needsLogin && !clerkReady) {
+    console.warn(`  ⚠️  Skipping Clerk user provisioning: clerkSetup did not succeed`);
   }
-  const ctx = { credentials: clerkCredentials, personaDir };
+  const ctx = { credentials: clerkCredentials, personaDir, clerkReady };
 
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`  ${persona.name} — ${persona.profile}`);
@@ -690,7 +703,7 @@ await mkdir(RUN_DIR, { recursive: true });
 
 const allDiaries = [];
 for (const persona of personasToRun) {
-  const diary = await runPersona(persona);
+  const diary = await runPersona(persona, { clerkReady });
   allDiaries.push(diary);
 }
 
