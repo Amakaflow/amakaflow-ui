@@ -68,7 +68,8 @@ export function ProgramsSection({
     try {
       const [manualPrograms, aiPrograms] = await Promise.all([
         getPrograms(profileId, false),
-        getTrainingPrograms(profileId, false),
+        // AMA-1450: user_id removed from training programs API.
+        getTrainingPrograms(false),
       ]);
       setPrograms(manualPrograms);
       setTrainingPrograms(aiPrograms);

@@ -77,7 +77,8 @@ export function useProgramDetailApi({
     setError(null);
 
     try {
-      const programData = await getTrainingProgram(programId, userId);
+      // AMA-1450: user_id removed from API call. Backend uses JWT auth.
+      const programData = await getTrainingProgram(programId);
 
       // Only update state if this is still the current load and component is mounted
       if (currentLoadId !== loadIdRef.current || !isMountedRef.current) {
@@ -127,7 +128,7 @@ export function useProgramDetailApi({
 
       setLoading(true);
       try {
-        const success = await updateProgramStatus(programId, userId, status);
+        const success = await updateProgramStatus(programId, status);
         if (success) {
           updateStatusInContext(status);
         }
@@ -155,7 +156,7 @@ export function useProgramDetailApi({
 
     setLoading(true);
     try {
-      const success = await updateProgramProgress(programId, userId, nextWeek);
+      const success = await updateProgramProgress(programId, nextWeek);
       if (success) {
         updateCurrentWeek(nextWeek);
         selectWeek(nextWeek);
@@ -176,7 +177,7 @@ export function useProgramDetailApi({
 
     setLoading(true);
     try {
-      const success = await deleteTrainingProgram(programId, userId);
+      const success = await deleteTrainingProgram(programId);
       if (success) {
         clearProgram();
         onDeleted?.();
@@ -198,7 +199,7 @@ export function useProgramDetailApi({
 
       setLoading(true);
       try {
-        const success = await markWorkoutCompleteApi(workoutId, userId, isCompleted);
+        const success = await markWorkoutCompleteApi(workoutId, isCompleted);
         if (success) {
           markWorkoutCompleteInContext(workoutId, isCompleted);
         }

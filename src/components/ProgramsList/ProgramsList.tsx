@@ -46,7 +46,8 @@ export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: Program
   const loadPrograms = useCallback(async () => {
     try {
       setError(null);
-      const data = await getTrainingPrograms(userId, true); // Include archived
+      // AMA-1450: user_id removed from API call. Backend uses JWT auth.
+      const data = await getTrainingPrograms(true); // Include archived
       setPrograms(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load programs';
@@ -140,7 +141,7 @@ export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: Program
     );
 
     try {
-      const success = await updateProgramStatus(programId, userId, 'active');
+      const success = await updateProgramStatus(programId, 'active');
       if (success) {
         toast.success('Program activated');
       } else {
@@ -169,7 +170,7 @@ export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: Program
     );
 
     try {
-      const success = await updateProgramStatus(programId, userId, 'paused');
+      const success = await updateProgramStatus(programId, 'paused');
       if (success) {
         toast.success('Program paused');
       } else {
@@ -194,7 +195,7 @@ export function ProgramsList({ userId, onViewProgram, onAddToCalendar }: Program
     setPrograms((prev) => prev.filter((p) => p.id !== programId));
 
     try {
-      const success = await deleteTrainingProgram(programId, userId);
+      const success = await deleteTrainingProgram(programId);
       if (success) {
         toast.success('Program deleted');
       } else {
