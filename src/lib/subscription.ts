@@ -1,6 +1,15 @@
 /**
- * Subscription and usage tracking for Free vs Pro tiers.
- * Uses Clerk Billing for tier detection and feature gating.
+ * Subscription tier definitions and static limits for display.
+ *
+ * AMA-1453: The localStorage-based usage tracking (`trackImport`,
+ * `getImportsRemaining`, `canImport`, etc) was removed — it was a client-
+ * side counter with no backend enforcement and no production consumers.
+ * Real usage-based limits will live in the new daily counter system built
+ * under AMA-1449 sub-project 1c, once pricing research (AMA-1452) is done.
+ *
+ * This file now exposes only the static tier metadata that UI components
+ * need for display purposes. Tier membership itself is checked via
+ * `useSubscription()` (which wraps Clerk's `has({ plan: 'pro' })`).
  */
 
 export type Tier = 'free' | 'pro';
@@ -19,6 +28,10 @@ export interface TierLimits {
   connectedCalendars: boolean;
 }
 
+// AMA-1452 will replace these numbers with research-backed values. The
+// current constants are display-only placeholders retained so dependent
+// UI components continue to type-check until the new counter system
+// (AMA-1449 sub-project 1c) replaces them entirely.
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
     importsPerMonth: 5,
@@ -42,9 +55,6 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
 };
 
-// These functions are called from React components that have access to useAuth()
-// For non-hook contexts, use the hook-based versions below
-
 export function getTierLimits(tier: Tier): TierLimits {
   return TIER_LIMITS[tier];
 }
@@ -53,62 +63,4 @@ export function isFeatureAvailable(tier: Tier, feature: keyof TierLimits): boole
   const limits = TIER_LIMITS[tier];
   const value = limits[feature];
   return typeof value === 'boolean' ? value : true;
-}
-
-// Usage tracking (localStorage — complementary to Clerk's subscription status)
-const USAGE_KEY = 'amakaflow_usage';
-
-interface UsageData {
-  importsThisMonth: number;
-  monthKey: string;
-  connectedDevices: string[];
-}
-
-function getCurrentMonthKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getUsage(): UsageData {
-  try {
-    const raw = localStorage.getItem(USAGE_KEY);
-    if (raw) {
-      const data = JSON.parse(raw) as UsageData;
-      if (data.monthKey !== getCurrentMonthKey()) {
-        return { importsThisMonth: 0, monthKey: getCurrentMonthKey(), connectedDevices: data.connectedDevices || [] };
-      }
-      return data;
-    }
-  } catch (e) {
-    console.warn('Usage tracking unavailable:', e);
-  }
-  return { importsThisMonth: 0, monthKey: getCurrentMonthKey(), connectedDevices: [] };
-}
-
-function saveUsage(data: UsageData): void {
-  try {
-    localStorage.setItem(USAGE_KEY, JSON.stringify(data));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-export function trackImport(): void {
-  const usage = getUsage();
-  usage.importsThisMonth++;
-  saveUsage(usage);
-}
-
-export function getImportsUsed(): number {
-  return getUsage().importsThisMonth;
-}
-
-export function getImportsRemaining(tier: Tier): number {
-  const limits = getTierLimits(tier);
-  if (limits.importsPerMonth === Infinity) return Infinity;
-  return Math.max(0, limits.importsPerMonth - getUsage().importsThisMonth);
-}
-
-export function canImport(tier: Tier): boolean {
-  return getImportsRemaining(tier) > 0;
 }
