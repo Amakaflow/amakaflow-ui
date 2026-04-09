@@ -32,7 +32,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 //
 // The persona engine doesn't use dotenv. Parse .env.local manually so this
 // module can be imported standalone without taking on a new dependency.
-async function loadEnvLocal() {
+// Exported so persona-engine.mjs can reuse it instead of duplicating the
+// parser (CodeRabbit AMA-1447 nitpick).
+export async function loadEnvLocal() {
   const envPath = path.resolve(__dirname, '../../.env.local');
   try {
     const text = await readFile(envPath, 'utf-8');
@@ -42,7 +44,17 @@ async function loadEnvLocal() {
       const eq = trimmed.indexOf('=');
       if (eq === -1) continue;
       const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      // Strip matching surrounding quotes so values like KEY="value with
+      // spaces" are parsed correctly. Our current .env.local keys aren't
+      // quoted, but this makes the parser robust if someone adds one later.
+      if (
+        value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'")))
+      ) {
+        value = value.slice(1, -1);
+      }
       // Don't clobber pre-set env vars (e.g. when running under CI)
       if (process.env[key] === undefined) {
         process.env[key] = value;

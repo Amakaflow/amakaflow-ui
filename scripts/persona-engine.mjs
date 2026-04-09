@@ -17,7 +17,7 @@ import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clerk, clerkSetup } from '@clerk/testing/playwright';
-import { createPersonaUser, deletePersonaUser } from './personas/clerk-setup.mjs';
+import { createPersonaUser, deletePersonaUser, loadEnvLocal } from './personas/clerk-setup.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = 'http://localhost:3000';
@@ -598,26 +598,9 @@ if (personasToRun.length === 0) {
 console.log(`\n🎭 AmakaFlow Persona Engine v2`);
 console.log(`   Running ${personasToRun.length} persona(s) — ${TIMESTAMP}\n`);
 
-// Load CLERK_* env vars from amakaflow-ui/.env.local so @clerk/testing can
-// find CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY. The Vite dev server reads
-// .env.local automatically for client-side vars; Node scripts do not.
-async function loadEnvLocal() {
-  const envPath = path.resolve(__dirname, '..', '.env.local');
-  try {
-    const text = await readFile(envPath, 'utf-8');
-    for (const line of text.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eq = trimmed.indexOf('=');
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim();
-      if (process.env[key] === undefined) process.env[key] = value;
-    }
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-  }
-}
+// Reload .env.local in case clerk-setup.mjs's module-load call missed any
+// keys we set later. loadEnvLocal is idempotent (it skips pre-set vars) and
+// imported from clerk-setup.mjs so there's only one parser in the codebase.
 await loadEnvLocal();
 
 // @clerk/testing looks for CLERK_PUBLISHABLE_KEY; the Vite app uses the
@@ -630,12 +613,27 @@ if (process.env.VITE_CLERK_PUBLISHABLE_KEY && !process.env.CLERK_PUBLISHABLE_KEY
 // once per suite that bypasses Clerk's bot detection for subsequent
 // clerk.signIn() calls. See:
 //   https://clerk.com/docs/testing/playwright/overview
+//
+// If clerkSetup fails AND any persona we're about to run needs login,
+// fail fast in CI rather than wasting time running steps that will all
+// fail at the auth gate.
+let clerkReady = false;
 try {
   await clerkSetup();
+  clerkReady = true;
   console.log(`   🔐 Clerk testing token obtained (dev instance)\n`);
 } catch (err) {
   console.warn(`   ⚠️  clerkSetup failed: ${err.message}`);
   console.warn(`      Login steps will not work until this is resolved.\n`);
+  const anyNeedsLogin = personasToRun.some((p) =>
+    p.steps.some((s) => s.type === 'login')
+  );
+  if (anyNeedsLogin && process.env.CI) {
+    console.error(
+      `   ❌ Exiting: CI run requires Clerk auth but clerkSetup failed.`
+    );
+    process.exit(1);
+  }
 }
 
 await mkdir(RUN_DIR, { recursive: true });
