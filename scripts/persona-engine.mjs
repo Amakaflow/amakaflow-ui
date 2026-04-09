@@ -121,6 +121,14 @@ async function executeStep(step, page, userId, ctx) {
             .map((el) => (el.textContent || '').trim().slice(0, 200))
             .filter(Boolean);
           const modalVisible = !!document.querySelector('.cl-modalContent, .cl-signIn-root, .cl-card');
+          // Cookie NAMES only (not values) — session JWTs can appear in
+          // non-HttpOnly dev cookies and committing them to CI logs or
+          // diagnostic JSON artifacts is a leak risk. Names are enough to
+          // tell us whether __session / __clerk_db_jwt are set.
+          const cookieNames = document.cookie
+            .split(';')
+            .map((c) => c.split('=')[0].trim())
+            .filter(Boolean);
           return {
             url: location.href,
             pathname: location.pathname,
@@ -131,8 +139,8 @@ async function executeStep(step, page, userId, ctx) {
             visibleButtons: buttons,
             errorText,
             modalVisible,
-            cookieCount: document.cookie.split(';').filter(Boolean).length,
-            cookies: document.cookie.slice(0, 300),
+            cookieCount: cookieNames.length,
+            cookieNames,
           };
         });
         console.log('    🔬 DIAGNOSTIC DOM STATE after password submit:');
@@ -156,9 +164,10 @@ async function executeStep(step, page, userId, ctx) {
         // session JWT as a cookie. localStorage only gets
         // __clerk_environment (instance config, not auth state), so
         // checking cookies is ground truth for "is this browser signed in".
+        // Check cookie NAMES (not values) to avoid leaking JWTs in logs.
         const hasSessionCookie =
-          domState.cookies.includes('__session=') ||
-          domState.cookies.includes('__clerk_db_jwt=');
+          domState.cookieNames.includes('__session') ||
+          domState.cookieNames.some((n) => n.startsWith('__clerk_db_jwt'));
         if (!hasSessionCookie) {
           const errMsg =
             domState.errorText.length > 0
@@ -422,96 +431,118 @@ async function runPersona(persona) {
 
   let browser, context, page;
 
-  if (persona.mode === 'web') {
-    browser = await chromium.launch({ headless: true });
-    context = await browser.newContext();
-    page = await context.newPage();
+  // Wrap the entire run in try/finally so Clerk/Supabase teardown always
+  // fires, even if a step crashes, the browser launch fails, or the
+  // evidence writer throws mid-run. Without this, any unhandled exception
+  // would orphan the provisioned Clerk user and Supabase profile row.
+  try {
+    if (persona.mode === 'web') {
+      browser = await chromium.launch({ headless: true });
+      context = await browser.newContext();
+      page = await context.newPage();
 
-    // Inject persona user ID into all API requests
-    await page.route('**/*', async (route) => {
-      const url = route.request().url();
-      if (url.includes('/api/') || url.includes(':800')) {
-        const headers = { ...route.request().headers(), 'x-test-user-id': userId };
-        await route.continue({ headers });
-      } else {
-        await route.continue();
+      // Inject persona user ID into all API requests
+      await page.route('**/*', async (route) => {
+        const url = route.request().url();
+        if (url.includes('/api/') || url.includes(':800')) {
+          const headers = { ...route.request().headers(), 'x-test-user-id': userId };
+          await route.continue({ headers });
+        } else {
+          await route.continue();
+        }
+      });
+
+      // Initialize page
+      await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.evaluate((uid) => localStorage.setItem('persona_id', uid), userId);
+      await page.waitForTimeout(500);
+    }
+
+    for (let i = 0; i < persona.steps.length; i++) {
+      const step = persona.steps[i];
+      const stepNum = String(i + 1).padStart(2, '0');
+      console.log(`  Step ${stepNum}: ${step.name}...`);
+
+      let result;
+      try {
+        result = await executeStep(step, page, userId, ctx);
+      } catch (err) {
+        result = { pass: false, check: `CRASH: ${err.message.slice(0, 150)}` };
       }
-    });
 
-    // Initialize page
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await page.evaluate((uid) => localStorage.setItem('persona_id', uid), userId);
-    await page.waitForTimeout(500);
-  }
+      // Evidence capture: screenshot for UI steps, JSON for API steps.
+      // Previously we screenshotted unconditionally after every step, which
+      // produced stale screenshots of the previous page for API steps and
+      // polluted the visual golden set. Now UI and API steps are separated.
+      const slug = step.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+      const isApiStep = step.type === 'api' || step.type === 'api-multi';
+      let screenshotName = null;
+      let apiEvidenceName = null;
 
-  for (let i = 0; i < persona.steps.length; i++) {
-    const step = persona.steps[i];
-    const stepNum = String(i + 1).padStart(2, '0');
-    console.log(`  Step ${stepNum}: ${step.name}...`);
+      if (isApiStep) {
+        apiEvidenceName = `${stepNum}-${slug}.json`;
+        const apiEvidence = {
+          step: step.name,
+          type: step.type,
+          request: {
+            port: step.port || null,
+            endpoint: step.endpoint || null,
+            method: step.method || 'GET',
+            body: step.body || null,
+          },
+          result,
+        };
+        await writeFile(
+          `${personaDir}/${apiEvidenceName}`,
+          JSON.stringify(apiEvidence, null, 2)
+        ).catch(() => {});
+      } else if (page) {
+        screenshotName = `${stepNum}-${slug}.png`;
+        await page.screenshot({ path: `${personaDir}/${screenshotName}`, fullPage: true }).catch(() => {});
+      }
 
-    let result;
-    try {
-      result = await executeStep(step, page, userId, ctx);
-    } catch (err) {
-      result = { pass: false, check: `CRASH: ${err.message.slice(0, 150)}` };
-    }
+      const icon = result.pass ? '✅' : '❌';
+      console.log(`    ${icon} ${result.check}`);
 
-    // Evidence capture: screenshot for UI steps, JSON for API steps.
-    // Previously we screenshotted unconditionally after every step, which
-    // produced stale screenshots of the previous page for API steps and
-    // polluted the visual golden set. Now UI and API steps are separated.
-    const slug = step.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-    const isApiStep = step.type === 'api' || step.type === 'api-multi';
-    let screenshotName = null;
-    let apiEvidenceName = null;
-
-    if (isApiStep) {
-      apiEvidenceName = `${stepNum}-${slug}.json`;
-      const apiEvidence = {
-        step: step.name,
+      diary.steps.push({
+        number: i + 1,
+        name: step.name,
         type: step.type,
-        request: {
-          port: step.port || null,
-          endpoint: step.endpoint || null,
-          method: step.method || 'GET',
-          body: step.body || null,
-        },
-        result,
-      };
-      await writeFile(
-        `${personaDir}/${apiEvidenceName}`,
-        JSON.stringify(apiEvidence, null, 2)
-      ).catch(() => {});
-    } else if (page) {
-      screenshotName = `${stepNum}-${slug}.png`;
-      await page.screenshot({ path: `${personaDir}/${screenshotName}`, fullPage: true }).catch(() => {});
+        check: result.check,
+        passed: result.pass,
+        screenshot: screenshotName,
+        apiEvidence: apiEvidenceName,
+      });
+
+      if (result.pass) diary.score.passed++;
+      else diary.score.failed++;
+    }
+  } finally {
+    // Browser teardown. Independent try/catch each so one failure doesn't
+    // skip the Clerk cleanup below.
+    if (context) {
+      try { await context.close(); } catch (err) {
+        console.warn(`  ⚠️  context.close() failed: ${err.message}`);
+      }
+    }
+    if (browser) {
+      try { await browser.close(); } catch (err) {
+        console.warn(`  ⚠️  browser.close() failed: ${err.message}`);
+      }
     }
 
-    const icon = result.pass ? '✅' : '❌';
-    console.log(`    ${icon} ${result.check}`);
-
-    diary.steps.push({
-      number: i + 1,
-      name: step.name,
-      type: step.type,
-      check: result.check,
-      passed: result.pass,
-      screenshot: screenshotName,
-      apiEvidence: apiEvidenceName,
-    });
-
-    if (result.pass) diary.score.passed++;
-    else diary.score.failed++;
-  }
-
-  if (context) await context.close();
-  if (browser) await browser.close();
-
-  // Tear down the Clerk user. Idempotent — logs a warning if cleanup fails so
-  // we don't mask the real test result, but flags any orphans for manual review.
-  if (clerkCredentials?.userId) {
-    await deletePersonaUser(clerkCredentials.userId);
-    console.log(`  🧹 Deleted Clerk user ${clerkCredentials.email}`);
+    // Tear down the Clerk user + Supabase profile row. Idempotent — logs a
+    // warning if cleanup fails so we don't mask the real test result, but
+    // flags any orphans for manual review.
+    if (clerkCredentials?.userId) {
+      try {
+        await deletePersonaUser(clerkCredentials.userId);
+        console.log(`  🧹 Deleted Clerk user ${clerkCredentials.email}`);
+      } catch (err) {
+        console.warn(`  ⚠️  deletePersonaUser failed: ${err.message}`);
+        console.warn(`     Orphan user ${clerkCredentials.userId} may need manual cleanup.`);
+      }
+    }
   }
 
   // Write diary JSON + markdown
