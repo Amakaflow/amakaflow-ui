@@ -98,13 +98,15 @@ export function ChatInput({ onSend, isStreaming, rateLimitInfo, autoFocus }: Cha
           data-testid="chat-input-textarea"
         />
 
-        {/* Voice input button (AMA-435) */}
+        {/* Voice input button (AMA-435 + AMA-1320 countdown) */}
         <VoiceInputButton
           state={voiceInput.state}
           isSupported={voiceInput.isSupported}
           error={voiceInput.error}
           confidence={voiceInput.confidence}
           disabled={isStreaming}
+          recordingDurationMs={voiceInput.recordingDurationMs}
+          maxDurationMs={voiceInput.maxDurationMs}
           onStart={voiceInput.startRecording}
           onStop={voiceInput.stopRecording}
           onCancel={voiceInput.cancelRecording}

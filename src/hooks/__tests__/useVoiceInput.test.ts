@@ -45,6 +45,24 @@ describe('useVoiceInput', () => {
       expect(result.current.confidence).toBe(0);
       expect(result.current.error).toBeNull();
     });
+
+    // AMA-1320: regression test for the 60s cutoff bug. The default must
+    // stay at 5 minutes to match iOS. If someone drops this back to 60s,
+    // power users describing a full workout get cut off mid-sentence.
+    it('defaults maxDurationMs to 300000 (5 minutes, matches iOS)', () => {
+      const { result } = renderHook(() => useVoiceInput());
+      expect(result.current.maxDurationMs).toBe(300_000);
+    });
+
+    it('honors an explicit maxDurationMs override', () => {
+      const { result } = renderHook(() => useVoiceInput({ maxDurationMs: 120_000 }));
+      expect(result.current.maxDurationMs).toBe(120_000);
+    });
+
+    it('starts with recordingDurationMs=0', () => {
+      const { result } = renderHook(() => useVoiceInput());
+      expect(result.current.recordingDurationMs).toBe(0);
+    });
   });
 
   describe('browser support detection', () => {

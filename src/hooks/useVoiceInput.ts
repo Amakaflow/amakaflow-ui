@@ -8,9 +8,14 @@
  *
  * Features:
  * - MediaRecorder with audio/webm;codecs=opus
- * - 60-second max recording limit
+ * - 5-minute max recording limit (matches iOS VoiceRecordingService)
+ * - Live `recordingDurationMs` output so consumers can render a countdown
  * - Fallback to Web Speech API on Deepgram failure
  * - Feature detection for unsupported browsers
+ *
+ * AMA-1320: Web max was previously 60s, which cut off power users describing
+ * full workout sessions. Bumped to 300s (match iOS) and surfaced live duration
+ * so the UI can show a visible countdown before the hard cutoff fires.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -24,6 +29,10 @@ export interface UseVoiceInputReturn {
   confidence: number;
   error: string | null;
   isSupported: boolean;
+  /** Elapsed milliseconds of the current recording. 0 when not recording. */
+  recordingDurationMs: number;
+  /** Configured max duration. Consumers use this with `recordingDurationMs` to render a countdown. */
+  maxDurationMs: number;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   cancelRecording: () => void;
@@ -36,8 +45,12 @@ interface UseVoiceInputOptions {
   language?: string;
 }
 
-const DEFAULT_MAX_DURATION_MS = 60_000; // 60 seconds
+// Match iOS VoiceRecordingService.maxDuration (300s). Covers a power user
+// narrating a full workout session (8+ exercises with sets/reps) comfortably.
+// AMA-1320: was previously 60s, which cut off mid-sentence.
+const DEFAULT_MAX_DURATION_MS = 300_000; // 5 minutes
 const MIN_CONFIDENCE_THRESHOLD = 0.5;
+const DURATION_TICK_MS = 100; // 10 Hz — smooth countdown without burning CPU
 
 // Check if the browser supports the required APIs
 function checkBrowserSupport(): boolean {
@@ -126,11 +139,14 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   const [transcript, setTranscript] = useState('');
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [recordingDurationMs, setRecordingDurationMs] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartedAtRef = useRef<number>(0);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isSupported = checkBrowserSupport();
@@ -143,6 +159,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       isMountedRef.current = false;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+      }
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -158,6 +177,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -306,6 +329,17 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       mediaRecorder.start();
       setState('recording');
 
+      // Start live duration tracking so the UI can render a countdown.
+      // Uses wall-clock time so it stays accurate even if the tick interval
+      // drifts under tab-throttling conditions.
+      recordingStartedAtRef.current = Date.now();
+      setRecordingDurationMs(0);
+      durationIntervalRef.current = setInterval(() => {
+        if (!isMountedRef.current) return;
+        const elapsed = Date.now() - recordingStartedAtRef.current;
+        setRecordingDurationMs(elapsed);
+      }, DURATION_TICK_MS);
+
       // Set max duration timeout
       timeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current?.state === 'recording') {
@@ -324,6 +358,13 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   }, [isSupported, maxDurationMs, cleanup, processTranscription]);
 
   const stopRecording = useCallback(() => {
+    // Stop ticking the duration immediately so the final rendered value is
+    // the moment the user pressed stop, not whenever the MediaRecorder.onstop
+    // handler finally fires.
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -341,6 +382,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       mediaRecorderRef.current.stop();
     }
     cleanup();
+    setRecordingDurationMs(0);
     setState('idle');
     setError(null);
   }, [cleanup]);
@@ -349,6 +391,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     setTranscript('');
     setConfidence(0);
     setError(null);
+    setRecordingDurationMs(0);
     if (state === 'error') {
       setState('idle');
     }
@@ -360,6 +403,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     confidence,
     error,
     isSupported,
+    recordingDurationMs,
+    maxDurationMs,
     startRecording,
     stopRecording,
     cancelRecording,
