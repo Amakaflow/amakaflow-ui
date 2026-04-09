@@ -46,7 +46,6 @@ import {
 } from './router';
 import { TeamSharing } from '../components/TeamSharing';
 import { HomeScreen } from '../components/Home/HomeScreen';
-import { WelcomeGuide } from '../components/WelcomeGuide';
 import { ExportPage } from '../components/Export';
 import { DeviceId } from '../lib/devices';
 import { VIEW_TO_PATH, pathToView } from '../hooks/useUrlSync';
@@ -157,7 +156,6 @@ export function AppShell() {
                     user={user}
                     workoutHistoryList={workoutHistoryList}
                     navigate={navigate}
-                    workflowState={workflowState}
                   />
                 }
               />
@@ -393,7 +391,6 @@ export function AppShell() {
                     user={user}
                     workoutHistoryList={workoutHistoryList}
                     navigate={navigate}
-                    workflowState={workflowState}
                   />
                 }
               />
@@ -420,43 +417,23 @@ function HomeRoute({
   user,
   workoutHistoryList,
   navigate,
-  workflowState,
 }: {
   user: any;
   workoutHistoryList: any[];
   navigate: (view: View) => void;
-  workflowState: any;
 }) {
-  if (workflowState.welcomeDismissed) {
-    return (
-      <div className="py-6 sm:py-8">
-        <HomeScreen
-          user={user}
-          recentWorkouts={workoutHistoryList}
-          onNavigate={navigate}
-        />
-      </div>
-    );
-  }
+  // AMA-1451: HomeScreen is the unconditional home for authenticated users.
+  // The legacy WelcomeGuide wizard has been removed — the agentic HomeScreen
+  // (OrchestratorChat, stats, quick actions) is the goal of the app and
+  // should be every user's first experience.
   return (
-    <>
-      <div className="container mx-auto px-4 py-6 sm:py-8">
-        <WelcomeGuide
-          onGetStarted={() => {
-            workflowState.handleWelcomeDismiss();
-            navigate('workflow');
-          }}
-          onDismiss={workflowState.handleWelcomeDismiss}
-        />
-        {!isDemoMode && (
-          <div className="mt-8 text-center">
-            <p className="text-xs text-muted-foreground">
-              Build: {new Date(workflowState.buildTimestamp).toLocaleString()}
-            </p>
-          </div>
-        )}
-      </div>
-    </>
+    <div className="py-6 sm:py-8">
+      <HomeScreen
+        user={user}
+        recentWorkouts={workoutHistoryList}
+        onNavigate={navigate}
+      />
+    </div>
   );
 }
 
