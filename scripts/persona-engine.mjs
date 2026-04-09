@@ -399,6 +399,21 @@ async function executeApiStep(step, userId) {
     if (step.expectField) {
       if (step.expectField.includes('>')) {
         const [field, op] = step.expectField.split(' > ');
+        // Supported forms:
+        //   "length"            → data is a bare array
+        //   "<key>.length"      → data is an object with a single array field
+        //   "<key>"             → scalar lookup on data
+        // Deeper paths like "foo.bar.length" are intentionally NOT supported —
+        // they would silently return 0 with the old implementation, which
+        // masked typos. Reject them explicitly with a clear error.
+        const dotCount = (field.match(/\./g) || []).length;
+        if (dotCount > 1) {
+          return {
+            pass: false,
+            check: `API ${step.endpoint}: unsupported expectField "${field}" — only single-level nesting (e.g. "workouts.length") is supported`,
+            response: respMeta,
+          };
+        }
         let val;
         if (field === 'length') {
           // Bare array response: data is the array
