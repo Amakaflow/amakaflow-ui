@@ -20,9 +20,14 @@ interface VoiceInputButtonProps {
   error: string | null;
   confidence: number;
   disabled?: boolean;
-  /** Live recording duration in ms. When provided, the button renders a countdown label. */
+  /** Live recording duration in ms. When provided, the button renders an elapsed-time counter. */
   recordingDurationMs?: number;
-  /** Max recording duration in ms. Used with recordingDurationMs to compute remaining time. */
+  /**
+   * Max recording duration in ms. Accepted for API symmetry with `useVoiceInput`
+   * but not currently rendered — the elapsed counter counts up rather than
+   * down because AMA-1320's 30-minute cap is a safety backstop, not a
+   * user-facing limit.
+   */
   maxDurationMs?: number;
   onStart: () => void;
   onStop: () => void;
@@ -30,12 +35,12 @@ interface VoiceInputButtonProps {
 }
 
 /**
- * Format remaining time as "m:ss". Caller passes remaining ms.
+ * Format elapsed time as "m:ss". Caller passes elapsed ms.
  * Returns "0:00" for anything ≤ 0 so the display doesn't flicker negative.
  */
-function formatRemaining(remainingMs: number): string {
-  const clamped = Math.max(0, remainingMs);
-  const totalSeconds = Math.ceil(clamped / 1000);
+function formatElapsed(elapsedMs: number): string {
+  const clamped = Math.max(0, elapsedMs);
+  const totalSeconds = Math.floor(clamped / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -84,17 +89,16 @@ export function VoiceInputButton({
   const isError = state === 'error';
   const isDisabled = disabled || !isSupported || isProcessing;
 
-  // Countdown: show remaining time while recording. Turns amber at <30s,
-  // red at <10s, to warn the user before the hard cutoff fires.
-  const showCountdown =
-    isRecording && recordingDurationMs !== undefined && maxDurationMs !== undefined;
-  const remainingMs =
-    showCountdown && maxDurationMs !== undefined && recordingDurationMs !== undefined
-      ? maxDurationMs - recordingDurationMs
-      : 0;
-  const remainingLabel = showCountdown ? formatRemaining(remainingMs) : '';
-  const countdownUrgency =
-    remainingMs <= 10_000 ? 'urgent' : remainingMs <= 30_000 ? 'warning' : 'normal';
+  // AMA-1320: Show an elapsed-time counter (counting up) next to the mic
+  // while recording, like Telegram voice notes. The 30-minute cap in
+  // useVoiceInput is a safety backstop, not a user-facing limit, so we
+  // deliberately do NOT show remaining time or warning colors — that would
+  // imply a practical limit users should worry about. `maxDurationMs` is
+  // accepted in props for API symmetry with the hook but intentionally
+  // unused in rendering.
+  void maxDurationMs;
+  const showElapsed = isRecording && recordingDurationMs !== undefined;
+  const elapsedLabel = showElapsed ? formatElapsed(recordingDurationMs ?? 0) : '';
 
   const handleClick = () => {
     if (isRecording) {
@@ -156,22 +160,18 @@ export function VoiceInputButton({
         )}
       </Button>
 
-      {/* AMA-1320: countdown while recording so users know how much time
-          they have before the hard cutoff fires. Silent cutoffs felt like
-          the feature was broken. */}
-      {showCountdown && (
+      {/* AMA-1320: elapsed-time counter while recording. Counts UP, not down
+          — the 30-min cap in useVoiceInput is a safety backstop, not a
+          user-facing limit (Telegram-style voice note UX). No warning
+          colors because there's no meaningful cutoff to warn about. */}
+      {showElapsed && (
         <span
-          className={cn(
-            'text-[11px] font-mono tabular-nums select-none',
-            countdownUrgency === 'urgent' && 'text-red-500 font-semibold',
-            countdownUrgency === 'warning' && 'text-amber-500',
-            countdownUrgency === 'normal' && 'text-muted-foreground',
-          )}
-          data-testid="chat-voice-countdown"
+          className="text-[11px] font-mono tabular-nums select-none text-muted-foreground"
+          data-testid="chat-voice-elapsed"
           aria-live="polite"
-          aria-label={`${remainingLabel} remaining`}
+          aria-label={`Recording, ${elapsedLabel} elapsed`}
         >
-          {remainingLabel}
+          {elapsedLabel}
         </span>
       )}
     </div>

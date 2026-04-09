@@ -8,14 +8,20 @@
  *
  * Features:
  * - MediaRecorder with audio/webm;codecs=opus
- * - 5-minute max recording limit (matches iOS VoiceRecordingService)
- * - Live `recordingDurationMs` output so consumers can render a countdown
+ * - 30-minute safety cap — not a real limit anyone hits in practice. Matches
+ *   the Telegram voice-note UX where recording feels unbounded from the
+ *   user's perspective.
+ * - Live `recordingDurationMs` output so consumers can render an elapsed
+ *   m:ss counter (counting up, not down)
  * - Fallback to Web Speech API on Deepgram failure
  * - Feature detection for unsupported browsers
  *
  * AMA-1320: Web max was previously 60s, which cut off power users describing
- * full workout sessions. Bumped to 300s (match iOS) and surfaced live duration
- * so the UI can show a visible countdown before the hard cutoff fires.
+ * full workout sessions. Bumped to 1800s (30 min) per David's direction —
+ * "it should be the same as when I'm recording a message on Telegram". The
+ * cap still exists as a backstop (prevents runaway tabs, backend request-
+ * timeout blowouts, Deepgram upload size issues) but is not user-facing.
+ * Surfaced live duration so the UI can show an elapsed m:ss counter.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -31,7 +37,7 @@ export interface UseVoiceInputReturn {
   isSupported: boolean;
   /** Elapsed milliseconds of the current recording. 0 when not recording. */
   recordingDurationMs: number;
-  /** Configured max duration. Consumers use this with `recordingDurationMs` to render a countdown. */
+  /** Configured max duration (safety backstop, not a user-facing limit in practice). */
   maxDurationMs: number;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
@@ -45,12 +51,15 @@ interface UseVoiceInputOptions {
   language?: string;
 }
 
-// Match iOS VoiceRecordingService.maxDuration (300s). Covers a power user
-// narrating a full workout session (8+ exercises with sets/reps) comfortably.
-// AMA-1320: was previously 60s, which cut off mid-sentence.
-const DEFAULT_MAX_DURATION_MS = 300_000; // 5 minutes
+// 30-minute safety cap. Chosen to be long enough that no real user ever
+// experiences it as a limit (matches Telegram voice-note UX per David's
+// direction on AMA-1320), short enough that a stuck tab or forgotten
+// recording can't run indefinitely. Still catches backend request-timeout
+// and Deepgram upload-size edge cases without making them the user's
+// problem.
+const DEFAULT_MAX_DURATION_MS = 1_800_000; // 30 minutes
 const MIN_CONFIDENCE_THRESHOLD = 0.5;
-const DURATION_TICK_MS = 100; // 10 Hz — smooth countdown without burning CPU
+const DURATION_TICK_MS = 100; // 10 Hz — smooth elapsed-time display without burning CPU
 
 // Check if the browser supports the required APIs
 function checkBrowserSupport(): boolean {
