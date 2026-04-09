@@ -56,9 +56,10 @@
       "name": "Verify workout on mock Garmin",
       "type": "api",
       "port": 8099,
+      "_note": "Mock returns {workouts: [...]} not a bare array. Use nested length check.",
       "endpoint": "/workout-service/workouts",
       "method": "GET",
-      "expectField": "length > 0"
+      "expectField": "workouts.length > 0"
     },
     {
       "name": "Log completed workout",

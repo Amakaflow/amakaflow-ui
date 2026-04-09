@@ -57,9 +57,9 @@
     },
     {
       "name": "Check Sync Dashboard (Strava)",
-      "type": "dropdown",
-      "menu": "nav-insights-menu",
-      "item": "Sync Dashboard"
+      "_note": "Sync Dashboard was promoted from nav-insights-menu to a top-level button with data-testid=nav-sync.",
+      "type": "click",
+      "selector": "[data-testid='nav-sync']"
     },
     {
       "name": "View Programs",
