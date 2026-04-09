@@ -6,6 +6,11 @@
   "mode": "web",
   "steps": [
     {
+      "name": "Login as Lisa",
+      "_note": "AMA-1447 — real Clerk auth via @clerk/backend. Credentials provisioned at run start by clerk-setup.mjs and torn down on exit.",
+      "type": "login"
+    },
+    {
       "name": "Open app",
       "type": "navigate",
       "url": "/"
