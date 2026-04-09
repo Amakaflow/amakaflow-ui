@@ -68,27 +68,37 @@ export async function streamReplan(
 ): Promise<AbortController> {
   const controller = new AbortController();
 
-  const token = await getAuthToken();
-
-  const response = await fetch(`${PROGRAM_API_BASE_URL}/api/programs/replan/stream`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(request),
-    signal: controller.signal,
-  });
+  let response: Response;
+  try {
+    const token = await getAuthToken();
+    response = await fetch(`${PROGRAM_API_BASE_URL}/api/programs/replan/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    callbacks.onError?.({
+      type: 'error',
+      stage: 'replanning',
+      message: err instanceof Error ? err.message : 'Failed to start re-plan stream.',
+      recoverable: true,
+    });
+    callbacks.onDone?.();
+    return controller;
+  }
 
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => response.statusText);
-    const errorEvent: ReplanErrorEvent = {
+    callbacks.onError?.({
       type: 'error',
       stage: 'replanning',
       message: `Request failed: ${text}`,
       recoverable: false,
-    };
-    callbacks.onError?.(errorEvent);
+    });
     callbacks.onDone?.();
     return controller;
   }
@@ -116,12 +126,14 @@ export async function streamReplan(
             if (!raw) continue;
             try {
               const payload = JSON.parse(raw) as Record<string, unknown>;
-              if (eventType === 'stage' || payload['stage']) {
-                callbacks.onStage?.({
-                  type: 'stage',
-                  stage: String(payload['stage'] ?? eventType),
-                  message: String(payload['message'] ?? ''),
-                  sub_progress: payload['sub_progress'] as ReplanStageEvent['sub_progress'],
+              // Check error first so error payloads with a "stage" field don't
+              // incorrectly trigger onStage.
+              if (eventType === 'error' || payload['recoverable'] !== undefined) {
+                callbacks.onError?.({
+                  type: 'error',
+                  stage: String(payload['stage'] ?? 'replanning'),
+                  message: String(payload['message'] ?? 'Unknown error'),
+                  recoverable: Boolean(payload['recoverable']),
                 });
               } else if (eventType === 'preview' || payload['preview_id']) {
                 callbacks.onPreview?.({
@@ -130,12 +142,12 @@ export async function streamReplan(
                   replanned_weeks: (payload['replanned_weeks'] as number[]) ?? [],
                   program: (payload['program'] as Record<string, unknown>) ?? {},
                 });
-              } else if (eventType === 'error' || payload['recoverable'] !== undefined) {
-                callbacks.onError?.({
-                  type: 'error',
-                  stage: String(payload['stage'] ?? 'replanning'),
-                  message: String(payload['message'] ?? 'Unknown error'),
-                  recoverable: Boolean(payload['recoverable']),
+              } else if (eventType === 'stage' || payload['stage']) {
+                callbacks.onStage?.({
+                  type: 'stage',
+                  stage: String(payload['stage'] ?? eventType),
+                  message: String(payload['message'] ?? ''),
+                  sub_progress: payload['sub_progress'] as ReplanStageEvent['sub_progress'],
                 });
               }
             } catch {
