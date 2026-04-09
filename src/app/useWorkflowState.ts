@@ -237,7 +237,6 @@ export function useWorkflowState({
     apiAvailable: generation.apiAvailable,
     showStravaEnhance: generation.showStravaEnhance,
     pinterestBulkModal: generation.pinterestBulkModal,
-    welcomeDismissed: generation.welcomeDismissed,
     buildTimestamp: generation.buildTimestamp,
     handleGenerateStructure: generation.handleGenerateStructure,
     handleCancelGeneration: generation.handleCancelGeneration,
@@ -247,7 +246,6 @@ export function useWorkflowState({
     handleLoadTemplate: generation.handleLoadTemplate,
     handleCreateNew: generation.handleCreateNew,
     handleStartNew: generation.handleStartNew,
-    handleWelcomeDismiss: generation.handleWelcomeDismiss,
     // editing
     isEditingFromHistory: editing.isEditingFromHistory,
     isCreatingFromScratch: editing.isCreatingFromScratch,

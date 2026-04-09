@@ -203,27 +203,8 @@ describe('useWorkflowGeneration', () => {
     expect(onClearEditingFlags).toHaveBeenCalledTimes(1);
   });
 
-  it('handleWelcomeDismiss: sets localStorage key and welcomeDismissed becomes true', () => {
-    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
-
-    expect(result.current.welcomeDismissed).toBe(false);
-
-    act(() => {
-      result.current.handleWelcomeDismiss();
-    });
-
-    expect(localStorage.getItem('amakaflow_welcome_dismissed')).toBe('true');
-    expect(result.current.welcomeDismissed).toBe(true);
-  });
-
-  it('welcomeDismissed initial state: reads from localStorage (starts as true when already dismissed)', () => {
-    // Pre-populate localStorage before rendering the hook
-    localStorage.setItem('amakaflow_welcome_dismissed', 'true');
-
-    const { result } = renderHook(() => useWorkflowGeneration(defaultProps));
-
-    expect(result.current.welcomeDismissed).toBe(true);
-  });
+  // AMA-1451: welcomeDismissed + handleWelcomeDismiss tests removed.
+  // WelcomeGuide is deprecated; HomeScreen is the unconditional home.
 
   it('handlePinterestBulkClose: resets pinterestBulkModal.open to false', () => {
     const { result } = renderHook(() => useWorkflowGeneration(defaultProps));

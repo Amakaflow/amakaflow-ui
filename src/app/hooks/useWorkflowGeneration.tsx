@@ -49,7 +49,6 @@ export interface UseWorkflowGenerationResult {
   apiAvailable: boolean | null;
   showStravaEnhance: boolean;
   pinterestBulkModal: PinterestBulkModalState;
-  welcomeDismissed: boolean;
   buildTimestamp: string;
   handleGenerateStructure: (newSources: Source[]) => Promise<void>;
   handleCancelGeneration: () => void;
@@ -59,7 +58,6 @@ export interface UseWorkflowGenerationResult {
   handleLoadTemplate: (template: WorkoutStructure) => void;
   handleCreateNew: () => Promise<void>;
   handleStartNew: () => void;
-  handleWelcomeDismiss: () => void;
 }
 
 export function useWorkflowGeneration({
@@ -75,9 +73,8 @@ export function useWorkflowGeneration({
   onClearEditingFlags,
   clearWorkflowState,
 }: UseWorkflowGenerationProps): UseWorkflowGenerationResult {
-  const [welcomeDismissed, setWelcomeDismissed] = useState(
-    () => localStorage.getItem('amakaflow_welcome_dismissed') === 'true'
-  );
+  // AMA-1451: welcomeDismissed state removed. WelcomeGuide is deprecated;
+  // HomeScreen is the unconditional home for authenticated users.
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<string | null>(null);
@@ -110,11 +107,6 @@ export function useWorkflowGeneration({
       clearTimeout(timeoutId);
     };
   }, []);
-
-  const handleWelcomeDismiss = () => {
-    localStorage.setItem('amakaflow_welcome_dismissed', 'true');
-    setWelcomeDismissed(true);
-  };
 
   const handleStartNew = () => {
     setSources([]);
@@ -410,7 +402,6 @@ export function useWorkflowGeneration({
     apiAvailable,
     showStravaEnhance,
     pinterestBulkModal,
-    welcomeDismissed,
     buildTimestamp,
     handleGenerateStructure,
     handleCancelGeneration,
@@ -420,6 +411,5 @@ export function useWorkflowGeneration({
     handleLoadTemplate,
     handleCreateNew,
     handleStartNew,
-    handleWelcomeDismiss,
   };
 }
