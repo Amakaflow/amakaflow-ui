@@ -100,12 +100,16 @@ async function executeStep(step, page, userId, ctx) {
             .catch(() => {});
         }
 
+        // Read cookies from the browser CONTEXT, not document.cookie.
+        // document.cookie cannot see HttpOnly cookies (RFC 6265), and
+        // Clerk's __session is typically HttpOnly in production. Reading
+        // via page.context().cookies() sees all cookies regardless. This
+        // aligns with Clerk's Playwright testing guide:
+        // https://clerk.com/docs/guides/development/testing/playwright/test-authenticated-flows
+        const contextCookies = await page.context().cookies(BASE_URL);
+        const cookieNames = contextCookies.map((c) => c.name);
+
         const domState = await page.evaluate(() => {
-          const pick = (obj, keys) => {
-            const out = {};
-            for (const k of keys) out[k] = obj[k] || null;
-            return out;
-          };
           const localStorageKeys = Object.keys(localStorage || {});
           const sessionStorageKeys = Object.keys(sessionStorage || {});
           const clerkLocalKeys = localStorageKeys.filter((k) => k.toLowerCase().includes('clerk'));
@@ -121,14 +125,6 @@ async function executeStep(step, page, userId, ctx) {
             .map((el) => (el.textContent || '').trim().slice(0, 200))
             .filter(Boolean);
           const modalVisible = !!document.querySelector('.cl-modalContent, .cl-signIn-root, .cl-card');
-          // Cookie NAMES only (not values) — session JWTs can appear in
-          // non-HttpOnly dev cookies and committing them to CI logs or
-          // diagnostic JSON artifacts is a leak risk. Names are enough to
-          // tell us whether __session / __clerk_db_jwt are set.
-          const cookieNames = document.cookie
-            .split(';')
-            .map((c) => c.split('=')[0].trim())
-            .filter(Boolean);
           return {
             url: location.href,
             pathname: location.pathname,
@@ -139,10 +135,10 @@ async function executeStep(step, page, userId, ctx) {
             visibleButtons: buttons,
             errorText,
             modalVisible,
-            cookieCount: cookieNames.length,
-            cookieNames,
           };
         });
+        domState.cookieCount = cookieNames.length;
+        domState.cookieNames = cookieNames;
         console.log('    🔬 DIAGNOSTIC DOM STATE after password submit:');
         console.log('       url:', domState.url);
         console.log('       modalVisible:', domState.modalVisible);
@@ -280,17 +276,33 @@ async function executeStep(step, page, userId, ctx) {
     case 'api-multi': {
       let allOk = true;
       const results = [];
+      const perCheck = [];
       for (const check of step.checks) {
         try {
           const resp = await fetch(`http://localhost:${check.port}${check.endpoint}`, { timeout: 5000 });
           results.push(`${check.port}: ${resp.status}`);
+          perCheck.push({
+            port: check.port,
+            endpoint: check.endpoint,
+            status: resp.status,
+            ok: resp.ok,
+          });
           if (!resp.ok) allOk = false;
-        } catch {
+        } catch (err) {
           results.push(`${check.port}: DOWN`);
+          perCheck.push({
+            port: check.port,
+            endpoint: check.endpoint,
+            error: err.message.slice(0, 200),
+          });
           allOk = false;
         }
       }
-      return { pass: allOk, check: `Health: ${results.join(', ')}` };
+      return {
+        pass: allOk,
+        check: `Health: ${results.join(', ')}`,
+        response: { checks: perCheck },
+      };
     }
 
     default:
@@ -329,10 +341,18 @@ async function executeApiStep(step, userId) {
       body: step.method !== 'GET' ? body : undefined,
     });
 
+    // Response metadata captured on EVERY return path so the diary's API
+    // evidence JSON has status + body to inspect when a step fails.
+    // Per AMA-1445 spec: evidence is request + response + result.
+    const respMeta = { status: resp.status, ok: resp.ok };
+
     // Handle SSE streams
     if (step.expectStream) {
       const text = await resp.text();
       const hasData = text.includes('data:');
+      // Keep a bounded slice of the stream for evidence — full SSE can be huge.
+      respMeta.bodyKind = 'stream';
+      respMeta.bodyPreview = text.slice(0, 2000);
 
       // Strict tool check (must call specific tool)
       if (step.expectTool) {
@@ -340,6 +360,7 @@ async function executeApiStep(step, userId) {
         return {
           pass: hasData && hasTool,
           check: `API stream: ${hasData ? 'received' : 'empty'}, tool ${step.expectTool}: ${hasTool ? 'called' : 'NOT called'}`,
+          response: respMeta,
         };
       }
 
@@ -351,13 +372,20 @@ async function executeApiStep(step, userId) {
         return {
           pass,
           check: `API stream: ${hasData ? 'received' : 'empty'}, tool: ${hasTool ? 'called' : 'no'}, content: ${hasWorkoutContent ? 'has exercises' : 'no exercises'}`,
+          response: respMeta,
         };
       }
 
-      return { pass: hasData, check: `API stream: ${hasData ? 'received' : 'empty'}` };
+      return {
+        pass: hasData,
+        check: `API stream: ${hasData ? 'received' : 'empty'}`,
+        response: respMeta,
+      };
     }
 
     const data = await resp.json().catch(() => null);
+    respMeta.bodyKind = 'json';
+    respMeta.body = data;
 
     // Check expected field
     if (step.expectField) {
@@ -376,15 +404,31 @@ async function executeApiStep(step, userId) {
           val = data?.[field];
         }
         const pass = val > parseInt(op);
-        return { pass, check: `API ${step.endpoint}: ${field}=${val} (expected > ${op})` };
+        return {
+          pass,
+          check: `API ${step.endpoint}: ${field}=${val} (expected > ${op})`,
+          response: respMeta,
+        };
       }
       const hasField = data && step.expectField in data;
-      return { pass: hasField, check: `API ${step.endpoint}: ${step.expectField} ${hasField ? 'present' : 'missing'}` };
+      return {
+        pass: hasField,
+        check: `API ${step.endpoint}: ${step.expectField} ${hasField ? 'present' : 'missing'}`,
+        response: respMeta,
+      };
     }
 
-    return { pass: resp.ok, check: `API ${step.endpoint}: ${resp.status}` };
+    return {
+      pass: resp.ok,
+      check: `API ${step.endpoint}: ${resp.status}`,
+      response: respMeta,
+    };
   } catch (err) {
-    return { pass: false, check: `API error: ${err.message.slice(0, 100)}` };
+    return {
+      pass: false,
+      check: `API error: ${err.message.slice(0, 100)}`,
+      response: { error: err.message.slice(0, 500) },
+    };
   }
 }
 
@@ -490,7 +534,13 @@ async function runPersona(persona) {
             method: step.method || 'GET',
             body: step.body || null,
           },
-          result,
+          // AMA-1445 spec: evidence is request + response + result. The
+          // response comes from executeApiStep / api-multi and contains the
+          // HTTP status, body (JSON or stream preview), and any error
+          // message, so failing API steps can be diagnosed from the diary
+          // alone without re-running.
+          response: result.response || null,
+          result: { pass: result.pass, check: result.check },
         };
         await writeFile(
           `${personaDir}/${apiEvidenceName}`,

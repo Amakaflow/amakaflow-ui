@@ -68,32 +68,43 @@ export async function loadEnvLocal() {
 
 await loadEnvLocal();
 
-const SECRET = process.env.CLERK_SECRET_KEY;
-if (!SECRET || !SECRET.startsWith('sk_test_')) {
-  throw new Error(
-    'clerk-setup.mjs: CLERK_SECRET_KEY missing or not a test key. ' +
-      'Add it to amakaflow-ui/.env.local (without VITE_ prefix) or set in environment.'
-  );
+// Lazy Clerk client — only validate the secret key and construct the client
+// when a persona that actually needs Clerk (a `login` step) calls into us.
+// Previously this module threw at import time, which blocked API-only
+// personas like Ray and Kai from running in environments without Clerk
+// credentials. CodeRabbit AMA-1447 critical finding.
+let clerk = null;
+function getClerkClient() {
+  if (clerk) return clerk;
+  const secret = process.env.CLERK_SECRET_KEY;
+  if (!secret || !secret.startsWith('sk_test_')) {
+    throw new Error(
+      'clerk-setup.mjs: CLERK_SECRET_KEY missing or not a test key. ' +
+        'Add it to amakaflow-ui/.env.local (without VITE_ prefix) or set in environment.'
+    );
+  }
+  clerk = createClerkClient({ secretKey: secret });
+  return clerk;
 }
 
-const clerk = createClerkClient({ secretKey: SECRET });
-
-// Supabase service-role client — bypasses RLS so we can directly upsert the
-// persona's profile row with a pre-seeded device. This lets the persona skip
-// the "Complete Your Profile" onboarding wizard that useAppAuth renders when
-// the user has no devices selected and no Strava connected. Validating the
-// onboarding UI itself is out of scope here — see AMA-1448.
-//
-// Service role key is backend-only and must NEVER be exposed to client code.
-// Read from amakaflow-backend/.env (via VITE_-less env var in .env.local).
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
+// Lazy Supabase service-role client — same pattern. Only constructed when a
+// persona with a `login` step calls createPersonaUser. Service role key
+// bypasses RLS so we can pre-seed profile rows to skip the onboarding wizard
+// (AMA-1448 covers testing the onboarding UI itself). Service role key is
+// backend-only and must NEVER be exposed to client code.
 let supabaseAdmin = null;
-if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-  supabaseAdmin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+function getSupabaseAdmin() {
+  if (supabaseAdmin !== null) return supabaseAdmin;
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRole) {
+    supabaseAdmin = false; // sentinel: attempted, not available
+    return null;
+  }
+  supabaseAdmin = createSupabaseClient(url, serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  return supabaseAdmin;
 }
 
 /**
@@ -113,9 +124,10 @@ export async function createPersonaUser(persona) {
   // breach corpus. Random base36 + timestamp + special chars satisfies that.
   const password = `Persona_${persona.id.replace(/[^a-zA-Z0-9]/g, '')}_${Math.random().toString(36).slice(2)}_${ts}!`;
 
+  const clerkClient = getClerkClient();
   let user;
   try {
-    user = await clerk.users.createUser({
+    user = await clerkClient.users.createUser({
       emailAddress: [email],
       password,
       firstName: persona.name || persona.id,
@@ -134,8 +146,9 @@ export async function createPersonaUser(persona) {
   //
   // Uses the service role key to bypass RLS, which is why this lives in the
   // test-only clerk-setup module and not in the main app code.
-  if (supabaseAdmin) {
-    const { error: upsertError } = await supabaseAdmin.rpc('upsert_clerk_profile', {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    const { error: upsertError } = await supabase.rpc('upsert_clerk_profile', {
       p_user_id: user.id,
       p_email: email,
       p_name: `${persona.name || persona.id} Persona`,
@@ -146,7 +159,7 @@ export async function createPersonaUser(persona) {
       // to a direct insert. If that also fails, warn and continue — the
       // persona will just hit the onboarding gate and the test will surface
       // the problem visibly.
-      const { error: insertError } = await supabaseAdmin
+      const { error: insertError } = await supabase
         .from('profiles')
         .upsert(
           {
@@ -190,15 +203,17 @@ export async function deletePersonaUser(userId) {
   // still gets cleaned up. Foreign keys in Supabase may cascade-delete
   // related rows; if not, those become orphans and need a separate cleanup
   // sweep.
-  if (supabaseAdmin) {
-    const { error } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
     if (error) {
       console.warn(`⚠️  Supabase profile delete failed for ${userId}: ${error.message}`);
     }
   }
 
   try {
-    await clerk.users.deleteUser(userId);
+    const clerkClient = getClerkClient();
+    await clerkClient.users.deleteUser(userId);
   } catch (err) {
     console.warn(`⚠️  deletePersonaUser(${userId}) failed: ${err.message}`);
     console.warn(`   This persona's Clerk user may need manual cleanup in the dashboard.`);
