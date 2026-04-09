@@ -1,15 +1,21 @@
 /**
  * ProgramActions - Dropdown menu with program actions (Activate, Pause, Archive, Delete)
+ *
+ * AMA-1456: Adds "Re-plan" quick-action presets that stream a partial program
+ * re-plan via POST /api/programs/replan/stream.
  */
 
-import { useState } from 'react';
-import { MoreVertical, Play, Pause, Archive, Trash2, RotateCcw } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { MoreVertical, Play, Pause, Archive, Trash2, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import {
@@ -23,11 +29,14 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import type { TrainingProgram, ProgramStatus } from '../../types/training-program';
+import { REPLAN_PRESETS, streamReplan } from '@/lib/program-replan-api';
 
 interface ProgramActionsProps {
   program: TrainingProgram;
   onStatusChange: (status: ProgramStatus) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
+  /** Called with new preview_id when a re-plan completes successfully. */
+  onReplanComplete?: (previewId: string) => void;
   isLoading?: boolean;
 }
 
@@ -35,10 +44,65 @@ export function ProgramActions({
   program,
   onStatusChange,
   onDelete,
+  onReplanComplete,
   isLoading,
 }: ProgramActionsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReplanning, setIsReplanning] = useState(false);
+  const [replanError, setReplanError] = useState<string | null>(null);
+
+  const handleReplan = useCallback(
+    async (presetIndex: number) => {
+      const preset = REPLAN_PRESETS[presetIndex];
+      if (!preset) return;
+
+      const totalWeeks = program.weeks?.length ?? program.duration_weeks;
+      const currentWeek = Math.max(1, program.current_week ?? 1);
+
+      let startWeek: number;
+      let endWeek: number | undefined;
+
+      if (preset.startWeekOffset !== null) {
+        startWeek = currentWeek + preset.startWeekOffset;
+      } else {
+        // "last N weeks" — count back from end
+        startWeek = Math.max(1, totalWeeks - (preset.weeksCount ?? 4) + 1);
+      }
+
+      if (preset.weeksCount !== null) {
+        endWeek = Math.min(totalWeeks, startWeek + preset.weeksCount - 1);
+      }
+
+      // Re-plan requires a preview_id from the program pipeline preview store.
+      // For saved programs, expose the program id as a best-effort key; the
+      // backend will return a "not found" error if no matching preview exists,
+      // and the caller's onReplanComplete will not fire.
+      const previewId = program.id;
+
+      setIsReplanning(true);
+      setReplanError(null);
+
+      const controller = await streamReplan(
+        { preview_id: previewId, start_week: startWeek, end_week: endWeek },
+        {
+          onPreview: (ev) => {
+            setIsReplanning(false);
+            onReplanComplete?.(ev.preview_id);
+          },
+          onError: (ev) => {
+            setIsReplanning(false);
+            setReplanError(ev.message);
+          },
+          onDone: () => setIsReplanning(false),
+        },
+      );
+
+      // Store controller ref so we could cancel if needed (future enhancement)
+      return controller;
+    },
+    [program, onReplanComplete],
+  );
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -95,6 +159,9 @@ export function ProgramActions({
 
   return (
     <>
+      {replanError && (
+        <p className="text-sm text-destructive mb-2">{replanError}</p>
+      )}
       <div className="flex items-center gap-2">
         {/* Primary action button */}
         {primaryAction && (
@@ -142,6 +209,27 @@ export function ProgramActions({
                 Restore
               </DropdownMenuItem>
             )}
+
+            {/* AMA-1456: Re-plan quick-action presets */}
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={isReplanning || isLoading}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${isReplanning ? 'animate-spin' : ''}`} />
+                {isReplanning ? 'Re-planning…' : 'Re-plan weeks'}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {REPLAN_PRESETS.map((preset, idx) => (
+                  <DropdownMenuItem
+                    key={preset.label}
+                    onClick={() => handleReplan(idx)}
+                    disabled={isReplanning}
+                  >
+                    {preset.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setShowDeleteDialog(true)}
