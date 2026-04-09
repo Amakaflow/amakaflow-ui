@@ -3,6 +3,11 @@
  *
  * Client for communicating with the calendar-api for training program management.
  * Handles fetching, updating, and deleting AI-generated training programs.
+ *
+ * AMA-1450: The backend no longer accepts `user_id` in query strings or
+ * request bodies. The authenticated user from the Clerk JWT is the single
+ * source of truth for ownership on every endpoint. All client functions
+ * below have had their `userId` parameter removed.
  */
 
 import { authenticatedFetch } from './authenticated-fetch';
@@ -46,29 +51,26 @@ async function trainingProgramApiCall<T>(
  * @returns TrainingProgram if found, null if not found
  */
 export async function getTrainingProgram(
-  programId: string,
-  userId: string
+  programId: string
 ): Promise<TrainingProgram | null> {
   if (isDemoMode) {
     const { DEMO_TRAINING_PROGRAMS } = await import('./mock-data/demo-extended');
     return DEMO_TRAINING_PROGRAMS.find(p => p.id === programId) || DEMO_TRAINING_PROGRAMS[0] || null;
   }
-  const queryParams = new URLSearchParams({ user_id: userId });
   const response = await trainingProgramApiCall<{
     success: boolean;
     program?: TrainingProgram;
     message?: string;
-  }>(`/training-programs/${programId}?${queryParams.toString()}`);
+  }>(`/training-programs/${programId}`);
 
   return response.success ? response.program || null : null;
 }
 
 /**
- * Get all training programs for a user
+ * Get all training programs for the authenticated user
  * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function getTrainingPrograms(
-  userId: string,
   includeArchived: boolean = false
 ): Promise<TrainingProgram[]> {
   if (isDemoMode) {
@@ -76,7 +78,6 @@ export async function getTrainingPrograms(
     return DEMO_TRAINING_PROGRAMS;
   }
   const queryParams = new URLSearchParams({
-    user_id: userId,
     include_archived: includeArchived.toString(),
   });
 
@@ -95,7 +96,6 @@ export async function getTrainingPrograms(
  */
 export async function updateProgramStatus(
   programId: string,
-  userId: string,
   status: ProgramStatus
 ): Promise<boolean> {
   const response = await trainingProgramApiCall<{
@@ -103,7 +103,7 @@ export async function updateProgramStatus(
     message: string;
   }>(`/training-programs/${programId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ user_id: userId, status }),
+    body: JSON.stringify({ status }),
   });
 
   return response.success;
@@ -115,7 +115,6 @@ export async function updateProgramStatus(
  */
 export async function updateProgramProgress(
   programId: string,
-  userId: string,
   currentWeek: number
 ): Promise<boolean> {
   const response = await trainingProgramApiCall<{
@@ -123,7 +122,7 @@ export async function updateProgramProgress(
     message: string;
   }>(`/training-programs/${programId}/progress`, {
     method: 'PATCH',
-    body: JSON.stringify({ user_id: userId, current_week: currentWeek }),
+    body: JSON.stringify({ current_week: currentWeek }),
   });
 
   return response.success;
@@ -134,15 +133,13 @@ export async function updateProgramProgress(
  * @throws Error if the API call fails (network error, server error, etc.)
  */
 export async function deleteTrainingProgram(
-  programId: string,
-  userId: string
+  programId: string
 ): Promise<boolean> {
   const response = await trainingProgramApiCall<{
     success: boolean;
     message: string;
   }>(`/training-programs/${programId}`, {
     method: 'DELETE',
-    body: JSON.stringify({ user_id: userId }),
   });
 
   return response.success;
@@ -154,7 +151,6 @@ export async function deleteTrainingProgram(
  */
 export async function markWorkoutComplete(
   workoutId: string,
-  userId: string,
   isCompleted: boolean = true
 ): Promise<boolean> {
   const response = await trainingProgramApiCall<{
@@ -162,7 +158,7 @@ export async function markWorkoutComplete(
     message: string;
   }>(`/training-programs/workouts/${workoutId}/complete`, {
     method: 'PATCH',
-    body: JSON.stringify({ user_id: userId, is_completed: isCompleted }),
+    body: JSON.stringify({ is_completed: isCompleted }),
   });
 
   return response.success;
@@ -174,15 +170,13 @@ export async function markWorkoutComplete(
  * @returns ProgramWorkout if found, null if not found
  */
 export async function getProgramWorkout(
-  workoutId: string,
-  userId: string
+  workoutId: string
 ): Promise<ProgramWorkout | null> {
-  const queryParams = new URLSearchParams({ user_id: userId });
   const response = await trainingProgramApiCall<{
     success: boolean;
     workout?: ProgramWorkout;
     message?: string;
-  }>(`/training-programs/workouts/${workoutId}?${queryParams.toString()}`);
+  }>(`/training-programs/workouts/${workoutId}`);
 
   return response.success ? response.workout || null : null;
 }

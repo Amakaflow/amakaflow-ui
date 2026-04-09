@@ -72,10 +72,8 @@ describe('useProgramDetailApi', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(mockGetTrainingProgram).toHaveBeenCalledWith(
-        TEST_PROGRAM_ID,
-        TEST_USER_ID
-      );
+      // AMA-1450: userId removed from getTrainingProgram signature
+      expect(mockGetTrainingProgram).toHaveBeenCalledWith(TEST_PROGRAM_ID);
       expect(result.current.program).toEqual(mockTrainingProgram);
     });
 
@@ -183,9 +181,9 @@ describe('useProgramDetailApi', () => {
       });
 
       expect(success).toBe(true);
+      // AMA-1450: userId removed from updateProgramStatus signature
       expect(mockUpdateProgramStatus).toHaveBeenCalledWith(
         TEST_PROGRAM_ID,
-        TEST_USER_ID,
         'paused'
       );
       expect(result.current.program?.status).toBe('paused');
@@ -252,9 +250,9 @@ describe('useProgramDetailApi', () => {
       });
 
       expect(success).toBe(true);
+      // AMA-1450: userId removed from updateProgramProgress signature
       expect(mockUpdateProgramProgress).toHaveBeenCalledWith(
         TEST_PROGRAM_ID,
-        TEST_USER_ID,
         currentWeek + 1
       );
       expect(result.current.program?.current_week).toBe(currentWeek + 1);
@@ -280,9 +278,9 @@ describe('useProgramDetailApi', () => {
         await result.current.advanceWeek();
       });
 
+      // AMA-1450: userId removed from updateProgramStatus signature
       expect(mockUpdateProgramStatus).toHaveBeenCalledWith(
         TEST_PROGRAM_ID,
-        TEST_USER_ID,
         'completed'
       );
     });
@@ -327,10 +325,8 @@ describe('useProgramDetailApi', () => {
       });
 
       expect(success).toBe(true);
-      expect(mockDeleteTrainingProgram).toHaveBeenCalledWith(
-        TEST_PROGRAM_ID,
-        TEST_USER_ID
-      );
+      // AMA-1450: userId removed from deleteTrainingProgram signature
+      expect(mockDeleteTrainingProgram).toHaveBeenCalledWith(TEST_PROGRAM_ID);
       expect(onDeleted).toHaveBeenCalled();
       expect(result.current.program).toBeNull();
     });
@@ -373,9 +369,9 @@ describe('useProgramDetailApi', () => {
       });
 
       expect(success).toBe(true);
+      // AMA-1450: userId removed from markWorkoutComplete signature
       expect(mockMarkWorkoutComplete).toHaveBeenCalledWith(
         TEST_WORKOUT_ID,
-        TEST_USER_ID,
         true
       );
     });
@@ -394,9 +390,9 @@ describe('useProgramDetailApi', () => {
         await result.current.markWorkoutComplete(TEST_WORKOUT_ID, false);
       });
 
+      // AMA-1450: userId removed from markWorkoutComplete signature
       expect(mockMarkWorkoutComplete).toHaveBeenCalledWith(
         TEST_WORKOUT_ID,
-        TEST_USER_ID,
         false
       );
     });
@@ -415,9 +411,9 @@ describe('useProgramDetailApi', () => {
         await result.current.markWorkoutComplete(TEST_WORKOUT_ID);
       });
 
+      // AMA-1450: userId removed from markWorkoutComplete signature
       expect(mockMarkWorkoutComplete).toHaveBeenCalledWith(
         TEST_WORKOUT_ID,
-        TEST_USER_ID,
         true
       );
     });

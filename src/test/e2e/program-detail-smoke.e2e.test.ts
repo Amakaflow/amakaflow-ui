@@ -57,7 +57,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
           success: boolean;
           programs: any[];
           count: number;
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       expect(result).toHaveProperty('success');
@@ -77,7 +77,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       if (result.programs.length > 0) {
@@ -102,7 +102,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}&include_archived=false`)
+        }>(`/training-programs?include_archived=false`)
       );
 
       // All returned programs should not be archived
@@ -124,7 +124,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           program: any;
-        }>(`/training-programs/${testProgramId}?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs/${testProgramId}`)
       );
 
       expect(result.success).toBe(true);
@@ -154,7 +154,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           program: any;
-        }>(`/training-programs/${testProgramId}?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs/${testProgramId}`)
       );
 
       const program = result.program;
@@ -186,7 +186,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
 
     it('returns 404 for non-existent program', async () => {
       try {
-        await apiCall(`/training-programs/non-existent-id?user_id=${TEST_USER_ID}`);
+        await apiCall(`/training-programs/non-existent-id`);
         expect.fail('Expected 404 error');
       } catch (error) {
         expect((error as Error).message).toMatch(/not found|404/i);
@@ -218,7 +218,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
           }>(`/training-programs/${statusTestProgramId}/status`, {
             method: 'PATCH',
             body: JSON.stringify({
-              user_id: TEST_USER_ID,
+              // AMA-1450: user_id removed from request body.
               status: 'paused',
             }),
           })
@@ -245,7 +245,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           program: any;
-        }>(`/training-programs/${testProgramId}?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs/${testProgramId}`)
       );
 
       const program = programResult.program;
@@ -268,7 +268,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
           }>(`/training-programs/workouts/${workoutId}/complete`, {
             method: 'PATCH',
             body: JSON.stringify({
-              user_id: TEST_USER_ID,
+              // AMA-1450: user_id removed from request body.
               is_completed: true,
             }),
           })
@@ -295,7 +295,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       const validGoals = ['strength', 'hypertrophy', 'fat_loss', 'endurance', 'general_fitness'];
@@ -310,7 +310,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       const validStatuses = ['draft', 'active', 'paused', 'completed', 'archived'];
@@ -325,7 +325,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       const validModels = ['linear', 'undulating', 'block', 'conjugate'];
@@ -340,7 +340,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           programs: any[];
-        }>(`/training-programs?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs`)
       );
 
       const validLevels = ['beginner', 'intermediate', 'advanced'];
@@ -360,7 +360,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           program: any;
-        }>(`/training-programs/${testProgramId}?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs/${testProgramId}`)
       );
 
       const weeks = result.program.weeks;
@@ -387,7 +387,7 @@ describe('@smoke Program Detail API Smoke Tests', () => {
         apiCall<{
           success: boolean;
           program: any;
-        }>(`/training-programs/${testProgramId}?user_id=${TEST_USER_ID}`)
+        }>(`/training-programs/${testProgramId}`)
       );
 
       for (const week of result.program.weeks) {
