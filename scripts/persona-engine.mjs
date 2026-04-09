@@ -16,6 +16,8 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clerk, clerkSetup } from '@clerk/testing/playwright';
+import { createPersonaUser, deletePersonaUser } from './personas/clerk-setup.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = 'http://localhost:3000';
@@ -38,12 +40,138 @@ async function loadPersonas() {
 // STEP HANDLERS
 // ═══════════════════════════════════════════════════════════════════════
 
-async function executeStep(step, page, userId) {
+async function executeStep(step, page, userId, ctx) {
   switch (step.type) {
     case 'navigate':
       await page.goto(`${BASE_URL}${step.url}`, { waitUntil: 'networkidle', timeout: 15000 });
       await page.waitForTimeout(2000);
       return { pass: true, check: `Navigated to ${step.url}` };
+
+    case 'login': {
+      // Real Clerk auth via @clerk/testing's official Playwright helper.
+      // Bypasses the UI form entirely — clerk.signIn() calls Clerk's client
+      // SDK directly with the identifier and password, creating a real session
+      // and injecting it into the browser. This is the canonical Clerk
+      // testing pattern documented at:
+      //   https://clerk.com/docs/testing/playwright/test-authenticated-flows
+      //
+      // The user is provisioned at run start by createPersonaUser() in
+      // clerk-setup.mjs (which calls @clerk/backend's users.createUser).
+      // Credentials flow through ctx into this step.
+      if (!ctx?.credentials) {
+        return { pass: false, check: 'login step requires Clerk credentials in run context' };
+      }
+      const { email, password } = ctx.credentials;
+
+      try {
+        // Navigate to the app first — Clerk's signIn helper needs an active
+        // page context with Clerk's SDK loaded.
+        await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(1000);
+
+        await clerk.signIn({
+          page,
+          signInParams: {
+            strategy: 'password',
+            identifier: email,
+            password,
+          },
+        });
+
+        // Navigate again to force ClerkProvider to re-read the session
+        // cookies and re-render the authenticated view. Per Clerk's docs
+        // pattern (docs/testing/playwright/test-authenticated-flows), the
+        // navigation AFTER signIn is what propagates the session into the
+        // React app. Without it, the cookies are set but the UI still
+        // shows the landing page.
+        await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 15000 });
+        await page.waitForTimeout(2000);
+
+        // Diagnostic DOM dump (kept as a safety net per 2026-04-09 decision).
+        // If clerk.signIn() worked, we should see a real session key in
+        // localStorage (__clerk_client_jwt or similar). If it didn't, the
+        // diagnostic lets us see exactly what state the page is in.
+        if (ctx?.personaDir) {
+          await page
+            .screenshot({
+              path: `${ctx.personaDir}/00-login-diagnostic-mid-submit.png`,
+              fullPage: true,
+            })
+            .catch(() => {});
+        }
+
+        const domState = await page.evaluate(() => {
+          const pick = (obj, keys) => {
+            const out = {};
+            for (const k of keys) out[k] = obj[k] || null;
+            return out;
+          };
+          const localStorageKeys = Object.keys(localStorage || {});
+          const sessionStorageKeys = Object.keys(sessionStorage || {});
+          const clerkLocalKeys = localStorageKeys.filter((k) => k.toLowerCase().includes('clerk'));
+          const clerkSessionKeys = sessionStorageKeys.filter((k) => k.toLowerCase().includes('clerk'));
+          const buttons = Array.from(document.querySelectorAll('button'))
+            .filter((b) => {
+              const r = b.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            })
+            .map((b) => (b.textContent || '').trim().slice(0, 60))
+            .filter(Boolean);
+          const errorText = Array.from(document.querySelectorAll('[role="alert"], .cl-formFieldError, .cl-alert, [data-clerk-error]'))
+            .map((el) => (el.textContent || '').trim().slice(0, 200))
+            .filter(Boolean);
+          const modalVisible = !!document.querySelector('.cl-modalContent, .cl-signIn-root, .cl-card');
+          return {
+            url: location.href,
+            pathname: location.pathname,
+            localStorageKeys,
+            sessionStorageKeys,
+            clerkLocalKeys,
+            clerkSessionKeys,
+            visibleButtons: buttons,
+            errorText,
+            modalVisible,
+            cookieCount: document.cookie.split(';').filter(Boolean).length,
+            cookies: document.cookie.slice(0, 300),
+          };
+        });
+        console.log('    🔬 DIAGNOSTIC DOM STATE after password submit:');
+        console.log('       url:', domState.url);
+        console.log('       modalVisible:', domState.modalVisible);
+        console.log('       clerkLocalKeys:', domState.clerkLocalKeys);
+        console.log('       clerkSessionKeys:', domState.clerkSessionKeys);
+        console.log('       visibleButtons:', domState.visibleButtons);
+        console.log('       errorText:', domState.errorText);
+        console.log('       localStorageKeys:', domState.localStorageKeys);
+        console.log('       cookieCount:', domState.cookieCount);
+        if (ctx?.personaDir) {
+          await writeFile(
+            `${ctx.personaDir}/00-login-diagnostic-dom.json`,
+            JSON.stringify(domState, null, 2)
+          ).catch(() => {});
+        }
+
+        // Real success signal: Clerk's __session cookie. clerk.signIn()
+        // creates the session server-side via Clerk's API and sets the
+        // session JWT as a cookie. localStorage only gets
+        // __clerk_environment (instance config, not auth state), so
+        // checking cookies is ground truth for "is this browser signed in".
+        const hasSessionCookie =
+          domState.cookies.includes('__session=') ||
+          domState.cookies.includes('__clerk_db_jwt=');
+        if (!hasSessionCookie) {
+          const errMsg =
+            domState.errorText.length > 0
+              ? `Clerk error: ${domState.errorText.join('; ')}`
+              : 'No Clerk __session cookie — clerk.signIn() did not create a session';
+          return { pass: false, check: `Login failed: ${errMsg}` };
+        }
+
+        return { pass: true, check: `Logged in as ${email}` };
+      } catch (err) {
+        return { pass: false, check: `Login failed: ${err.message.slice(0, 150)}` };
+      }
+    }
 
     case 'dropdown': {
       await page.getByTestId(step.menu).click();
@@ -271,6 +399,22 @@ async function runPersona(persona) {
     score: { passed: 0, failed: 0, total: persona.steps.length },
   };
 
+  // Provision a real Clerk user if any step needs login. AMA-1447: programmatic
+  // per-persona identity via @clerk/backend. Created here, deleted in finally.
+  const needsLogin = persona.steps.some((s) => s.type === 'login');
+  let clerkCredentials = null;
+  if (needsLogin) {
+    try {
+      clerkCredentials = await createPersonaUser(persona);
+      console.log(`  🔐 Provisioned Clerk user ${clerkCredentials.email} (id=${clerkCredentials.userId})`);
+    } catch (err) {
+      console.error(`  ❌ Clerk user provisioning failed: ${err.message}`);
+      // Continue — login step will fail with a clear error and the rest of
+      // the run will be visible in the diary so we can debug.
+    }
+  }
+  const ctx = { credentials: clerkCredentials, personaDir };
+
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`  ${persona.name} — ${persona.profile}`);
   console.log(`  User ID: ${userId} | Mode: ${persona.mode}`);
@@ -307,7 +451,7 @@ async function runPersona(persona) {
 
     let result;
     try {
-      result = await executeStep(step, page, userId);
+      result = await executeStep(step, page, userId, ctx);
     } catch (err) {
       result = { pass: false, check: `CRASH: ${err.message.slice(0, 150)}` };
     }
@@ -363,6 +507,13 @@ async function runPersona(persona) {
   if (context) await context.close();
   if (browser) await browser.close();
 
+  // Tear down the Clerk user. Idempotent — logs a warning if cleanup fails so
+  // we don't mask the real test result, but flags any orphans for manual review.
+  if (clerkCredentials?.userId) {
+    await deletePersonaUser(clerkCredentials.userId);
+    console.log(`  🧹 Deleted Clerk user ${clerkCredentials.email}`);
+  }
+
   // Write diary JSON + markdown
   await writeFile(`${personaDir}/diary.json`, JSON.stringify(diary, null, 2));
 
@@ -415,6 +566,46 @@ if (personasToRun.length === 0) {
 
 console.log(`\n🎭 AmakaFlow Persona Engine v2`);
 console.log(`   Running ${personasToRun.length} persona(s) — ${TIMESTAMP}\n`);
+
+// Load CLERK_* env vars from amakaflow-ui/.env.local so @clerk/testing can
+// find CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY. The Vite dev server reads
+// .env.local automatically for client-side vars; Node scripts do not.
+async function loadEnvLocal() {
+  const envPath = path.resolve(__dirname, '..', '.env.local');
+  try {
+    const text = await readFile(envPath, 'utf-8');
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const value = trimmed.slice(eq + 1).trim();
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+}
+await loadEnvLocal();
+
+// @clerk/testing looks for CLERK_PUBLISHABLE_KEY; the Vite app uses the
+// VITE_ prefix. Mirror the value so the testing SDK finds it.
+if (process.env.VITE_CLERK_PUBLISHABLE_KEY && !process.env.CLERK_PUBLISHABLE_KEY) {
+  process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
+}
+
+// Clerk's canonical Playwright auth bootstrap: fetches a Testing Token
+// once per suite that bypasses Clerk's bot detection for subsequent
+// clerk.signIn() calls. See:
+//   https://clerk.com/docs/testing/playwright/overview
+try {
+  await clerkSetup();
+  console.log(`   🔐 Clerk testing token obtained (dev instance)\n`);
+} catch (err) {
+  console.warn(`   ⚠️  clerkSetup failed: ${err.message}`);
+  console.warn(`      Login steps will not work until this is resolved.\n`);
+}
 
 await mkdir(RUN_DIR, { recursive: true });
 

@@ -98,6 +98,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@clerk/backend": "^3.2.8",
+    "@clerk/testing": "^2.0.12",
     "@playwright/test": "^1.48.0",
     "@storybook/addon-a11y": "^10.2.13",
     "@storybook/addon-docs": "^10.2.13",
