@@ -103,7 +103,7 @@ describe('config module', () => {
       const endpoints = getApiHealthEndpoints();
 
       expect(Array.isArray(endpoints)).toBe(true);
-      expect(endpoints.length).toBe(6); // 6 services
+      expect(endpoints.length).toBe(7); // 7 services (including orchestrator)
 
       // Each endpoint should have name and url
       endpoints.forEach(endpoint => {
