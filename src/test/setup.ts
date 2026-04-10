@@ -1,7 +1,15 @@
-import { expect, afterEach, vi } from 'vitest';
+import { expect, afterEach, afterAll, beforeAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom/vitest';
+import { server } from './mocks/server';
+
+// Start MSW server before all tests
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+// Reset handlers between tests (removes per-test overrides)
+afterEach(() => server.resetHandlers());
+// Clean up after all tests
+afterAll(() => server.close());
 
 // Mock localStorage
 const localStorageMock = (() => {
