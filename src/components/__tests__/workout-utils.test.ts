@@ -48,7 +48,7 @@ describe('getBlockKeyMetric', () => {
       rounds: 4,
       rest_between_rounds_sec: 30,
     };
-    expect(getBlockKeyMetric(block as Block)).toBe('4 rnds · 30s rest');
+    expect(getBlockKeyMetric(block as Block)).toBe('4 rounds · 30s rest/round');
   });
   it('returns time cap for amrap', () => {
     const block: Partial<Block> = {
@@ -64,7 +64,7 @@ describe('getBlockKeyMetric', () => {
       time_rest_sec: 10,
       rounds: 8,
     };
-    expect(getBlockKeyMetric(block as Block)).toBe('20s on · 10s off · 8 rnds');
+    expect(getBlockKeyMetric(block as Block)).toBe('20s on · 10s off · 8 rounds');
   });
   it('returns Configure → when fields missing', () => {
     const block: Partial<Block> = { structure: 'circuit' };
