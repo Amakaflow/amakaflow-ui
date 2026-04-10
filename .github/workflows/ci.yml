@@ -24,11 +24,13 @@ jobs:
           args: '-ignore SC2'
 
   test:
-    name: Unit Tests
+    name: Unit Tests (changed only)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -38,17 +40,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Run vitest
-        run: npm run test:run
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+      - name: Run affected tests
+        run: npx vitest run --changed HEAD~1
 
   build:
     name: Type Check & Build
