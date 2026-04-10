@@ -338,9 +338,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       mediaRecorder.start();
       setState('recording');
 
-      // Start live duration tracking so the UI can render a countdown.
-      // Uses wall-clock time so it stays accurate even if the tick interval
-      // drifts under tab-throttling conditions.
+      // Start live elapsed-time tracking so the UI can render an "m:ss"
+      // counter. Uses wall-clock time so it stays accurate even if the tick
+      // interval drifts under browser tab-throttling conditions.
       recordingStartedAtRef.current = Date.now();
       setRecordingDurationMs(0);
       durationIntervalRef.current = setInterval(() => {

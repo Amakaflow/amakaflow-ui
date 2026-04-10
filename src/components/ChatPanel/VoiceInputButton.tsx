@@ -9,6 +9,7 @@
  * - unsupported: Hidden or disabled with tooltip
  */
 
+import { useMemo } from 'react';
 import { Mic, MicOff, Loader2, Square } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../ui/utils';
@@ -89,16 +90,19 @@ export function VoiceInputButton({
   const isError = state === 'error';
   const isDisabled = disabled || !isSupported || isProcessing;
 
-  // AMA-1320: Show an elapsed-time counter (counting up) next to the mic
-  // while recording, like Telegram voice notes. The 30-minute cap in
-  // useVoiceInput is a safety backstop, not a user-facing limit, so we
-  // deliberately do NOT show remaining time or warning colors — that would
-  // imply a practical limit users should worry about. `maxDurationMs` is
-  // accepted in props for API symmetry with the hook but intentionally
-  // unused in rendering.
+  // AMA-1320: Derive the elapsed-time label from props. Separated into
+  // useMemo per CR review — keeps render body free of state derivation.
+  // maxDurationMs is accepted for API symmetry with the hook but
+  // intentionally unused (the 30-min cap is a backstop, not a user-facing
+  // limit, so we don't show remaining time or warning colors).
   void maxDurationMs;
-  const showElapsed = isRecording && recordingDurationMs !== undefined;
-  const elapsedLabel = showElapsed ? formatElapsed(recordingDurationMs ?? 0) : '';
+  const { showElapsed, elapsedLabel } = useMemo(() => {
+    const show = isRecording && recordingDurationMs !== undefined;
+    return {
+      showElapsed: show,
+      elapsedLabel: show ? formatElapsed(recordingDurationMs ?? 0) : '',
+    };
+  }, [isRecording, recordingDurationMs]);
 
   const handleClick = () => {
     if (isRecording) {
