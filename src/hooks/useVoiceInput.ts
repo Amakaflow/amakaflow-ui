@@ -8,9 +8,20 @@
  *
  * Features:
  * - MediaRecorder with audio/webm;codecs=opus
- * - 60-second max recording limit
+ * - 30-minute safety cap — not a real limit anyone hits in practice. Matches
+ *   the Telegram voice-note UX where recording feels unbounded from the
+ *   user's perspective.
+ * - Live `recordingDurationMs` output so consumers can render an elapsed
+ *   m:ss counter (counting up, not down)
  * - Fallback to Web Speech API on Deepgram failure
  * - Feature detection for unsupported browsers
+ *
+ * AMA-1320: Web max was previously 60s, which cut off power users describing
+ * full workout sessions. Bumped to 1800s (30 min) per David's direction —
+ * "it should be the same as when I'm recording a message on Telegram". The
+ * cap still exists as a backstop (prevents runaway tabs, backend request-
+ * timeout blowouts, Deepgram upload size issues) but is not user-facing.
+ * Surfaced live duration so the UI can show an elapsed m:ss counter.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -24,6 +35,10 @@ export interface UseVoiceInputReturn {
   confidence: number;
   error: string | null;
   isSupported: boolean;
+  /** Elapsed milliseconds of the current recording. 0 when not recording. */
+  recordingDurationMs: number;
+  /** Configured max duration (safety backstop, not a user-facing limit in practice). */
+  maxDurationMs: number;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   cancelRecording: () => void;
@@ -36,8 +51,15 @@ interface UseVoiceInputOptions {
   language?: string;
 }
 
-const DEFAULT_MAX_DURATION_MS = 60_000; // 60 seconds
+// 30-minute safety cap. Chosen to be long enough that no real user ever
+// experiences it as a limit (matches Telegram voice-note UX per David's
+// direction on AMA-1320), short enough that a stuck tab or forgotten
+// recording can't run indefinitely. Still catches backend request-timeout
+// and Deepgram upload-size edge cases without making them the user's
+// problem.
+const DEFAULT_MAX_DURATION_MS = 1_800_000; // 30 minutes
 const MIN_CONFIDENCE_THRESHOLD = 0.5;
+const DURATION_TICK_MS = 100; // 10 Hz — smooth elapsed-time display without burning CPU
 
 // Check if the browser supports the required APIs
 function checkBrowserSupport(): boolean {
@@ -126,11 +148,14 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   const [transcript, setTranscript] = useState('');
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [recordingDurationMs, setRecordingDurationMs] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartedAtRef = useRef<number>(0);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isSupported = checkBrowserSupport();
@@ -143,6 +168,9 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       isMountedRef.current = false;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+      }
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -158,6 +186,10 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -306,6 +338,17 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       mediaRecorder.start();
       setState('recording');
 
+      // Start live elapsed-time tracking so the UI can render an "m:ss"
+      // counter. Uses wall-clock time so it stays accurate even if the tick
+      // interval drifts under browser tab-throttling conditions.
+      recordingStartedAtRef.current = Date.now();
+      setRecordingDurationMs(0);
+      durationIntervalRef.current = setInterval(() => {
+        if (!isMountedRef.current) return;
+        const elapsed = Date.now() - recordingStartedAtRef.current;
+        setRecordingDurationMs(elapsed);
+      }, DURATION_TICK_MS);
+
       // Set max duration timeout
       timeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current?.state === 'recording') {
@@ -324,6 +367,13 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
   }, [isSupported, maxDurationMs, cleanup, processTranscription]);
 
   const stopRecording = useCallback(() => {
+    // Stop ticking the duration immediately so the final rendered value is
+    // the moment the user pressed stop, not whenever the MediaRecorder.onstop
+    // handler finally fires.
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -341,6 +391,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
       mediaRecorderRef.current.stop();
     }
     cleanup();
+    setRecordingDurationMs(0);
     setState('idle');
     setError(null);
   }, [cleanup]);
@@ -349,6 +400,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     setTranscript('');
     setConfidence(0);
     setError(null);
+    setRecordingDurationMs(0);
     if (state === 'error') {
       setState('idle');
     }
@@ -360,6 +412,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
     confidence,
     error,
     isSupported,
+    recordingDurationMs,
+    maxDurationMs,
     startRecording,
     stopRecording,
     cancelRecording,
