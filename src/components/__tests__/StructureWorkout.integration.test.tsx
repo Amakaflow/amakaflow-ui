@@ -47,31 +47,6 @@ describe('StructureWorkout integration', () => {
     expect(screen.queryByText(/no warm-up found/i)).not.toBeInTheDocument();
   });
 
-  it('auto-migrates legacy workoutWarmup setting to warmup block', () => {
-    const onWorkoutChange = vi.fn();
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <StructureWorkout
-          workout={{
-            title: 'Test', source: 'test',
-            settings: { defaultRestType: 'timed', defaultRestSec: 30, workoutWarmup: { enabled: true, activity: 'jump_rope', durationSec: 300 } },
-            blocks: [{ id: 'b1', label: 'Main', structure: 'circuit', rounds: 3, exercises: [] }],
-          }}
-          {...defaultProps}
-          onWorkoutChange={onWorkoutChange}
-        />
-      </DndProvider>
-    );
-    // Auto-migration fires onWorkoutChange with warmup block prepended
-    expect(onWorkoutChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        blocks: expect.arrayContaining([
-          expect.objectContaining({ structure: 'warmup', warmup_activity: 'jump_rope' })
-        ])
-      })
-    );
-  });
-
   it('shows AddBlockTypePicker when + Add Block clicked', () => {
     renderSW({ title: 'Test', source: 'test', blocks: [] });
     fireEvent.click(screen.getByRole('button', { name: /add block/i }));

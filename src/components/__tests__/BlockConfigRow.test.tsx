@@ -18,7 +18,7 @@ describe('BlockConfigRow', () => {
     );
     expect(screen.getByText('Rounds')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('Rest')).toBeInTheDocument();
+    expect(screen.getByText('Rest between rounds')).toBeInTheDocument();
     expect(screen.getByText('30s')).toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe('BlockConfigRow', () => {
       />
     );
     expect(screen.getByText('Work')).toBeInTheDocument();
-    expect(screen.getByText('Rest')).toBeInTheDocument();
+    expect(screen.getByText('Rest per interval')).toBeInTheDocument();
     expect(screen.getByText('Rounds')).toBeInTheDocument();
   });
 
