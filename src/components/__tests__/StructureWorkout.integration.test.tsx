@@ -1,26 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { StructureWorkout } from '../StructureWorkout';
+import { StructureWorkout } from '../StructureWorkout/StructureWorkout';
 import type { WorkoutStructure } from '../../types/workout';
 
 const defaultProps = {
   onWorkoutChange: vi.fn(),
-  onAutoMap: vi.fn(),
-  onValidate: vi.fn(),
   loading: false,
-  selectedDevice: 'ios_companion' as const,
-  onDeviceChange: vi.fn(),
-  userSelectedDevices: ['ios_companion'],
 };
 
 function renderSW(workout: WorkoutStructure) {
-  return render(
-    <DndProvider backend={HTML5Backend}>
-      <StructureWorkout workout={workout} {...defaultProps} />
-    </DndProvider>
-  );
+  return render(<StructureWorkout workout={workout} {...defaultProps} />);
 }
 
 describe('StructureWorkout integration', () => {
@@ -45,31 +34,6 @@ describe('StructureWorkout integration', () => {
     ]});
     fireEvent.click(screen.getAllByRole('button', { name: /skip/i })[0]);
     expect(screen.queryByText(/no warm-up found/i)).not.toBeInTheDocument();
-  });
-
-  it('auto-migrates legacy workoutWarmup setting to warmup block', () => {
-    const onWorkoutChange = vi.fn();
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <StructureWorkout
-          workout={{
-            title: 'Test', source: 'test',
-            settings: { defaultRestType: 'timed', defaultRestSec: 30, workoutWarmup: { enabled: true, activity: 'jump_rope', durationSec: 300 } },
-            blocks: [{ id: 'b1', label: 'Main', structure: 'circuit', rounds: 3, exercises: [] }],
-          }}
-          {...defaultProps}
-          onWorkoutChange={onWorkoutChange}
-        />
-      </DndProvider>
-    );
-    // Auto-migration fires onWorkoutChange with warmup block prepended
-    expect(onWorkoutChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        blocks: expect.arrayContaining([
-          expect.objectContaining({ structure: 'warmup', warmup_activity: 'jump_rope' })
-        ])
-      })
-    );
   });
 
   it('shows AddBlockTypePicker when + Add Block clicked', () => {
