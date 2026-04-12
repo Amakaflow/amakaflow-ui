@@ -26,6 +26,27 @@ const CHAT = 'http://localhost:8005';
 const STRAVA = 'http://localhost:8000';
 
 // ---------------------------------------------------------------------------
+// Known IDs — shared across dynamic mock handlers
+// ---------------------------------------------------------------------------
+
+/** Exercise IDs that return data (others get 404). Matches progression-e2e.fixtures.ts. */
+export const KNOWN_EXERCISE_IDS = [
+  'ex-001', 'ex-002',
+  'barbell-bench-press', 'barbell-squat', 'deadlift',
+];
+
+/** Exercise IDs that exist but have no weight history (bodyweight). */
+export const BODYWEIGHT_EXERCISE_IDS = ['pull-up', 'plank'];
+
+/** Workout IDs that return data from the mix endpoint. Matches mix-workouts-smoke fixtures. */
+export const KNOWN_WORKOUT_IDS = [
+  '480de2f4-9785-47aa-83ac-4fdc0254f5de',
+  'c3e654d9-b44f-47f4-86ec-c2a0acf516d3',
+  'workout-001',
+  'workout-002',
+];
+
+// ---------------------------------------------------------------------------
 // Sample data — minimal but structurally correct
 // ---------------------------------------------------------------------------
 
@@ -345,9 +366,9 @@ const mapperHandlers = [
     const url = new URL(request.url);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
 
-    const knownExercises = ['ex-001', 'ex-002', 'barbell-bench-press', 'barbell-squat', 'deadlift'];
+    const knownExercises = KNOWN_EXERCISE_IDS;
     // Bodyweight / no-history exercises — return empty sessions
-    if (exerciseId === 'pull-up' || exerciseId === 'plank') {
+    if (BODYWEIGHT_EXERCISE_IDS.includes(exerciseId)) {
       return HttpResponse.json({
         exercise_id: exerciseId,
         exercise_name: 'Pull Up',
@@ -383,7 +404,7 @@ const mapperHandlers = [
   }),
   http.get(`${MAPPER}/progression/exercises/:exerciseId/last-weight`, ({ params }) => {
     const exerciseId = params.exerciseId as string;
-    const knownExercises = ['ex-001', 'ex-002', 'barbell-bench-press', 'barbell-squat', 'deadlift'];
+    const knownExercises = KNOWN_EXERCISE_IDS;
     if (knownExercises.includes(exerciseId)) {
       return HttpResponse.json({
         exercise_id: exerciseId,
@@ -1000,7 +1021,7 @@ const ingestorHandlers = [
     const sources = body.sources || [];
 
     // Check for non-existent workout IDs
-    const knownWorkouts = ['480de2f4-9785-47aa-83ac-4fdc0254f5de', 'c3e654d9-b44f-47f4-86ec-c2a0acf516d3', 'workout-001', 'workout-002'];
+    const knownWorkouts = KNOWN_WORKOUT_IDS;
     for (const source of sources) {
       if (!knownWorkouts.includes(source.workout_id)) {
         return HttpResponse.json({ detail: 'Workout not found' }, { status: 404 });
