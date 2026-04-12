@@ -4,8 +4,10 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom/vitest';
 import { server } from './mocks/server';
 
-// Start MSW server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+// Start MSW server before all tests.
+// 'error' fails immediately if any test makes a request without a matching MSW handler.
+// This ensures all tests run offline — no silent dependency on live backend services.
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 // Reset handlers between tests (removes per-test overrides)
 afterEach(() => server.resetHandlers());
 // Clean up after all tests

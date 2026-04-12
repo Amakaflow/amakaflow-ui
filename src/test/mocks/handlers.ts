@@ -24,6 +24,7 @@ const INGESTOR = 'http://localhost:8004';
 const CALENDAR = 'http://localhost:8003';
 const CHAT = 'http://localhost:8005';
 const STRAVA = 'http://localhost:8000';
+const ORCHESTRATOR = 'http://localhost:8010';
 
 // ---------------------------------------------------------------------------
 // Known IDs — shared across dynamic mock handlers
@@ -1863,6 +1864,27 @@ const stravaHandlers = [
 ];
 
 // ---------------------------------------------------------------------------
+// ORCHESTRATOR handlers (port 8010)
+// ---------------------------------------------------------------------------
+
+const orchestratorHandlers = [
+  http.post(`${ORCHESTRATOR}/agent`, () =>
+    HttpResponse.json({
+      message: 'Here is your weekly plan.',
+      tool_results: [
+        {
+          tool: 'plan_week',
+          result: {
+            days: [],
+            summary: 'Generated weekly plan',
+          },
+        },
+      ],
+    }),
+  ),
+];
+
+// ---------------------------------------------------------------------------
 // Combined export
 // ---------------------------------------------------------------------------
 
@@ -1872,4 +1894,5 @@ export const handlers = [
   ...chatHandlers,
   ...calendarHandlers,
   ...stravaHandlers,
+  ...orchestratorHandlers,
 ];
