@@ -5,9 +5,10 @@ import '@testing-library/jest-dom/vitest';
 import { server } from './mocks/server';
 
 // Start MSW server before all tests.
-// 'error' fails immediately if any test makes a request without a matching MSW handler.
-// This ensures all tests run offline — no silent dependency on live backend services.
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+// 'warn' logs unhandled requests to stderr. CI pipeline greps for these warnings
+// and fails the build if any are found — catching tests that bypass MSW mocks
+// without causing hangs from error-mode throws in intentional error tests.
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 // Reset handlers between tests (removes per-test overrides)
 afterEach(() => server.resetHandlers());
 // Clean up after all tests
