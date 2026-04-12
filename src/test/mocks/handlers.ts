@@ -97,7 +97,6 @@ const SAMPLE_COMPLETION = {
 const SAMPLE_EXERCISE_HISTORY = {
   exercise_id: 'ex-001',
   exercise_name: 'Squat',
-  session_count: 12,
   supports_1rm: true,
   one_rm_formula: 'epley',
   total_sessions: 12,
@@ -129,7 +128,6 @@ const SAMPLE_EXERCISE_HISTORY = {
 };
 
 const SAMPLE_PERSONAL_RECORD = {
-  id: 'pr-001',
   exercise_id: 'ex-001',
   exercise_name: 'Bench Press',
   record_type: '1rm',
@@ -372,7 +370,6 @@ const mapperHandlers = [
       return HttpResponse.json({
         exercise_id: exerciseId,
         exercise_name: 'Pull Up',
-        session_count: 0,
         supports_1rm: false,
         one_rm_formula: 'brzycki',
         total_sessions: 0,
@@ -427,7 +424,6 @@ const mapperHandlers = [
     // Full set of mock records covering all types — matches progression-e2e.fixtures.ts
     const allRecords = [
       {
-        id: 'pr-001',
         exercise_id: 'barbell-bench-press',
         exercise_name: 'Barbell Bench Press',
         record_type: '1rm',
@@ -438,7 +434,6 @@ const mapperHandlers = [
         details: null,
       },
       {
-        id: 'pr-002',
         exercise_id: 'barbell-bench-press',
         exercise_name: 'Barbell Bench Press',
         record_type: 'max_weight',
@@ -449,7 +444,6 @@ const mapperHandlers = [
         details: null,
       },
       {
-        id: 'pr-003',
         exercise_id: 'barbell-bench-press',
         exercise_name: 'Barbell Bench Press',
         record_type: 'max_reps',
@@ -460,7 +454,6 @@ const mapperHandlers = [
         details: null,
       },
       {
-        id: 'pr-004',
         exercise_id: 'barbell-squat',
         exercise_name: 'Barbell Squat',
         record_type: '1rm',
@@ -471,7 +464,6 @@ const mapperHandlers = [
         details: null,
       },
       {
-        id: 'pr-005',
         exercise_id: 'barbell-squat',
         exercise_name: 'Barbell Squat',
         record_type: 'max_weight',
@@ -497,7 +489,6 @@ const mapperHandlers = [
     return HttpResponse.json({
       records: filtered,
       exercise_id: exerciseId || null,
-      total: filtered.length,
     });
   }),
   http.get(`${MAPPER}/progression/volume`, () =>
