@@ -340,15 +340,44 @@ const mapperHandlers = [
       total: 2,
     }),
   ),
-  http.get(`${MAPPER}/progression/exercises/:exerciseId/history`, ({ params }) => {
+  http.get(`${MAPPER}/progression/exercises/:exerciseId/history`, ({ params, request }) => {
     const exerciseId = params.exerciseId as string;
+    const url = new URL(request.url);
+    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+
     const knownExercises = ['ex-001', 'ex-002', 'barbell-bench-press', 'barbell-squat', 'deadlift'];
-    if (knownExercises.includes(exerciseId)) {
+    // Bodyweight / no-history exercises — return empty sessions
+    if (exerciseId === 'pull-up' || exerciseId === 'plank') {
       return HttpResponse.json({
+        exercise_id: exerciseId,
+        exercise_name: 'Pull Up',
+        session_count: 0,
+        supports_1rm: false,
+        one_rm_formula: 'brzycki',
+        total_sessions: 0,
+        all_time_best_1rm: null,
+        all_time_max_weight: null,
+        sessions: [],
+      });
+    }
+    if (knownExercises.includes(exerciseId)) {
+      const history = {
         ...SAMPLE_EXERCISE_HISTORY,
         exercise_id: exerciseId,
         exercise_name: exerciseId === 'barbell-bench-press' ? 'Barbell Bench Press' : 'Squat',
-      });
+      };
+      // Simulate pagination: offset > 0 returns a different session
+      if (offset > 0) {
+        history.sessions = [
+          {
+            ...SAMPLE_EXERCISE_HISTORY.sessions[0],
+            completion_id: `comp-page2-${offset}`,
+            workout_date: '2025-01-10T10:00:00Z',
+            workout_name: 'Earlier Workout',
+          },
+        ];
+      }
+      return HttpResponse.json(history);
     }
     return HttpResponse.json({ detail: 'Exercise not found' }, { status: 404 });
   }),
@@ -960,9 +989,29 @@ const ingestorHandlers = [
     HttpResponse.json({ success: true, workout: SAMPLE_WORKOUT }),
   ),
   http.post(`${INGESTOR}/workouts/mix`, async ({ request }) => {
+    // Check auth header — return 401 if missing
+    const apiKey = request.headers.get('X-API-Key');
+    if (!apiKey) {
+      return HttpResponse.json({ detail: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await request.json() as { title?: string; sources?: Array<{ workout_id: string; block_indices: number[] }> };
     const title = body.title || 'Mixed Workout';
     const sources = body.sources || [];
+
+    // Check for non-existent workout IDs
+    const knownWorkouts = ['480de2f4-9785-47aa-83ac-4fdc0254f5de', 'c3e654d9-b44f-47f4-86ec-c2a0acf516d3', 'workout-001', 'workout-002'];
+    for (const source of sources) {
+      if (!knownWorkouts.includes(source.workout_id)) {
+        return HttpResponse.json({ detail: 'Workout not found' }, { status: 404 });
+      }
+      // Check for out-of-range block indices (each workout has 3 blocks)
+      for (const idx of source.block_indices || []) {
+        if (idx > 2) {
+          return HttpResponse.json({ detail: 'Block index out of range' }, { status: 422 });
+        }
+      }
+    }
 
     // Build blocks matching the requested block_indices from each source
     const blocks = sources.flatMap((source) =>

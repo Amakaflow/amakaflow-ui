@@ -5,6 +5,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
+// Mock Clerk's PricingTable — it requires ClerkProvider which isn't available in unit tests
+vi.mock('@clerk/clerk-react', () => ({
+  PricingTable: () => <div data-testid="clerk-pricing-table" />,
+}));
+
 import { PricingPage } from '../PricingPage';
 
 describe('PricingPage', () => {

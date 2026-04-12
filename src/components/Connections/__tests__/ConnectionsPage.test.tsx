@@ -14,19 +14,19 @@ describe('ConnectionsPage', () => {
     render(<ConnectionsPage />);
     expect(screen.getByText('Platform Connections')).toBeInTheDocument();
     expect(screen.getByTestId('platform-card-stryd')).toBeInTheDocument();
-    expect(screen.getByTestId('platform-card-garmin')).toBeInTheDocument();
     expect(screen.getByTestId('platform-card-strava')).toBeInTheDocument();
+    // Garmin uses separate GarminPairing component, not a PlatformCard
   });
 
-  it('shows connected count from mock data (2 of 3)', () => {
+  it('shows connected count from mock data (1 of 2)', () => {
     render(<ConnectionsPage />);
-    expect(screen.getByText(/2 of 3 connected/)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 connected/)).toBeInTheDocument();
   });
 
-  it('shows connected badges for Stryd and Garmin', () => {
+  it('shows connected badge for Stryd', () => {
     render(<ConnectionsPage />);
     const badges = screen.getAllByText('Connected');
-    expect(badges).toHaveLength(2);
+    expect(badges).toHaveLength(1); // Only Stryd is connected
   });
 
   it('shows Connect button for disconnected Strava', () => {
@@ -37,10 +37,10 @@ describe('ConnectionsPage', () => {
     expect(connectButton).toBeInTheDocument();
   });
 
-  it('shows Sync Now buttons for connected platforms', () => {
+  it('shows Sync Now button for connected platform', () => {
     render(<ConnectionsPage />);
     const syncButtons = screen.getAllByRole('button', { name: /Sync Now/ });
-    expect(syncButtons).toHaveLength(2); // Stryd + Garmin
+    expect(syncButtons).toHaveLength(1); // Only Stryd is connected
   });
 
   it('calls onBack when back button is clicked', () => {

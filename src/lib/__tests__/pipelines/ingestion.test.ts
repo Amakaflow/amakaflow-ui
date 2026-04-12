@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { setupServer } from 'msw/node';
+import { describe, it, expect, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { runIngestionPipeline } from '../../../api/pipelines/ingestion';
 import { PipelineError } from '../../../api/pipelines';
@@ -8,6 +7,7 @@ import { WorkoutStructureSchema } from '../../../api/schemas/ingestor';
 import { ValidationResponseSchema } from '../../../api/schemas/mapper';
 import instagramScenario from '../../../api/fixtures/scenarios/instagram-url.json';
 import fileUploadScenario from '../../../api/fixtures/scenarios/file-upload.json';
+import { server } from '../../../test/mocks/server';
 
 const INGESTOR_RESPONSE = {
   title: 'Push Day',
@@ -38,10 +38,8 @@ const MAPPER_RESPONSE_UNMAPPED = {
   unmapped: ['bench press', 'overhead press'],
 };
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+// Use the global MSW server from setup.ts — override handlers per test
 afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 function useIngestor(body = INGESTOR_RESPONSE) {
   server.use(http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.json(body)));
@@ -95,8 +93,8 @@ describe('runIngestionPipeline', () => {
   });
 
   it('throws PipelineError when ingestor network request fails', async () => {
-    // Simulate a network-level failure by not registering any handlers
-    // (onUnhandledRequest: 'error' causes msw to throw for unmatched requests)
+    // Simulate a network-level failure by returning a network error
+    server.use(http.post(`${API_URLS.INGESTOR}/ingest/ai_workout`, () => HttpResponse.error()));
     const err = await runIngestionPipeline({ type: 'url', content: '' }).catch((e) => e);
     expect(err).toBeInstanceOf(PipelineError);
     expect(err.code).toBe('IngestorFailed');
