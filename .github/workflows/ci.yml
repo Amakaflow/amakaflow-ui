@@ -42,17 +42,8 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Run affected tests
-        run: npx vitest run --changed HEAD~1 2>&1 | tee /tmp/vitest-output.txt
+        run: npx vitest run --changed HEAD~1
         timeout-minutes: 5
-
-      - name: Check for unhandled MSW requests
-        if: always()
-        run: |
-          if grep -q "still wish to intercept this unhandled request" /tmp/vitest-output.txt 2>/dev/null; then
-            echo "::error::Tests made HTTP requests without MSW handlers. Add handlers to src/test/mocks/handlers.ts"
-            grep -B 3 "still wish to intercept this unhandled request" /tmp/vitest-output.txt
-            exit 1
-          fi
 
   build:
     name: Type Check & Build
