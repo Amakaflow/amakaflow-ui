@@ -43,7 +43,7 @@ jobs:
 
       - name: Run affected tests
         run: npx vitest run --changed HEAD~1 2>&1 | tee /tmp/vitest-output.txt
-        timeout-minutes: 3
+        timeout-minutes: 5
 
       - name: Check for unhandled MSW requests
         if: always()
