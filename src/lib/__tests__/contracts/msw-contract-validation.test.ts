@@ -43,8 +43,15 @@ allSchemas.forEach(schema => {
   }
 });
 
+// Cache compiled validators to avoid recompiling per call
+const validatorCache = new Map<object, ReturnType<typeof ajv.compile>>();
+
 function validateSchema(schema: object, data: unknown): { valid: boolean; errors: string[] } {
-  const validate = ajv.compile(schema);
+  let validate = validatorCache.get(schema);
+  if (!validate) {
+    validate = ajv.compile(schema);
+    validatorCache.set(schema, validate);
+  }
   const valid = validate(data);
   const errors = valid
     ? []
@@ -60,7 +67,7 @@ function validateSchema(schema: object, data: unknown): { valid: boolean; errors
 
 async function mswFetch(path: string, base = API_URLS.MAPPER): Promise<Response> {
   return fetch(`${base}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Accept': 'application/json' },
   });
 }
 
@@ -112,13 +119,15 @@ describe('@contract MSW Mock Shapes — Progression API', () => {
       const response = await mswFetch('/progression/exercises/barbell-bench-press/history');
       const data = await response.json();
 
-      if (data.sessions.length > 0 && data.sessions[0].sets.length > 0) {
-        const set = data.sessions[0].sets[0];
-        expect(set).toHaveProperty('set_number');
-        expect(set).toHaveProperty('weight_unit');
-        expect(set).toHaveProperty('status');
-        expect(set).toHaveProperty('is_pr');
-      }
+      // Mock must have at least one session with sets to validate
+      expect(data.sessions.length).toBeGreaterThan(0);
+      expect(data.sessions[0].sets.length).toBeGreaterThan(0);
+
+      const set = data.sessions[0].sets[0];
+      expect(set).toHaveProperty('set_number');
+      expect(set).toHaveProperty('weight_unit');
+      expect(set).toHaveProperty('status');
+      expect(set).toHaveProperty('is_pr');
     });
 
     it('returns 404 with error schema for unknown exercise', async () => {
@@ -132,11 +141,15 @@ describe('@contract MSW Mock Shapes — Progression API', () => {
       expect(valid).toBe(true);
     });
 
-    it('returns empty sessions for bodyweight exercises', async () => {
+    it('returns empty sessions for bodyweight exercises with valid schema', async () => {
       const response = await mswFetch('/progression/exercises/pull-up/history');
       expect(response.ok).toBe(true);
 
       const data = await response.json();
+      const { valid, errors } = validateSchema(exerciseHistorySchema, data);
+
+      if (!valid) console.error('Bodyweight schema errors:', errors);
+      expect(valid).toBe(true);
       expect(data.sessions).toHaveLength(0);
       expect(data.supports_1rm).toBe(false);
     });
@@ -176,6 +189,7 @@ describe('@contract MSW Mock Shapes — Progression API', () => {
       const response = await mswFetch('/progression/records?record_type=1rm');
       const data = await response.json();
 
+      expect(data.records.length).toBeGreaterThan(0);
       for (const record of data.records) {
         expect(record.record_type).toBe('1rm');
       }
@@ -185,6 +199,7 @@ describe('@contract MSW Mock Shapes — Progression API', () => {
       const response = await mswFetch('/progression/records?exercise_id=barbell-bench-press');
       const data = await response.json();
 
+      expect(data.records.length).toBeGreaterThan(0);
       for (const record of data.records) {
         expect(record.exercise_id).toBe('barbell-bench-press');
       }

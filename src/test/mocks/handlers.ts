@@ -370,7 +370,6 @@ const mapperHandlers = [
       return HttpResponse.json({
         exercise_id: exerciseId,
         exercise_name: 'Pull Up',
-        session_count: 0,
         supports_1rm: false,
         one_rm_formula: 'brzycki',
         total_sessions: 0,
