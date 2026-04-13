@@ -80,7 +80,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     mockAuthenticatedFetch.mockClear();
   });
 
-  // AMA-1522: Parsed exercise results not rendered in the DOM after API response
+  // AMA-1522: mockFetch response consumed before parse button — needs investigation
   it.skip('should call API and display structured data when parse succeeds', async () => {
     // Mock successful API response
     mockFetch.mockResolvedValueOnce({
@@ -190,7 +190,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     expect(parseBtn).toBeDisabled();
   });
 
-  // AMA-1522: Parsed exercise results not rendered in the DOM after API response
+  // AMA-1522: mockFetch response consumed before parse button — needs investigation
   it.skip('should include structured data when accepting parsed exercises', async () => {
     // Mock successful API response
     mockFetch.mockResolvedValueOnce({

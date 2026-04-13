@@ -4,7 +4,7 @@
  * Part of AMA-481: Build Exercise History Page with 1RM Trends
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DateRangeFilter, filterByDateRange, type DateRange } from '../DateRangeFilter';
@@ -19,7 +19,19 @@ import {
 // filterByDateRange Utility Tests
 // =============================================================================
 
+// Freeze time to noon to prevent boundary flakes near midnight
+const FIXED_DATE = new Date('2026-04-12T12:00:00Z');
+
 describe('filterByDateRange utility', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_DATE);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('edge cases', () => {
     it('returns empty array when sessions is undefined', () => {
       const result = filterByDateRange(undefined, '30d');
