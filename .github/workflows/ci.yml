@@ -42,9 +42,8 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Run affected tests
+        shell: bash {0}
         run: |
-          # timeout sends SIGTERM after 240s if vitest hangs after tests complete.
-          # Exit code 124 = timeout killed the process (tests passed but vitest didn't exit).
           timeout 240 npx vitest run --changed HEAD~1
           EXIT=$?
           if [ $EXIT -eq 124 ]; then
