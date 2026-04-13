@@ -72,6 +72,7 @@ describe('VideoIngestDialog Parse Description Integration', () => {
 
   afterEach(() => {
     server.resetHandlers();
+    vi.useRealTimers();
   });
 
   it('should call API and display structured data when parse succeeds', async () => {
