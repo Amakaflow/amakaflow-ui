@@ -4,7 +4,10 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom/vitest';
 import { server } from './mocks/server';
 
-// Start MSW server before all tests
+// Start MSW server before all tests.
+// 'bypass' lets unhandled requests pass through silently.
+// Contract validation tests (msw-contract-validation.test.ts) ensure mock
+// shapes stay in sync with API schemas — that's the real safety net.
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 // Reset handlers between tests (removes per-test overrides)
 afterEach(() => server.resetHandlers());
