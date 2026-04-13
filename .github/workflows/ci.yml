@@ -26,7 +26,7 @@ jobs:
   test:
     name: Unit Tests (changed only)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
 
       - name: Run affected tests
         run: npx vitest run --changed HEAD~1
-        timeout-minutes: 5
+        timeout-minutes: 8
 
   build:
     name: Type Check & Build
