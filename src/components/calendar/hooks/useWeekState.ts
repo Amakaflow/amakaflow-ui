@@ -1,8 +1,47 @@
 import { useState, useCallback } from 'react';
-import type { WeekState, PlanPreviewState, PlanSummaryData, ProposedSession, SessionType, Intensity } from '../types';
-import { getMockWeekState, getGeneratedWeekState, getMockPlanPreview } from '../mockData';
+import type { WeekState, PlanPreviewState, PlanSummaryData, ProposedSession, SessionType, Intensity, ConflictWarning, DayState } from '../types';
+import { getMockWeekState, getGeneratedWeekState, getMockPlanPreview, mockSchedulingConflicts } from '../mockData';
 
 export type ViewLayer = 'planned' | 'actuals';
+
+// ---------------------------------------------------------------------------
+// Conflict detection (AMA-1521)
+// ---------------------------------------------------------------------------
+
+/** Detect scheduling conflicts in the generated week plan. */
+function detectConflicts(days: DayState[]): ConflictWarning[] {
+  const warnings: ConflictWarning[] = [];
+
+  // Check for consecutive hard sessions
+  for (let i = 0; i < days.length - 1; i++) {
+    const today = days[i];
+    const tomorrow = days[i + 1];
+
+    const todayHasHard = today.sessions.some(s => s.intensity === 'hard');
+    const tomorrowHasHard = tomorrow.sessions.some(s => s.intensity === 'hard');
+
+    if (todayHasHard && tomorrowHasHard) {
+      warnings.push({
+        date: tomorrow.date,
+        message: `Back-to-back hard sessions on ${today.dayLabel} and ${tomorrow.dayLabel} — consider adding recovery time.`,
+        suggestion: `Move the ${tomorrow.dayLabel} session to allow 48h recovery.`,
+      });
+    }
+  }
+
+  // Check for days flagged with conflicts in the schedule
+  for (const day of days) {
+    if (day.hasConflict && day.sessions.length > 1) {
+      warnings.push({
+        date: day.date,
+        message: `${day.dayLabel} has ${day.sessions.length} sessions that may conflict.`,
+        suggestion: 'Consider spreading sessions across the week.',
+      });
+    }
+  }
+
+  return warnings;
+}
 
 // ---------------------------------------------------------------------------
 // Orchestrator response → PlanPreviewState mapping (AMA-1436)
@@ -230,6 +269,7 @@ export function useWeekState() {
         ...prev,
         days: newDays,
         generated: true,
+        conflicts: detectConflicts(newDays),
         completedCount: allSessions.filter(s => s.status === 'completed').length,
         totalPlanned: allSessions.filter(s => s.status !== 'missed').length,
       };
