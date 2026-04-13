@@ -7,6 +7,7 @@
  */
 
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { ChevronDown, ChevronUp, Dumbbell, Timer, Footprints } from 'lucide-react';
 import { cn } from '../ui/utils';
 import type { CoachMessage as CoachMessageType, SourceReference } from './hooks/useCoachChat';
@@ -124,7 +125,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           ) : (
             <div
               className="prose prose-sm prose-invert max-w-none [&_p]:my-0 [&_strong]:text-foreground"
-              dangerouslySetInnerHTML={{ __html: `<p>${formatMarkdown(message.content)}</p>` }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(`<p>${formatMarkdown(message.content)}</p>`) }}
             />
           )}
 
