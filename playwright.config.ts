@@ -32,8 +32,8 @@ export default defineConfig({
   // Retry failed tests in CI
   retries: process.env.CI ? 2 : 0,
 
-  // Limit workers in CI for stability
-  workers: process.env.CI ? 1 : undefined,
+  // Use 4 workers in CI for reasonable speed (58 smoke tests × 30s timeout)
+  workers: process.env.CI ? 4 : undefined,
 
   // Reporter configuration
   reporter: process.env.CI
