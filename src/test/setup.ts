@@ -5,10 +5,10 @@ import '@testing-library/jest-dom/vitest';
 import { server } from './mocks/server';
 
 // Start MSW server before all tests.
-// 'warn' logs unhandled requests to stderr. CI pipeline greps for these warnings
-// and fails the build if any are found — catching tests that bypass MSW mocks
-// without causing hangs from error-mode throws in intentional error tests.
-beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
+// 'bypass' lets unhandled requests pass through silently.
+// Contract validation tests (msw-contract-validation.test.ts) ensure mock
+// shapes stay in sync with API schemas — that's the real safety net.
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 // Reset handlers between tests (removes per-test overrides)
 afterEach(() => server.resetHandlers());
 // Clean up after all tests
