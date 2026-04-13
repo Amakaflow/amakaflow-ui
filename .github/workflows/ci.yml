@@ -42,7 +42,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Run affected tests
-        run: npx vitest run --changed HEAD~1 --forceExit
+        run: npx vitest run --changed HEAD~1 --teardownTimeout=5000
         timeout-minutes: 5
 
   build:
