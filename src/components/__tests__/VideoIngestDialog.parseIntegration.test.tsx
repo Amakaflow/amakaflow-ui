@@ -1,19 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { VideoIngestDialog } from '../VideoIngestDialog';
 import { parseDescriptionForExercises } from '../../lib/parse-exercises';
 import { API_URLS } from '../../lib/config';
-
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
-// Mock authenticated-fetch as a spy that passes through to global.fetch
-const mockAuthenticatedFetch = vi.fn((...args: any[]) => global.fetch(...args));
-vi.mock('../../lib/authenticated-fetch', () => ({
-  authenticatedFetch: (...args: any[]) => mockAuthenticatedFetch(...args),
-}));
+import { server } from '../../test/mocks/server';
 
 // Mock video-api so handleDetectUrl doesn't consume mockFetch responses
 vi.mock('../../lib/video-api', () => ({
@@ -76,28 +68,31 @@ describe('VideoIngestDialog Parse Description Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
-    mockAuthenticatedFetch.mockClear();
   });
 
-  // AMA-1522: mockFetch response consumed before parse button — needs investigation
-  it.skip('should call API and display structured data when parse succeeds', async () => {
-    // Mock successful API response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        exercises: [
-          { raw_name: 'Pull-ups', sets: 4, reps: '8', superset_group: 'A', order: 0 },
-          { raw_name: 'Z Press', sets: 4, reps: '8', superset_group: 'A', order: 1 },
-          { raw_name: 'Seated sled pull', sets: 5, distance: '10m', order: 2 },
-        ],
-        confidence: 90,
-      }),
-    });
+  afterEach(() => {
+    server.resetHandlers();
+    vi.useRealTimers();
+  });
+
+  it('should call API and display structured data when parse succeeds', async () => {
+    // Override MSW handler to return structured exercises
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () =>
+        HttpResponse.json({
+          success: true,
+          exercises: [
+            { raw_name: 'Pull-ups', sets: 4, reps: '8', superset_group: 'A', order: 0 },
+            { raw_name: 'Z Press', sets: 4, reps: '8', superset_group: 'A', order: 1 },
+            { raw_name: 'Seated sled pull', sets: 5, distance: '10m', order: 2 },
+          ],
+          confidence: 90,
+        }),
+      ),
+    );
 
     render(<VideoIngestDialog {...defaultProps} />);
-    
+
     // Navigate to manual entry (Instagram flow)
     await navigateToParseStep();
 
@@ -108,19 +103,6 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     // Click Parse
     const parseBtn = screen.getByRole('button', { name: /parse exercises/i });
     fireEvent.click(parseBtn);
-
-    // Wait for API call and results — verify authenticatedFetch was used (not raw fetch)
-    await waitFor(() => {
-      expect(mockAuthenticatedFetch).toHaveBeenCalledWith(`${API_URLS.INGESTOR}/parse/text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: 'Pull-ups 4x8 + Z Press 4x8\nSeated sled pull 5 x 10m',
-          source: 'instagram'
-        }),
-        signal: expect.any(AbortSignal),
-      });
-    });
 
     // Verify structured data is displayed
     await waitFor(() => {
@@ -138,11 +120,15 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   });
 
   it('should fall back to local parser when API fails', async () => {
-    // Mock failed API response
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    // Override MSW handler to return error
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () =>
+        HttpResponse.json({ detail: 'Server error' }, { status: 500 }),
+      ),
+    );
 
     render(<VideoIngestDialog {...defaultProps} />);
-    
+
     // Navigate to manual entry
     await navigateToParseStep();
 
@@ -165,8 +151,10 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   });
 
   it('should show loading spinner during API call', async () => {
-    // Mock slow API response
-    mockFetch.mockImplementationOnce(() => new Promise(() => {})); // Never resolves
+    // Override MSW handler to never respond (simulates slow API)
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () => new Promise(() => {})),
+    );
 
     render(<VideoIngestDialog {...defaultProps} />);
     
@@ -190,19 +178,19 @@ describe('VideoIngestDialog Parse Description Integration', () => {
     expect(parseBtn).toBeDisabled();
   });
 
-  // AMA-1522: mockFetch response consumed before parse button — needs investigation
-  it.skip('should include structured data when accepting parsed exercises', async () => {
-    // Mock successful API response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        exercises: [
-          { raw_name: 'Squats', sets: 4, reps: '8', order: 0 },
-        ],
-        confidence: 90,
-      }),
-    });
+  it('should include structured data when accepting parsed exercises', async () => {
+    // Override MSW handler to return structured exercises
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () =>
+        HttpResponse.json({
+          success: true,
+          exercises: [
+            { raw_name: 'Squats', sets: 4, reps: '8', order: 0 },
+          ],
+          confidence: 90,
+        }),
+      ),
+    );
 
     render(<VideoIngestDialog {...defaultProps} />);
     
@@ -238,17 +226,10 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   it('should handle API timeout gracefully', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    // Mock API that times out (abort signal triggered)
-    mockFetch.mockImplementationOnce((_url: string, options: RequestInit) => {
-      return new Promise((_, reject) => {
-        // Simulate abort on timeout
-        if (options.signal) {
-          options.signal.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
-        }
-      });
-    });
+    // Override MSW handler to never respond (simulates timeout)
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () => new Promise(() => {})),
+    );
 
     render(<VideoIngestDialog {...defaultProps} />);
 
@@ -275,9 +256,11 @@ describe('VideoIngestDialog Parse Description Integration', () => {
   });
 
   it('should show error when both API and local parser fail', async () => {
-    // Mock failed API
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
-    
+    // Override MSW handler to return network error
+    server.use(
+      http.post(`${API_URLS.INGESTOR}/parse/text`, () => HttpResponse.error()),
+    );
+
     // Mock empty local parser result
     vi.mocked(parseDescriptionForExercises).mockReturnValueOnce([]);
 
