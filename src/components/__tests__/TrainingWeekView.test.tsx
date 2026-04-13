@@ -101,10 +101,7 @@ describe('TrainingWeekView', () => {
     }, { timeout: 3000 });
   });
 
-  // AMA-1521: applyPlan sets generated=true but doesn't populate weekState.conflicts,
-  // so ConflictWarningBanner never renders. Component bug — conflicts should be set
-  // when plan is applied (like getGeneratedWeekState does).
-  it.skip('shows conflict warning banner after generating and applying plan', async () => {
+  it('shows conflict warning banner after generating and applying plan', async () => {
     render(<TrainingWeekView />);
     fireEvent.click(screen.getByTestId('generate-week-btn'));
     await waitFor(() => {
@@ -117,7 +114,7 @@ describe('TrainingWeekView', () => {
     expect(screen.getByTestId('conflict-warning-0')).toBeInTheDocument();
   });
 
-  it.skip('dismisses conflict warning when X is clicked', async () => {
+  it('dismisses conflict warning when X is clicked', async () => {
     render(<TrainingWeekView />);
     fireEvent.click(screen.getByTestId('generate-week-btn'));
     await waitFor(() => {
