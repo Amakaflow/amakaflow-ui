@@ -154,8 +154,9 @@ export function HelpPage({ onBack }: HelpPageProps) {
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        {/* Main Content (section, not <main>: AppShell already provides the
+            single page main landmark — AMA-1559) */}
+        <section aria-label="Help content" className="flex-1 min-w-0">
           <div className="max-w-4xl mx-auto px-4 py-8 lg:px-8 lg:py-12">
             {/* Page intro */}
             <div className="mb-12">
@@ -200,7 +201,7 @@ export function HelpPage({ onBack }: HelpPageProps) {
               </div>
             </footer>
           </div>
-        </main>
+        </section>
       </div>
     </div>
   );
