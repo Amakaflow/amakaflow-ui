@@ -109,7 +109,7 @@ export class AddSourcesPage {
     this.platformInfoBadge = page
       .locator('.bg-muted\\/50.rounded-lg.border')
       .first()
-      .locator('[class*="Badge"]');
+      .locator('[data-slot="badge"]');
 
     // Platform steps text
     this.platformSteps = page.locator('.text-xs.text-muted-foreground').filter({
@@ -346,15 +346,18 @@ export class AddSourcesPage {
   // =========================================================================
 
   /**
-   * Navigate to the main app page where AddSources is rendered.
-   * Seeds preferences first if provided.
+   * Navigate to the workflow page where AddSources is rendered. Seeds
+   * preferences first if provided. Goes to `/workflow` directly rather
+   * than clicking through the nav, since this is the page object's only
+   * concern (other tests cover navigation).
    */
   async goto(prefs?: Record<string, unknown>) {
     await this.page.goto('/');
     if (prefs) {
       await this.seedPreferences(prefs);
-      await this.page.reload();
     }
+    await this.page.goto('/workflow');
+    await this.page.waitForLoadState('networkidle');
   }
 
   // =========================================================================
@@ -473,7 +476,7 @@ export class AddSourcesPage {
    */
   async expectBadgeText(text: string | RegExp) {
     // The badge is inside the platform detection area
-    const badge = this.page.locator('[class*="Badge"]').filter({ hasText: text });
+    const badge = this.page.locator('[data-slot="badge"]').filter({ hasText: text });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
   }
 
@@ -547,7 +550,7 @@ export class AddSourcesPage {
    * "Superset N" badges inside blocks.
    */
   async expectSupersetBadgeVisible(supersetNumber: number) {
-    const badge = this.page.locator('[class*="Badge"]').filter({
+    const badge = this.page.locator('[data-slot="badge"]').filter({
       hasText: `Superset ${supersetNumber}`,
     });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
@@ -557,7 +560,7 @@ export class AddSourcesPage {
    * Assert that a specific number of superset groups are rendered.
    */
   async expectSupersetCount(count: number) {
-    const supersetBadges = this.page.locator('[class*="Badge"]').filter({
+    const supersetBadges = this.page.locator('[data-slot="badge"]').filter({
       hasText: /^Superset \d+$/,
     });
     await expect(supersetBadges).toHaveCount(count, { timeout: 5_000 });
@@ -585,7 +588,7 @@ export class AddSourcesPage {
    * block header), distinct from the per-superset "Superset N" badges.
    */
   async expectBlockStructureBadge(structureName: string) {
-    const badge = this.page.locator('[class*="Badge"]').filter({
+    const badge = this.page.locator('[data-slot="badge"]').filter({
       hasText: structureName,
     });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
