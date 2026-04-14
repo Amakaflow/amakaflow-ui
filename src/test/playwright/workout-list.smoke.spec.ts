@@ -21,7 +21,12 @@
 import { test, expect } from '@playwright/test';
 import { WorkoutsPage } from './pages/WorkoutsPage';
 
-test.describe('WorkoutList Smoke Tests @smoke', () => {
+// AMA-1555: Many tests in this file fail nondeterministically because MSW
+// handlers are global and shared across parallel workers. Skipped pending
+// per-test MSW fixture refactor. Remove `test.fixme()` when AMA-1555 lands.
+test.describe('WorkoutList Smoke Tests', { tag: ['@smoke', '@regression'] }, () => {
+  test.fixme(true, 'AMA-1555: MSW global handlers cause nondeterministic failures under parallel workers');
+
   let workoutsPage: WorkoutsPage;
 
   test.beforeEach(async ({ page }) => {

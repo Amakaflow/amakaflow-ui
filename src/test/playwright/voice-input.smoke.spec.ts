@@ -41,7 +41,7 @@ async function waitForVoiceState(page: Page, state: string) {
     .toHaveAttribute('data-state', state, { timeout: 10_000 });
 }
 
-test.describe('Voice Input Smoke Tests @smoke', () => {
+test.describe('Voice Input Smoke Tests', { tag: ['@smoke', '@regression'] }, () => {
   test.beforeEach(async ({ context }) => {
     // Grant microphone permission for all tests
     await context.grantPermissions(['microphone']);

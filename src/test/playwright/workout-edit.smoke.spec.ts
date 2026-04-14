@@ -27,7 +27,7 @@
 import { test, expect } from '@playwright/test';
 import { WorkoutsPage } from './pages/WorkoutsPage';
 
-test.describe('Workout Edit (from Library) Smoke Tests @smoke', () => {
+test.describe('Workout Edit (from Library) Smoke Tests', { tag: ['@smoke', '@regression'] }, () => {
   let workoutsPage: WorkoutsPage;
 
   test.beforeEach(async ({ page }) => {
