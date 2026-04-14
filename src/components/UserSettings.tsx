@@ -515,8 +515,9 @@ export function UserSettings({ user, onBack, onAccountsChange, onAccountDeleted,
         </ScrollArea>
       </aside>
 
-      {/* Main Content Area */}
-      <main className={cn(
+      {/* Main Content Area (section, not <main>: AppShell already provides
+          the single page main landmark — AMA-1559) */}
+      <section aria-label="Settings panel" className={cn(
         "flex-1 overflow-auto bg-background",
         // Mobile: full-width when showing panel, hidden when showing menu
         mobileView === 'panel' ? "block" : "hidden md:block"
@@ -1957,7 +1958,7 @@ Block: Warm-Up
             </div>
           )}
         </div>
-      </main>
+      </section>
     </div>
   );
 }

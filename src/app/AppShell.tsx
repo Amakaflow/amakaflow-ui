@@ -145,7 +145,7 @@ export function AppShell() {
           hasClerk={hasClerk}
           onNavigate={navigate}
         />
-        <div className="pb-16 md:pb-0 overflow-x-hidden">
+        <main id="app-main" className="pb-16 md:pb-0 overflow-x-hidden">
           <Suspense fallback={<LoadingSpinner />}>
             <Routes location={displayLocation}>
               {/* Home */}
@@ -399,7 +399,7 @@ export function AppShell() {
             {/* Phase 4: Modal routes render on top of background location */}
             <ModalOutlet />
           </Suspense>
-        </div>
+        </main>
         <BuildBadge />
         <DevSystemStatus />
         <ChatPanel />

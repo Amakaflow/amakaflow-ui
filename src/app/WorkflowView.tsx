@@ -127,7 +127,6 @@ export function WorkflowView({
       {/* Main Content */}
       <div
         id="main-content"
-        role="main"
         data-assistant-target="main-content"
         className={`container mx-auto px-4 py-8 ${workout ? 'pb-32' : ''}`}
       >
