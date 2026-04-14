@@ -42,12 +42,16 @@ export class SettingsPage {
   constructor(page: Page) {
     this.page = page;
 
-    // Settings sidebar
+    // Settings sidebar. The menu item label was renamed from "General settings"
+    // to "Image & AI processing" — see UserSettings.tsx menuItems
+    // (AI & IMPORT category, id="general"). The page heading inside still
+    // reads "General settings".
     this.settingsHeading = page.getByRole('heading', { name: 'Settings' });
-    this.generalMenuItem = page.getByRole('button', { name: 'General settings' });
+    this.generalMenuItem = page.getByRole('button', { name: 'Image & AI processing' });
 
-    // Instagram Import card -- locate by the card header text
-    this.instagramImportCard = page.locator('[class*="Card"]').filter({
+    // Instagram Import card -- the shadcn Card component uses
+    // data-slot="card" (the className doesn't contain "Card").
+    this.instagramImportCard = page.locator('[data-slot="card"]').filter({
       hasText: 'Instagram Import',
     });
     this.instagramImportTitle = this.instagramImportCard.getByText('Instagram Import');

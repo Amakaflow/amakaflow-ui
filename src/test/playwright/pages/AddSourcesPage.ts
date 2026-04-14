@@ -109,7 +109,7 @@ export class AddSourcesPage {
     this.platformInfoBadge = page
       .locator('.bg-muted\\/50.rounded-lg.border')
       .first()
-      .locator('[class*="Badge"]');
+      .locator('[data-slot="badge"]');
 
     // Platform steps text
     this.platformSteps = page.locator('.text-xs.text-muted-foreground').filter({
@@ -152,7 +152,7 @@ export class AddSourcesPage {
 
     // StructureWorkout view -- appears after successful generation.
     // Contains block cards with exercises and supersets.
-    this.structureView = page.locator('[class*="Card"]').filter({
+    this.structureView = page.locator('[data-slot="card"]').filter({
       has: page.locator('svg.lucide-grip-vertical'),
     });
 
@@ -346,15 +346,18 @@ export class AddSourcesPage {
   // =========================================================================
 
   /**
-   * Navigate to the main app page where AddSources is rendered.
-   * Seeds preferences first if provided.
+   * Navigate to the workflow page where AddSources is rendered. Seeds
+   * preferences first if provided. Goes to `/workflow` directly rather
+   * than clicking through the nav, since this is the page object's only
+   * concern (other tests cover navigation).
    */
   async goto(prefs?: Record<string, unknown>) {
     await this.page.goto('/');
     if (prefs) {
       await this.seedPreferences(prefs);
-      await this.page.reload();
     }
+    await this.page.goto('/workflow');
+    await this.page.waitForLoadState('networkidle');
   }
 
   // =========================================================================
@@ -472,8 +475,9 @@ export class AddSourcesPage {
    * Assert that the platform badge shows the expected text.
    */
   async expectBadgeText(text: string | RegExp) {
-    // The badge is inside the platform detection area
-    const badge = this.page.locator('[class*="Badge"]').filter({ hasText: text });
+    // Scope to the platform info container so an unrelated badge with the
+    // same text elsewhere on the page doesn't make this nondeterministic.
+    const badge = this.platformInfoBadge.filter({ hasText: text });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
   }
 
@@ -547,8 +551,11 @@ export class AddSourcesPage {
    * "Superset N" badges inside blocks.
    */
   async expectSupersetBadgeVisible(supersetNumber: number) {
-    const badge = this.page.locator('[class*="Badge"]').filter({
-      hasText: `Superset ${supersetNumber}`,
+    // Scope to the structure view + use exact match so a similarly-named
+    // badge (e.g. "Superset 11" when looking for "Superset 1") doesn't
+    // produce a false positive.
+    const badge = this.structureView.locator('[data-slot="badge"]').filter({
+      hasText: new RegExp(`^Superset ${supersetNumber}$`),
     });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
   }
@@ -557,7 +564,7 @@ export class AddSourcesPage {
    * Assert that a specific number of superset groups are rendered.
    */
   async expectSupersetCount(count: number) {
-    const supersetBadges = this.page.locator('[class*="Badge"]').filter({
+    const supersetBadges = this.structureView.locator('[data-slot="badge"]').filter({
       hasText: /^Superset \d+$/,
     });
     await expect(supersetBadges).toHaveCount(count, { timeout: 5_000 });
@@ -585,7 +592,7 @@ export class AddSourcesPage {
    * block header), distinct from the per-superset "Superset N" badges.
    */
   async expectBlockStructureBadge(structureName: string) {
-    const badge = this.page.locator('[class*="Badge"]').filter({
+    const badge = this.structureView.locator('[data-slot="badge"]').filter({
       hasText: structureName,
     });
     await expect(badge.first()).toBeVisible({ timeout: 5_000 });
