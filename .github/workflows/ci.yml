@@ -161,13 +161,16 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run regression smoke tests
+        id: smoke-tests
         run: npx playwright test --project=smoke-regression
         env:
           VITE_DEMO_MODE: 'true'
 
+      # The job sets `continue-on-error: true`, so `failure()` never returns
+      # true in subsequent steps. Use the step's outcome instead.
       - name: Upload test results on failure
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: steps.smoke-tests.outcome == 'failure'
         with:
           name: playwright-regression-report
           path: |
