@@ -97,13 +97,22 @@ export function AppShell() {
     setCurrentView,
   });
 
-  if ((hasClerk && !clerkLoaded) || authLoading) return <Spinner />;
+  // AMA-1559 follow-up: every render branch needs exactly one <main>
+  // landmark for assistive tech. The auth-gate / loading / profile branches
+  // would otherwise render zero mains.
+  if ((hasClerk && !clerkLoaded) || authLoading) {
+    return (
+      <main id="app-main">
+        <Spinner />
+      </main>
+    );
+  }
 
   if (hasClerk && !user) {
     return (
       <>
         <Toaster position="top-center" />
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <main id="app-main" className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-primary/10">
           <div className="w-full max-w-md space-y-4 text-center">
             <div className="flex justify-center">
               <img src="/logo.png" alt="AmakaFlow" className="w-24 h-24 rounded-xl object-contain" />
@@ -117,7 +126,7 @@ export function AppShell() {
               <SignUpButton mode="modal"><Button variant="outline" className="w-full">Sign Up</Button></SignUpButton>
             </div>
           </div>
-        </div>
+        </main>
       </>
     );
   }
@@ -126,12 +135,20 @@ export function AppShell() {
     return (
       <>
         <Toaster position="top-center" />
-        <ProfileCompletion user={user} onComplete={handleProfileComplete} />
+        <main id="app-main">
+          <ProfileCompletion user={user} onComplete={handleProfileComplete} />
+        </main>
       </>
     );
   }
 
-  if (!user) return <Spinner />;
+  if (!user) {
+    return (
+      <main id="app-main">
+        <Spinner />
+      </main>
+    );
+  }
 
   return (
     <ProgressProvider demo>
