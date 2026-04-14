@@ -71,7 +71,12 @@ export function OrchestratorChat() {
           disabled={loading}
           className="flex-1"
         />
-        <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon">
+        <Button
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          size="icon"
+          aria-label={loading ? 'Sending message' : 'Send message'}
+        >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </Button>
       </div>
