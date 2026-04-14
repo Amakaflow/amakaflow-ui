@@ -29,11 +29,16 @@ export default defineConfig({
   // Fail the build on CI if you accidentally left test.only in source
   forbidOnly: !!process.env.CI,
 
-  // Retry failed tests in CI
-  retries: process.env.CI ? 2 : 0,
+  // Default retries (overridden per project below).
+  // AMA-1556: retries: 2 on a broken test costs 3× the timeout — use 0/1 per project.
+  retries: 0,
 
-  // Limit workers in CI for stability
-  workers: process.env.CI ? 1 : undefined,
+  // GH ubuntu-latest is 4 vCPU; with dev server + MSW + Chromium, 2 workers
+  // avoids CPU oversubscription. AMA-1556.
+  workers: process.env.CI ? 2 : undefined,
+
+  // Bail out of runaway failing runs in CI so a broken suite can't burn the whole timeout.
+  maxFailures: process.env.CI ? 5 : 0,
 
   // Reporter configuration
   reporter: process.env.CI
@@ -57,10 +62,28 @@ export default defineConfig({
 
   // Configure projects for different browsers
   projects: [
-    // Smoke tests - run on every PR (Chromium only for speed)
+    // Blocker smoke — must always pass on every PR. Tagged @blocker.
+    // Required CI check. retries: 0 — real failures should fail fast.
+    // See src/test/playwright/README.md.
     {
-      name: 'smoke',
+      name: 'smoke-blocker',
       testMatch: /.*\.smoke\.spec\.ts/,
+      grep: /@blocker/,
+      retries: 0,
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['microphone'],
+      },
+    },
+
+    // Regression smoke — broader coverage. Tagged @regression (default for any
+    // smoke test that isn't @blocker). Non-blocking in CI; flagged but doesn't
+    // fail the PR. retries: 1 to absorb genuine flakiness.
+    {
+      name: 'smoke-regression',
+      testMatch: /.*\.smoke\.spec\.ts/,
+      grep: /@regression/,
+      retries: 1,
       use: {
         ...devices['Desktop Chrome'],
         permissions: ['microphone'],

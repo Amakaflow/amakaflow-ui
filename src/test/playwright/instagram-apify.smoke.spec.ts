@@ -60,7 +60,7 @@ async function seedPrefsAndReload(page: Page, prefs: Record<string, unknown>) {
 // Test Suite
 // ===========================================================================
 
-test.describe('Instagram Apify Smoke Tests @smoke', () => {
+test.describe('Instagram Apify Smoke Tests', { tag: ['@smoke', '@regression'] }, () => {
   // =========================================================================
   // SMOKE-IG1: Settings toggle visible + disabled for free tier
   // =========================================================================
