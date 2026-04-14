@@ -69,12 +69,15 @@ export class WorkoutsPage {
   }
 
   /**
-   * Navigate to the workouts page by clicking the "My Workouts" nav item.
+   * Navigate to the workouts page by opening the Training dropdown and
+   * clicking "My Workouts". The library item lives inside the Training
+   * dropdown (AMA-1557).
    */
   async goto(path = '/') {
     await this.page.goto(path);
     await this.page.waitForLoadState('networkidle');
-    // Click "My Workouts" in the nav to switch to the workouts view
+    // Open the Training dropdown, then click the My Workouts item
+    await this.page.locator('[data-testid="nav-training-menu"]').click();
     await this.page.locator('[data-assistant-target="nav-library"]').click();
     await this.page.waitForLoadState('networkidle');
   }

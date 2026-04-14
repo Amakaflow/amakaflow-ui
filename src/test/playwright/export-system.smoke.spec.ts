@@ -19,13 +19,7 @@
 import { test, expect } from '@playwright/test';
 import { WorkoutsPage } from './pages/WorkoutsPage';
 
-// AMA-1554 (the port hardcode) is fixed; tests now reach the dev server.
-// They still fail because `WorkoutsPage.goto()` clicks `nav-library` which
-// doesn't exist in demo mode — same root cause as AMA-1557. Remove the fixme
-// once the nav routing is sorted there.
 test.describe('Export System Smoke Tests', { tag: ['@smoke', '@regression'] }, () => {
-  test.fixme(true, 'AMA-1557: nav-library button not findable in demo mode');
-
   let workoutsPage: WorkoutsPage;
 
   test.beforeEach(async ({ page }) => {
