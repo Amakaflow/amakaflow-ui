@@ -281,6 +281,7 @@ export function NavBar({
               data-assistant-target="nav-settings"
               onClick={() => handleNavigate('settings')}
               className="gap-2"
+              aria-label="Settings"
             >
               <Settings className="w-4 h-4" />
             </Button>
