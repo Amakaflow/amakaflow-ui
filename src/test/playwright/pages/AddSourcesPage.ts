@@ -117,8 +117,9 @@ export class AddSourcesPage {
     });
 
     // Added Sources card -- the card that appears when sources are added.
-    // Identified by the "Added Sources" title text.
-    this.addedSourcesCard = page.locator('[class*="Card"]').filter({
+    // Identified by the "Added Sources" title text. (shadcn Card uses
+    // data-slot="card", not a "Card" className — AMA-1561.)
+    this.addedSourcesCard = page.locator('[data-slot="card"]').filter({
       hasText: /Added Sources/,
     });
     this.addedSourcesList = this.addedSourcesCard.locator('.space-y-2 > div');

@@ -119,6 +119,9 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
     }
   }, [open, initialUrl]);
 
+  // (Auto-trigger effect moved below handleDetectUrl declaration — see AMA-1561.)
+  const _autoProcessTriggered = useRef(false);
+
   // Exercise search
   useEffect(() => {
     if (searchQuery.length >= 2) {
@@ -292,6 +295,26 @@ export function VideoIngestDialog({ open, onOpenChange, userId, onWorkoutCreated
       setIsLoading(false);
     }
   }, [videoUrl, userId, onWorkoutCreated, onOpenChange]);
+
+  // Auto-trigger processing when dialog opened with a pre-filled URL
+  // (the user already clicked "Add" in AddSources, so they shouldn't need
+  // to click Continue inside the dialog too — AMA-1561). Defined here so
+  // handleDetectUrl is in scope.
+  useEffect(() => {
+    if (!open) {
+      _autoProcessTriggered.current = false;
+      return;
+    }
+    if (
+      initialUrl
+      && videoUrl === initialUrl
+      && step === 'url'
+      && !_autoProcessTriggered.current
+    ) {
+      _autoProcessTriggered.current = true;
+      handleDetectUrl();
+    }
+  }, [open, initialUrl, videoUrl, step, handleDetectUrl]);
 
   const handleUseCachedWorkout = useCallback(async () => {
     if (!cachedVideo?.workout_data) return;
