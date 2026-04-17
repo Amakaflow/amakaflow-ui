@@ -158,7 +158,12 @@ export default defineConfig({
 
   // Web server to run before tests
   webServer: {
-    command: 'VITE_DEMO_MODE=true npm run dev',
+    // VITE_CHAT_BETA_PERIOD=false bypasses the beta-access gate so the
+    // ChatPanel (and its voice button) renders for unauthenticated test users.
+    // Without it, useChatFeatureFlags returns `chat_beta_period=true,
+    // chat_beta_access=false` by default and ChatPanel renders ComingSoonBadge,
+    // which has no trigger button (AMA-1581).
+    command: 'VITE_DEMO_MODE=true VITE_CHAT_BETA_PERIOD=false npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
