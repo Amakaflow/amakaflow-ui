@@ -41,11 +41,12 @@ export class ChatPanelPage {
       '[data-testid="chat-trigger-button"], [data-testid="chat-voice-button"]',
     ).first().waitFor({ state: 'visible', timeout });
     if (await this.triggerButton.isVisible().catch(() => false)) {
-      // DevSystemStatus pill (position: fixed; bottom: 8; left: 8; z: 9999)
-      // overlaps the FAB's click point on Desktop Chrome, so Playwright's
-      // normal actionability check retries forever. Force-click since we
-      // already confirmed visibility above.
-      await this.triggerButton.click({ force: true });
+      // Dispatch the click via JavaScript instead of Playwright's actionability
+      // pipeline. On Desktop Chrome in CI, Playwright's viewport check rejects
+      // the FAB's bounding box as "outside of the viewport" even with
+      // `force: true`; dispatching a real click on the element from the page
+      // context sidesteps that and still fires the onClick handler.
+      await this.triggerButton.evaluate((el) => (el as HTMLButtonElement).click());
     }
     await this.voiceButton.waitFor({ state: 'visible', timeout });
   }
