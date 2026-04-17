@@ -46,6 +46,10 @@ test.describe('Workout Edit (from Library) Smoke Tests', { tag: ['@smoke', '@reg
 
     await workoutsPage.clickEditButton(ids[0]);
 
+    // clickEdit triggers onViewChange('workflow') → React Router nav to /workflow.
+    // Wait for the route before asserting on editor UI.
+    await page.waitForURL('**/workflow**', { timeout: 10_000 });
+
     // Must wait for StructureWorkout to mount
     await page.getByText('Back to History').waitFor({ state: 'visible', timeout: 10_000 });
 
@@ -68,6 +72,7 @@ test.describe('Workout Edit (from Library) Smoke Tests', { tag: ['@smoke', '@reg
     expect(ids.length).toBeGreaterThan(0);
 
     await workoutsPage.clickEditButton(ids[0]);
+    await page.waitForURL('**/workflow**', { timeout: 10_000 });
 
     // The StructureWorkout view is inside data-assistant-target="workout-log"
     const editor = page.locator('[data-assistant-target="workout-log"]');
@@ -86,6 +91,7 @@ test.describe('Workout Edit (from Library) Smoke Tests', { tag: ['@smoke', '@reg
     expect(ids.length).toBeGreaterThan(0);
 
     await workoutsPage.clickEditButton(ids[0]);
+    await page.waitForURL('**/workflow**', { timeout: 10_000 });
     await page.getByText('Back to History').waitFor({ state: 'visible', timeout: 10_000 });
 
     await page.getByText('Back to History').click();

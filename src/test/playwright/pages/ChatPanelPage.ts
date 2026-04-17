@@ -13,6 +13,7 @@ export class ChatPanelPage {
   readonly page: Page;
 
   // Locators
+  readonly triggerButton: Locator;
   readonly voiceButton: Locator;
   readonly textarea: Locator;
   readonly sendButton: Locator;
@@ -20,6 +21,7 @@ export class ChatPanelPage {
 
   constructor(page: Page) {
     this.page = page;
+    this.triggerButton = page.locator('[data-testid="chat-trigger-button"]');
     this.voiceButton = page.locator('[data-testid="chat-voice-button"]');
     this.textarea = page.locator('[data-testid="chat-input-textarea"]');
     this.sendButton = page.locator('[data-testid="chat-send-button"]');
@@ -27,11 +29,23 @@ export class ChatPanelPage {
   }
 
   /**
-   * Navigate to the app and wait for ChatPanel to be ready
+   * Open the ChatPanel if it's currently closed. ChatPanel is collapsed by
+   * default — the trigger FAB toggles it. Idempotent: safe to call when
+   * already open.
+   */
+  async openPanel(timeout = 10_000) {
+    if (await this.triggerButton.isVisible().catch(() => false)) {
+      await this.triggerButton.click();
+    }
+    await this.voiceButton.waitFor({ state: 'visible', timeout });
+  }
+
+  /**
+   * Navigate to the app, open the ChatPanel, and wait for the voice button.
    */
   async goto() {
     await this.page.goto('/');
-    await this.voiceButton.waitFor({ state: 'visible', timeout: 10_000 });
+    await this.openPanel();
   }
 
   /**
