@@ -73,6 +73,12 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         permissions: ['microphone'],
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+          ],
+        },
       },
     },
 
@@ -87,6 +93,16 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         permissions: ['microphone'],
+        // Chromium flags so getUserMedia/MediaRecorder succeed in headless
+        // CI: --use-fake-ui-for-media-stream auto-accepts the permission
+        // prompt, --use-fake-device-for-media-stream provides a synthetic
+        // audio/video track (AMA-1581).
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+          ],
+        },
       },
     },
 
