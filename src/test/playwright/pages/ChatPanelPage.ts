@@ -33,7 +33,13 @@ export class ChatPanelPage {
    * default — the trigger FAB toggles it. Idempotent: safe to call when
    * already open.
    */
-  async openPanel(timeout = 10_000) {
+  async openPanel(timeout = 15_000) {
+    // The trigger FAB only exists while the panel is closed. Wait for EITHER
+    // the FAB or the already-open voice button so we're resilient to both
+    // states and to React-mount timing races.
+    await this.page.locator(
+      '[data-testid="chat-trigger-button"], [data-testid="chat-voice-button"]',
+    ).first().waitFor({ state: 'visible', timeout });
     if (await this.triggerButton.isVisible().catch(() => false)) {
       await this.triggerButton.click();
     }
