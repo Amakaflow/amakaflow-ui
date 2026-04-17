@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ServiceName } from '../store/runTypes';
+import { API_URLS } from '../../../lib/config';
 
 const SERVICE_URLS: Record<ServiceName, string> = {
-  ingestor: 'http://localhost:8004',
-  mapper: 'http://localhost:8001',
-  garmin: 'http://localhost:8002',
-  strava: 'http://localhost:8000',
-  calendar: 'http://localhost:8003',
-  chat: 'http://localhost:8005',
+  ingestor: API_URLS.INGESTOR,
+  mapper: API_URLS.MAPPER,
+  garmin: API_URLS.GARMIN,
+  strava: API_URLS.STRAVA,
+  calendar: API_URLS.CALENDAR,
+  chat: API_URLS.CHAT,
 };
 
 export interface ServiceStatus {

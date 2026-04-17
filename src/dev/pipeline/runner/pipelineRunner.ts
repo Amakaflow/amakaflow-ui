@@ -138,12 +138,13 @@ export async function* runPipeline(opts: PipelineRunnerOptions): AsyncGenerator<
         (workoutStructure as Record<string, unknown>)?.title as string ??
         'AI Generated Workout';
 
-      yield { type: 'step:started', runId, stepId: genId(), service: 'mapper', label: 'Export to Garmin' };
+      const exportStepId = genId();
+      yield { type: 'step:started', runId, stepId: exportStepId, service: 'mapper', label: 'Export to Garmin' };
       const exportResult = await executeExport(workoutStructure, title);
       yield {
         type: 'step:completed',
         runId,
-        stepId: genId(),
+        stepId: exportStepId,
         step: {
           id: '',
           service: 'mapper',

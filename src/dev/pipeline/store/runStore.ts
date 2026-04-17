@@ -74,7 +74,11 @@ export function applyEventToRun(run: PipelineRun, event: StepEvent): PipelineRun
       return { ...run, steps: [...run.steps, newStep] };
     }
     case 'step:completed': {
-      const steps = run.steps.map(s => s.id === event.stepId ? event.step : s);
+      const steps = run.steps.map(s => {
+        if (s.id !== event.stepId) return s;
+        const durationMs = s.startedAt ? Date.now() - s.startedAt : undefined;
+        return { ...event.step, id: s.id, durationMs };
+      });
       return { ...run, steps };
     }
     case 'step:failed': {
