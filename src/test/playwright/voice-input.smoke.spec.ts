@@ -12,29 +12,19 @@
  */
 
 import { test, expect, Page, BrowserContext } from '@playwright/test';
+import { ChatPanelPage } from './pages/ChatPanelPage';
 import {
   mockTranscribeSuccess,
   mockTranscribeHelloWorld,
 } from './fixtures/voice-api.fixtures';
 
-// Test selectors
+// Test selectors. The ChatPanel is collapsed by default — ChatPanelPage.goto
+// handles opening it before waiting on the voice button.
 const SELECTORS = {
-  triggerButton: '[data-testid="chat-trigger-button"]',
   voiceButton: '[data-testid="chat-voice-button"]',
   textarea: '[data-testid="chat-input-textarea"]',
   sendButton: '[data-testid="chat-send-button"]',
 } as const;
-
-// The ChatPanel is collapsed by default — a FAB toggles it open. Voice button
-// only mounts once the panel is open. Tests navigate + open in one step.
-async function gotoAndOpenChat(page: Page) {
-  await page.goto('/');
-  const trigger = page.locator(SELECTORS.triggerButton);
-  if (await trigger.isVisible().catch(() => false)) {
-    await trigger.click();
-  }
-  await expect(page.locator(SELECTORS.voiceButton)).toBeVisible({ timeout: 10_000 });
-}
 
 // Helper to mock the transcribe endpoint
 async function mockTranscribeEndpoint(page: Page, response: object, status = 200) {
@@ -64,7 +54,7 @@ test.describe('Voice Input Smoke Tests', { tag: ['@smoke', '@regression'] }, () 
     await mockTranscribeEndpoint(page, mockTranscribeHelloWorld);
 
     // Navigate and open ChatPanel so the voice button is mounted
-    await gotoAndOpenChat(page);
+    await new ChatPanelPage(page).goto();
 
     // Wait for the voice button to be in idle state
     const voiceButton = page.locator(SELECTORS.voiceButton);
@@ -135,7 +125,7 @@ test.describe('Voice Input Smoke Tests', { tag: ['@smoke', '@regression'] }, () 
     // Setup: Mock the transcribe endpoint
     await mockTranscribeEndpoint(page, mockTranscribeSuccess);
 
-    await gotoAndOpenChat(page);
+    await new ChatPanelPage(page).goto();
 
     // Step 1: Type existing text in textarea
     const textarea = page.locator(SELECTORS.textarea);
@@ -171,7 +161,7 @@ test.describe('Voice Input Smoke Tests', { tag: ['@smoke', '@regression'] }, () 
     });
     await mockTranscribeEndpoint(page, mockTranscribeHelloWorld);
 
-    await gotoAndOpenChat(page);
+    await new ChatPanelPage(page).goto();
 
     // Complete a recording
     const voiceButton = page.locator(SELECTORS.voiceButton);
@@ -193,7 +183,7 @@ test.describe('Voice Input Smoke Tests', { tag: ['@smoke', '@regression'] }, () 
 
   test('SMOKE-5: voice button shows correct visual states', async ({ page }) => {
     await mockTranscribeEndpoint(page, mockTranscribeHelloWorld);
-    await gotoAndOpenChat(page);
+    await new ChatPanelPage(page).goto();
 
     const voiceButton = page.locator(SELECTORS.voiceButton);
 

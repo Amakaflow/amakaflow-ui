@@ -126,10 +126,16 @@ export class WorkoutsPage {
   }
 
   /**
-   * Click the edit button for a specific workout
+   * Click the edit button for a specific workout. The click triggers
+   * `onViewChange('workflow')` → React Router navigates to `/workflow`.
+   * We wait for that URL so callers can immediately assert on editor UI
+   * without racing the route mount.
    */
-  async clickEditButton(workoutId: string) {
+  async clickEditButton(workoutId: string, waitForNavigation = true) {
     await this.getEditButton(workoutId).click();
+    if (waitForNavigation) {
+      await this.page.waitForURL('**/workflow**', { timeout: 10_000 });
+    }
   }
 
   /**
