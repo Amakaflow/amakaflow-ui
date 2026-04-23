@@ -10,21 +10,35 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
-// Track which plan Protect was asked to gate on, so we can assert it.
-const protectCalls: Array<{ plan?: string; hasChildren: boolean }> = [];
+// Capture the plan slug the `condition` closure asks about, so we can assert
+// the gate really is checking for the `pro` plan.
+const protectPlanChecks: string[] = [];
 // Toggle: simulate signed-in vs signed-out user.
 let mockSignedIn = true;
 // Toggle: simulate has-pro-plan vs not.
 let mockHasPro = true;
+
+type ClerkHas = (options: { plan?: string; role?: string; permission?: string }) => boolean;
+type ClerkProtectProps = {
+  condition?: (has: ClerkHas) => boolean;
+  children?: ReactNode;
+  fallback?: ReactNode;
+};
 
 vi.mock('@clerk/clerk-react', () => ({
   PricingTable: () => <div data-testid="clerk-pricing-table">[PricingTable]</div>,
   SignedIn: ({ children }: { children: ReactNode }) => (mockSignedIn ? <>{children}</> : null),
   SignedOut: ({ children }: { children: ReactNode }) => (mockSignedIn ? null : <>{children}</>),
   RedirectToSignIn: () => <div data-testid="redirect-sign-in" />,
-  Protect: ({ plan, children, fallback }: { plan?: string; children: ReactNode; fallback?: ReactNode }) => {
-    protectCalls.push({ plan, hasChildren: !!children });
-    return mockHasPro ? <>{children}</> : <>{fallback}</>;
+  Protect: ({ condition, children, fallback }: ClerkProtectProps) => {
+    // Run the caller's condition with a `has` that records which plan is
+    // being checked and answers based on the mockHasPro toggle.
+    const has: ClerkHas = ({ plan }) => {
+      if (plan) protectPlanChecks.push(plan);
+      return mockHasPro;
+    };
+    const allowed = condition ? condition(has) : true;
+    return allowed ? <>{children}</> : <>{fallback}</>;
   },
 }));
 
@@ -34,7 +48,7 @@ import { PaywallPage, ProPlanGate } from '../PaywallPage';
 
 describe('PaywallPage', () => {
   beforeEach(() => {
-    protectCalls.length = 0;
+    protectPlanChecks.length = 0;
     mockSignedIn = true;
     mockHasPro = true;
   });
@@ -45,8 +59,13 @@ describe('PaywallPage', () => {
         <PaywallPage />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/changes when your body does/i)).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toBeInTheDocument();
+    // AMA-1590 spec copy — must match exactly (no editorializing like "actually").
+    expect(heading.textContent).toMatch(
+      /One plan for your runs, lifts, and conditioning — that changes when your body does\.?\s*Written to your watch every morning\./i,
+    );
+    expect(heading.textContent).not.toMatch(/actually/i);
     expect(screen.getByText(/\$24\/month, 7-day free trial/i)).toBeInTheDocument();
     expect(screen.getByTestId('clerk-pricing-table')).toBeInTheDocument();
   });
@@ -66,12 +85,12 @@ describe('PaywallPage', () => {
 
 describe('ProPlanGate', () => {
   beforeEach(() => {
-    protectCalls.length = 0;
+    protectPlanChecks.length = 0;
     mockSignedIn = true;
     mockHasPro = true;
   });
 
-  it('delegates plan check to Clerk Protect with plan="pro"', () => {
+  it('delegates the plan check to Clerk Protect with plan="pro"', () => {
     render(
       <MemoryRouter>
         <ProPlanGate>
@@ -79,8 +98,8 @@ describe('ProPlanGate', () => {
         </ProPlanGate>
       </MemoryRouter>,
     );
-    expect(protectCalls).toHaveLength(1);
-    expect(protectCalls[0].plan).toBe('pro');
+    // Asserts the gate actually calls has({plan: 'pro'}), not just that Protect rendered.
+    expect(protectPlanChecks).toContain('pro');
   });
 
   it('renders children when the user has the pro plan', () => {

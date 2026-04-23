@@ -18,7 +18,6 @@ import { ModalOutlet } from '../components/ModalOutlet';
 import { useAppAuth } from './useAppAuth';
 import { useWorkoutHistory } from './useWorkoutHistory';
 import { NavBar } from './NavBar';
-import { PaywallPage } from './PaywallPage';
 import { WorkflowView } from './WorkflowView';
 import type { View } from './router';
 import {
@@ -44,6 +43,7 @@ import {
   CrewsPage,
   GamificationPage,
   MorePage,
+  PaywallPage,
 } from './router';
 import { TeamSharing } from '../components/TeamSharing';
 import { HomeScreen } from '../components/Home/HomeScreen';

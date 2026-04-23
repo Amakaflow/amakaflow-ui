@@ -14,20 +14,20 @@ export function PaywallPage() {
   return (
     <>
       <SignedOut>
-        {/* Users must be signed in before they can subscribe. */}
-        <RedirectToSignIn redirectUrl="/paywall" />
+        {/* Users must be signed in before they can subscribe.
+            Clerk returns to the current URL after sign-in by default,
+            so we don't pass a redirect prop (avoids the Clerk 5.x prop-name
+            churn around redirectUrl vs signInFallbackRedirectUrl). */}
+        <RedirectToSignIn />
       </SignedOut>
       <SignedIn>
         <main className="paywall-root" role="main" aria-labelledby="paywall-heading">
           <header className="paywall-hero">
             <h1 id="paywall-heading">
-              One plan for your runs, lifts, and conditioning —
-              <br />
-              that actually changes when your body does.
+              One plan for your runs, lifts, and conditioning — that changes
+              when your body does. Written to your watch every morning.
             </h1>
-            <p className="paywall-subhead">
-              Written to your watch every morning. $24/month, 7-day free trial.
-            </p>
+            <p className="paywall-subhead">$24/month, 7-day free trial.</p>
           </header>
           <section aria-label="Pricing" className="paywall-pricing">
             <PricingTable />
@@ -55,7 +55,9 @@ export function PaywallPage() {
 export function ProPlanGate({ children }: { children: ReactNode }) {
   return (
     <Protect
-      plan="pro"
+      // Clerk 5.x Protect does not accept a top-level `plan` prop; use the
+      // condition form with `has({ plan })` per Clerk's typed API.
+      condition={(has) => has({ plan: 'pro' })}
       fallback={<PaywallPage />}
     >
       {children}

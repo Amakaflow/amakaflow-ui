@@ -115,3 +115,9 @@ export const GamificationPage = lazy(() =>
 export const MorePage = lazy(() =>
   import('../components/MorePage').then(m => ({ default: m.MorePage }))
 );
+
+// AMA-1590 / AMA-MVP-08: paywall route — lazy so Clerk's PricingTable isn't
+// pulled into the main bundle for users who never hit /paywall.
+export const PaywallPage = lazy(() =>
+  import('./PaywallPage').then(m => ({ default: m.PaywallPage }))
+);
