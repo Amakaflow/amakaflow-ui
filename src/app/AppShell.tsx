@@ -43,6 +43,7 @@ import {
   CrewsPage,
   GamificationPage,
   MorePage,
+  PaywallPage,
 } from './router';
 import { TeamSharing } from '../components/TeamSharing';
 import { HomeScreen } from '../components/Home/HomeScreen';
@@ -165,6 +166,9 @@ export function AppShell() {
         <main id="app-main" className="pb-16 md:pb-0 overflow-x-hidden">
           <Suspense fallback={<LoadingSpinner />}>
             <Routes location={displayLocation}>
+              {/* Paywall — AMA-1590 / AMA-MVP-08 */}
+              <Route path="/paywall" element={<PaywallPage />} />
+
               {/* Home */}
               <Route
                 path="/"

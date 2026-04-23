@@ -1,0 +1,41 @@
+/* AMA-1590: paywall page styles — minimal, centered, mobile-first. */
+
+.paywall-root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 5rem;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}
+
+.paywall-hero {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.paywall-hero h1 {
+  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+  line-height: 1.25;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--color-text, #111);
+}
+
+.paywall-subhead {
+  font-size: 1.125rem;
+  color: var(--color-text-muted, #555);
+  margin: 0;
+}
+
+.paywall-pricing {
+  display: flex;
+  justify-content: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .paywall-hero h1 {
+    color: #f4f4f5;
+  }
+  .paywall-subhead {
+    color: #a1a1aa;
+  }
+}
