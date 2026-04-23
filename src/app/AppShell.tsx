@@ -18,6 +18,7 @@ import { ModalOutlet } from '../components/ModalOutlet';
 import { useAppAuth } from './useAppAuth';
 import { useWorkoutHistory } from './useWorkoutHistory';
 import { NavBar } from './NavBar';
+import { PaywallPage } from './PaywallPage';
 import { WorkflowView } from './WorkflowView';
 import type { View } from './router';
 import {
@@ -165,6 +166,9 @@ export function AppShell() {
         <main id="app-main" className="pb-16 md:pb-0 overflow-x-hidden">
           <Suspense fallback={<LoadingSpinner />}>
             <Routes location={displayLocation}>
+              {/* Paywall — AMA-1590 / AMA-MVP-08 */}
+              <Route path="/paywall" element={<PaywallPage />} />
+
               {/* Home */}
               <Route
                 path="/"
