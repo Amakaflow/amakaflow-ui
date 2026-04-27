@@ -9,7 +9,7 @@ reviews:
   # Trigger a review explicitly with `@coderabbitai review` or add the `review-ready` label.
   # Max 2 reviews per PR total (see memory: coderabbit-one-pass-per-batch.md).
   auto_review:
-    enabled: false
+    enabled: true
     drafts: false
   request_changes_workflow: false
   high_level_summary: true
