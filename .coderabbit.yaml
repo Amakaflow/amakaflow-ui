@@ -22,7 +22,7 @@ knowledge_base:
   mcp:
     usage: enabled
   code_guidelines:
-    enabled: true
+    enabled: false
     filePatterns:
       - "CLAUDE.md"
       - "ARCHITECTURE.md"
