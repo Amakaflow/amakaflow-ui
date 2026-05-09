@@ -1,15 +1,21 @@
 /**
  * ProgramActions - Dropdown menu with program actions (Activate, Pause, Archive, Delete)
+ *
+ * AMA-1456: Adds "Re-plan" quick-action presets that stream a partial program
+ * re-plan via POST /api/programs/replan/stream.
  */
 
 import { useState } from 'react';
-import { MoreVertical, Play, Pause, Archive, Trash2, RotateCcw } from 'lucide-react';
+import { MoreVertical, Play, Pause, Archive, Trash2, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import {
@@ -23,11 +29,15 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import type { TrainingProgram, ProgramStatus } from '../../types/training-program';
+import { REPLAN_PRESETS } from '@/lib/program-replan-api';
+import { useProgramReplan } from '@/hooks/useProgramReplan';
 
 interface ProgramActionsProps {
   program: TrainingProgram;
   onStatusChange: (status: ProgramStatus) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
+  /** Called with new preview_id when a re-plan completes successfully. */
+  onReplanComplete?: (previewId: string) => void;
   isLoading?: boolean;
 }
 
@@ -35,10 +45,16 @@ export function ProgramActions({
   program,
   onStatusChange,
   onDelete,
+  onReplanComplete,
   isLoading,
 }: ProgramActionsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { isReplanning, replanError, triggerReplan } = useProgramReplan({
+    program,
+    onReplanComplete,
+  });
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -95,6 +111,9 @@ export function ProgramActions({
 
   return (
     <>
+      {replanError && (
+        <p className="text-sm text-destructive mb-2">{replanError}</p>
+      )}
       <div className="flex items-center gap-2">
         {/* Primary action button */}
         {primaryAction && (
@@ -142,6 +161,27 @@ export function ProgramActions({
                 Restore
               </DropdownMenuItem>
             )}
+
+            {/* AMA-1456: Re-plan quick-action presets */}
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={isReplanning || isLoading}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${isReplanning ? 'animate-spin' : ''}`} />
+                {isReplanning ? 'Re-planning…' : 'Re-plan weeks'}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {REPLAN_PRESETS.map((preset, idx) => (
+                  <DropdownMenuItem
+                    key={preset.label}
+                    onClick={() => triggerReplan(idx)}
+                    disabled={isReplanning}
+                  >
+                    {preset.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setShowDeleteDialog(true)}
