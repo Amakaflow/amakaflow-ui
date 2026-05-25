@@ -13,6 +13,14 @@ reviews:
     drafts: false
   request_changes_workflow: false
   high_level_summary: true
+  # AMA: CodeRabbit is for CODE only. Doc-only PRs must not consume CR credits.
+  path_filters:
+    - "!**/*.md"
+    - "!**/*.mdx"
+    - "!docs/**"
+    - "!**/CHANGELOG*"
+    - "!**/LICENSE*"
+    - "!**/*.txt"
 
 knowledge_base:
   linear:
