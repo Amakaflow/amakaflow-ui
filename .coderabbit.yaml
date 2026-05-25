@@ -13,8 +13,19 @@ reviews:
     drafts: false
   request_changes_workflow: false
   high_level_summary: true
+  # AMA: CodeRabbit is for CODE only. Doc-only PRs must not consume CR credits.
+  path_filters:
+    - "!**/*.md"
+    - "!**/*.mdx"
+    - "!docs/**"
+    - "!**/CHANGELOG*"
+    - "!**/LICENSE*"
+    - "!**/*.txt"
 
 knowledge_base:
+  # AMA: org-wide learnings so a lesson taught on one repo applies everywhere.
+  learnings:
+    scope: global
   linear:
     usage: enabled
     team_keys:
