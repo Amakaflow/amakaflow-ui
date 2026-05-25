@@ -23,6 +23,9 @@ reviews:
     - "!**/*.txt"
 
 knowledge_base:
+  # AMA: org-wide learnings so a lesson taught on one repo applies everywhere.
+  learnings:
+    scope: global
   linear:
     usage: enabled
     team_keys:
