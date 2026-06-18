@@ -267,6 +267,26 @@ const mapperHandlers = [
   http.get(`${MAPPER}/workouts/:id/sync-status`, () =>
     HttpResponse.json({ status: 'synced', synced_at: '2025-01-15T10:00:00Z' }),
   ),
+  http.post(`${MAPPER}/workouts/:id/push/amazfit`, ({ params }) =>
+    HttpResponse.json({
+      success: true,
+      workout_id: params.id,
+      status: 'pending',
+    }),
+  ),
+  http.get(`${MAPPER}/amazfit/pending`, () =>
+    HttpResponse.json({
+      success: true,
+      workouts: [SAMPLE_WORKOUT],
+    }),
+  ),
+  http.post(`${MAPPER}/amazfit/:workoutId/confirm`, ({ params }) =>
+    HttpResponse.json({
+      success: true,
+      workout_id: params.workoutId,
+      status: 'confirmed',
+    }),
+  ),
   http.get(`${MAPPER}/workouts/:id`, () =>
     HttpResponse.json(SAMPLE_WORKOUT),
   ),

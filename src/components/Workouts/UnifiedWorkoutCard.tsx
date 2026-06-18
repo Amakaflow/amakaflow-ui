@@ -47,6 +47,7 @@ import {
   isFollowAlongWorkout,
 } from '../../types/unified-workout';
 import { formatDuration, getRelativeTime } from '../../lib/unified-workouts';
+import { pushToAmazfit } from '../../lib/mapper-api';
 
 // =============================================================================
 // Types
@@ -164,6 +165,13 @@ export function SyncStatusIndicator({ workout }: { workout: UnifiedWorkout }) {
       errorMessage: syncStatus.garmin.errorMessage,
     });
   }
+  if (syncStatus.amazfit) {
+    platformStatuses.push({
+      name: 'Amazfit',
+      status: getStatus(syncStatus.amazfit),
+      errorMessage: syncStatus.amazfit.errorMessage,
+    });
+  }
   if (syncStatus.apple) {
     platformStatuses.push({
       name: 'iOS',
@@ -272,11 +280,22 @@ export function UnifiedWorkoutCard({
 }: UnifiedWorkoutCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPushingToAmazfit, setIsPushingToAmazfit] = useState(false);
   const [syncState, setSyncState] = useState<'none' | 'synced' | 'failed'>(
     workout.syncStatus?.garmin?.synced === true ||
     workout.syncStatus?.garmin?.status === 'synced'
       ? 'synced'
       : 'none'
+  );
+  const [amazfitPushState, setAmazfitPushState] = useState<'none' | 'ready' | 'failed'>(
+    workout.syncStatus?.amazfit?.status === 'pending' ||
+    workout.syncStatus?.amazfit?.status === 'syncing' ||
+    workout.syncStatus?.amazfit?.status === 'synced' ||
+    workout.syncStatus?.amazfit?.synced === true
+      ? 'ready'
+      : workout.syncStatus?.amazfit?.status === 'failed'
+        ? 'failed'
+        : 'none'
   );
 
   // Fix: keep local syncState in sync when the parent passes updated workout props
@@ -285,6 +304,17 @@ export function UnifiedWorkoutCard({
       workout.syncStatus?.garmin?.status === 'synced';
     setSyncState(garminSynced ? 'synced' : 'none');
   }, [workout.syncStatus?.garmin?.synced, workout.syncStatus?.garmin?.status]);
+
+  useEffect(() => {
+    const amazfitStatus = workout.syncStatus?.amazfit?.status;
+    const readyOnAmazfit = workout.syncStatus?.amazfit?.synced ||
+      amazfitStatus === 'pending' ||
+      amazfitStatus === 'syncing' ||
+      amazfitStatus === 'synced';
+    setAmazfitPushState(
+      readyOnAmazfit ? 'ready' : amazfitStatus === 'failed' ? 'failed' : 'none'
+    );
+  }, [workout.syncStatus?.amazfit?.synced, workout.syncStatus?.amazfit?.status]);
 
   const handlePushToGarmin = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -312,6 +342,19 @@ export function UnifiedWorkoutCard({
       setIsSyncing(false);
     }
   }, [workout.title, workout.id, onSync]);
+
+  const handlePushToAmazfit = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsPushingToAmazfit(true);
+    try {
+      await pushToAmazfit(workout.id);
+      setAmazfitPushState('ready');
+    } catch {
+      setAmazfitPushState('failed');
+    } finally {
+      setIsPushingToAmazfit(false);
+    }
+  }, [workout.id]);
 
   const handleDelete = useCallback(async () => {
     if (!onDelete) return;
@@ -502,12 +545,50 @@ export function UnifiedWorkoutCard({
               </Button>
             </div>
 
+            {/* Push to Amazfit — queues workout for watch pickup; does not claim execution */}
+            <div className="mt-2">
+              <Button
+                variant={amazfitPushState === 'ready' ? 'ghost' : amazfitPushState === 'failed' ? 'destructive' : 'outline'}
+                size="sm"
+                className={cn(
+                  "w-full gap-2 text-xs",
+                  amazfitPushState === 'ready' && "text-green-500 border-green-500/20"
+                )}
+                onClick={handlePushToAmazfit}
+                disabled={isPushingToAmazfit || amazfitPushState === 'ready'}
+              >
+                {isPushingToAmazfit ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Pushing to Amazfit...
+                  </>
+                ) : amazfitPushState === 'ready' ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Ready on Amazfit
+                  </>
+                ) : amazfitPushState === 'failed' ? (
+                  <>
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Failed — tap to retry
+                  </>
+                ) : (
+                  <>
+                    <Watch className="h-3.5 w-3.5" />
+                    Push to Amazfit
+                  </>
+                )}
+              </Button>
+            </div>
+
             {/* Sync status — only show when workout has been genuinely exported/synced (AMA-904) */}
             {workout.syncStatus && (
               workout.syncStatus.garmin?.synced === true ||
+              workout.syncStatus.amazfit?.synced === true ||
               workout.syncStatus.apple?.synced === true ||
               workout.syncStatus.strava?.synced === true ||
               ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.garmin?.status ?? '') ||
+              ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.amazfit?.status ?? '') ||
               ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.apple?.status ?? '') ||
               ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.strava?.status ?? '') ||
               ['synced', 'pending', 'syncing', 'failed', 'outdated'].includes(workout.syncStatus.ios?.status ?? '') ||

@@ -195,6 +195,24 @@ export async function getExerciseSuggestions(
   });
 }
 
+export interface AmazfitPushResponse {
+  success?: boolean;
+  workout_id?: string;
+  status?: string;
+  message?: string;
+}
+
+/**
+ * Queue a saved library workout for pickup by the Amazfit ZeppOS side service.
+ * This only means the workout is ready on the phone/watch queue; it does not
+ * mean the workout has already been executed on the watch.
+ */
+export async function pushToAmazfit(workoutId: string): Promise<AmazfitPushResponse> {
+  return mapperApiCall<AmazfitPushResponse>(`/workouts/${workoutId}/push/amazfit`, {
+    method: 'POST',
+  });
+}
+
 /**
  * Save user mapping
  * Calls /mappings/add endpoint

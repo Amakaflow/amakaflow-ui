@@ -69,6 +69,7 @@ export interface SyncStatusEntry {
 
 export interface SyncStatus {
   garmin?: SyncStatusEntry;
+  amazfit?: SyncStatusEntry;
   apple?: SyncStatusEntry;
   android?: SyncStatusEntry;
   strava?: SyncStatusEntry;
